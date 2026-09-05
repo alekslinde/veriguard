@@ -139,6 +139,7 @@ describe("storeReport", () => {
       scamPhone: "",
       scamEmail: "",
       scamReplyTo: "",
+      region: "AU",
     };
     await storeReport(report, false);
     expect(mockExecute).toHaveBeenCalledWith(
@@ -162,6 +163,7 @@ describe("storeReport", () => {
       scamPhone: "+61412345678",
       scamEmail: "noreply@fake-ato.com",
       scamReplyTo: "replies@elsewhere.ru",
+      region: "AU",
     };
     await storeReport(report, false);
 
@@ -171,6 +173,65 @@ describe("storeReport", () => {
     expect(insertCall[0].args).toContain("https://au-post.fake/track");
     expect(insertCall[0].args).toContain("+61412345678");
     expect(insertCall[0].args).toContain("noreply@fake-ato.com");
+  });
+
+  // The `region` column is what every coverage-gap analysis reads, and it
+  // shipped without a single test — it was only ever observed emitting its
+  // DEFAULT '' in production. These cover the write path so the column can be
+  // trusted before an analysis leans on it.
+  it("persists the resolved region in the INSERT args", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [{ n: 0 }] }); // COUNT → 0 existing
+
+    const report = {
+      id: "RPT-REGION1",
+      type: "sms",
+      content: "Your parcel is held",
+      description: "",
+      contact: "",
+      submittedAt: Date.now(),
+      location: "London, United Kingdom",
+      scamUrl: "",
+      scamPhone: "",
+      scamEmail: "",
+      scamReplyTo: "",
+      region: "GB",
+    };
+    await storeReport(report, false);
+
+    const insertCall = mockExecute.mock.calls.find(
+      (c) => (c[0] as { sql: string }).sql.includes("INSERT INTO reports")
+    )!;
+    expect(insertCall[0].sql).toContain("region");
+    // Assert on the column's own position, not merely that "GB" appears
+    // somewhere in the args — region is the last bound parameter, and several
+    // other columns legitimately bind ''. Positional is what actually proves
+    // the value landed in `region` rather than beside it.
+    const args = insertCall[0].args as unknown[];
+    expect(args[args.length - 1]).toBe("GB");
+  });
+
+  // Guards the ambiguity directly: '' means "row predates the Phase 2
+  // migration". A live write producing '' would make the two unreadable apart
+  // forever, so it must fail rather than persist.
+  it("refuses to store a report with an empty region", async () => {
+    const report = {
+      id: "RPT-NOREGION",
+      type: "sms",
+      content: "Your parcel is held",
+      description: "",
+      contact: "",
+      submittedAt: Date.now(),
+      location: "NSW, Australia",
+      scamUrl: "",
+      scamPhone: "",
+      scamEmail: "",
+      scamReplyTo: "",
+      region: "",
+    };
+
+    await expect(storeReport(report, false)).rejects.toThrow(/no region/i);
+    // And nothing reached the database — a rejected write must not half-land.
+    expect(mockExecute).not.toHaveBeenCalled();
   });
 
   it("persists scam_reply_to in the INSERT column list and args", async () => {
@@ -188,6 +249,7 @@ describe("storeReport", () => {
       scamPhone: "",
       scamEmail: "x@evil.tk",
       scamReplyTo: "scammer@other.ru",
+      region: "AU",
     };
     await storeReport(report, false);
 
@@ -213,6 +275,7 @@ describe("storeReport", () => {
       scamPhone: "",
       scamEmail: "",
       scamReplyTo: "",
+      region: "AU",
     };
     await storeReport(report, false);
 
@@ -237,6 +300,7 @@ describe("storeReport", () => {
       scamPhone: "",
       scamEmail: "",
       scamReplyTo: "",
+      region: "AU",
     };
     await storeReport(report, false);
 
@@ -266,6 +330,7 @@ describe("storeReport", () => {
       scamPhone: "",
       scamEmail: "",
       scamReplyTo: "",
+      region: "AU",
     };
     await storeReport(report, true); // suspect
 
@@ -290,6 +355,7 @@ describe("storeReport", () => {
       scamPhone: "+61412345678",
       scamEmail: "",
       scamReplyTo: "",
+      region: "AU",
     };
     await storeReport(report, false);
 
@@ -313,6 +379,7 @@ describe("storeReport", () => {
       scamPhone: "",
       scamEmail: "",
       scamReplyTo: "",
+      region: "AU",
     };
     await storeReport(report, false);
     const calls = mockExecute.mock.calls.map((c) => c[0]);
@@ -332,6 +399,7 @@ describe("storeReport", () => {
       scamPhone: "",
       scamEmail: "",
       scamReplyTo: "",
+      region: "AU",
     };
     await storeReport(report, true);
     const calls = mockExecute.mock.calls.map((c) => c[0]);

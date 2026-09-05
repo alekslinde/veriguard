@@ -15,6 +15,7 @@
 //   - the timestamp column is `submitted_at` (epoch ms), not `created_at`.
 
 import { getDb } from "../lib/db";
+import { REGION_OPTIONS } from "@veriguard/engine/regions";
 
 const isProd = Boolean(process.env.TURSO_DATABASE_URL);
 
@@ -139,22 +140,48 @@ async function main() {
   }
 
   // 4. Uncovered regions are the one thing that would justify jumping the queue
-  //    ahead of detection depth, per the plan's "Explicitly not next" section.
-  const COVERED = new Set(["AU", "GB", "US", "NZ", "CA", "IE"]);
+  //    ahead of detection depth. Authoring a full region pack is expensive and
+  //    every one so far has surfaced cross-region defects, so breadth is only
+  //    worth buying against demonstrated demand — which is what this measures.
+  //
+  //    Derived from the engine's own pack list rather than hand-kept: this set
+  //    was written when six packs existed and silently went stale when SG
+  //    shipped, which would have counted a real SG report as evidence for
+  //    adding a pack that already exists. ZZ is "assessed with base signals
+  //    only" — a deliberate tier, not a gap.
+  const COVERED = new Set<string>(REGION_OPTIONS.map((r) => r.code));
   const uncovered = rows.filter(
     (r) => r.region !== "(unset)" && !COVERED.has(r.region),
   );
   console.log("\n" + "─".repeat(60));
-  if (uncovered.length) {
+  if (attributed === 0) {
+    // The uncovered-region check is computed over attributed rows, so with none
+    // it is vacuous — it cannot see an uncovered region either. Saying "all
+    // clear" here reads as reassurance about coverage when it is really a
+    // statement that we know nothing at all, so say the latter.
+    console.log(
+      "⚠️  No attributed reports — this check is vacuous, NOT a clean bill of health.",
+    );
+    console.log(
+      `   All ${total} row(s) are pre-migration '(unset)'. With zero attributed rows`,
+    );
+    console.log(
+      "   an uncovered region is undetectable, so draw no coverage conclusion from",
+    );
+    console.log("   this run. Confirm a real submission writes `region` first.");
+  } else if (uncovered.length) {
     const n = uncovered.reduce((s, r) => s + r.n, 0);
     console.log(
       `⚠️  ${n} report(s) (${pct(n, attributed)} of attributed) from regions with no pack:`,
     );
     for (const r of uncovered) console.log(`      ${r.region}: ${r.n}`);
-    console.log("   Per the plan, significant volume here is the one argument for");
-    console.log("   adding an English region before resolving the Phase 6 question.");
+    console.log("   Significant volume here is the one argument for authoring a");
+    console.log("   new region pack ahead of further detection depth.");
   } else {
-    console.log("✅ No reports from uncovered regions — all traffic is in the six packs.");
+    console.log(
+      `✅ No reports from uncovered regions — all ${attributed} attributed report(s)`,
+    );
+    console.log(`   fall inside the ${COVERED.size} packs the engine ships.`);
   }
   console.log();
 }

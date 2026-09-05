@@ -26,7 +26,18 @@ export interface Report {
   emailAuth?: string; // compact SPF/DKIM/DMARC summary; absent for non-email reports
   // Region pack that assessed this report (ISO 3166-1 alpha-2). Operational
   // data for measuring coverage gaps — not surfaced in the public feed.
-  region?: string;
+  //
+  // REQUIRED, and deliberately not optional. The column was added by Phase 2
+  // with DEFAULT '', so rows predating it read as ''. If a live write could
+  // also produce '', the two become indistinguishable on read: an analysis
+  // cannot tell "instrumentation never fired" from "no reports since the
+  // migration" — which is exactly the ambiguity that left the column
+  // untrustworthy after its first audit (10 rows, 0 attributed).
+  //
+  // resolveRegion() always returns a real RegionCode (it falls back to
+  // DEFAULT_REGION rather than returning empty), so every caller already has
+  // one. Requiring it here makes that a type error rather than a silent ''.
+  region: string;
 }
 
 // ── Rate limiter ──────────────────────────────────────────────────────────────
@@ -122,6 +133,19 @@ function getPrimaryIdentifier(report: Report): [IdentifierCol, string] | null {
 }
 
 export async function storeReport(report: Report, suspect: boolean): Promise<void> {
+  // The type requires a region, but this is the one write that makes the column
+  // trustworthy, and TypeScript does not police a JS caller or a hand-built
+  // object cast into shape. An empty region here would be silently
+  // indistinguishable from a pre-migration row forever, so fail loudly instead
+  // of persisting the ambiguity — a dropped report is recoverable, a column
+  // nobody can interpret is not.
+  if (!report.region) {
+    throw new Error(
+      `storeReport: report ${report.id} has no region. ` +
+        `Region is required so '' stays unambiguously "pre-migration row".`,
+    );
+  }
+
   const db = await getDb();
 
   let reportCount = 1;
@@ -155,7 +179,7 @@ export async function storeReport(report: Report, suspect: boolean): Promise<voi
       report.id, report.type, report.content, report.description, report.contact,
       report.submittedAt, suspect ? 1 : 0,
       report.scamUrl, report.scamPhone, report.scamEmail, report.scamReplyTo,
-      report.emailAuth ?? "", reportCount, report.location, report.region ?? "",
+      report.emailAuth ?? "", reportCount, report.location, report.region,
     ],
   });
 
