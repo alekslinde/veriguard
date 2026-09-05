@@ -1,6 +1,7 @@
 import { parseEmailHeaders, analyseEmailIdentities, domainOf } from "./emailHeaders";
 import { extractIdentifiers, normaliseForAnalysis, defang, refang, isDefanged, normaliseUnicode, hasMixedScriptHost, displayedHyphenCount } from "./urlSanitizer";
 import { registrableLabel, publicSuffix } from "./publicSuffix";
+import { findKeyboardTypo } from "./keyboardAdjacency";
 import { detectType } from "./detectType";
 import { analysePhone, PhoneIntel } from "./phoneIntel";
 import { isShortened, expandUrl, type ExpandFetch } from "./urlExpander";
@@ -613,6 +614,35 @@ export function checkUrl(
       if (labelWords.includes(brand) && !brandOwnsLabel(brand)) {
         sig.add("link", `Impersonates "${brand}" in the domain name — classic phishing move`, 45);
       }
+    }
+
+    // ── Keyboard-adjacency typosquat ───────────────────────────────────────
+    //
+    // The rules above need the brand to APPEAR in the label. A squat that
+    // misspells it — "payppal.com", "wsstpac.com" — contains no brand string at
+    // all and scored nothing, which is the whole point of registering one.
+    //
+    // Structural by construction: the check is about keystrokes, so it needs no
+    // per-country research and improves every region at once, including `ZZ`.
+    // The brand list still comes from the pack, so a region with no brands
+    // authored simply gets no hits rather than a wrong one.
+    //
+    // Scored BELOW the substring rules (35 vs 45). A visible brand in a domain
+    // is unambiguous; a near-miss is inference, and the shorter the brand the
+    // more it is inference — hence the length floor inside the module. Enough
+    // to reach `suspicious` on its own, not enough to reach `likely_scam`
+    // without corroboration, which is the right failure direction for a rule
+    // that can in principle land on an innocent label.
+    //
+    // Only ever consulted when the brand is NOT present verbatim, so a real
+    // site can never be scored by both this and the substring rule.
+    const typo = findKeyboardTypo(registrable, TYPOSQUAT_BRANDS.substring);
+    if (typo && !hostname.includes(typo)) {
+      sig.add(
+        "link",
+        `Domain is one mistyped letter away from "${typo}" — scammers register misspellings so a slip of the finger lands on their site instead`,
+        35,
+      );
     }
   }
 

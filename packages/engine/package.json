@@ -9,6 +9,7 @@
     "./detectType": "./src/detectType.ts",
     "./emailHeaders": "./src/emailHeaders.ts",
     "./engineTypes": "./src/engineTypes.ts",
+    "./keyboardAdjacency": "./src/keyboardAdjacency.ts",
     "./phoneIntel": "./src/phoneIntel.ts",
     "./publicSuffix": "./src/publicSuffix.ts",
     "./regions": "./src/regions/index.ts",
