@@ -116,6 +116,35 @@ describe("checkUrl — the signal in place", () => {
     expect(typoFlags).toHaveLength(0);
   });
 
+  it("covers a brand listed only in the word list", () => {
+    // "startrack" appears only in TYPOSQUAT_WORD_BRANDS. An earlier cut passed
+    // just the substring list, so every word-only brand had no typo coverage
+    // at all and this scored nothing.
+    const result = checkUrl("https://startrackk.com/track", undefined, "AU");
+    expect(result.flags.some((f) => f.includes('"startrack"'))).toBe(true);
+  });
+
+  it("still does not fire on the real word-list brand's site", () => {
+    const result = checkUrl("https://startrack.com", undefined, "AU");
+    expect(result.flags.some((f) => f.includes("one mistyped letter away"))).toBe(false);
+  });
+
+  it("suppresses the typo flag only when a brand rule actually scored", () => {
+    // A trailing doubling leaves the brand intact as a substring, so
+    // "netflixx.com" contains "netflix". The substring rule scores it 45 and
+    // the typo flag correctly stays silent — one tell, one flag.
+    const substringCase = checkUrl("https://netflixx.com", undefined, "AU");
+    expect(substringCase.flags.some((f) => f.includes("Impersonates"))).toBe(true);
+    expect(substringCase.flags.some((f) => f.includes("one mistyped letter away"))).toBe(false);
+
+    // The same shape on a WORD brand is the case that was silently lost: the
+    // substring rule never considers "startrack", so nothing scored it, and a
+    // raw containment test suppressed a flag with nothing to defer to.
+    const wordCase = checkUrl("https://startrackk.com", undefined, "AU");
+    expect(wordCase.flags.some((f) => f.includes("Impersonates"))).toBe(false);
+    expect(wordCase.flags.some((f) => f.includes("one mistyped letter away"))).toBe(true);
+  });
+
   it("works under ZZ with no brands authored, without erroring", () => {
     // The structural half is region-independent; the brand list is not. A pack
     // with no brands must yield no hits rather than a wrong one.
@@ -130,16 +159,36 @@ describe("false-positive sweep across every pack's own brands", () => {
   // authors, on its own .com, must stay clean — including against the OTHER
   // brands in the same list, which is where a near-collision would show up.
   it("flags none of the packs' real brand domains", () => {
+    // Both lists, because both now feed the rule. This is the assertion that
+    // gates admitting the word list: the split guards against SUBSTRING
+    // collision, which a within-one-character rule cannot have, but that
+    // argument is only sound while no brand is a keyboard-typo of another.
     const offenders: string[] = [];
     for (const code of supportedRegions()) {
       const pack = resolveRegionPack(code);
-      for (const brand of pack.typosquatBrands.substring) {
+      const all = [
+        ...pack.typosquatBrands.substring,
+        ...pack.typosquatBrands.word,
+      ];
+      for (const brand of all) {
         if (!/^[a-z]+$/.test(brand)) continue;
-        const hit = findKeyboardTypo(brand, pack.typosquatBrands.substring);
+        const hit = findKeyboardTypo(brand, all);
         if (hit) offenders.push(`${code}: ${brand} matched ${hit}`);
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it("does not flag the real businesses that got \"velocity\" demoted", () => {
+    // velocityglobal.com, velocitypartners.com and velocitybank.com are
+    // unrelated real businesses that a bare substring match on "velocity"
+    // called likely_scam. They are the reason the word list exists, so they
+    // are the regression to hold when the word list feeds a fuzzy rule.
+    // All are rejected on length long before adjacency is consulted.
+    const brands = ["velocity", "startrack", "aupost", "nsandi"];
+    for (const label of ["velocityglobal", "velocitypartners", "velocitybank"]) {
+      expect(findKeyboardTypo(label, brands), `${label} was flagged`).toBe(null);
+    }
   });
 
   it("flags none of a sweep of ordinary non-brand labels", () => {
