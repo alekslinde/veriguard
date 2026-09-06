@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeContent } from "@veriguard/engine/scamDetector";
-import { CHECK_RATE_LIMIT, checkAndRecordRateLimit, incrementCheckCount } from "@/lib/reportStore";
+import { CHECK_RATE_LIMIT, checkAndRecordRateLimit, incrementCheckCount, recordTargetRegion } from "@/lib/reportStore";
+import { inferTargetRegion } from "@/lib/targetRegion";
 import { clientIpFromHeaders } from "@/lib/geo";
 import { getUrlhausBlocklist } from "@/lib/urlhausBlocklist";
 import { resolveRegion } from "@/lib/regionResolver";
@@ -54,10 +55,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { content, region, surface }: {
+    const { content, region, surface, shareRegion }: {
       content: string;
       region?: string;
       surface?: string;
+      /**
+       * Opt-out for target-region inference. Defaults to on: the inference is
+       * aggregate-only — a day-bucketed counter with no per-check row, no IP
+       * and no content — so there is no per-user record to withhold, and the
+       * coverage question it answers is one the project cannot otherwise ask.
+       * A client sending `false` is excluded from the aggregate entirely.
+       */
+      shareRegion?: boolean;
     } = await req.json();
 
     if (!content?.trim()) {
@@ -84,7 +93,28 @@ export async function POST(req: NextRequest) {
     // reach this route are accepted; anything else — including a missing value
     // from an older client — records as `web`, which is what this endpoint
     // served before the share target existed.
-    incrementCheckCount(surface === "share" ? "share" : "web").catch(() => {});
+    const checkSurface = surface === "share" ? "share" : "web";
+    incrementCheckCount(checkSurface).catch(() => {});
+
+    // Which country the content appeared to be AIMED at, which is not the same
+    // as `resolvedRegion` — that records where this request connected from. The
+    // two disagreeing is the whole point: an HMRC impersonation forwarded from
+    // Sydney is a GB campaign seen from AU, and nothing else records that.
+    //
+    // The DB write is deliberately not awaited, matching the check counter
+    // above: the caller is waiting on a verdict, and a telemetry write must not
+    // add latency to it. The INFERENCE itself is synchronous and does run on
+    // the response path — it is pure string matching against module-scope
+    // regexes, with no allocation per suffix.
+    //
+    // `.catch()` rather than bare `void`: `recordTargetRegion` swallows its own
+    // failures today, so this is belt-and-braces, but a floated promise with no
+    // handler turns any future throw into an unhandled rejection that takes the
+    // process down rather than dropping a telemetry row.
+    if (shareRegion !== false) {
+      const target = inferTargetRegion(content);
+      recordTargetRegion(checkSurface, target.region, target.confidence).catch(() => {});
+    }
     return NextResponse.json({ results, region: resolvedRegion }, { headers: cors });
   } catch {
     return NextResponse.json(

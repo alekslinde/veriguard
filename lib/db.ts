@@ -79,6 +79,37 @@ async function setup(): Promise<void> {
       PRIMARY KEY (day, surface, outcome)
     )
   `).catch(() => {});
+  // Target-region aggregate: which country a checked scam appeared to be AIMED
+  // at, as opposed to where the person checking it connected from.
+  //
+  // A SEPARATE TABLE rather than a column on check_events, and that is forced
+  // rather than preferred. The upsert there keys on (day, surface, outcome);
+  // SQLite cannot alter a primary key with ALTER TABLE, so a migrated-in
+  // `target_region` column would sit OUTSIDE the key and every region would
+  // collide onto one row, silently overwriting each other via
+  // `DO UPDATE SET value = value + 1`. The counts would look plausible and be
+  // meaningless.
+  //
+  // Shape is deliberately identical in spirit to check_events: a day-bucketed
+  // counter, incremented in place. There is NO per-check row, no timestamp
+  // finer than a day, no IP, and no fragment of the content that produced the
+  // inference — only how many checks on a given day looked like they targeted a
+  // given country, at a given confidence. That is what makes this aggregate
+  // rather than a per-user event log.
+  //
+  // `confidence` is stored because the rungs are not equal evidence: a country
+  // calling code is unambiguous, a brand name is barely a hint. A consumer that
+  // publishes these must be able to filter rather than treat them alike.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS target_region_events (
+      day           TEXT    NOT NULL,
+      surface       TEXT    NOT NULL,
+      target_region TEXT    NOT NULL,
+      confidence    TEXT    NOT NULL,
+      value         INTEGER NOT NULL,
+      PRIMARY KEY (day, surface, target_region, confidence)
+    )
+  `).catch(() => {});
   await db.execute(`INSERT OR IGNORE INTO counters (name, value) VALUES ('checks', 0)`);
   await db.execute(`INSERT OR IGNORE INTO counters (name, value) VALUES ('reports', 0)`);
   // Migrations — ALTER TABLE ignores silently if column already exists

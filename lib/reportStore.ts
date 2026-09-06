@@ -261,6 +261,102 @@ export async function recordCheckEvent(
 }
 
 /**
+ * Minimum count below which a target-region bucket is withheld from anything
+ * published.
+ *
+ * Set deliberately high for a scam-reporting context. A bucket is a
+ * (day, surface, country, confidence) tuple, and a small one in a
+ * low-population region is identifying in a way a raw count does not look like
+ * it is: "three checks targeting country X on day Y" is a much smaller group
+ * than it appears when X has few users.
+ *
+ * At current volumes this suppresses essentially everything, and that is the
+ * correct outcome rather than a failure of the design — it means "we do not yet
+ * have enough data to say", which is the project's actual position. Raising the
+ * number later is safe; lowering it retroactively republishes buckets that were
+ * withheld, so it is not.
+ */
+export const MIN_CELL_SIZE = 20;
+
+/**
+ * Record one inferred target region against the day's aggregate.
+ *
+ * Never throws, for the same reason `recordCheckEvent` does not: this is
+ * telemetry on a user-facing path, and it must not be able to fail a check.
+ *
+ * An empty region is DROPPED rather than bucketed as "unknown". That differs
+ * deliberately from `recordCheckEvent`, which buckets an unrecognised surface
+ * so a miswired client shows up as unattributed volume. Here "no national
+ * signal was present" is the common case — most scam text carries no country
+ * marker at all — so counting it would produce a giant meaningless bucket that
+ * dwarfs every real one and invites reading it as a finding.
+ */
+export async function recordTargetRegion(
+  surface: CheckSurface,
+  region: string,
+  confidence: string,
+  at: number = Date.now(),
+): Promise<void> {
+  if (!region) return;
+  const safeSurface: CheckSurface = CHECK_SURFACES.includes(surface) ? surface : "unknown";
+  try {
+    const db = await getDb();
+    await db.execute({
+      sql: `INSERT INTO target_region_events (day, surface, target_region, confidence, value)
+            VALUES (?, ?, ?, ?, 1)
+            ON CONFLICT(day, surface, target_region, confidence)
+            DO UPDATE SET value = value + 1`,
+      args: [utcDay(at), safeSurface, region, confidence],
+    });
+  } catch {
+    // Aggregate is best-effort; a lost increment is not worth failing a check.
+  }
+}
+
+export interface TargetRegionRow {
+  day: string;
+  surface: CheckSurface;
+  targetRegion: string;
+  confidence: string;
+  value: number;
+}
+
+/**
+ * Read the target-region aggregate.
+ *
+ * `suppress` applies the minimum cell size and is ON by default: the unsuppressed
+ * read has to be asked for explicitly, so publishing raw counts is a deliberate
+ * act rather than something reached by forgetting an argument. Suppression drops
+ * the row entirely rather than zeroing it — a zero would be read as "no checks
+ * targeted this country", which is a claim the data does not support.
+ */
+export async function getTargetRegionEvents(
+  sinceDay?: string,
+  suppress = true,
+): Promise<TargetRegionRow[]> {
+  const db = await getDb();
+  const result = sinceDay
+    ? await db.execute({
+        sql: `SELECT day, surface, target_region, confidence, value
+              FROM target_region_events WHERE day >= ?
+              ORDER BY day DESC, target_region, confidence`,
+        args: [sinceDay],
+      })
+    : await db.execute(
+        `SELECT day, surface, target_region, confidence, value
+         FROM target_region_events ORDER BY day DESC, target_region, confidence`,
+      );
+  const rows = result.rows.map((r) => ({
+    day: r.day as string,
+    surface: r.surface as CheckSurface,
+    targetRegion: r.target_region as string,
+    confidence: r.confidence as string,
+    value: Number(r.value),
+  }));
+  return suppress ? rows.filter((r) => r.value >= MIN_CELL_SIZE) : rows;
+}
+
+/**
  * Increment the public lifetime "scams checked" total.
  *
  * `surface` is optional so existing callers keep working unchanged; passing it
