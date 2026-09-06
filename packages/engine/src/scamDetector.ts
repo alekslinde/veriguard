@@ -1,6 +1,7 @@
 import { parseEmailHeaders, analyseEmailIdentities, domainOf } from "./emailHeaders";
 import { extractIdentifiers, normaliseForAnalysis, defang, refang, isDefanged, normaliseUnicode, hasMixedScriptHost, displayedHyphenCount } from "./urlSanitizer";
 import { registrableLabel, publicSuffix } from "./publicSuffix";
+import { findKeyboardTypo } from "./keyboardAdjacency";
 import { detectType } from "./detectType";
 import { analysePhone, PhoneIntel } from "./phoneIntel";
 import { isShortened, expandUrl, type ExpandFetch } from "./urlExpander";
@@ -613,6 +614,86 @@ export function checkUrl(
       if (labelWords.includes(brand) && !brandOwnsLabel(brand)) {
         sig.add("link", `Impersonates "${brand}" in the domain name — classic phishing move`, 45);
       }
+    }
+
+    // ── Keyboard-adjacency typosquat ───────────────────────────────────────
+    //
+    // The rules above need the brand to APPEAR in the label. A squat that
+    // misspells it — "payppal.com", "wsstpac.com" — contains no brand string at
+    // all and scored nothing, which is the whole point of registering one.
+    //
+    // Structural by construction: the check is about keystrokes, so it needs no
+    // per-country research and improves every region at once, including `ZZ`.
+    // The brand list still comes from the pack, so a region with no brands
+    // authored simply gets no hits rather than a wrong one.
+    //
+    // Scored BELOW the substring rules (35 vs 45). A visible brand in a domain
+    // is unambiguous; a near-miss is inference, and the shorter the brand the
+    // more it is inference — hence the length floor inside the module. Enough
+    // to reach `suspicious` on its own, not enough to reach `likely_scam`
+    // without corroboration, which is the right failure direction for a rule
+    // that can in principle land on an innocent label.
+    //
+    // Only ever consulted when the brand is NOT present verbatim, so a real
+    // site can never be scored by both this and the substring rule.
+    // Both brand lists feed this, unlike the rules above.
+    //
+    // The substring/word split exists to stop a SHORT brand matching inside a
+    // longer unrelated word — "nib" in "nibble", "agl" in "bagel". That hazard
+    // is specific to substring containment and cannot arise here: two of the
+    // three shapes below preserve length exactly and the third adds one
+    // character, so a candidate is always within one character of the brand.
+    // "velocityglobal" — the real business that got the bare "velocity" removed
+    // from the substring list — is fourteen characters against eight and is
+    // rejected on length before anything else runs.
+    //
+    // Excluding the word list was the first cut and it was wrong for a reason
+    // worth recording: it silently dropped every brand whose only listing is
+    // there, so "startrackk.com" scored nothing. The six-character floor
+    // already removes the genuinely short ones ("agl", "nib", "hcf"), which is
+    // the same hazard handled at the right layer. Verified across all packs:
+    // with the word lists included, no brand is a keyboard-typo of any other.
+    const typo = findKeyboardTypo(registrable, [
+      ...TYPOSQUAT_BRANDS.substring,
+      ...TYPOSQUAT_BRANDS.word,
+    ]);
+    //
+    // The suppression condition is whether the SUBSTRING RULE ALREADY SCORED
+    // this brand, which is not the same as whether the hostname contains it.
+    // Testing containment directly — `!hostname.includes(typo)` — silently
+    // disabled the entire doubling shape: doubling a letter leaves the brand
+    // intact as a substring ("startrackk" contains "startrack"), so every
+    // doubled squat of a substring-listed brand suppressed itself. It survived
+    // review because the worked example, "payppal", doubles a letter in the
+    // MIDDLE and so happens not to contain "paypal".
+    //
+    // A brand that is present but exempt (the brand owning the label, or a
+    // trusted suffix) scored nothing from the substring rule, so there is
+    // nothing to double-score against — but those hosts are the real site and
+    // must not be flagged here either. `brandOwnsLabel` is what separates
+    // them, and it is the same test the substring rule uses.
+    // Mirrors the two rules above exactly, rather than approximating them with
+    // raw containment. `startrack` is a WORD brand, so the substring rule never
+    // looked at it — but "startrackk.com" contains it, and a containment test
+    // therefore suppressed a flag that nothing had actually scored.
+    const scoredBySubstringRule =
+      typo !== null
+      && TYPOSQUAT_BRANDS.substring.includes(typo)
+      && hostname.includes(typo)
+      && !brandOwnsLabel(typo);
+    const scoredByWordRule =
+      typo !== null
+      && TYPOSQUAT_BRANDS.word.includes(typo)
+      && labelWords.includes(typo)
+      && !brandOwnsLabel(typo);
+    const isRealBrandSite = typo !== null && brandOwnsLabel(typo);
+
+    if (typo && !scoredBySubstringRule && !scoredByWordRule && !isRealBrandSite) {
+      sig.add(
+        "link",
+        `Domain is one mistyped letter away from "${typo}" — scammers register misspellings so a slip of the finger lands on their site instead`,
+        35,
+      );
     }
   }
 
