@@ -16,6 +16,8 @@ vi.mock("@/lib/reportStore", async (importOriginal) => {
 
 import { POST } from "@/app/api/check/route";
 import { NextRequest } from "next/server";
+import { readFileSync } from "fs";
+import path from "path";
 
 let ipCounter = 0;
 function check(body: unknown): NextRequest {
@@ -97,5 +99,26 @@ describe("check route — target-region inference", () => {
     const res = await POST(check({ content: "HMRC refund at hmrc-refund.co.uk" }));
     await settle();
     expect(res.status).toBe(200);
+  });
+
+  it("attaches a rejection handler to the floated telemetry promise", async () => {
+    // Asserted against the SOURCE, not by provoking a rejection.
+    //
+    // A behavioural version of this test cannot work here and was written and
+    // discarded: `recordTargetRegion` catches internally, so the route's own
+    // handler is unreachable through the real function, and a mock that rejects
+    // exercises the mock rather than the route. Removing the `.catch()` left
+    // that test green, which makes it worse than no test.
+    //
+    // The property is nonetheless real: an unawaited promise with no handler
+    // turns any future throw in the callee into an unhandled rejection, which
+    // takes the process down rather than dropping a telemetry row. Reading the
+    // source is the honest way to assert it.
+    const route = readFileSync(
+      path.join(process.cwd(), "app/api/check/route.ts"),
+      "utf8",
+    );
+    expect(route).toMatch(/recordTargetRegion\([^)]*\)\s*\.catch\(/);
+    expect(route).not.toMatch(/void\s+recordTargetRegion/);
   });
 });

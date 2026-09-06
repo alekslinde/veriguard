@@ -101,12 +101,19 @@ export async function POST(req: NextRequest) {
     // two disagreeing is the whole point: an HMRC impersonation forwarded from
     // Sydney is a GB campaign seen from AU, and nothing else records that.
     //
-    // Deliberately NOT awaited, matching the check counter above: the caller is
-    // waiting on a verdict, and a telemetry write must not add latency to it.
-    // `recordTargetRegion` swallows its own failures.
+    // The DB write is deliberately not awaited, matching the check counter
+    // above: the caller is waiting on a verdict, and a telemetry write must not
+    // add latency to it. The INFERENCE itself is synchronous and does run on
+    // the response path — it is pure string matching against module-scope
+    // regexes, with no allocation per suffix.
+    //
+    // `.catch()` rather than bare `void`: `recordTargetRegion` swallows its own
+    // failures today, so this is belt-and-braces, but a floated promise with no
+    // handler turns any future throw into an unhandled rejection that takes the
+    // process down rather than dropping a telemetry row.
     if (shareRegion !== false) {
       const target = inferTargetRegion(content);
-      void recordTargetRegion(checkSurface, target.region, target.confidence);
+      recordTargetRegion(checkSurface, target.region, target.confidence).catch(() => {});
     }
     return NextResponse.json({ results, region: resolvedRegion }, { headers: cors });
   } catch {

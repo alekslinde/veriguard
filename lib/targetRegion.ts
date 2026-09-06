@@ -99,25 +99,131 @@ const NATIONAL_SUFFIXES: ReadonlyMap<string, string> = (() => {
 })();
 
 /**
- * Agency names, per region, excluding any claimed by more than one pack.
+ * Compiled national-suffix probes, longest suffix first.
  *
- * Same reasoning as the suffixes, and it matters more here: packs list each
- * other's agencies in `foreignAuthorityMentions`, and some names genuinely
- * recur. A name two packs claim is not evidence for either.
+ * Precompiled at module scope rather than per call. The previous version built
+ * a RegExp for every suffix on every check — ~44 constructions per request on
+ * a public endpoint with no content-length cap.
+ */
+const NATIONAL_SUFFIX_PATTERNS: readonly [string, RegExp][] = [...NATIONAL_SUFFIXES]
+  .map(([suffix, code]): [string, RegExp] => [
+    code,
+    new RegExp(`\\.${escapeRegExp(suffix)}$`, "i"),
+  ]);
+
+/**
+ * Hostnames appearing in the text.
  *
- * Lowercased for matching. Short names are dropped — a two- or three-letter
- * agency acronym matches inside ordinary words far too readily, and this is a
- * substring match over free text rather than a scored signal with word
- * boundaries behind it.
+ * The TLD rung matches against these rather than the raw content, because a
+ * suffix is only evidence when it terminates a host. Requiring a plausible
+ * label structure — at least two dot-separated labels, no whitespace — is what
+ * separates "auspost.com.au" from "confirm your details.ca", which the earlier
+ * free-text scan could not tell apart.
+ *
+ * Structure alone is not enough, and assuming it was is what let
+ * "confirm your details.ca" through: a missing space after a full stop produces
+ * something indistinguishable from a real two-label domain. The engine hit the
+ * same wall in `extractBareHosts` and answered it with CORROBORATION, which is
+ * the rule adopted here — a candidate counts only when something other than its
+ * shape says a host was meant:
+ *
+ *   · a scheme ("https://details.ca"), or
+ *   · a "www." prefix, or
+ *   · a path ("details.ca/verify"), or
+ *   · three or more labels ("my.details.ca") — prose does not stack dots.
+ *
+ * A bare two-label token in running text is therefore ignored, which loses the
+ * occasional real mention of a domain. That trade is deliberately one-sided:
+ * abstaining costs a row in an aggregate that suppresses small counts anyway,
+ * while a wrong attribution is permanent and silent.
+ */
+const HOSTNAME_CANDIDATE =
+  /(?:(https?:\/\/)|(?:^|[\s<>"'(\[]))((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,24})(\/[^\s<>"')\]]*)?(?=$|[\s<>"')\]:,?!])/gi;
+
+function hostnames(haystack: string): string[] {
+  const found: string[] = [];
+  for (const match of haystack.matchAll(HOSTNAME_CANDIDATE)) {
+    const [, scheme, host, path] = match;
+    const clean = host.toLowerCase().replace(/\.$/, "");
+    const corroborated =
+      Boolean(scheme)
+      || Boolean(path)
+      || clean.startsWith("www.")
+      || clean.split(".").length >= 3;
+    if (corroborated) found.push(clean);
+  }
+  return found;
+}
+
+/**
+ * Agency and brand names that exactly one pack claims but which are ordinary
+ * English, or generic across countries.
+ *
+ * Uniqueness of claim is necessary but NOT sufficient — the same lesson as
+ * `NON_NATIONAL_SUFFIXES`, which this file learned once and did not generalise.
+ * Every entry below was a real misattribution: "revenue figures are up" read as
+ * Ireland, "the reserve bank said" as New Zealand, "postal service update" and
+ * "the sheriff called" as the US.
+ *
+ * The tell is that the phrase describes a KIND of institution rather than
+ * naming one. Every country has a revenue office, a central bank, a postal
+ * service and local councils; only some have an "HMRC" or a "Centrelink". A
+ * name that could complete the sentence "every country has a ___" carries no
+ * national information no matter which pack happens to list it.
+ */
+/**
+ * Brand names that are also ordinary English words.
+ *
+ * Word boundaries fix collisions INSIDE other words — "chase" no longer matches
+ * "purchase" — but they cannot help when the brand *is* a word someone might
+ * write on its own. "your bank is nationwide", "chase the invoice", "spark of
+ * interest", "the countdown is on" are all ordinary sentences, and each was
+ * attributing a check to a region.
+ *
+ * Only genuinely ambiguous words are listed. Distinctive names that happen to
+ * be lowercase alphabetic — tesco, argos, schwab, santander — are safe once
+ * bounded, and excluding them would cost real signal for nothing.
+ *
+ * This is the `word`-vs-`substring` judgement the engine makes per pack, which
+ * this module cannot inherit because it needs the opposite default: the engine
+ * can afford a loose brand hit that other rules outweigh, whereas an
+ * attribution here is a permanent row.
+ */
+const AMBIGUOUS_BRAND_WORDS = new Set([
+  "nationwide", "chase", "spark", "countdown", "discover", "truist",
+  "fidelity", "regions", "target", "revenue", "interac",
+]);
+
+const GENERIC_INSTITUTION_TERMS = new Set([
+  "revenue", "inland revenue", "revenue service", "central bank",
+  "reserve bank", "national bank", "postal service", "post office",
+  "sheriff", "council tax", "local council", "city council", "council",
+  "tax office", "police", "customs", "immigration", "border force",
+  "social security", "health service", "electoral commission",
+  "consumer protection", "attorney general", "state police",
+]);
+
+/**
+ * Agency names, per region, excluding any claimed by more than one pack and any
+ * that name a kind of institution rather than a specific one.
+ *
+ * Matched on WORD BOUNDARIES, not as substrings. The engine gets away with
+ * substring matching here because a wrong hit only adds a scored signal that
+ * other rules can outweigh; a wrong hit here is a permanent row in an
+ * aggregate, so it has to be right on its own.
  */
 const MIN_AUTHORITY_LENGTH = 4;
 
-const NATIONAL_AUTHORITIES: ReadonlyMap<string, string> = (() => {
+function uniquelyClaimed(
+  pick: (pack: ReturnType<typeof resolveRegionPack>) => readonly string[],
+  exclude: ReadonlySet<string>,
+): Map<string, string> {
   const claims = new Map<string, Set<string>>();
   for (const code of supportedRegions()) {
-    for (const name of resolveRegionPack(code).authorityMentions) {
-      const key = name.toLowerCase();
+    for (const raw of pick(resolveRegionPack(code))) {
+      const key = raw.toLowerCase().trim();
       if (key.length < MIN_AUTHORITY_LENGTH) continue;
+      if (exclude.has(key)) continue;
       claims.set(key, (claims.get(key) ?? new Set()).add(code));
     }
   }
@@ -126,32 +232,78 @@ const NATIONAL_AUTHORITIES: ReadonlyMap<string, string> = (() => {
     if (codes.size === 1) unique.set(name, [...codes][0]);
   }
   return unique;
-})();
+}
+
+/**
+ * Compile a name map into longest-first regex probes, one per region.
+ *
+ * Longest-first ordering exists because insertion order once decided which
+ * region won: NZ's "inland revenue" beat SG's "inland revenue authority", and
+ * an IRAS notice was attributed to New Zealand. `NATIONAL_SUFFIXES` already
+ * sorted for exactly this reason and the other two maps did not.
+ *
+ * **Honest note on its current reachability:** with word boundaries in place,
+ * no cross-region pair in today's packs actually needs this sort — the one
+ * whole-word case ("medicare" inside "centers for medicare") is claimed by both
+ * AU and US, so the uniqueness filter removes it before ordering matters.
+ * Removing the sort therefore does not fail the suite today.
+ *
+ * It is kept deliberately rather than deleted as dead code: the property it
+ * guarantees ("a more specific name wins") is one a pack author would
+ * reasonably assume, it costs one sort at module load, and the alternative is
+ * that the next pack to add a compound agency name silently loses to a shorter
+ * one elsewhere. What it must NOT have is a test implying it is exercised when
+ * it is not — that is the failure mode this file has already hit twice.
+ *
+ * Names are grouped per region into one alternation so the ladder tests each
+ * region once rather than once per name.
+ */
+function compileNamePatterns(names: Map<string, string>): [string, RegExp][] {
+  const byRegion = new Map<string, string[]>();
+  for (const [name, code] of names) {
+    byRegion.set(code, [...(byRegion.get(code) ?? []), name]);
+  }
+  // Longest name first WITHIN a region, and regions ordered by their longest
+  // name, so a more specific match always wins over a shorter one elsewhere.
+  const entries: [string, string[]][] = [...byRegion].map(([code, list]) => [
+    code,
+    [...list].sort((a, b) => b.length - a.length),
+  ]);
+  entries.sort((a, b) => b[1][0].length - a[1][0].length);
+  return entries.map(([code, list]) => [
+    code,
+    // \b on both sides: "chase" must not match inside "purchase", and
+    // "nationwide" must not match inside "is nationwide,". Names can contain
+    // spaces and punctuation, so each is escaped rather than assumed word-safe.
+    new RegExp(`\\b(?:${list.map(escapeRegExp).join("|")})\\b`, "i"),
+  ]);
+}
+
+const NATIONAL_AUTHORITY_PATTERNS: readonly [string, RegExp][] = compileNamePatterns(
+  uniquelyClaimed((p) => p.authorityMentions, GENERIC_INSTITUTION_TERMS),
+);
 
 /**
  * Brands claimed by exactly one pack.
  *
- * The weakest rung by some distance, and the reason it sits last. PayPal,
- * Amazon and Netflix are impersonated worldwide, so a brand only carries
- * national information when no other pack lists it — which leaves the genuinely
- * local ones (Centrelink, HMRC, Revenue) doing the work.
+ * **Only the `substring` list.** The engine splits brands into `substring` and
+ * `word` precisely because the latter are short or collide with dictionary
+ * words, and `scamDetector` honours that split — this module flattened the two
+ * together and inherited every collision the split exists to prevent: US brand
+ * "chase" matched inside "purchase confirmation", GB's "nationwide" inside
+ * "your bank is nationwide".
+ *
+ * Word-boundary matching alone does not rescue them. "nationwide" is a real
+ * English word, so `\bnationwide\b` still fires on ordinary prose; the split
+ * is a judgement about which names are safe to look for at all, and it belongs
+ * to the pack author rather than to this file.
+ *
+ * The weakest rung regardless — PayPal and Amazon are impersonated worldwide, so
+ * only genuinely local brands survive the uniqueness filter.
  */
-const NATIONAL_BRANDS: ReadonlyMap<string, string> = (() => {
-  const claims = new Map<string, Set<string>>();
-  for (const code of supportedRegions()) {
-    const pack = resolveRegionPack(code);
-    for (const brand of [...pack.typosquatBrands.substring, ...pack.typosquatBrands.word]) {
-      const key = brand.toLowerCase();
-      if (key.length < MIN_AUTHORITY_LENGTH) continue;
-      claims.set(key, (claims.get(key) ?? new Set()).add(code));
-    }
-  }
-  const unique = new Map<string, string>();
-  for (const [brand, codes] of claims) {
-    if (codes.size === 1) unique.set(brand, [...codes][0]);
-  }
-  return unique;
-})();
+const NATIONAL_BRAND_PATTERNS: readonly [string, RegExp][] = compileNamePatterns(
+  uniquelyClaimed((p) => p.typosquatBrands.substring, AMBIGUOUS_BRAND_WORDS),
+);
 
 /**
  * Infer the country a piece of content was aimed at.
@@ -184,27 +336,33 @@ export function inferTargetRegion(content: string): TargetInference {
 
   const haystack = content.toLowerCase();
 
-  // 2. A national TLD. Registration under a country's namespace is a
-  //    deliberate act and a strong marker, though weaker than a calling code
-  //    because a squatter can register anywhere.
-  for (const [suffix, code] of NATIONAL_SUFFIXES) {
-    // Bounded on the left by a dot so "gov.au" does not match inside
-    // "notgov.au", and on the right by a non-label character so "co.uk" does
-    // not match "co.ukraine".
-    if (new RegExp(`\\.${escapeRegExp(suffix)}(?![a-z0-9-])`, "i").test(haystack)) {
-      return { region: code, confidence: "tld" };
+  // 2. A national TLD, matched against extracted HOSTNAMES rather than the raw
+  //    text. Registration under a country's namespace is a deliberate act and a
+  //    strong marker, though weaker than a calling code because a squatter can
+  //    register anywhere.
+  //
+  //    Scanning free text was wrong and produced confident nonsense: a missing
+  //    space after a full stop turns ordinary prose into an apparent domain, so
+  //    "please confirm your details.ca" read as Canada and "See attachment.ie
+  //    file" as Ireland. Both at `tld` confidence, the second-strongest rung.
+  //    The earlier `.co` defect inside "news.co.ukraine-today.info" was the
+  //    same bug seen once and patched by excluding the suffix rather than by
+  //    fixing where matching happens.
+  for (const host of hostnames(haystack)) {
+    for (const [suffix, pattern] of NATIONAL_SUFFIX_PATTERNS) {
+      if (pattern.test(host)) return { region: suffix, confidence: "tld" };
     }
   }
 
-  // 3. A named national agency. Strong when it fires, but a substring match
-  //    over free text, so it sits below a structural signal.
-  for (const [name, code] of NATIONAL_AUTHORITIES) {
-    if (haystack.includes(name)) return { region: code, confidence: "authority" };
+  // 3. A named national agency, matched on word boundaries. Strong when it
+  //    fires, but it reads free text, so it sits below a structural signal.
+  for (const [code, pattern] of NATIONAL_AUTHORITY_PATTERNS) {
+    if (pattern.test(haystack)) return { region: code, confidence: "authority" };
   }
 
   // 4. A brand only one region lists. Weakest rung — see NATIONAL_BRANDS.
-  for (const [brand, code] of NATIONAL_BRANDS) {
-    if (haystack.includes(brand)) return { region: code, confidence: "brand" };
+  for (const [code, pattern] of NATIONAL_BRAND_PATTERNS) {
+    if (pattern.test(haystack)) return { region: code, confidence: "brand" };
   }
 
   return NO_INFERENCE;

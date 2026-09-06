@@ -13,7 +13,8 @@ describe("inferTargetRegion — the ladder", () => {
     });
   });
 
-  it("reads a national TLD", () => {
+  it("reads a national TLD on a corroborated host", () => {
+    // Three labels, so the host is not a sentence with a missing space.
     expect(inferTargetRegion("Claim at hmrc-refund.co.uk now")).toEqual({
       region: "GB",
       confidence: "tld",
@@ -31,6 +32,108 @@ describe("inferTargetRegion — the ladder", () => {
     // is allocated rather than inferred.
     const result = inferTargetRegion("Call +44 20 7946 0000 or visit scam.com.au");
     expect(result).toEqual({ region: "GB", confidence: "phone" });
+  });
+});
+
+describe("inferTargetRegion — hostnames, not prose", () => {
+  // A missing space after a full stop produces something structurally
+  // identical to a two-label domain. Shape alone cannot separate them, so a
+  // bare two-label token needs corroboration that a host was meant.
+  it("ignores a bare two-label token in running text", () => {
+    expect(inferTargetRegion("Hi, please confirm your details.ca").region).toBe("");
+    expect(inferTargetRegion("See attachment.ie file").region).toBe("");
+    expect(inferTargetRegion("Package 3.us delivery").region).toBe("");
+  });
+
+  it("accepts a host corroborated by a scheme", () => {
+    expect(inferTargetRegion("Visit https://my-gov.com.au")).toEqual({
+      region: "AU",
+      confidence: "tld",
+    });
+  });
+
+  it("accepts a host corroborated by a path", () => {
+    expect(inferTargetRegion("Go to details.ca/verify-now")).toEqual({
+      region: "CA",
+      confidence: "tld",
+    });
+  });
+
+  it("accepts a host corroborated by a www. prefix", () => {
+    expect(inferTargetRegion("Go to www.revenue.ie")).toEqual({
+      region: "IE",
+      confidence: "tld",
+    });
+  });
+
+  it("accepts a host corroborated by a third label", () => {
+    expect(inferTargetRegion("Verify at hmrc.gov.uk")).toEqual({
+      region: "GB",
+      confidence: "tld",
+    });
+  });
+});
+
+describe("inferTargetRegion — name matching semantics", () => {
+  it("prefers the longest matching agency name across regions", () => {
+    // NZ lists "inland revenue"; SG lists "inland revenue authority". With
+    // insertion-order iteration and a bare substring test, NZ won and an IRAS
+    // notice was attributed to New Zealand.
+    expect(inferTargetRegion("IRAS: Inland Revenue Authority of Singapore tax notice").region)
+      .toBe("SG");
+  });
+
+  it("attributes a compound agency name to the region that owns it", () => {
+    // Asserts the OUTCOME, not the mechanism. Both of these are decided by word
+    // boundaries and the uniqueness filter rather than by longest-first
+    // ordering: removing the sort leaves them green.
+    //
+    // Said plainly because the alternative is worse — an earlier version of
+    // this test claimed to exercise the sort and did not, which is precisely
+    // the "green test that never reaches the code" failure this file has hit
+    // before. See the note on reachability in compileNamePatterns.
+    expect(inferTargetRegion("Verify your MyGovID account").region).toBe("IE");
+    expect(inferTargetRegion("Centers for Medicare notice").region).toBe("US");
+  });
+
+  it("matches names on word boundaries, not as substrings", () => {
+    // US brand "chase" inside "purchase"; GB brand "nationwide" inside prose.
+    expect(inferTargetRegion("purchase confirmation for your order").region).toBe("");
+
+    // IE's agency "INIS" sits inside the ordinary word "ministry", so an
+    // unbounded match attributes any "Ministry of Health" notice to Ireland.
+    expect(inferTargetRegion("Notice from the Ministry of Health").region).toBe("");
+  });
+
+  it("ignores brand names that are ordinary English words", () => {
+    // Word boundaries cannot help when the brand IS a word someone might write.
+    expect(inferTargetRegion("Your bank is nationwide, contact us").region).toBe("");
+    expect(inferTargetRegion("chase the invoice please").region).toBe("");
+    expect(inferTargetRegion("the countdown is on").region).toBe("");
+  });
+
+  it("keeps distinctive brand names that happen to be lowercase words", () => {
+    // Excluding every alphabetic brand would cost real signal for nothing.
+    expect(inferTargetRegion("Your tesco clubcard is expiring").region).toBe("GB");
+    expect(inferTargetRegion("barclays login required").region).toBe("GB");
+  });
+
+  it("ignores agency names that describe a kind of institution", () => {
+    // Every country has these. Uniqueness of claim is necessary, not sufficient.
+    for (const text of [
+      "the sheriff called",
+      "your council tax is overdue",
+      "revenue figures are up",
+      "the reserve bank said",
+      "postal service update",
+    ]) {
+      expect(inferTargetRegion(text).region, text).toBe("");
+    }
+  });
+
+  it("keeps specifically-named agencies", () => {
+    expect(inferTargetRegion("HMRC: your tax refund is pending").region).toBe("GB");
+    expect(inferTargetRegion("Centrelink payment suspended").region).toBe("AU");
   });
 });
 
@@ -134,5 +237,25 @@ describe("inferTargetRegion — privacy properties", () => {
     const secret = "my-very-private-account-12345";
     const result = inferTargetRegion(`HMRC refund for ${secret} at gov.uk`);
     expect(JSON.stringify(result)).not.toContain(secret);
+  });
+});
+
+describe("inferTargetRegion — cost on the response path", () => {
+  it("stays fast on a large input", () => {
+    // This runs synchronously on a public endpoint with no content-length cap,
+    // so the matchers are compiled at module scope rather than per call. An
+    // earlier version built a RegExp per suffix per check (~44 per request) and
+    // took ~5.6ms on this input.
+    const big = "Lorem ipsum dolor sit amet consectetur adipiscing elit. ".repeat(1000);
+    expect(big.length).toBeGreaterThan(50_000);
+
+    inferTargetRegion(big); // warm
+    const start = performance.now();
+    for (let i = 0; i < 10; i++) inferTargetRegion(big);
+    const perCall = (performance.now() - start) / 10;
+
+    // Generous relative to the ~0.9ms measured, so this catches a regression in
+    // ORDER of magnitude — a per-call compile — without failing on a slow CI box.
+    expect(perCall).toBeLessThan(15);
   });
 });
