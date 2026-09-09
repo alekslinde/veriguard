@@ -328,7 +328,7 @@ const AU_SEASONS: ScamSeason[] = [
     ],
     advice: "Only bet with operators licensed in Australia — check the licence on the regulator's list. Nobody can guarantee a win, and no legitimate prize needs a fee to release it. A site that holds winnings you can already see behind a \"verification\" fee is a fake platform, not a slow payout.",
     sources: [AU.scamwatch, AU.acma],
-    reviewed: "2026-08-31",
+    reviewed: "2026-09-06",
   },
   {
     id: "summer-travel",
@@ -947,7 +947,7 @@ const CALENDARS = {
  * omission is invisible at runtime (regionToday falls back rather than throws),
  * so the type is the only place it can be caught.
  */
-type CalendarRegion = keyof typeof CALENDARS;
+export type CalendarRegion = keyof typeof CALENDARS;
 
 /** Narrows an arbitrary region code to one that has an authored calendar. */
 function isCalendarRegion(code: RegionCode): code is CalendarRegion {

@@ -806,7 +806,7 @@ const RADARS = {
   AU: AU_THREATS,
 } satisfies Partial<Record<RegionCode, ThreatEntry[]>>;
 
-type RadarRegion = keyof typeof RADARS;
+export type RadarRegion = keyof typeof RADARS;
 
 function isRadarRegion(code: RegionCode): code is RadarRegion {
   return code in RADARS;

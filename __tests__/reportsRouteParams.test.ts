@@ -1,12 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { PublicReport } from "@/lib/reportStore";
 
 // P6/P7 (probe 2026-09-09). Both findings are about the /api/reports query
 // string reaching the DB layer unbounded or unparsed, so these assert on the
 // arguments the route hands the store rather than on rows: the defects are in
 // the coercion, and binding them is what turns them into a full-table read or
 // a 500.
-const getPublicReports = vi.fn(async () => []);
-const getPublicReportsCount = vi.fn(async () => 0);
+// Typed against the real signatures rather than `async () => []`: a bare
+// zero-arg arrow infers an empty-tuple parameter list, so `mock.calls[0][0]`
+// below is a tsc error (TS2493) even though vitest strips types and runs green.
+type ReportsArgs = Parameters<typeof import("@/lib/reportStore").getPublicReports>;
+type CountArgs = Parameters<typeof import("@/lib/reportStore").getPublicReportsCount>;
+
+const getPublicReports = vi.fn(async (..._args: ReportsArgs) => [] as PublicReport[]);
+const getPublicReportsCount = vi.fn(async (..._args: CountArgs) => 0);
 vi.mock("@/lib/reportStore", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/reportStore")>();
   return {
@@ -27,7 +34,7 @@ function req(qs: string): NextRequest {
 
 /** The options object the route handed getPublicReports. */
 function opts(): { limit: number; offset: number; since?: number } {
-  return getPublicReports.mock.calls[0]![0] as unknown as {
+  return getPublicReports.mock.calls[0]![0] as {
     limit: number; offset: number; since?: number;
   };
 }

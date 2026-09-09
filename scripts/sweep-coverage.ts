@@ -48,16 +48,22 @@
 //   npx tsx scripts/sweep-coverage.ts             # human report
 //   npx tsx scripts/sweep-coverage.ts --markdown  # issue/PR-body format
 //
-// Exit codes: 0 always — this is a report, not a gate. Promotion is an editorial
-// call, and a sweep can be legitimately skipped (an infrastructure-only cycle
-// with nothing consumer-facing in it). Failing CI over that would train people
-// to ignore it. check-promotion-freshness.ts is the one that exits non-zero.
+// Exit codes: 0 whatever the report SAYS · 2 if the check itself could not run
+// (no roadmaps found, or an unexpected throw).
+//
+// Findings never fail the run: promotion is an editorial call, and a sweep can
+// be legitimately skipped (an infrastructure-only cycle with nothing
+// consumer-facing in it), so failing CI over that would train people to ignore
+// it. check-promotion-freshness.ts is the one that gates. But a checker that
+// cannot read the archive is broken rather than clean, and exiting 0 there
+// would look identical to a healthy run forever — the same reasoning that
+// gives check-promotion-freshness.ts its own exit 2.
 
 import { readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
-import { radarForRegion, authoredRadarRegions, lastUpdated } from "../lib/threatRadar";
+import { radarForRegion, authoredRadarRegions, lastUpdated, type RadarRegion } from "../lib/threatRadar";
 import { calendarForRegion, authoredCalendarRegions, lastReviewed } from "../lib/scamCalendar";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -70,7 +76,7 @@ interface SweepRow {
   /** Sweep date, from the filename. */
   date: string;
   /** Radar entry ids citing this sweep as their `roadmap`, by region. */
-  promoted: Array<{ region: string; ids: string[] }>;
+  promoted: Array<{ region: RadarRegion; ids: string[] }>;
   /** Total entries citing it, across regions. */
   total: number;
 }
