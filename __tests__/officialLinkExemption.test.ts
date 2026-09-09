@@ -49,6 +49,10 @@ describe("official-link exemption (SMS)", () => {
   // exemption's own matcher did not. Found by the metamorphic
   // host-trailing-dot relation, which asserts the two must score equal, not by
   // any fixture here.
+  //
+  // This covers the FALSE-POSITIVE direction only. The same dot also drops a
+  // suspicious-TLD flag on a scam, and the relation cannot see that half — see
+  // urlTrailingDot.test.ts for why, and for the tests that do cover it.
   it("accepts an allowlisted domain written in fully-qualified form", () => {
     const plain = checkSms("Track your parcel at https://auspost.com.au/mypost/track", undefined, "AU");
     const fqdn  = checkSms("Track your parcel at https://auspost.com.au./mypost/track", undefined, "AU");
