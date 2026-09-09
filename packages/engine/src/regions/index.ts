@@ -92,6 +92,7 @@ function buildPack(region: RegionDefinition): RegionPack {
     trustedHostSuffixes: region.trustedHostSuffixes,
     brandSuffixes: region.brandSuffixes,
     authorityOwnDomains: region.authorityOwnDomains ?? [],
+    gatedBenefitPhrases: region.gatedBenefitPhrases ?? [],
     brandMentions: region.brandMentions,
     officialSenderNames: region.officialSenderNames,
 

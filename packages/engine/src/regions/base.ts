@@ -187,6 +187,38 @@ const REQUEST_WORDS = [
   "pay deposit to hold the property", "send deposit to hold the property",
   "deposit to secure the room", "deposit to reserve the room",
   "transfer deposit to hold",
+  // Crypto seed-phrase solicitation (D3 / #272 / NASC media release Sep 2026;
+  // TechCrunch 17 Aug 2026 hardware-wallet breach coverage). The wallet-approval
+  // group above covers "connect wallet" / "approve transaction", but not the
+  // seed-phrase ask, which is the higher-severity request: an approval drains
+  // one allowance, a seed phrase hands over the whole wallet permanently.
+  //
+  // FP risk is very low. No legitimate service ever asks for a seed phrase, and
+  // the only ordinary consumer use of the term is the instruction never to share
+  // it — which is negated phrasing ("never share your seed phrase") and so is
+  // handled by the negation guard rather than by omitting the entry.
+  //
+  // Listed as the two shortest forms that carry the signal. "recovery seed
+  // phrase", "wallet recovery phrase" and "secret recovery phrase" are all
+  // deliberately absent: this list is substring-matched, and "seed phrase" /
+  // "recovery phrase" already match inside every one of them, so listing them
+  // would make the longer entry unreachable and score one phrase twice. Same
+  // convention as the "updated bank details" note above, and enforced by the
+  // pack-shadowing invariant in __tests__/packShadowing.test.ts.
+  "seed phrase", "recovery phrase",
+  // Money-mule recruitment (D5 / #273 / AFP media release Jul 2026; An Garda
+  // Síochána advisory Aug 2026; Lloyds Bank fraud blog Aug 2026). Targets
+  // under-25s via social media and SMS. The victim is the recruit, who is
+  // committing an offence without knowing it — so this reaches a person the
+  // other request groups do not.
+  //
+  // "money mule" and "financial courier" carry near-zero FP: no legitimate
+  // employer uses either term to a candidate. The transfer phrasings are the
+  // weaker half and only tip a verdict when compounded, which is the right
+  // ceiling — payment-processing onboarding does use adjacent language.
+  "money mule", "financial courier", "act as a payment agent",
+  "transfer funds on our behalf",
+  "receive transfers into your account",
 ];
 
 // The medium-confidence half of D3 (#180). "Keys will be posted to you" is a

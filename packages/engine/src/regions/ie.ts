@@ -142,6 +142,22 @@ const AUTHORITY_MENTIONS = [
   // An Post is a state company and functions as the parcel-lure authority
   // exactly as Australia Post does.
   "an post", "anpost", "eflow", "e-flow",
+  // NTMA / State Savings (D2 / #271 / Irish Times 29 Apr 2026; RTE News 28 May
+  // 2026). The active campaign is a deepfake of Tanaiste Simon Harris promoting
+  // a fake "Personal Investment Account", trading on the real planned State
+  // Savings scheme.
+  //
+  // Note on scoring: an authority mention is +25, which clears the 20-point
+  // "suspicious" threshold on its own — so these do NOT require compounding,
+  // contrary to the filing issue. That is why the NTMA entries are also added
+  // to NO_LINK_SENDERS below: the agency genuinely does not cold-text, so a
+  // link alongside the name is the corroborating signal, and a forwarded news
+  // article naming State Savings carries no link and stays at the bare mention.
+  //
+  // "national treasury management agency" is absent: "ntma" does not appear
+  // inside it, so it would be a second scoring hit on one fact. The abbreviation
+  // is what appears in lures.
+  "ntma", "state savings",
 ];
 
 // Irish bodies that have publicly confirmed they do not send links in
@@ -154,6 +170,9 @@ const NO_LINK_SENDERS = [
   "revenue", "revenue commissioners", "ros",
   "department of social protection", "social protection", "dsp",
   "an post", "anpost",
+  // The NTMA sells State Savings through An Post and by post; it does not send
+  // unsolicited SMS links (#271).
+  "ntma", "state savings",
 ];
 
 // Interpol/Europol plus the shared Chinese-authority terms (see base.ts).
@@ -188,6 +207,10 @@ const REWARD_WORDS = [
   "central bank approved", "central bank registered",
   "verified by central bank", "cbi approved",
   "government backed investment",
+  // The fake product name from the Harris deepfake campaign (#271). "state
+  // savings scheme" is absent — "state savings" is already an authority mention
+  // and substring-matches it, so listing it here would score one fact twice.
+  "personal investment account",
 ];
 
 // State and agency domains. These are exact-or-subdomain matched by checkUrl, so
@@ -200,6 +223,9 @@ const LEGIT_DOMAINS = [
   "garda.ie", "ncsc.gov.ie", "fraudsmart.ie",
   "centralbank.ie", "ccpc.ie", "rsa.ie", "motortax.ie",
   "eflow.ie",
+  // NTMA / State Savings (#271) — the real estate behind the impersonation,
+  // and the domain the no-link-sender flag tells people to go to instead.
+  "ntma.ie", "statesavings.ie",
 ];
 
 // Cover brands for callback/TOAD phishing — Ireland-operating additions to the
@@ -357,7 +383,7 @@ export const IE: RegionDefinition = {
   authorityMentions: AUTHORITY_MENTIONS,
   noLinkSenders: NO_LINK_SENDERS,
   noLinkSendersFlag:
-    "Revenue, the Department of Social Protection and An Post all state they never send texts with links asking for personal or payment details — a message from one of these with a clickable link is a scam. Log in at revenue.ie or gov.ie directly instead.",
+    "Revenue, the Department of Social Protection, An Post and the NTMA (State Savings) all state they never send texts with links asking for personal or payment details — a message from one of these with a clickable link is a scam. Log in at revenue.ie, gov.ie or statesavings.ie directly instead.",
 
   foreignAuthorityMentions: FOREIGN_AUTHORITY_MENTIONS,
   foreignAuthorityFlag:

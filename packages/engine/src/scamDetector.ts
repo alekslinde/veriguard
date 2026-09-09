@@ -841,6 +841,174 @@ export function checkUrl(
  * signal that would otherwise misfire, and never lowers a score by itself.
  * Header-based spoofing is caught separately by analyseEmailIdentities.
  */
+/**
+ * Do all the links in this message point at the region's own allowlisted
+ * agency/brand domains?
+ *
+ * The companion to isOwnDomainSender, for the case that has no sender metadata
+ * to trust. An SMS carries no verified sender domain, so the only thing the
+ * engine can check is where the message actually sends you — and a link to the
+ * agency's real domain is the one thing a phishing SMS cannot fake.
+ *
+ * Requires EVERY link to be allowlisted, not merely one: the standard evasion
+ * is to pad a message with a legitimate link alongside the payload one, so a
+ * .some() test here would hand attackers the exemption for free.
+ *
+ * Checks both allowlists the packs maintain. legitDomains is the broad
+ * region-wide list; authorityOwnDomains is the narrower set of organisations
+ * whose real mail demonstrably comes from a non-government domain
+ * (auspost.com.au), and its comment describes precisely this case. Consulting
+ * only the first left a real Australia Post tracking SMS scoring 55.
+ *
+ * Matching is exact-or-subdomain, identical to the allowlist branch in
+ * checkUrl, so "revenue.ie.evil.tk" does not qualify. Returns false when there
+ * are no links at all — the caller's rules are about links, and "no links"
+ * is not "safe links".
+ */
+/**
+ * A clause that WARNS against sharing something, rather than asking for it.
+ *
+ * Module-scoped because two rules need it: the verification-code harvest rule,
+ * and the credential-warning filter on REQUEST_WORDS. Evaluated per clause by
+ * both — scoped to the whole message it becomes a bypass, since appending one
+ * reassurance sentence would disarm the signal ("Send me the code. Never share
+ * it with anyone.").
+ */
+const NEGATED_ASK =
+  /\b(never|do\s?n'?o?t|don't|no\s+one|nobody|will\s+never|would\s+never)\b[^.!?]{0,40}\b(share|forward|send|give|disclose|reveal|ask|enter|type|provide)\b/i;
+const DISREGARD_NOTICE =
+  /\b(if\s+you\s+did\s?n'?o?t\s+request|ignore\s+this\s+message)\b/i;
+
+/**
+ * Request phrases that name a secret so sensitive the ordinary consumer use of
+ * the term is the warning never to share it. Anti-fraud advice from a wallet
+ * vendor, an exchange or a bank uses the exact words a phishing message does,
+ * so these are the entries where a negated clause has to suppress the hit.
+ *
+ * Deliberately narrow: "bank details" and "password" appear in plenty of
+ * legitimate asks ("update your bank details in the portal"), so a negation
+ * guard over the whole REQUEST_WORDS list would weaken real signals. These
+ * three have no legitimate ask at all.
+ */
+const CREDENTIAL_WARNING_TERMS = ["seed phrase", "recovery phrase", "verification code"];
+
+/**
+ * Does an agency name plausibly identify this host?
+ *
+ * Organisations shorten their own names in domains, so a literal substring test
+ * fails on exactly the cases that matter: "australia post" is auspost.com.au,
+ * "an post" is anpost.com, "services australia" hosts Centrelink and Medicare.
+ * Inferring identity from string overlap alone got the headline case wrong —
+ * "Australia Post: track it at auspost.com.au" still scored 55.
+ *
+ * Three passes, cheapest first:
+ *   · the whole normalised name appears in the host ("revenue" in revenue.ie)
+ *   · the host contains an accepted abbreviation of a multi-word name
+ *     ("auspost" from "australia post", "anpost" from "an post")
+ *   · every word of the name appears in the host in order
+ *     ("servicesaustralia" from "services australia")
+ *
+ * Deliberately no fuzzy or initialism matching: "ato" must not be satisfied by
+ * an unrelated host that happens to contain those three letters.
+ */
+function authorityMatchesHost(authority: string, haystack: string): boolean {
+  const words = authority.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  if (words.length === 0) return false;
+  const full = words.join("");
+  if (full.length < 3) return false;
+  if (haystack.includes(full)) return true;
+
+  // Abbreviated compounds: keep the first word's leading syllable. "australia
+  // post" → "auspost", "an post" → "anpost". Only tried for multi-word names,
+  // where the shortening is a real naming convention rather than a guess.
+  if (words.length > 1) {
+    const rest = words.slice(1).join("");
+    for (let n = 2; n <= Math.min(5, words[0].length); n++) {
+      if (haystack.includes(words[0].slice(0, n) + rest)) return true;
+    }
+  }
+
+  // All words present in order, allowing anything between them.
+  let from = 0;
+  for (const w of words) {
+    const at = haystack.indexOf(w, from);
+    if (at === -1) return false;
+    from = at + w.length;
+  }
+  return true;
+}
+
+function allLinksOnLegitDomains(
+  urls: string[] | null,
+  pack: { legitDomains: string[]; authorityOwnDomains: string[]; trustedHostSuffixes: string[] },
+  namedAuthorities: string[],
+): boolean {
+  if (!urls || urls.length === 0) return false;
+  const allowed = [...pack.legitDomains, ...pack.authorityOwnDomains];
+  return urls.every((u) => {
+    let link: URL;
+    try {
+      link = new URL(u.trim().startsWith("http") ? u.trim() : `https://${u.trim()}`);
+    } catch {
+      return false;
+    }
+    const host = link.hostname.toLowerCase();
+    const onAllowlist = allowed.some((d) => {
+      const domain = d.toLowerCase();
+      return host === domain || host.endsWith("." + domain);
+    });
+    if (!onAllowlist) return false;
+
+    // An allowlisted host carrying a nested URL is an open redirect: the real
+    // destination is the parameter, not the host. checkUrl already scores this
+    // shape as suspicious (see carriesNestedUrl), so honouring it here would
+    // let gov.ie/redirect?url=revenue-ie.top launder the exemption.
+    if (/[?&](url|u|redirect|dest|destination|target|continue|next)=https?(:|%3a)/i.test(link.search)) {
+      return false;
+    }
+
+    // The link must not CONTRADICT any agency the message names in its prose.
+    // Testing only "is this domain allowlisted" let an impersonation launder
+    // through a link to an unrelated allowlisted domain — "ATO: your tax refund
+    // is pending, log in at auspost.com.au/track" was cleared to safe.
+    //
+    // Phrased as "no conflict" rather than "must match" on purpose. A genuine
+    // notification often names its sender nowhere but the link itself ("Track
+    // your parcel at auspost.com.au"), and requiring a prose match would put
+    // that straight back to 55 — the exact bug this exemption exists to fix.
+    // So a message naming no authority in prose keeps the exemption; one that
+    // names any has to point at one of them.
+    //
+    // EVERY named authority must be consistent with the link, not merely one.
+    // A .some() here was the mirror of the padding evasion the links loop
+    // guards against: appending the single word "AusPost." to an ATO
+    // impersonation pointing at auspost.com.au dropped it from 55 to 15/safe.
+    if (namedAuthorities.length === 0) return true;
+
+    // Identity is compared against the whole host, not just the registrable
+    // label. A bare public-suffix allowlist entry ("gov.ie", "gov.au") has an
+    // empty label, which denied the exemption for the very domain the
+    // no-link-sender flag tells the reader to use — a Revenue message linking
+    // gov.ie scored 55 while advising "log in at gov.ie directly instead".
+    //
+    // A host inside the jurisdiction's own government estate satisfies ANY
+    // agency the message names. This is the same concept isOwnDomainSender
+    // uses: gov.au and gov.ie host the whole estate, so an agency's real link
+    // frequently lives on a domain that does not carry its name at all —
+    // Centrelink and Medicare both live under servicesaustralia.gov.au, and
+    // Revenue publishes under gov.ie. String matching cannot bridge a parent
+    // agency relationship, and requiring one scored those genuine messages 55
+    // while the emitted flag told the reader to use the very domain it flagged.
+    const inGovEstate =
+      pack.trustedHostSuffixes.some((suffix) => host.endsWith(suffix.toLowerCase())) ||
+      pack.trustedHostSuffixes.some((suffix) => host === suffix.replace(/^\./, "").toLowerCase());
+    if (inGovEstate) return true;
+
+    const haystack = `${host}.${registrableLabel(host)}`.replace(/[^a-z0-9]/g, "");
+    return namedAuthorities.every((a) => authorityMatchesHost(a, haystack));
+  });
+}
+
 function isOwnDomainSender(
   channel: "sms" | "email",
   senderDomain: string | undefined,
@@ -1179,11 +1347,20 @@ export function checkSms(
   // sentence defuse a live lure — "Congratulations! Claim your $1000 prize now.
   // Your claim is ready." dropped from 40 to 24, a one-sentence evasion. The
   // word only stops counting when EVERY occurrence reads as the noun.
+  //
+  // The determiner and verb forms above miss the COMPOUND-NOUN use, where
+  // "claim" modifies another noun with nothing in front of it: "benefits claim
+  // assistance", "claim status", "claim number". That is administrative
+  // vocabulary — a benefits or insurance office writing about a case — and it
+  // was scoring +12 on ordinary VA correspondence ("Your VA benefits claim
+  // assistance appointment is confirmed for Tuesday" reached 37/suspicious
+  // alongside the authority mention). The following noun is what disambiguates:
+  // a reward lure says "claim your prize", never "claim assistance".
+  const CLAIM_AS_NOUN =
+    /\b(?:your|the|this|a|my|their|our)\s+claims?\b|\bclaims?\s+(?:has|have|was|were|is|are)\b|\bclaims?\s+(?:assistance|status|number|reference|form|history|decision|department|centre|center|processing|adjuster|handler|id)\b/gi;
   const claimIsAlwaysNoun =
     /\bclaims?\b/i.test(text) &&
-    (text.match(/\bclaims?\b/gi) ?? []).length ===
-      (text.match(/\b(?:your|the|this|a|my|their|our)\s+claims?\b|\bclaims?\s+(?:has|have|was|were|is|are)\b/gi) ?? [])
-        .length;
+    (text.match(/\bclaims?\b/gi) ?? []).length === (text.match(CLAIM_AS_NOUN) ?? []).length;
   const rewardHits = REWARD_WORDS.filter(
     (w) => mentions(lower, w) && !(w === "claim" && claimIsAlwaysNoun),
   );
@@ -1203,7 +1380,28 @@ export function checkSms(
   // They still contribute through the authority-mention rule below, which is
   // where "this message is about a government service" belongs. Here they are
   // separated so the remaining hits are things actually being requested.
-  const requestHits = REQUEST_WORDS.filter((w) => mentions(lower, w));
+  // A credential term inside a "never share your …" clause is anti-fraud
+  // advice, not an ask. Ledger, exchanges and banks all publish exactly this
+  // wording, and it scored 30/suspicious — flagging the warning that protects
+  // people is worse than missing it, because it teaches them the verdict is
+  // noise. Evaluated per clause, so a scam cannot buy the exemption by
+  // appending a reassurance sentence to a real ask.
+  //
+  // Split on coordinating conjunctions as well as sentence punctuation. On
+  // punctuation alone, "Enter your seed phrase to restore access but never
+  // share it with anyone" was ONE clause, so the trailing negation covered the
+  // ask and the message scored 0/safe — the evasion this guard exists to
+  // prevent, just without a full stop. Splitting here costs nothing: a genuine
+  // warning ("never share your seed phrase or recovery phrase") keeps the
+  // negation and the term in the same fragment.
+  const clauses = text.split(/[.!?\n]+|\b(?:but|however|though|although|and then)\b/i);
+  const warnedTerms = new Set(
+    CREDENTIAL_WARNING_TERMS.filter((term) =>
+      clauses.some((c) => NEGATED_ASK.test(c) && mentions(c.toLowerCase(), term)) &&
+      !clauses.some((c) => !NEGATED_ASK.test(c) && mentions(c.toLowerCase(), term)),
+    ),
+  );
+  const requestHits = REQUEST_WORDS.filter((w) => mentions(lower, w) && !warnedTerms.has(w));
   const SERVICE = serviceNames(PACK);
   const genuineAsks = requestHits.filter((w) => !SERVICE.has(w));
   const namedServices = requestHits.filter((w) => SERVICE.has(w));
@@ -1240,6 +1438,24 @@ export function checkSms(
   const hasDepositAsk = /deposit/i.test(text);
   if (mentionsAny(lower, KEYS_BY_POST_PHRASES) && (hasDepositAsk || hasBankAsk)) {
     sig.add("message", "Keys promised by post alongside a deposit request — in the fake-landlord script the 'landlord' is always abroad, so there's no viewing and no key handover. Never send a deposit for a property you or someone you trust hasn't physically viewed.", 15);
+  }
+
+  // Benefit-programme lures, gated (D6 / #274 / FTC consumer alert 24 Aug 2026).
+  // Currently only the US pack populates gatedBenefitPhrases (veterans' benefit
+  // programmes), but the rule reads it from the pack like every other list, so
+  // another region can fill the same slot without touching this file — and the
+  // phrases stay inside the packShadowing / entryOverlap invariants.
+  //
+  // Gated on a link or an information ask because the phrasing alone is shared
+  // with legitimate VA and veteran-charity correspondence, which already picks
+  // up +25 from the "va" authority mention. Requiring the delivery mechanism is
+  // what separates "your entitlement review is pending, confirm your SSN at
+  // <link>" from "your claim assistance appointment is confirmed for Tuesday".
+  if (
+    mentionsAny(lower, PACK.gatedBenefitPhrases) &&
+    (/https?:\/\//i.test(text) || genuineAsks.length > 0 || hasBankAsk)
+  ) {
+    sig.add("message", "Veterans-benefit lure — scammers impersonate VA programmes to collect personal details or up-front fees. The VA never charges to file a claim and never asks for your details by text; check your claim at va.gov or call the VA on 1-800-827-1000.", 25);
   }
 
   // Family impersonation, the "Hi Mum" script (D2 / #251). A stranger opens as
@@ -1504,10 +1720,6 @@ export function checkSms(
   // kind of trailing boilerplate — it is copied from the real notices it
   // imitates — so the guard has to ask whether *this* clause is a warning, not
   // whether the message contains one anywhere.
-  const NEGATED_ASK =
-    /\b(never|do\s?n'?o?t|don't|no\s+one|nobody|will\s+never|would\s+never)\b[^.!?]{0,40}\b(share|forward|send|give|disclose|reveal|ask)\b/i;
-  const DISREGARD_NOTICE =
-    /\b(if\s+you\s+did\s?n'?o?t\s+request|ignore\s+this\s+message)\b/i;
   // "confirm" is deliberately absent from the verbs: confirming a code you
   // hold is what legitimate flows ask for ("confirm the security code on
   // your statement"). The scam asks you to TRANSMIT it onward.
@@ -1528,8 +1740,7 @@ export function checkSms(
     /\b(forward|send|share|reply\s+with|text\s+(?:me|us)|give\s+(?:me|us))\b[^.!?]{0,40}\b(?:the\s+|your\s+|that\s+)?(?:security|access|sms)\b[^.!?]{0,20}\bcode\b/i;
   const accountContext =
     /\b(account|verify|verification|restore|unlock|suspend|suspended|locked\s+out|log\s?in|sign\s?in|2fa|two[\s-]factor)\b/i.test(text);
-  const codeHarvest = text
-    .split(/[.!?\n]+/)
+  const codeHarvest = clauses
     .some((clause) => {
       if (NEGATED_ASK.test(clause) || DISREGARD_NOTICE.test(clause)) return false;
       if (CODE_ASK.test(clause) || CODE_RETURN.test(clause)) return true;
@@ -1624,7 +1835,32 @@ export function checkSms(
   // and it was scoring a real Australia Post delivery notification as
   // suspicious. The domain is matched exactly or as a subdomain, so a lookalike
   // like `auspost.com.au.evil.tk` does not qualify (see isOwnDomainSender).
-  if (mentionsAny(lower, PACK.authorityMentions) && !isOwnDomainSender(channel, options?.senderDomain, PACK)) {
+  // SMS only. An email has a verifiable sender domain, and isOwnDomainSender
+  // already uses it — so for email the body link must NOT override the sender:
+  // a spoofed message from auspost.com.au.evil.tk quoting the real
+  // auspost.com.au/track link is an ordinary phishing shape, and treating its
+  // link as proof of identity would clear it. SMS carries no sender domain at
+  // all, which is exactly why the body link is the only evidence available
+  // there.
+  // Matched against the message text with the URLs stripped out. The link's own
+  // hostname must not be what proves the message names that agency, or the test
+  // is circular: "ATO: log in at auspost.com.au" would find "auspost" inside the
+  // URL, call it a named authority, and clear the impersonation it was meant to
+  // catch.
+  const proseOnly = lower.replace(/https?:\/\/[^\s]+/gi, " ");
+  const namedAuthorities = PACK.authorityMentions.filter((a) => mentions(proseOnly, a));
+  const linksAreOfficial =
+    channel === "sms" && allLinksOnLegitDomains(urlMatch, PACK, namedAuthorities);
+  if (
+    mentionsAny(lower, PACK.authorityMentions) &&
+    !isOwnDomainSender(channel, options?.senderDomain, PACK) &&
+    // ...and not when every link in the message goes to that agency's own
+    // domain. "Verify directly via official channels" is wrong advice for a
+    // message whose only link IS the official channel. A real Australia Post
+    // tracking SMS scored 55/likely_scam here — the same score as an outright
+    // lookalike (revenue-ie.top) — which is the failure this prevents.
+    !linksAreOfficial
+  ) {
     // Naming an agency is not by itself evidence of anything: every genuine
     // message from the ATO says "ATO", and the real AusPost delivery notice
     // says "AusPost". Uncorroborated, this rule scored a 25 on ordinary mail
@@ -1659,6 +1895,14 @@ export function checkSms(
     // the flag text ("an SMS from one of these bodies...") is then plainly
     // wrong about what was checked. Found when a genuine Australia Post
     // delivery notification scored 38/suspicious on this rule.
+    // The official-link exemption applies here too — this rule's premise is
+    // "these bodies do not put links in their texts", which cannot be the right
+    // call for a link to the body's own domain. It is not repeated in this
+    // condition because the enclosing `if` already requires !linksAreOfficial;
+    // duplicating it would read as an independent guard that is really the same
+    // one. If that outer condition is ever loosened, this branch needs the
+    // check added back explicitly — see the officialLinkExemption tests, which
+    // assert the no-link-sender flag directly rather than through the outer rule.
     if (channel === "sms" && urlMatch && mentionsAny(lower, PACK.noLinkSenders)) {
       sig.add("message", PACK.noLinkSendersFlag, 15);
     }
