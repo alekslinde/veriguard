@@ -88,7 +88,7 @@ const URGENCY_TAX = [
   "tax refund", "tax rebate", "you are eligible for a refund",
   "hmrc refund", "refund is waiting", "claim your refund",
   "cost of living payment", "cost of living support",
-  "winter fuel payment", "energy bill support", "energy rebate",
+  "winter fuel payment", "energy bill support",
   "council tax reduction",
   "universal credit payment", "budgeting advance",
   // Generic benefit-entitlement framing (D1 / #178 / Merseyside Police and
@@ -221,6 +221,31 @@ const REQUEST_WORDS = [
   "smart meter installation fee", "smart meter replacement charge",
   "government energy rebate", "energy bill rebate", "energy support payment",
 ];
+
+// Energy allowance / price-cap lures (D1 / #270 / Action Fraud alert
+// `energyrebatescam`; the Q4 Ofgem cap cycle from 1 October 2026). The
+// October cap change is the one window when energy money is genuinely in the
+// news, which is exactly when these land.
+//
+// Bare "energy rebate" used to sit in URGENCY_TAX and was removed here: it is
+// ordinary supplier billing language, and a real message ("your energy rebate
+// of £12 has been applied to your account balance") scored +10 with an
+// "urgency language detected" flag on it. The noun is not the signal — the
+// unsolicited claim/eligibility framing around it is, which is what the
+// entries below encode. "government energy rebate" and "energy bill rebate"
+// keep the qualifier that made them safe and stay in REQUEST_WORDS above.
+//
+// "ofgem rebate" is deliberately absent: Ofgem is already an authorityMention
+// (+25), so the lure compounds without it, and as a flat entry it would score
+// the regulator's name a second time. "energy support scheme payment" and
+// "energy payment allowance" are likewise absent — "energy support payment"
+// above substring-matches neither cleanly enough to justify a third near-
+// duplicate, and the two below carry the campaign.
+const URGENCY_ENERGY_ALLOWANCE = [
+  "energy support allowance", "household energy support",
+  "claim your bill rebate",
+];
+
 
 // FCA-authorised firms are legally prohibited from claiming regulator
 // endorsement, and the FCA never endorses investments via SMS or email — so
@@ -368,7 +393,7 @@ export const GB: RegionDefinition = {
     utility: URGENCY_UTILITY,
     pension: URGENCY_PENSION,
     recall: URGENCY_RECALL,
-    tax: URGENCY_TAX,
+    tax: [...URGENCY_TAX, ...URGENCY_ENERGY_ALLOWANCE],
     taxThreat: URGENCY_TAX_THREAT,
   },
 

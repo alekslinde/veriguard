@@ -7,6 +7,7 @@ import { analysePhone, PhoneIntel } from "./phoneIntel";
 import { isShortened, expandUrl, type ExpandFetch } from "./urlExpander";
 import { resolveRegionPack, supportedRegions, DEFAULT_REGION, type RegionInput, type RegionCoverage, type RegionPack } from "./regions";
 import { KEYS_BY_POST_PHRASES, FAMILY_RELATION_TERMS, NEW_NUMBER_PRETEXT_PHRASES } from "./regions/base";
+import { VETERANS_BENEFIT_PHRASES } from "./regions/us";
 import type { CheckResult, Signal, SignalSource } from "./engineTypes";
 
 // ScamType and CheckResult live in engineTypes.ts to break the import cycle
@@ -1240,6 +1241,24 @@ export function checkSms(
   const hasDepositAsk = /deposit/i.test(text);
   if (mentionsAny(lower, KEYS_BY_POST_PHRASES) && (hasDepositAsk || hasBankAsk)) {
     sig.add("message", "Keys promised by post alongside a deposit request — in the fake-landlord script the 'landlord' is always abroad, so there's no viewing and no key handover. Never send a deposit for a property you or someone you trust hasn't physically viewed.", 15);
+  }
+
+  // Veterans-benefit lures, gated (D6 / #274 / FTC consumer alert 24 Aug 2026).
+  // Only scored for the US pack — the phrases name US programmes, and the list
+  // is imported directly rather than through the pack because no other region
+  // has an equivalent slot.
+  //
+  // Gated on a link or an information ask because the phrasing alone is shared
+  // with legitimate VA and veteran-charity correspondence, which already picks
+  // up +25 from the "va" authority mention. Requiring the delivery mechanism is
+  // what separates "your entitlement review is pending, confirm your SSN at
+  // <link>" from "your claim assistance appointment is confirmed for Tuesday".
+  if (
+    PACK.code === "US" &&
+    mentionsAny(lower, VETERANS_BENEFIT_PHRASES) &&
+    (/https?:\/\//i.test(text) || genuineAsks.length > 0 || hasBankAsk)
+  ) {
+    sig.add("message", "Veterans-benefit lure — scammers impersonate VA programmes to collect personal details or up-front fees. The VA never charges to file a claim and never asks for your details by text; check your claim at va.gov or call the VA on 1-800-827-1000.", 25);
   }
 
   // Family impersonation, the "Hi Mum" script (D2 / #251). A stranger opens as

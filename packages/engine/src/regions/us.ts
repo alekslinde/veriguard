@@ -59,6 +59,28 @@ const URGENCY_PENSION = [
   "your social security number has been suspended",
 ];
 
+// Veterans-benefit lures, gated (D6 / #274 / FTC consumer alert 24 Aug 2026).
+// Scammers impersonate veterans' benefit programmes to extract personal
+// information and up-front fees.
+//
+// These are NOT in URGENCY_PENSION and never score alone, which is a departure
+// from the filing issue's proposal. "va" is already an authorityMention (+25),
+// so a flat entry here would stack on top of it and tip ordinary VA
+// correspondence: "Your VA benefits claim assistance appointment is confirmed
+// for Tuesday" measured 37/suspicious with no lure phrasing at all. Legitimate
+// veteran-support organisations use this exact vocabulary, and the population
+// this would misfire on is elderly veterans reading real benefit mail — the
+// wrong people to hand a false alarm.
+//
+// The composite in scamDetector requires a link or an information ask
+// alongside, which is what separates the lure from the appointment reminder.
+// "champva" and "tricare for life" stay out entirely: they are real programme
+// names carrying no scam signal of their own.
+export const VETERANS_BENEFIT_PHRASES = [
+  "veterans savings program", "va benefits claim assistance",
+  "veteran benefit entitlement review",
+];
+
 // Fake product-recall lures. Same script as the AU/UK campaigns; the CPSC
 // publishes genuine recalls, and no US retailer announces them by SMS.
 const URGENCY_RECALL = [
@@ -110,6 +132,20 @@ const URGENCY_FOREIGN_AUTHORITY = [
   "money laundering investigation", "your visa will be cancelled",
   "your visa will be revoked", "involved in criminal activity",
   "immigration violation",
+  // Jury-duty / bench-warrant SMS (D4 / #275 / FTC consumer alert Jun 2026;
+  // US Courts advisory 2026; Lancaster County Sheriff AI-voice report). The
+  // call side of this script already scores well — an "us marshals" authority
+  // hit plus urgency reaches likely_scam on its own. The gap these close is the
+  // SMS-only variant, which carries a payment link but no callback and no
+  // agency name, and measured only 35/suspicious before they were added.
+  //
+  // Real courts summon jurors by postal mail and never demand payment, so
+  // "missed jury duty" in a text is effectively always a scam. "bench warrant"
+  // is listed without a trailing qualifier so it also catches "bench warrant
+  // has been issued"; "warrant issued" in URGENCY_TAX_THREAT does not shadow
+  // it, since neither string contains the other.
+  "missed jury duty", "failed to appear for jury duty",
+  "bench warrant",
 ];
 
 // Identity re-registration phishing. The US has no single national digital
