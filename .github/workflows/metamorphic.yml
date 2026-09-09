@@ -1,0 +1,124 @@
+name: Metamorphic eval
+
+# The evasion gate. `npm test` asserts behaviour and the corpus eval ratchets
+# per-case predictions; this asks the third question — can a verdict be talked
+# out of by rewriting the message? It runs outside `npm test` deliberately (see
+# eval/README.md): it is slower than the unit gate and fails for a different
+# reason.
+#
+# ── Two roles, two seeds ─────────────────────────────────────────────────────
+#
+# The single-transform and region relations are deterministic: same corpus, same
+# engine, same result. Composite stacks are a SAMPLED search over the space of
+# transform combinations, so a different seed searches different ground — which
+# means a new seed can surface a pre-existing bug with no code change at all.
+#
+# Those two properties need different treatment, so:
+#
+#   · On a PR — fixed seed 1. Deterministic, so red means "this diff broke it"
+#     and nothing else. Behaves like a ratchet, same contract as baseline.json.
+#     Cheap enough (~700 composite checks) to run on every PR.
+#
+#   · Weekly on main — seed derived from the week number, so each run searches
+#     ground no previous run covered, with a wider sample. A finding here is
+#     real but is nobody's PR, so it refreshes the 🧬 Composite metamorphic
+#     drift issue instead of failing a build.
+#
+# The alternative — rotating the seed on PRs — was rejected: a gate that goes red
+# for reasons unrelated to your diff is one people learn to re-run until green,
+# and that costs more than the extra coverage buys.
+#
+# Exit codes (scripts/eval-metamorphic.ts): 0 clean · 1 deterministic relation
+# broke · 3 composite-only · 2 the harness itself broke.
+
+on:
+  pull_request:
+    # Only when something that can change a verdict or a relation moves. The
+    # engine, the packs, the corpus and the harness itself; not app or UI code,
+    # which cannot affect a score.
+    paths:
+      - "packages/engine/**"
+      - "eval/**"
+      - "scripts/eval-metamorphic.ts"
+      - ".github/workflows/metamorphic.yml"
+  push:
+    branches: [main]
+    paths:
+      - "packages/engine/**"
+      - "eval/**"
+      - "scripts/eval-metamorphic.ts"
+  schedule:
+    # Mondays 21:00 UTC ≈ 07:00 Tuesday Australia/Sydney — an hour before the
+    # promotion-freshness check, so the week's maintenance flags land together.
+    - cron: "0 21 * * 1"
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: "Composite sampling seed (blank = week number)"
+        required: false
+      stacks:
+        description: "Composite stacks to sample"
+        required: false
+        default: "400"
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: metamorphic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  metamorphic:
+    name: Metamorphic relations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # ── PR: fixed seed, gates the build ──────────────────────────────────
+      #
+      # Exit 3 (composite-only) still fails here, and that is deliberate: at a
+      # FIXED seed the composite family is deterministic too, so on a PR a
+      # composite violation is as much "your diff did this" as any other. The
+      # code exists to separate the weekly run's findings, not to make
+      # composites unenforceable.
+      - name: Metamorphic eval (PR — fixed seed)
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        run: |
+          npm run eval:metamorphic -- --seed=1 --stacks=120 --depth=2,3 --markdown \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      # ── Weekly: rotating seed, files an issue ────────────────────────────
+      - name: Metamorphic eval (weekly — rotating seed)
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          INPUT_SEED: ${{ github.event.inputs.seed }}
+          INPUT_STACKS: ${{ github.event.inputs.stacks }}
+        run: |
+          set +e
+          # Week number as the seed: distinct ground each week, and reproducible
+          # from the issue body months later, which a timestamp would not be.
+          seed="${INPUT_SEED:-$(date -u +%V)}"
+          stacks="${INPUT_STACKS:-400}"
+          npm run eval:metamorphic -- \
+            --seed="$seed" --stacks="$stacks" --depth=2,3,4 --markdown --issue \
+            >> "$GITHUB_STEP_SUMMARY"
+          code=$?
+          set -e
+          case "$code" in
+            0) echo "All relations hold at seed $seed." ;;
+            # Deterministic relations do not depend on the seed, so a failure
+            # here means main is broken — that must go red regardless of which
+            # job found it.
+            1) echo "::error::A single-transform or region relation is violated on main."; exit 1 ;;
+            3) echo "::warning::Composite search found a violation at seed $seed — see the 🧬 issue." ;;
+            *) echo "::error::Metamorphic harness failed (exit $code)."; exit "$code" ;;
+          esac

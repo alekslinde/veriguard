@@ -419,6 +419,45 @@ The per-step trail in the violation report is what made the diagnosis a minute's
 work rather than an afternoon's: it rescores every prefix of the stack, so the
 step that shed the points names itself.
 
+### In CI
+
+`.github/workflows/metamorphic.yml` runs this on two schedules with two seeds,
+because the families have different determinism:
+
+| | Seed | Sample | On a violation |
+|---|---|---|---|
+| **PR / push to main** | Fixed (1) | 120 stacks, depth 2–3 | Fails the build |
+| **Weekly (Mon 21:00 UTC)** | Week number | 400 stacks, depth 2–4 | Refreshes the 🧬 *Composite metamorphic drift* issue |
+
+The single-transform and region relations are deterministic — same corpus, same
+engine, same result — so on a PR red means "this diff broke it" and nothing else.
+Composites are a **sampled search**, so a new seed can surface a pre-existing bug
+with no code change at all. Rotating the seed on PRs was rejected for that
+reason: a gate that goes red for reasons unrelated to your diff is one people
+learn to re-run until green, which costs more than the coverage buys.
+
+At a *fixed* seed the composite family is deterministic too, which is why exit 3
+still fails a PR. The separate code exists to route the weekly search's findings
+to an issue, not to make composites unenforceable.
+
+Exit codes:
+
+| Code | Meaning |
+|---|---|
+| 0 | Everything holds |
+| 1 | A single-transform or region relation broke — deterministic, always fails |
+| 3 | Composite stacks only — real, but possibly not this diff's fault |
+| 2 | The harness itself broke (bad flags, unloadable corpus) |
+
+A run breaking both reports 1: the deterministic failure is the one to fix first
+and its cause is unambiguous.
+
+Only composites get an issue. The other two already fail the build on the PR that
+caused them, so an issue would restate a red check; composites are the search
+whose findings arrive without a triggering diff, which is what a long-lived
+digest issue is for. It closes itself on the next clean week and reopens on the
+next finding, matching `check-sources` and `promotion-freshness`.
+
 ### Reading a composite run
 
 `(no stack violated)` beside a large TOTAL is the healthy result. The abandoned
