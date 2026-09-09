@@ -50,7 +50,7 @@
 # them, so one pasted into the wrong block fails the build.
 
 version: 1
-updated: 2026-08-29
+updated: 2026-09-09
 
 tiers:
   1:
@@ -178,6 +178,129 @@ tiers:
       note: >-
         Non-AU but authoritative. US-first tactics usually reach AU within a
         cycle or two — useful as a leading indicator, not as AU evidence.
+
+    # ── GB ──────────────────────────────────────────────────────────────────
+    - domain: actionfraud.police.uk
+      name: Action Fraud (National Fraud Intelligence Bureau)
+      url: https://www.actionfraud.police.uk/news
+      region: GB
+      expect: blocked
+      check: manual
+      note: >-
+        The UK national fraud reporting centre. Named alerts here are the primary
+        GB evidence — the energy-rebate wave behind the 2026-09-06 D1 proposal was
+        an Action Fraud alert. Added 2026-09-09; GB had shipped detection but no
+        registered source until then. Its WAF returns 403 to automated requests,
+        hence `expect: blocked` — a human opens this one.
+    - domain: ncsc.gov.uk
+      name: NCSC — National Cyber Security Centre
+      url: https://www.ncsc.gov.uk/news
+      region: GB
+      check: manual
+      note: Runs the Suspicious Email Reporting Service; phishing trend reporting.
+    - domain: ofcom.org.uk
+      name: Ofcom — scam calls and texts
+      url: https://www.ofcom.org.uk/phones-and-broadband/scam-calls-and-messages/
+      region: GB
+      expect: blocked
+      check: manual
+      note: >-
+        Sender-ID and number-spoofing policy; the GB counterpart to ACMA. Bot
+        protection answers automated requests with 403, hence `expect: blocked`.
+    # ── NZ ──────────────────────────────────────────────────────────────────
+    - domain: ncsc.govt.nz
+      name: NCSC New Zealand (formerly CERT NZ)
+      url: https://www.ncsc.govt.nz/news/
+      region: NZ
+      check: manual
+      note: >-
+        NZ national cyber authority; quarterly reports and consumer advisories.
+        CERT NZ was folded into the NCSC and cert.govt.nz now 301s here, so the
+        registry records the body that actually publishes. Cited by name in the
+        2026-09-06 sweep while absent from this registry — the gap that
+        motivated check-source-coverage.ts.
+    - domain: netsafe.org.nz
+      name: Netsafe
+      url: https://netsafe.org.nz/news/
+      region: NZ
+      expect: blocked
+      check: manual
+      note: >-
+        NZ online-safety body; consumer scam alerts and reporting pipeline. Its
+        CDN blocks automated requests with 403, hence `expect: blocked`.
+    - domain: consumerprotection.govt.nz
+      name: Consumer Protection NZ (MBIE)
+      url: https://www.consumerprotection.govt.nz/general-help/scamwatch/
+      region: NZ
+      check: manual
+      note: MBIE's Scamwatch NZ — the closest NZ analogue to ACCC Scamwatch.
+
+    # ── CA ──────────────────────────────────────────────────────────────────
+    - domain: antifraudcentre-centreantifraude.ca
+      name: Canadian Anti-Fraud Centre (CAFC)
+      url: https://antifraudcentre-centreantifraude.ca/index-eng.htm
+      region: CA
+      check: manual
+      note: >-
+        Canada's national fraud reporting centre, jointly RCMP/CB/OPP. The
+        recovery-fraud impersonation pattern behind 2026-08-23 D2 came from CAFC
+        reporting. Bilingual — see the French-keyword gap in the README.
+    - domain: competitionbureau.gc.ca
+      name: Competition Bureau Canada
+      url: https://competition-bureau.canada.ca/deceptive-marketing-practices
+      region: CA
+      check: manual
+      note: Deceptive marketing and mass-marketing fraud; runs Fraud Prevention Month.
+    - domain: cyber.gc.ca
+      name: Canadian Centre for Cyber Security
+      url: https://www.cyber.gc.ca/en/alerts-advisories
+      region: CA
+      check: manual
+      note: Federal cyber advisories; phishing and smishing alerts.
+
+    # ── IE ──────────────────────────────────────────────────────────────────
+    - domain: garda.ie
+      name: An Garda Síochána — fraud alerts
+      url: https://www.garda.ie/en/crime-prevention/fraud/
+      region: IE
+      expect: blocked
+      check: manual
+      note: >-
+        Irish national police; the Garda National Economic Crime Bureau issues the
+        named fraud warnings. Source for the money-mule recruitment warnings
+        carried forward into 2026-09-06 D5. Bot protection returns 403 to
+        automated requests, hence `expect: blocked`.
+    - domain: ccpc.ie
+      name: CCPC — Competition and Consumer Protection Commission
+      url: https://www.ccpc.ie/consumers/
+      region: IE
+      check: manual
+      note: Irish consumer protection authority; scam and unauthorised-firm alerts.
+    - domain: fraudsmart.ie
+      name: FraudSMART (Banking & Payments Federation Ireland)
+      url: https://www.fraudsmart.ie/alerts/
+      region: IE
+      check: manual
+      note: >-
+        Industry-run but the most specific Irish source for live smishing and
+        vishing campaigns. Tier 1 on specificity; corroborate a novel claim
+        against garda.ie or ccpc.ie before it justifies a score alone.
+
+    # ── SG ──────────────────────────────────────────────────────────────────
+    - domain: scamshield.gov.sg
+      name: ScamShield (Singapore)
+      url: https://www.scamshield.gov.sg
+      region: SG
+      check: manual
+      note: >-
+        Singapore's national anti-scam service, run with the Singapore Police
+        Force. SG has a region pack but had no registered source.
+    - domain: police.gov.sg
+      name: Singapore Police Force — scam alerts
+      url: https://www.police.gov.sg/Advisories/Scams
+      region: SG
+      check: manual
+      note: The Anti-Scam Command publishes named campaign advisories here.
 
   2:
     - domain: krebsonsecurity.com

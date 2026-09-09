@@ -279,8 +279,15 @@ describe("lookalike discipline", () => {
   it("does not let expect: blocked spread widely", () => {
     // A handful is bot protection; many would mean the checker has stopped
     // actually checking anything.
+    //
+    // Raised from 5 to 9 on 2026-09-09 when tier-1 sources were registered for
+    // GB, NZ, CA, IE and SG: four of the new national authorities (Action
+    // Fraud, Ofcom, Netsafe, An Garda Síochána) sit behind WAFs that 403
+    // automated requests. Each was probed by hand and carries a note saying so.
+    // The cap exists to stop the flag being reached for casually, so it moves
+    // by the number actually justified rather than being removed.
     const blocked = allSources.filter((s) => s.expect === "blocked");
-    expect(blocked.length).toBeLessThanOrEqual(5);
+    expect(blocked.length).toBeLessThanOrEqual(9);
   });
 
   it("keeps retired sources marked and explained", () => {

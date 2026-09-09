@@ -344,3 +344,27 @@ The 2026-06-21 and 2026-07-01 roadmaps predate this convention and have no
 Status block. Their header notes record implementation status in prose
 ("all D1–D17 from that run are now implemented"), which is weaker but adequate;
 they have not been backfilled.
+
+**"No new threats identified" has meant "no sources registered."** Until
+2026-09-09 the registry held tier-1 sources for AU (17) and US (1) and none at
+all for GB, NZ, CA, IE or SG. Because the research reads *from* `sources.yml`
+rather than from open search, a region with no registered authority could only
+ever yield no findings — and several sweeps then recorded "no new materially
+distinct threats identified" for NZ, CA and IE. Read those lines as *not
+researched to the same depth*, never as *nothing is happening*: they are an
+artifact of an empty source list, not an observation about those countries.
+
+The 2026-09-06 NZ section names CERT NZ and Netsafe as checked while neither was
+in the registry, which is the clearest symptom — and CERT NZ had by then been
+folded into NZ's NCSC, so the body named in the prose no longer published under
+that name.
+
+Tier-1 sources for all five regions were registered on 2026-09-09, and
+[`check-source-coverage.ts`](../../scripts/check-source-coverage.ts) now reports
+any supported region with none (`npm run check-source-coverage`). What that does
+**not** do is backfill the cycles already written: the NZ, CA and IE sections of
+sweeps before 2026-09-09 remain unevidenced, and the surfaces promoted from them
+should not be treated as reviewed for those regions. The affected calendars are
+deliberately left showing their real, older `reviewed` dates rather than being
+bumped forward — a visibly stale date is the honest signal when the review did
+not happen.
