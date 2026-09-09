@@ -296,8 +296,22 @@ None of that was visible from the word lists alone.
 5. **Promote the cycle into the user-facing surfaces**, with test coverage:
    - `lib/threatRadar.ts` — add the cycle's *consumer-facing* campaigns (the
      ones a member of the public could actually meet; infrastructure findings
-     stay in docs), set their `lastSeen`/`roadmap` to this sweep, and age any
-     entry no longer in the two most recent sweeps down to `watchlist`.
+     stay in docs), set their `lastSeen`/`roadmap` to this sweep, and re-check
+     every entry's `status` against the authoring rule in `threatRadar.ts`:
+     `active` means a sweep in the last fortnight confirmed it, so an entry
+     whose `lastSeen` is older than the two most recent sweeps becomes
+     `watchlist`.
+
+     **Nothing is removed or replaced by a promotion.** Entries are added to
+     the existing set, and `watchlist` is not a demotion or a statement that a
+     threat has stopped — the entry stays on the page with its content and
+     provenance intact. The status records *how recently a sweep confirmed
+     it*, not how dangerous it is; an entry is still relevant simply by being
+     listed. Keeping entries `active` because they still feel current is the
+     one thing the rule exists to prevent: `active` stops carrying information
+     the moment it covers everything ever recorded. Standing tactics that run
+     continuously rather than in waves are the documented exception — see the
+     `RadarStatus` authoring rule for what earns it.
    - `lib/scamCalendar.ts` — re-review the seasons against the fresh intel and
      bump their `reviewed` date. Only add a season for a genuinely *seasonal*
      spike; a year-round campaign belongs on the radar, not the calendar.
