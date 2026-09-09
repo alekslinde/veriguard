@@ -892,9 +892,55 @@ const DISREGARD_NOTICE =
  */
 const CREDENTIAL_WARNING_TERMS = ["seed phrase", "recovery phrase", "verification code"];
 
+/**
+ * Does an agency name plausibly identify this host?
+ *
+ * Organisations shorten their own names in domains, so a literal substring test
+ * fails on exactly the cases that matter: "australia post" is auspost.com.au,
+ * "an post" is anpost.com, "services australia" hosts Centrelink and Medicare.
+ * Inferring identity from string overlap alone got the headline case wrong —
+ * "Australia Post: track it at auspost.com.au" still scored 55.
+ *
+ * Three passes, cheapest first:
+ *   · the whole normalised name appears in the host ("revenue" in revenue.ie)
+ *   · the host contains an accepted abbreviation of a multi-word name
+ *     ("auspost" from "australia post", "anpost" from "an post")
+ *   · every word of the name appears in the host in order
+ *     ("servicesaustralia" from "services australia")
+ *
+ * Deliberately no fuzzy or initialism matching: "ato" must not be satisfied by
+ * an unrelated host that happens to contain those three letters.
+ */
+function authorityMatchesHost(authority: string, haystack: string): boolean {
+  const words = authority.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  if (words.length === 0) return false;
+  const full = words.join("");
+  if (full.length < 3) return false;
+  if (haystack.includes(full)) return true;
+
+  // Abbreviated compounds: keep the first word's leading syllable. "australia
+  // post" → "auspost", "an post" → "anpost". Only tried for multi-word names,
+  // where the shortening is a real naming convention rather than a guess.
+  if (words.length > 1) {
+    const rest = words.slice(1).join("");
+    for (let n = 2; n <= Math.min(5, words[0].length); n++) {
+      if (haystack.includes(words[0].slice(0, n) + rest)) return true;
+    }
+  }
+
+  // All words present in order, allowing anything between them.
+  let from = 0;
+  for (const w of words) {
+    const at = haystack.indexOf(w, from);
+    if (at === -1) return false;
+    from = at + w.length;
+  }
+  return true;
+}
+
 function allLinksOnLegitDomains(
   urls: string[] | null,
-  pack: { legitDomains: string[]; authorityOwnDomains: string[] },
+  pack: { legitDomains: string[]; authorityOwnDomains: string[]; trustedHostSuffixes: string[] },
   namedAuthorities: string[],
 ): boolean {
   if (!urls || urls.length === 0) return false;
@@ -921,7 +967,7 @@ function allLinksOnLegitDomains(
       return false;
     }
 
-    // The link must not CONTRADICT the agency the message names in its prose.
+    // The link must not CONTRADICT any agency the message names in its prose.
     // Testing only "is this domain allowlisted" let an impersonation launder
     // through a link to an unrelated allowlisted domain — "ATO: your tax refund
     // is pending, log in at auspost.com.au/track" was cleared to safe.
@@ -931,18 +977,35 @@ function allLinksOnLegitDomains(
     // your parcel at auspost.com.au"), and requiring a prose match would put
     // that straight back to 55 — the exact bug this exemption exists to fix.
     // So a message naming no authority in prose keeps the exemption; one that
-    // names one has to point at it.
+    // names any has to point at one of them.
     //
-    // The registrable label carries the organisation's identity ("revenue" in
-    // revenue.ie), compared with punctuation and spacing removed so "an post"
-    // matches anpost.com and "australia post" matches auspost.com.au.
+    // EVERY named authority must be consistent with the link, not merely one.
+    // A .some() here was the mirror of the padding evasion the links loop
+    // guards against: appending the single word "AusPost." to an ATO
+    // impersonation pointing at auspost.com.au dropped it from 55 to 15/safe.
     if (namedAuthorities.length === 0) return true;
-    const label = registrableLabel(host).replace(/[^a-z0-9]/g, "");
-    if (!label) return false;
-    return namedAuthorities.some((a) => {
-      const term = a.toLowerCase().replace(/[^a-z0-9]/g, "");
-      return term.length >= 3 && (label.includes(term) || term.includes(label));
-    });
+
+    // Identity is compared against the whole host, not just the registrable
+    // label. A bare public-suffix allowlist entry ("gov.ie", "gov.au") has an
+    // empty label, which denied the exemption for the very domain the
+    // no-link-sender flag tells the reader to use — a Revenue message linking
+    // gov.ie scored 55 while advising "log in at gov.ie directly instead".
+    //
+    // A host inside the jurisdiction's own government estate satisfies ANY
+    // agency the message names. This is the same concept isOwnDomainSender
+    // uses: gov.au and gov.ie host the whole estate, so an agency's real link
+    // frequently lives on a domain that does not carry its name at all —
+    // Centrelink and Medicare both live under servicesaustralia.gov.au, and
+    // Revenue publishes under gov.ie. String matching cannot bridge a parent
+    // agency relationship, and requiring one scored those genuine messages 55
+    // while the emitted flag told the reader to use the very domain it flagged.
+    const inGovEstate =
+      pack.trustedHostSuffixes.some((suffix) => host.endsWith(suffix.toLowerCase())) ||
+      pack.trustedHostSuffixes.some((suffix) => host === suffix.replace(/^\./, "").toLowerCase());
+    if (inGovEstate) return true;
+
+    const haystack = `${host}.${registrableLabel(host)}`.replace(/[^a-z0-9]/g, "");
+    return namedAuthorities.every((a) => authorityMatchesHost(a, haystack));
   });
 }
 
@@ -1323,7 +1386,15 @@ export function checkSms(
   // people is worse than missing it, because it teaches them the verdict is
   // noise. Evaluated per clause, so a scam cannot buy the exemption by
   // appending a reassurance sentence to a real ask.
-  const clauses = text.split(/[.!?\n]+/);
+  //
+  // Split on coordinating conjunctions as well as sentence punctuation. On
+  // punctuation alone, "Enter your seed phrase to restore access but never
+  // share it with anyone" was ONE clause, so the trailing negation covered the
+  // ask and the message scored 0/safe — the evasion this guard exists to
+  // prevent, just without a full stop. Splitting here costs nothing: a genuine
+  // warning ("never share your seed phrase or recovery phrase") keeps the
+  // negation and the term in the same fragment.
+  const clauses = text.split(/[.!?\n]+|\b(?:but|however|though|although|and then)\b/i);
   const warnedTerms = new Set(
     CREDENTIAL_WARNING_TERMS.filter((term) =>
       clauses.some((c) => NEGATED_ASK.test(c) && mentions(c.toLowerCase(), term)) &&

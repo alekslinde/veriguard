@@ -105,6 +105,48 @@ describe("official-link exemption (SMS)", () => {
     expect(r.verdict).toBe("likely_scam");
   });
 
+  it("matches a multi-word agency name against its abbreviated domain", () => {
+    // The headline case. "australia post" does not appear in auspost.com.au as
+    // a substring, and inferring identity from string overlap alone left this
+    // real tracking SMS at 55. These messages NAME the agency in prose, so they
+    // exercise the matching path rather than the no-authority early return.
+    const r = checkSms(
+      "Australia Post: your parcel is on its way, track it at https://auspost.com.au/track/ABC123",
+      undefined,
+      "AU",
+    );
+    expect(authorityFlag(r)).toBeFalsy();
+    expect(r.verdict).toBe("safe");
+  });
+
+  it("accepts a parent agency's domain for the services it hosts", () => {
+    // Centrelink and Medicare both live under servicesaustralia.gov.au, and
+    // Revenue publishes under gov.ie. No string match can bridge a parent
+    // agency relationship — the government estate does.
+    for (const [region, text] of [
+      ["AU", "Centrelink: view your payment at https://servicesaustralia.gov.au/centrelink"],
+      ["AU", "Medicare: your claim is ready at https://servicesaustralia.gov.au/medicare"],
+      ["IE", "Revenue: log in at https://gov.ie/revenue to view your balance."],
+    ] as const) {
+      const r = checkSms(text, undefined, region);
+      expect(authorityFlag(r)).toBeFalsy();
+      expect(r.verdict).toBe("safe");
+    }
+  });
+
+  it("requires EVERY named authority to be consistent with the link", () => {
+    // The mirror of the padding evasion the links loop guards against: adding
+    // the single word "AusPost." to an ATO impersonation must not buy the
+    // exemption for a link that contradicts the ATO.
+    const r = checkSms(
+      "ATO: your tax refund is pending. AusPost. Log in at https://auspost.com.au/track",
+      undefined,
+      "AU",
+    );
+    expect(authorityFlag(r)).toBeTruthy();
+    expect(r.verdict).toBe("likely_scam");
+  });
+
   it("still flags an agency-named scam pointing somewhere else entirely", () => {
     const r = checkSms("AusPost: parcel held, pay fee at http://auspost-redelivery.top", undefined, "AU");
     expect(r.verdict).toBe("likely_scam");

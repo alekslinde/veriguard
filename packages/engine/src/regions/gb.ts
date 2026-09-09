@@ -244,6 +244,17 @@ const REQUEST_WORDS = [
 const URGENCY_ENERGY_ALLOWANCE = [
   "energy support allowance", "household energy support",
   "claim your bill rebate",
+  // The bare-noun lure, requalified. Dropping "energy rebate" outright went too
+  // far: "you are eligible for an energy rebate of £350" is the Action Fraud
+  // wording and fell to safe with no link present. These keep the
+  // eligibility/claim framing that distinguishes the lure from the billing
+  // line ("your energy rebate of £12 has been applied"), which stays at 0.
+  //
+  // Not shadowed by "you are eligible for a refund" in URGENCY_TAX — that
+  // string does not appear in these, and neither contains the other.
+  "eligible for an energy rebate", "eligible for a energy rebate",
+  "claim your energy rebate", "energy rebate is waiting",
+  "apply for your energy rebate",
 ];
 
 

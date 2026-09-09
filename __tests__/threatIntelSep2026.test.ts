@@ -50,6 +50,18 @@ describe("#272 base — crypto seed-phrase solicitation", () => {
     }
   });
 
+  it("still flags a real ask joined to a warning by a conjunction", () => {
+    // Clause splitting on sentence punctuation alone made this ONE clause, so
+    // the trailing negation covered the ask and it scored 0 — the same evasion
+    // the guard prevents, just without a full stop.
+    const r = checkSms(
+      "Enter your seed phrase to restore access but never share it with anyone",
+      undefined,
+      "AU",
+    );
+    expect(requestFlag(r)).toBeTruthy();
+  });
+
   it("still flags a real ask carrying trailing reassurance boilerplate", () => {
     // The negation is per clause, so appending a warning cannot disarm an ask.
     const r = checkSms(
@@ -241,6 +253,17 @@ describe("#270 GB — energy allowance / price-cap lures", () => {
     for (const phrase of ["household energy support", "claim your bill rebate"]) {
       expect(urgencyFlag(checkSms(phrase, undefined, "GB"))).toBeTruthy();
     }
+  });
+
+  it("still flags the bare-noun lure when it carries eligibility framing", () => {
+    // Removing "energy rebate" outright went too far: this is the Action Fraud
+    // wording and fell to safe with no link present.
+    expect(urgencyFlag(checkSms("You are eligible for an energy rebate of £350", undefined, "GB"))).toBeTruthy();
+    expect(checkSms(
+      "You are eligible for an energy rebate of £350. Claim now: http://gb-rebate.top",
+      undefined,
+      "GB",
+    ).verdict).toBe("likely_scam");
   });
 
   it("no longer flags ordinary supplier billing language", () => {
