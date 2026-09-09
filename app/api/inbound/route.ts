@@ -4,7 +4,8 @@ import { analyzeContent } from "@veriguard/engine/scamDetector";
 import { getUrlhausBlocklist } from "@/lib/urlhausBlocklist";
 import { analyseEmailSource } from "@/lib/emailSource";
 import { formatVerdictEmail } from "@/lib/verdictSummary";
-import { checkAndRecordRateLimit, incrementCheckCount, recordCheckEvent } from "@/lib/reportStore";
+import { checkAndRecordRateLimit, incrementCheckCount, recordCheckEvent, recordTargetRegion } from "@/lib/reportStore";
+import { inferTargetRegion } from "@/lib/targetRegion";
 import { SITE_URL } from "@/lib/siteUrl";
 
 // Inbound webhook for the forward-to-us flow. A Cloudflare Email Worker (see
@@ -110,6 +111,29 @@ export async function POST(req: NextRequest) {
     // Server-side expansion, as in /api/check — the forwarder's IP is never
     // exposed to a shortener.
     const results = await analyzeContent(original, blocklist, undefined, { fetcher: fetch });
+
+    // Which country the scam was aimed at — the same aggregate /api/check
+    // writes, on the surface that carries the traffic. Without this the
+    // aggregate silently describes web and share only while presenting as
+    // "checks", and forward-to-check is the surface most likely to carry a
+    // CROSS-BORDER campaign, which is the disagreement the data exists to
+    // record. The evidence is discarded with this request and cannot be
+    // backfilled, so an unwired path loses it permanently.
+    //
+    // Inferred from `original` — the extracted scam — not `raw`: the top-level
+    // headers belong to the forwarder, so inferring from those would attribute
+    // the campaign to whoever reported it.
+    //
+    // Aggregate-only, exactly as on the web path: a day-bucketed counter keyed
+    // on (day, surface, region, confidence), with no per-message row and no
+    // fragment of the content that produced it. There is no `shareRegion`
+    // signal on this path to honour — a forwarding mail client cannot send one.
+    //
+    // Not awaited, and `.catch()` rather than bare `void`: a telemetry write
+    // must never add latency to a reply or fail a check, and a floated promise
+    // with no handler turns a future throw into an unhandled rejection.
+    const target = inferTargetRegion(original);
+    recordTargetRegion("email", target.region, target.confidence).catch(() => {});
 
     const pixelReport = tracking.pixelReport.hasTrackingPixels ? tracking.pixelReport : null;
 

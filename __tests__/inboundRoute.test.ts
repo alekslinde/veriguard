@@ -7,12 +7,14 @@ vi.mock("@/lib/urlhausBlocklist", () => ({
 }));
 const incrementCheckCount = vi.fn(async () => {});
 const recordCheckEvent = vi.fn(async () => {});
+const recordTargetRegion = vi.fn(async () => {});
 vi.mock("@/lib/reportStore", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/reportStore")>();
   return {
     ...actual,
     incrementCheckCount: () => incrementCheckCount(),
     recordCheckEvent: (...args: unknown[]) => recordCheckEvent(...(args as [])),
+    recordTargetRegion: (...args: unknown[]) => recordTargetRegion(...(args as [])),
   };
 });
 
@@ -226,6 +228,97 @@ describe("POST /api/inbound — check counter", () => {
     const body = await res.json();
     expect(body.counted).toBeUndefined();
     expect(incrementCheckCount).not.toHaveBeenCalled();
+  });
+});
+
+// P8 (probe 2026-09-09): the inference was wired to /api/check only, so no
+// forwarded email could ever contribute a target-region row — and email was
+// the only surface carrying traffic. The evidence is discarded per request and
+// cannot be backfilled, so an unwired path loses it permanently.
+describe("POST /api/inbound — target-region inference", () => {
+  beforeEach(() => recordTargetRegion.mockClear());
+
+  it("records the target region of a forwarded scam on the email surface", async () => {
+    const auForward = [
+      "From: victim@gmail.com",
+      "Subject: Fwd: refund",
+      "",
+      "---------- Forwarded message ---------",
+      "From: myGov <refunds@mygov-refund.com.au>",
+      "Subject: refund",
+      "",
+      "You are owed money, click http://mygov-refund.com.au/claim",
+    ].join("\n");
+    const res = await POST(inbound({ raw: auForward, from: "p8-au@example.com" }));
+    expect((await res.json()).ok).toBe(true);
+    expect(recordTargetRegion).toHaveBeenCalledTimes(1);
+    const [surface, region, confidence] =
+      recordTargetRegion.mock.calls[0] as unknown as string[];
+    expect(surface).toBe("email");
+    expect(region).toBe("AU");
+    expect(confidence).toBe("tld");
+  });
+
+  // The whole reason to infer from `original` rather than `raw`. The top-level
+  // headers belong to the FORWARDER; inferring from those attributes the
+  // campaign to whoever reported it, which is the exact confusion between
+  // target and connection region the aggregate exists to expose.
+  // The AU signal lives ONLY in the forwarder's own header line, so it is
+  // absent from the extracted original entirely — inferring from `raw` yields
+  // AU, inferring from `original` yields GB. An earlier version of this test
+  // used a `.com.au` sender address and passed under BOTH readings (an email
+  // address is not a corroborated hostname, so it never scored), which made it
+  // a test that named the right thing without exercising it.
+  it("infers from the extracted scam, not the forwarder's own headers", async () => {
+    const crossBorder = [
+      "From: reporter@example.com",
+      "Subject: Fwd: tax — seen at https://www.mygov.com.au/inbox",
+      "",
+      "---------- Forwarded message ---------",
+      "From: HMRC <refunds@hmrc-refund.co.uk>",
+      "Subject: tax refund",
+      "",
+      "Your HMRC refund is pending: http://hmrc-refund.co.uk/claim",
+    ].join("\n");
+    await POST(inbound({ raw: crossBorder, from: "p8-crossborder@example.com" }));
+    expect(recordTargetRegion).toHaveBeenCalledTimes(1);
+    const [, region] = recordTargetRegion.mock.calls[0] as unknown as string[];
+    // GB (the scam's target), NOT AU (where the forwarder saw it).
+    expect(region).toBe("GB");
+  });
+
+  it("writes no target-region row on the delivered confirmation branch", async () => {
+    await POST(inbound({ delivered: true, from: "p8-delivered@example.com" }));
+    expect(recordTargetRegion).not.toHaveBeenCalled();
+  });
+
+  // Abstention is the common case and is dropped rather than bucketed, so the
+  // call still happens — recordTargetRegion itself drops an empty region.
+  it("passes an empty region through when no national signal is present", async () => {
+    const neutral = [
+      "From: victim@gmail.com",
+      "Subject: Fwd: parcel",
+      "",
+      "---------- Forwarded message ---------",
+      "From: delivery@parcel-notice.top",
+      "",
+      "Your parcel is held. Pay the fee at http://parcel-notice.top/pay",
+    ].join("\n");
+    await POST(inbound({ raw: neutral, from: "p8-neutral@example.com" }));
+    const [, region] = recordTargetRegion.mock.calls[0] as unknown as string[];
+    expect(region).toBe("");
+  });
+
+  // Telemetry must never fail a check: the forwarder still gets their verdict.
+  it("still returns a reply when the aggregate write rejects", async () => {
+    recordTargetRegion.mockRejectedValueOnce(new Error("db down"));
+    const res = await POST(inbound({ raw: SCAM_FORWARD, from: "p8-reject@example.com" }));
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    // Not `skip: "analysis-error"` — the telemetry failure must not reach the
+    // route's outer catch, which would swallow the verdict the forwarder came for.
+    expect(body.skip).toBeUndefined();
+    expect(body.reply.subject).toBeTruthy();
   });
 });
 
