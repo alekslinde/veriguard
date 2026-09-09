@@ -19,6 +19,8 @@
     "region-demand": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/region-demand.ts",
     "check-calendar": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/check-calendar-sources.ts",
     "check-promotion": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/check-promotion-freshness.ts",
+    "sweep-coverage": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/sweep-coverage.ts",
+    "check-source-coverage": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/check-source-coverage.ts",
     "icons": "node scripts/generate-icons.mjs",
     "psl": "node scripts/generate-psl.mjs",
     "ocr-assets": "node scripts/copy-ocr-assets.mjs",

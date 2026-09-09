@@ -34,8 +34,8 @@ import { readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
-import { lastUpdated } from "../lib/threatRadar";
-import { lastReviewed } from "../lib/scamCalendar";
+import { lastUpdated, authoredRadarRegions, type RadarRegion } from "../lib/threatRadar";
+import { lastReviewed, authoredCalendarRegions, type CalendarRegion } from "../lib/scamCalendar";
 // Plain .mjs helper shared with check-sources.mjs / dependabot-triage.mjs;
 // `allowJs` resolves it and infers its shape from JSDoc.
 import { publishDigestIssue } from "./lib/digestIssue.mjs";
@@ -43,16 +43,13 @@ import { publishDigestIssue } from "./lib/digestIssue.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROADMAP_DIR = resolve(HERE, "../docs/threat-intel");
 
-// The radar and calendar are both authored primarily for AU (the only region
-// with a radar, and the sweep's home region), so their freshness is measured
-// against AU. If a second region ever grows its own radar, add it here.
-const REGION = "AU";
-
 const ROADMAP_RE = /^(\d{4}-\d{2}-\d{2})-threat-roadmap\.md$/;
 
 interface Surface {
   /** Human label for the report. */
   name: string;
+  /** Region whose authored data this row measures. */
+  region: RadarRegion | CalendarRegion;
   /** File a promoter would edit. */
   file: string;
   /** The "as at" date the surface currently advertises, or null if empty. */
@@ -71,27 +68,68 @@ async function newestRoadmap(): Promise<string | null> {
   return dates.length ? dates[dates.length - 1] : null;
 }
 
+/**
+ * One row per authored (surface, region) pair.
+ *
+ * Enumerated from the data rather than a fixed "AU", so a region that grows a
+ * radar or calendar starts being measured the moment it is authored. A region
+ * with no authored data for a surface produces no row at all — that is not the
+ * same claim as "up to date", and inventing an empty row for every unauthored
+ * region would bury the real gaps under noise.
+ */
 function surfaces(): Surface[] {
-  return [
-    {
+  const rows: Surface[] = [];
+  for (const region of authoredRadarRegions()) {
+    rows.push({
       name: "Threat radar",
+      region,
       file: "lib/threatRadar.ts",
-      asAt: lastUpdated(REGION),
+      asAt: lastUpdated(region),
       derivedFrom: "lastUpdated() — the newest lastSeen across the entries",
-    },
-    {
+    });
+  }
+  for (const region of authoredCalendarRegions()) {
+    rows.push({
       name: "Scam calendar",
+      region,
       file: "lib/scamCalendar.ts",
-      asAt: lastReviewed(REGION),
+      asAt: lastReviewed(region),
       derivedFrom: "lastReviewed() — the newest reviewed date across the seasons",
-    },
-  ];
+    });
+  }
+  return rows;
 }
 
 interface Report {
   newest: string;
   behind: Array<{ surface: Surface; gapDays: number }>;
   inSync: Surface[];
+}
+
+/**
+ * Regions whose staleness gates the digest issue and the exit code.
+ *
+ * Everything authored is REPORTED; only these decide whether the check is
+ * failing. The two are deliberately different. Before this check looked past
+ * AU, five non-AU calendars were already behind — some by nearly a month — and
+ * folding them into the gate would mean `behind.length === 0` could never hold
+ * again, so the digest issue could never close no matter how promptly a sweep
+ * was promoted. A permanently-open flag is one nobody reads, which is the
+ * alert fatigue this file's own comments argue against.
+ *
+ * AU is the gate because it is the sweeps' home region: a roadmap that lands
+ * un-promoted is, first and always, an AU promotion that did not happen. The
+ * other regions are reported so their drift is visible and can be worked off
+ * deliberately, rather than being silently absent as they were before.
+ *
+ * Widen this as a region's promotion actually becomes routine — the list is
+ * the honest statement of what we hold ourselves to, not of what exists.
+ */
+const GATING_REGIONS = new Set(["AU"]);
+
+/** The behind-rows that gate: stale, and in a region we hold to the cycle. */
+function gating(report: Report): Report["behind"] {
+  return report.behind.filter((b) => GATING_REGIONS.has(b.surface.region));
 }
 
 // Whole-day gap between two YYYY-MM-DD strings, for the "N days behind" line.
@@ -124,20 +162,34 @@ function human(report: Report): string {
   const lines: string[] = [];
   lines.push(`Newest sweep on disk: ${report.newest}`);
   lines.push("");
-  if (report.behind.length === 0) {
-    lines.push("✅ Radar and calendar are both current with the newest sweep.");
+  const gate = gating(report);
+  const informational = report.behind.filter((b) => !GATING_REGIONS.has(b.surface.region));
+
+  if (gate.length === 0) {
+    lines.push("✅ Radar and calendar are current with the newest sweep.");
   } else {
     lines.push("⚠️  A surface has fallen behind the newest sweep:");
-    for (const { surface, gapDays } of report.behind) {
+    for (const { surface, gapDays } of gate) {
       const at = surface.asAt ?? "(empty)";
-      lines.push(`  • ${surface.name} (${surface.file}) — as at ${at}, ${gapDays} day(s) behind`);
+      lines.push(
+        `  • ${surface.name} [${surface.region}] (${surface.file}) — as at ${at}, ${gapDays} day(s) behind`,
+      );
     }
     lines.push("");
     lines.push("Promote the sweep into the surface(s) above — see");
     lines.push("docs/threat-intel/README.md, the Workflow section.");
   }
+
+  if (informational.length > 0) {
+    lines.push("");
+    lines.push("Also behind, not gating (see GATING_REGIONS):");
+    for (const { surface, gapDays } of informational) {
+      const at = surface.asAt ?? "(empty)";
+      lines.push(`  · ${surface.name} [${surface.region}] — as at ${at}, ${gapDays} day(s) behind`);
+    }
+  }
   for (const surface of report.inSync) {
-    lines.push(`  · ${surface.name} up to date (as at ${surface.asAt}).`);
+    lines.push(`  · ${surface.name} [${surface.region}] up to date (as at ${surface.asAt}).`);
   }
   return lines.join("\n");
 }
@@ -148,25 +200,47 @@ function markdown(report: Report): string {
   lines.push("");
   lines.push(`Newest sweep on disk: **${report.newest}**`);
   lines.push("");
-  if (report.behind.length === 0) {
-    lines.push("✅ The threat radar and scam calendar are both current with the newest sweep.");
+  const gate = gating(report);
+  const informational = report.behind.filter((b) => !GATING_REGIONS.has(b.surface.region));
+
+  const table = (rows: Report["behind"]) => {
+    lines.push("| Surface | Region | File | As at | Behind |");
+    lines.push("|---|---|---|---|---|");
+    for (const { surface, gapDays } of rows) {
+      const at = surface.asAt ?? "_(empty)_";
+      lines.push(
+        `| ${surface.name} | ${surface.region} | \`${surface.file}\` | ${at} | ${gapDays} day(s) |`,
+      );
+    }
+    lines.push("");
+  };
+
+  if (gate.length === 0) {
+    lines.push("✅ The threat radar and scam calendar are current with the newest sweep.");
+    if (informational.length > 0) {
+      lines.push("");
+      lines.push("Other authored regions are behind but do not gate this check:");
+      lines.push("");
+      table(informational);
+    }
     return lines.join("\n");
   }
   lines.push("The newest weekly sweep has landed in `docs/threat-intel/`, but a");
   lines.push("user-facing surface has not been promoted forward to match it:");
   lines.push("");
-  lines.push("| Surface | File | As at | Behind |");
-  lines.push("|---|---|---|---|");
-  for (const { surface, gapDays } of report.behind) {
-    const at = surface.asAt ?? "_(empty)_";
-    lines.push(`| ${surface.name} | \`${surface.file}\` | ${at} | ${gapDays} day(s) |`);
-  }
-  lines.push("");
+  table(gate);
   lines.push("**What to do:** promote the cycle into the surface(s) above, then re-run");
   lines.push("this check. The promotion step is documented in");
   lines.push("[`docs/threat-intel/README.md`](../blob/main/docs/threat-intel/README.md)");
   lines.push("(the *Workflow* section). This is a maintenance flag, not a broken build —");
   lines.push("promotion is an editorial call and stays a human step.");
+  if (informational.length > 0) {
+    lines.push("");
+    lines.push("Other authored regions are also behind. They are reported for");
+    lines.push("visibility and do not gate this check:");
+    lines.push("");
+    table(informational);
+  }
   return lines.join("\n");
 }
 
@@ -206,7 +280,7 @@ async function main() {
         label: "promotion-freshness",
         title: "📡 Radar / calendar promotion freshness",
         body: markdown(report),
-        clean: report.behind.length === 0,
+        clean: gating(report).length === 0,
         extraLabels: ["threat-intel"],
         labelColor: "0e8a16",
         labelDescription: "Weekly check that the radar/calendar have been promoted to the newest sweep",
@@ -222,7 +296,7 @@ async function main() {
     }
   }
 
-  process.exitCode = report.behind.length > 0 ? 1 : 0;
+  process.exitCode = gating(report).length > 0 ? 1 : 0;
 }
 
 // Only run when invoked directly, so newestRoadmap/assess can be imported by a
@@ -235,4 +309,4 @@ if (invokedDirectly) {
   });
 }
 
-export { newestRoadmap, assess, human, markdown, type Report };
+export { newestRoadmap, assess, human, markdown, gating, GATING_REGIONS, type Report };

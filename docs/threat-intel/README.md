@@ -296,8 +296,22 @@ None of that was visible from the word lists alone.
 5. **Promote the cycle into the user-facing surfaces**, with test coverage:
    - `lib/threatRadar.ts` — add the cycle's *consumer-facing* campaigns (the
      ones a member of the public could actually meet; infrastructure findings
-     stay in docs), set their `lastSeen`/`roadmap` to this sweep, and age any
-     entry no longer in the two most recent sweeps down to `watchlist`.
+     stay in docs), set their `lastSeen`/`roadmap` to this sweep, and re-check
+     every entry's `status` against the authoring rule in `threatRadar.ts`:
+     `active` means a sweep in the last fortnight confirmed it, so an entry
+     whose `lastSeen` is older than the two most recent sweeps becomes
+     `watchlist`.
+
+     **Nothing is removed or replaced by a promotion.** Entries are added to
+     the existing set, and `watchlist` is not a demotion or a statement that a
+     threat has stopped — the entry stays on the page with its content and
+     provenance intact. The status records *how recently a sweep confirmed
+     it*, not how dangerous it is; an entry is still relevant simply by being
+     listed. Keeping entries `active` because they still feel current is the
+     one thing the rule exists to prevent: `active` stops carrying information
+     the moment it covers everything ever recorded. Standing tactics that run
+     continuously rather than in waves are the documented exception — see the
+     `RadarStatus` authoring rule for what earns it.
    - `lib/scamCalendar.ts` — re-review the seasons against the fresh intel and
      bump their `reviewed` date. Only add a season for a genuinely *seasonal*
      spike; a year-round campaign belongs on the radar, not the calendar.
@@ -330,3 +344,27 @@ The 2026-06-21 and 2026-07-01 roadmaps predate this convention and have no
 Status block. Their header notes record implementation status in prose
 ("all D1–D17 from that run are now implemented"), which is weaker but adequate;
 they have not been backfilled.
+
+**"No new threats identified" has meant "no sources registered."** Until
+2026-09-09 the registry held tier-1 sources for AU (17) and US (1) and none at
+all for GB, NZ, CA, IE or SG. Because the research reads *from* `sources.yml`
+rather than from open search, a region with no registered authority could only
+ever yield no findings — and several sweeps then recorded "no new materially
+distinct threats identified" for NZ, CA and IE. Read those lines as *not
+researched to the same depth*, never as *nothing is happening*: they are an
+artifact of an empty source list, not an observation about those countries.
+
+The 2026-09-06 NZ section names CERT NZ and Netsafe as checked while neither was
+in the registry, which is the clearest symptom — and CERT NZ had by then been
+folded into NZ's NCSC, so the body named in the prose no longer published under
+that name.
+
+Tier-1 sources for all five regions were registered on 2026-09-09, and
+[`check-source-coverage.ts`](../../scripts/check-source-coverage.ts) now reports
+any supported region with none (`npm run check-source-coverage`). What that does
+**not** do is backfill the cycles already written: the NZ, CA and IE sections of
+sweeps before 2026-09-09 remain unevidenced, and the surfaces promoted from them
+should not be treated as reviewed for those regions. The affected calendars are
+deliberately left showing their real, older `reviewed` dates rather than being
+bumped forward — a visibly stale date is the honest signal when the review did
+not happen.

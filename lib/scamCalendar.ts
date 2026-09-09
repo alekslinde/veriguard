@@ -328,7 +328,7 @@ const AU_SEASONS: ScamSeason[] = [
     ],
     advice: "Only bet with operators licensed in Australia — check the licence on the regulator's list. Nobody can guarantee a win, and no legitimate prize needs a fee to release it. A site that holds winnings you can already see behind a \"verification\" fee is a fake platform, not a slow payout.",
     sources: [AU.scamwatch, AU.acma],
-    reviewed: "2026-08-31",
+    reviewed: "2026-09-06",
   },
   {
     id: "summer-travel",
@@ -433,17 +433,19 @@ const GB_SEASONS: ScamSeason[] = [
     title: "Winter energy & cost-of-living",
     window: { startMonth: 10, startDay: 1, endMonth: 3, endDay: 31 },
     confidence: "elevated",
-    why: "Winter bills are high and government support schemes are in the news, so both \"you're owed a rebate\" and \"pay now or be cut off\" find willing readers.",
+    why: "Winter bills are high and government support schemes are in the news, so both \"you're owed a rebate\" and \"pay now or be cut off\" find willing readers. The Ofgem price cap changes on 1 October, and the announcement is reliably followed within days by a wave of \"allowance\" and \"rebate\" texts riding the coverage.",
     lures: [
       "\"You're eligible for an energy rebate — apply now\"",
       "Fake supplier disconnection notices",
       "\"Ofgem/Government cost-of-living payment — confirm your bank details\"",
       "Fake council tax refund messages",
       "\"Benefit entitlement check required\" — a generic eligibility form that never names the payment",
+      "\"You are eligible for an energy support allowance of £350 — claim at …\"",
+      "\"Claim your bill rebate\" in the days after a price-cap announcement",
     ],
-    advice: "Government support is applied automatically or through GOV.UK — never a link asking for your bank details. The DWP writes by letter or through your Universal Credit journal; it doesn't text you an eligibility form. Check any bill by logging in to your supplier directly.",
+    advice: "Government support is applied automatically or through GOV.UK — never a link asking for your bank details. The DWP writes by letter or through your Universal Credit journal; it doesn't text you an eligibility form. Check any bill by logging in to your supplier directly. A price-cap change in the news is not a reason to trust a text about it — that is precisely when these arrive.",
     sources: [GB.takefive, GB.citizensadvice],
-    reviewed: "2026-08-27",
+    reviewed: "2026-09-06",
   },
   {
     id: "summer-holiday",
@@ -945,7 +947,7 @@ const CALENDARS = {
  * omission is invisible at runtime (regionToday falls back rather than throws),
  * so the type is the only place it can be caught.
  */
-type CalendarRegion = keyof typeof CALENDARS;
+export type CalendarRegion = keyof typeof CALENDARS;
 
 /** Narrows an arbitrary region code to one that has an authored calendar. */
 function isCalendarRegion(code: RegionCode): code is CalendarRegion {

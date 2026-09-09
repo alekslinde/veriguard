@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   radarForRegion,
+  authoredRadarRegions,
   threatsByStatus,
   activeThreats,
   lastUpdated,
@@ -138,6 +139,23 @@ describe("i18n", () => {
   });
 });
 
+/**
+ * Standing tactics, exempt from the recency half of the status rule.
+ *
+ * Documented on RadarStatus in lib/threatRadar.ts: these run continuously at a
+ * steady baseline rather than in waves, so they stop being re-reported without
+ * stopping. That is a fact about the reporting cadence, not the risk.
+ *
+ * Declared once and shared by every status check — three copies of the same
+ * literal is three places to forget when a tactic earns or loses the exemption.
+ */
+const PERSISTENT_IDS = new Set(["hi-mum", "voice-clone-family"]);
+
+/** The two most recent sweep dates an entry set cites. */
+function recentSweeps(entries: readonly ThreatEntry[]): string[] {
+  return [...new Set(entries.map((t) => t.lastSeen))].sort().slice(-2);
+}
+
 describe("threatsByStatus", () => {
   it("partitions the region's entries with nothing lost or duplicated", () => {
     const active = threatsByStatus("AU", "active");
@@ -154,15 +172,62 @@ describe("threatsByStatus", () => {
     // anything once it covers everything we have ever recorded — the first draft
     // marked 21 of 24 entries active, which taught the reader nothing.
     //
-    // The two exceptions are standing tactics rather than campaigns: they run
-    // continuously and so stop being re-reported, which is a fact about the
-    // reporting cadence and not about the risk.
-    const PERSISTENT = new Set(["hi-mum", "voice-clone-family"]);
+    // Recency is NECESSARY for `active`, and deliberately not sufficient: see
+    // the staleness test below for the other half, and PERSISTENT_IDS for the
+    // standing tactics that are exempt from this direction.
+    for (const region of authoredRadarRegions()) {
+      const entries = radarForRegion(region);
+      const sweeps = recentSweeps(entries);
+      for (const threat of entries) {
+        if (threat.status !== "active" || PERSISTENT_IDS.has(threat.id)) continue;
+        expect(
+          sweeps.includes(threat.lastSeen),
+          `${region}/${threat.id} last seen ${threat.lastSeen}`,
+        ).toBe(true);
+      }
+    }
+  });
 
-    const sweeps = [...new Set(AU.map((t) => t.lastSeen))].sort().slice(-2);
-    for (const threat of threatsByStatus("AU", "active")) {
-      if (PERSISTENT.has(threat.id)) continue;
-      expect(sweeps.includes(threat.lastSeen), `${threat.id} last seen ${threat.lastSeen}`).toBe(true);
+  it("does not carry a stale lastSeen on an entry it still calls active", () => {
+    // The direction that actually drifts, and the one nothing caught before:
+    // a promotion that updates some entries and not others leaves a campaign
+    // the newest sweep re-confirmed sitting on an old `lastSeen` (issue #194).
+    //
+    // Stated as "no active entry may be stale" rather than "every recent entry
+    // must be active". The stronger form was wrong: it would make recency
+    // SUFFICIENT for `active`, so a sweep that records a campaign cooling off
+    // could never be reflected — the promoter would have to force `active`,
+    // jump straight to `subsided`, or leave `lastSeen` stale to demote
+    // anything. That last option is precisely the staleness these checks
+    // exist to prevent, so the guard would have pressured toward the bug.
+    // Demoting a re-confirmed campaign to `watchlist` is a legitimate
+    // editorial call and stays available.
+    for (const region of authoredRadarRegions()) {
+      const entries = radarForRegion(region);
+      const sweeps = recentSweeps(entries);
+      for (const threat of entries) {
+        if (threat.status !== "active" || PERSISTENT_IDS.has(threat.id)) continue;
+        expect(
+          sweeps.includes(threat.lastSeen),
+          `${region}/${threat.id} is active but was last confirmed ${threat.lastSeen}, ` +
+            `outside the two most recent sweeps (${sweeps.join(", ")})`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("keeps at least one entry current with the newest promoted sweep", () => {
+    // Catches the whole-surface version of the same drift: every entry ageing
+    // in lockstep would satisfy the per-entry checks above while the board as a
+    // whole silently fell behind the archive.
+    for (const region of authoredRadarRegions()) {
+      const entries = radarForRegion(region);
+      if (entries.length === 0) continue;
+      const newest = entries.reduce((a, t) => (t.lastSeen > a ? t.lastSeen : a), "");
+      expect(
+        entries.some((t) => t.lastSeen === newest && t.status === "active"),
+        `${region} has no active entry at its newest sweep (${newest})`,
+      ).toBe(true);
     }
   });
 
