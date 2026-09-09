@@ -455,7 +455,18 @@ export function checkUrl(
     };
   }
 
-  const hostname = urlObj.hostname.toLowerCase();
+  // Trailing root dot stripped here, at the one place every hostname check in
+  // this function reads from, rather than at each caller. "evil.tk." is a valid
+  // FQDN for the identical host, but it survives URL parsing into `hostname`
+  // and defeats every `=== d` and `endsWith("." + d)` below.
+  //
+  // It cuts BOTH ways, which is why this belongs at the entry point and not in
+  // one matcher: a scam on "evil-login.tk./x" evaded the suspicious-TLD check
+  // (55 → 25), and a real "ato.gov.au./mytax" missed the legit-domain
+  // allowlist. Callers that route through normaliseForAnalysis were already
+  // covered; the ones that hand checkUrl a raw regex match were not, so the
+  // protection depended on which path the string arrived by.
+  const hostname = urlObj.hostname.toLowerCase().replace(/\.+$/, "");
   const fullUrl = input.toLowerCase();
 
   // Known-legitimate domains for this region — strong positive signal. Routed
@@ -952,7 +963,22 @@ function allLinksOnLegitDomains(
     } catch {
       return false;
     }
-    const host = link.hostname.toLowerCase();
+    // Trailing dot stripped for the same reason normaliseForAnalysis strips it:
+    // "auspost.com.au." is a valid FQDN for the identical host, but it survives
+    // URL parsing into `hostname` and defeats every comparison below. Left in,
+    // it fails in the costly direction here — a real Australia Post tracking
+    // SMS written with the root dot misses the allowlist and scores
+    // 55/likely_scam, which is exactly the false positive this exemption exists
+    // to prevent.
+    //
+    // The metamorphic host-trailing-dot relation caught THIS case, because a
+    // false positive raises the worst card. It does not cover the mirror
+    // direction — a dot dropping a suspicious-TLD flag lowers the message card
+    // while the per-URL card (which normalises first) stays high, and the
+    // harness scores the worst card. So that half is guarded by
+    // urlTrailingDot.test.ts, not by the relation. Do not read a green
+    // metamorphic run as coverage of the scam direction.
+    const host = link.hostname.toLowerCase().replace(/\.+$/, "");
     const onAllowlist = allowed.some((d) => {
       const domain = d.toLowerCase();
       return host === domain || host.endsWith("." + domain);
