@@ -353,6 +353,136 @@ bulk, and the base layer is where worldwide coverage actually comes from — but
 base edit changes every region at once while the corpus measures six countries.
 These relations are what make that safe to do quickly.
 
+## Composite stacks
+
+```bash
+npm run eval:metamorphic                                  # includes composites
+npm run eval:metamorphic -- --seed=7 --stacks=200         # search harder
+npm run eval:metamorphic -- --depth=2,3,4                 # deeper stacks
+npm run eval:metamorphic -- --no-composites               # single transforms only
+```
+
+The transforms above are applied **one at a time**. That is a weaker result than
+a clean run makes it look, because a relation holding individually does not make
+it hold in composition. Each step may legitimately shed a few points — an
+obfuscation penalty that does not fire twice, a keyword discount, a rule that
+stops matching — while no single step crosses a verdict threshold. Stack several
+and the sum can cross it, with every constituent check still green.
+
+That is also what an evader does. Nobody picks one trick and stops; they rewrite
+until it gets through, which means zero-width spaces *and* a homoglyph *and*
+padding *and* a forward wrapper, on one message. The single-transform suite
+cannot construct that message.
+
+Stacks are **sampled, not exhaustive**: depth 2 and 3 over 14 transforms is 2,366
+ordered stacks, and running all of them per case would take the suite from
+hundreds of checks to hundreds of thousands. `--seed` makes a sample
+reproducible, so a violation found in CI replays locally from the seed alone.
+Order is part of the attack and is recorded in the id — defanging then recasing
+is a different string from recasing then defanging, and the second may find no
+URL to defang at all.
+
+Three rules keep a composite sound, all enforced by the runner:
+
+| Rule | Why |
+|---|---|
+| A stack's relation is its **weakest** member | `equal` ∘ `equal` still means the same thing; any `noWeaker` member is permitted to raise the score, and the composite inherits that permission |
+| `applies` is re-checked at **every step**, against the running content | Step 2 is asked about the text step 1 produced, not the corpus content |
+| A no-op **abandons** the stack rather than shortening it | A depth-3 stack reported under a three-name label must have applied three transforms, or the reproduction does not match |
+
+### What it found
+
+Rule 2 is not hypothetical — it is the rule the first run broke, and the defect
+was in the **harness**, not the engine.
+
+`benign-padding` excludes cases carrying email headers, because prose above a
+`From:` line means the text is no longer an email and the header-derived signals
+it loses were correctly earned. The guard was `/^[A-Za-z-]+:\s/`, anchored to the
+start of the string, which is correct for every case in the corpus. But
+`forwarded-prefix` puts a `---------- Forwarded message ----------` banner
+*above* the header block, so the headers no longer sit at index 0, the guard
+waved the case through, and the composite padded above a `From:` line after all.
+
+Eight violations across four cases, all the same shape: `likely_scam (100) →
+suspicious (38)`, with the drop landing entirely on the padding step. The signal
+lost was *"Sender claims to be official but domain doesn't match"* — the
+impersonation row the email path derives from headers. On `au-sms-0007` the
+forward first *raised* the score 60 → 82, which is the wrapper correctly adding
+signal, before padding took it to 42.
+
+The guard is now `/^(?:From|Reply-To|Return-Path|Sender):\s/im` — multiline, and
+named to the headers the email path actually keys on. **No single transform can
+build the input it was written to exclude**, which is exactly why composition
+found it.
+
+The per-step trail in the violation report is what made the diagnosis a minute's
+work rather than an afternoon's: it rescores every prefix of the stack, so the
+step that shed the points names itself.
+
+### In CI
+
+`.github/workflows/metamorphic.yml` runs this on two schedules with two seeds,
+because the families have different determinism:
+
+| | Seed | Sample | On a violation |
+|---|---|---|---|
+| **PR / push to main** | Fixed (1) | 120 stacks, depth 2–3 | Fails the build |
+| **Weekly (Mon 21:00 UTC)** | ISO year+week (`202637`) | 400 stacks, depth 2–4 | Refreshes the 🧬 *Composite metamorphic drift* issue |
+
+The single-transform and region relations are deterministic — same corpus, same
+engine, same result — so on a PR red means "this diff broke it" and nothing else.
+Composites are a **sampled search**, so a new seed can surface a pre-existing bug
+with no code change at all. Rotating the seed on PRs was rejected for that
+reason: a gate that goes red for reasons unrelated to your diff is one people
+learn to re-run until green, which costs more than the coverage buys.
+
+At a *fixed* seed the composite family is deterministic too, which is why exit 3
+still fails a PR. The separate code exists to route the weekly search's findings
+to an issue, not to make composites unenforceable.
+
+The weekly seed combines the ISO year and week rather than using the week alone:
+`+%V` yields 53 values that repeat annually, so a year later the "new" search
+would cover ground already searched, and week 01 would collide with the fixed PR
+seed 1.
+
+`--issue` refuses (exit 2) when no composite search ran — `--no-composites`,
+`--stacks=0`, or an `--only` pool too small to build a stack. Zero violations
+out of zero checks is not a clean result, and closing the drift issue on one
+would auto-resolve an open finding nobody looked at.
+
+Exit codes:
+
+| Code | Meaning |
+|---|---|
+| 0 | Everything holds |
+| 1 | A single-transform or region relation broke — deterministic, always fails |
+| 3 | Composite stacks only — real, but possibly not this diff's fault |
+| 2 | The harness itself broke (bad flags, unloadable corpus) |
+
+A run breaking both reports 1: the deterministic failure is the one to fix first
+and its cause is unambiguous.
+
+Only composites get an issue. The other two already fail the build on the PR that
+caused them, so an issue would restate a red check; composites are the search
+whose findings arrive without a triggering diff, which is what a long-lived
+digest issue is for. It closes itself on the next clean week and reopens on the
+next finding, matching `check-sources` and `promotion-freshness`.
+
+### Reading a composite run
+
+`(no stack violated)` beside a large TOTAL is the healthy result. The abandoned
+count below it is coverage, not failure — most sampled stacks cannot apply to
+most cases (a phone reformatter over a URL-only case), and a run typically
+abandons far more applications than it completes. A **rising** abandoned share
+across seeds is worth a look, since it means the sample is drifting toward
+stacks the corpus cannot exercise.
+
+A clean composite run was verified the way the region relations were: by
+**injecting the defect it guards against** — an engine stubbed to hold under
+either single transform and collapse under both — and confirming the harness
+reported it. `__tests__/composite.test.ts` holds that shut, along with the
+header-guard regression above.
+
 ## Reading a run
 
 There is no threshold to tune and no baseline to ratchet. A violation is a

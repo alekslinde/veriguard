@@ -268,12 +268,22 @@ export const TRANSFORMS: Transform[] = [
     id: "benign-padding",
     intent: "Bury the scam in ordinary prose to dilute a ratio-based score",
     relation: "noWeaker",
-    // Not on a case whose content opens with email headers: prose above a
-    // "From:" line means the text is no longer an email, and the header-derived
-    // signals it loses were correctly earned. That is the harness changing the
-    // input's kind, not an evasion working.
+    // Not on a case whose content carries email headers: prose above a "From:"
+    // line means the text is no longer an email, and the header-derived signals
+    // it loses were correctly earned. That is the harness changing the input's
+    // kind, not an evasion working.
+    //
+    // Multiline, and specific to the headers the email path actually keys on.
+    // A start-anchored test was the original form and it is not enough under
+    // composition: `forwarded-prefix` puts a "---------- Forwarded message"
+    // banner above the block, so the headers no longer sit at index 0 and the
+    // guard waved the case through. The composite then padded above a From:
+    // line after all, dropped the impersonation signal with it, and reported
+    // eight violations that were all this artefact rather than an evasion.
+    // Composition is what surfaced it: no single transform can construct the
+    // input the guard was written to exclude.
     applies: (c) =>
-      c.type !== "url" && c.type !== "phone" && !/^[A-Za-z-]+:\s/.test(c.content),
+      c.type !== "url" && c.type !== "phone" && !/^(?:From|Reply-To|Return-Path|Sender):\s/im.test(c.content),
     apply: (content) =>
       `Hi there, hope you had a good weekend. Just passing this along, ` +
       `let me know what you think when you get a chance.\n\n${content}\n\n` +
