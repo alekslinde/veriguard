@@ -145,11 +145,31 @@ describe("checkUrl — the signal in place", () => {
     expect(wordCase.flags.some((f) => f.includes("one mistyped letter away"))).toBe(true);
   });
 
-  it("works under ZZ with no brands authored, without erroring", () => {
-    // The structural half is region-independent; the brand list is not. A pack
-    // with no brands must yield no hits rather than a wrong one.
+  it("fires under ZZ on a globally-squatted brand", () => {
+    // This assertion used to read the other way, and inverting it is the point
+    // of the base brand floor rather than a regression.
+    //
+    // The rule was always region-independent in its MECHANISM — a QWERTY
+    // neighbour map and three string shapes — but it scored against the pack's
+    // brand list, and `ZZ` had none. So it raised the floor in the full packs
+    // and did nothing for every country the `minimal` tier exists to serve,
+    // which is the half of "structural" that was not actually structural.
+    // BaseSignals.typosquatBrands closes that: the globally-squatted names are
+    // unioned into every pack.
     const result = checkUrl("https://payppal.com", undefined, "ZZ");
-    expect(result.flags.some((f) => f.includes("one mistyped letter away"))).toBe(false);
+    expect(result.flags.some((f) => f.includes('one mistyped letter away from "paypal"'))).toBe(true);
+  });
+
+  it("still yields no hit under ZZ for a brand only one country authors", () => {
+    // The other half of the same guarantee, and what stops the floor being read
+    // as "brands are global now". "commbank" is an AU bank; a squat of it must
+    // score in AU and stay silent where nobody has authored it, or the pack
+    // boundary has stopped meaning anything.
+    const au = checkUrl("https://cimmbank.com", undefined, "AU");
+    expect(au.flags.some((f) => f.includes("one mistyped letter away"))).toBe(true);
+
+    const zz = checkUrl("https://cimmbank.com", undefined, "ZZ");
+    expect(zz.flags.some((f) => f.includes("one mistyped letter away"))).toBe(false);
   });
 });
 

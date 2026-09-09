@@ -183,6 +183,17 @@ export interface BaseSignals {
    * script, not this one. Regions append their local exchanges.
    */
   cryptoExchanges: string[];
+  /**
+   * Brands impersonated in hostnames worldwide, unioned into every pack's
+   * `typosquatBrands.substring`.
+   *
+   * A flat list rather than a `BrandSet`: there is no global `word` half. The
+   * word rule exists for names too short or too dictionary-like to substring-
+   * match safely, and judging that safely for a country whose language and
+   * business names nobody here knows is exactly the research a `minimal` pack
+   * does not do. See GLOBAL_TYPOSQUAT_BRANDS in base.ts.
+   */
+  typosquatBrands: string[];
 }
 
 /** The national layer, authored per country. */
@@ -256,6 +267,11 @@ export interface RegionDefinition {
    * Brands whose names appearing in a *hostname* indicate typosquatting —
    * banks, telcos, government portals, retailers. Checked with
    * `hostname.includes()`, excluding the region's own trusted suffixes below.
+   *
+   * **This region's own brands only.** Globally-impersonated names live in
+   * `BaseSignals.typosquatBrands` and are unioned in by `buildPack`, so a pack
+   * listing one here would score it twice — the URL checker adds a signal per
+   * matching entry. Enforced by test rather than left to convention.
    */
   typosquatBrands: BrandSet;
 

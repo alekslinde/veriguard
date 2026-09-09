@@ -3,6 +3,25 @@ import { checkSms, checkUrl, mentions } from "@veriguard/engine/scamDetector";
 import { resolveRegionPack, supportedRegions, DEFAULT_REGION, FALLBACK_REGION } from "@veriguard/engine/regions";
 import { BASE_SIGNALS, CHINESE_AUTHORITY_MENTIONS } from "@veriguard/engine/regions/base";
 import { AU } from "@veriguard/engine/regions/au";
+import { GB } from "@veriguard/engine/regions/gb";
+import { US } from "@veriguard/engine/regions/us";
+import { NZ } from "@veriguard/engine/regions/nz";
+import { CA } from "@veriguard/engine/regions/ca";
+import { IE } from "@veriguard/engine/regions/ie";
+import { SG } from "@veriguard/engine/regions/sg";
+import { REST_OF_WORLD } from "@veriguard/engine/regions/rest-of-world";
+import { findKeyboardTypo } from "@veriguard/engine/keyboardAdjacency";
+import type { RegionCode, RegionDefinition } from "@veriguard/engine/regions/types";
+
+/**
+ * The national layers, keyed by code — what a pack AUTHOR wrote, before
+ * buildPack merges base into it. Needed by the base/national disjointness
+ * invariant, which is a statement about the authored list and is invisible in
+ * the resolved pack (where the two layers are already unioned).
+ */
+const REGION_DEFINITIONS: Record<RegionCode, RegionDefinition> = {
+  AU, GB, US, NZ, CA, IE, SG, ZZ: REST_OF_WORLD,
+};
 
 describe("resolveRegionPack", () => {
   it("resolves a known region", () => {
@@ -207,6 +226,137 @@ describe("pack invariants (every region)", () => {
       const flags = checkSms(text, undefined, code).flags.join(" | ").toLowerCase();
       expect({ text, flags: flags.includes("government agency") }).toEqual({ text, flags: false });
       expect({ text, flags: flags.includes("police authority") }).toEqual({ text, flags: false });
+    }
+  });
+
+  // ── Global brand floor ──────────────────────────────────────────────────
+  //
+  // The base list is what makes the structural typosquat rules reach a country
+  // nobody has authored. Before it, `ZZ` and every `minimal` pack carried empty
+  // brand lists, so both the substring rule and keyboard-adjacency detection
+  // had nothing to match against — the adjacency rule was region-independent by
+  // construction and did nothing for exactly the regions that needed it.
+
+  it.each(packs)("%s: inherits the global brand floor", (_code, pack) => {
+    for (const brand of BASE_SIGNALS.typosquatBrands) {
+      expect(pack.typosquatBrands.substring).toContain(brand);
+    }
+  });
+
+  it.each(packs)("%s: doesn't re-list a global brand nationally", (code, _pack) => {
+    // The URL checker adds one signal per matching entry, so a brand in both
+    // layers scores +90 instead of +45 — a silent doubling that no flag text
+    // reveals, since the flag names the brand once either way.
+    //
+    // buildPack deliberately does not dedupe: collapsing it here would hide the
+    // authoring mistake rather than surface it, which is the same reasoning as
+    // the pack-shadowing invariant. So the disjointness is asserted instead.
+    const national = REGION_DEFINITIONS[code].typosquatBrands;
+    for (const brand of BASE_SIGNALS.typosquatBrands) {
+      expect({ code, substring: national.substring.includes(brand) })
+        .toEqual({ code, substring: false });
+      expect({ code, word: national.word.includes(brand) })
+        .toEqual({ code, word: false });
+    }
+  });
+
+  it.each(packs)("%s: scores a squat of a global brand", (code) => {
+    // The behavioural half, and the point of the whole exercise: a pack with no
+    // national brands at all must still catch these. Asserted per-pack so a
+    // future region cannot regress it by overriding the merge.
+    const flags = checkUrl("http://paypal-secure-verify.cyou/login", undefined, code)
+      .flags.join(" | ").toLowerCase();
+    expect({ code, impersonating: flags.includes('impersonates "paypal"') })
+      .toEqual({ code, impersonating: true });
+  });
+
+  it.each(packs)("%s: scores a keyboard typo of a global brand", (code) => {
+    // Adjacency specifically — the rule the reach gap was really about. "payppal"
+    // is the doubled-key shape, and it contains no brand substring at all, so
+    // nothing else in the checker can be producing this flag.
+    const flags = checkUrl("http://payppal.com/login", undefined, code)
+      .flags.join(" | ").toLowerCase();
+    expect({ code, typo: flags.includes('one mistyped letter away from "paypal"') })
+      .toEqual({ code, typo: true });
+  });
+
+  // The false-positive direction, and the costlier one — a scam card on a real
+  // site teaches users the verdicts are noise. These brands now score in every
+  // region, so a wrong flag is wrong in ~190 countries rather than one.
+  //
+  // The national suffixes below are the regression this pair exists for. A
+  // sweep of the six global brands across 18 national suffixes produced 96
+  // impersonation flags on real sites, because `brandSuffixes` asks "would a
+  // COVERED region's brands be here" and no pack authors `.com.br`, `.co.jp` or
+  // `.co.za`. Global brands register in every country, so for them the
+  // multi-label default inverts — see SQUAT_NAMESPACE_SUFFIXES.
+  it.each(packs)("%s: leaves the global brands' own sites alone", (code) => {
+    const hosts = [
+      "paypal.com", "www.amazon.com", "netflix.com",
+      // Suffixes a pack authors.
+      "amazon.co.uk", "paypal.com.sg", "netflix.com.au",
+      // Suffixes NO pack authors — the case the union got wrong.
+      "paypal.com.br", "amazon.co.jp", "netflix.co.za", "www.paypal.com.tr",
+    ];
+    for (const host of hosts) {
+      const flags = checkUrl(`https://${host}/`, undefined, code).flags.join(" | ").toLowerCase();
+      expect({ code, host, impersonating: flags.includes("impersonates") })
+        .toEqual({ code, host, impersonating: false });
+    }
+  });
+
+  it.each(packs)("%s: still squats a global brand in a lookalike namespace", (code) => {
+    // The other half. Inverting the default for global brands must not hand the
+    // ownership exemption to the namespaces the multi-label rule exists to
+    // catch: `.co` and `.io` second-levels are sold worldwide as `.com`
+    // lookalikes, so a brand owning the label there is evidence of a squat.
+    // `gov.uk`, `ac.uk` and `edu.au` are the restricted namespaces, and they are
+    // here because the unit test for that rule was the ONLY thing covering it:
+    // removing the non-commercial second-level check failed six unit cases and
+    // not one behavioural one, while actually exempting `amazon.gov.uk` and
+    // `netflix.ac.uk` — a global brand squatting a government or academic
+    // namespace, waved through. A guard reachable only from its own unit test
+    // is the same shape as the adjacency alphabetic-label guard that passed its
+    // injection for lack of a fixture that reached it.
+    const hosts = [
+      // Sold internationally as `.com` lookalikes.
+      "paypal.gov.co", "amazon.com.co", "netflix.co.io",
+      // Wildcard registry — no enumerated commercial second level.
+      "paypal.com.np",
+      // Eligibility-restricted, so not a commercial namespace in any country.
+      //
+      // `ac.uk` rather than `gov.uk`: the GB pack lists `.gov.uk` in
+      // trustedHostSuffixes, which exempts the whole namespace BEFORE the
+      // ownership rule is reached. That is deliberate and predates this — the
+      // registry vets who may register, so nothing under it is a squat — but it
+      // means `gov.uk` cannot carry this assertion in every pack. `ac.uk` is
+      // restricted the same way and is in no pack's trusted list.
+      "netflix.ac.uk", "paypal.edu.au",
+    ];
+    for (const host of hosts) {
+      const flags = checkUrl(`http://${host}/login`, undefined, code).flags.join(" | ").toLowerCase();
+      expect({ code, host, impersonating: flags.includes("impersonates") })
+        .toEqual({ code, host, impersonating: true });
+    }
+  });
+
+  it("keeps the global list substring-safe", () => {
+    // Matched with hostname.includes() in every region at once, so a collision
+    // is a false accusation worldwide rather than in one country. The adjacency
+    // floor is six characters and these must clear it too, or a brand would be
+    // listed for a rule that silently ignores it.
+    for (const brand of BASE_SIGNALS.typosquatBrands) {
+      expect({ brand, length: brand.length >= 6 }).toEqual({ brand, length: true });
+      expect({ brand, alphabetic: /^[a-z]+$/.test(brand) }).toEqual({ brand, alphabetic: true });
+    }
+  });
+
+  it("keeps the global brands from being typos of one another", () => {
+    // They are checked against every candidate together, so one brand being a
+    // keyboard slip of another would make each squat of the pair ambiguous.
+    for (const brand of BASE_SIGNALS.typosquatBrands) {
+      const others = BASE_SIGNALS.typosquatBrands.filter((b) => b !== brand);
+      expect({ brand, typoOf: findKeyboardTypo(brand, others) }).toEqual({ brand, typoOf: null });
     }
   });
 

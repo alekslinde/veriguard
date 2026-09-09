@@ -297,16 +297,17 @@ const TYPOSQUAT_BRANDS = [
   // Toll authorities — the highest-volume US smishing category.
   "ezpass", "e-zpass", "sunpass", "fastrak", "txtag",
   // Payment apps and processors. These are the irreversible rails, so a
-  // credential phish here converts directly to loss.
-  "paypal", "zelle", "venmo", "cashapp", "square-cash",
+  // credential phish here converts directly to loss. PayPal is global and
+  // lives in base; the rest are US rails.
+  "zelle", "venmo", "cashapp", "square-cash",
   // Telcos and ISPs.
   "verizon", "xfinity", "comcast", "tmobile", "spectrum",
-  // Retail, delivery and streaming — global brands still get US-targeted
-  // typosquats.
-  "amazon", "walmart", "target-shop", "costco", "netflix", "bestbuy",
+  // Retail and delivery. amazon/netflix moved to base.
+  "walmart", "target-shop", "costco", "bestbuy",
   "fedex", "ups-delivery", "doordash", "instacart",
-  // Crypto exchanges.
-  "coinbase", "binance", "kraken", "gemini-exchange",
+  // Crypto exchanges. coinbase/binance/kraken are in base; Gemini is the
+  // US-specific addition.
+  "gemini-exchange",
 ];
 
 // Brands too short or too dictionary-colliding for substring matching. "ups"

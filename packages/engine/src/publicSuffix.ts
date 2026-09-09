@@ -96,3 +96,68 @@ export function registrableLabel(hostname: string): string {
   const domain = registrableDomain(hostname);
   return domain ? domain.split(".")[0] ?? "" : "";
 }
+
+/**
+ * TLDs whose second-level namespaces are sold internationally as `.com`
+ * lookalikes rather than serving a national registrant base.
+ *
+ * The one genuinely curated input to `isNationalCommercialSuffix` below, and
+ * deliberately tiny. Everything else that rule needs it can read off the PSL;
+ * this cannot be, because `com.co` and `com.br` are indistinguishable as data —
+ * both are ordinary `com.<cc>` entries. What separates them is a fact about how
+ * the registry sells: `.co` and `.io` are marketed worldwide off their
+ * resemblance to `.com` and `.io`-the-tech-suffix, to registrants with no
+ * connection to Colombia or the Indian Ocean Territory. A brand name under one
+ * is not that brand's local presence, because there is no locality involved.
+ *
+ * The bar for adding a TLD here is that its second-levels are sold as generics.
+ * It is NOT "the registry is open" — `.co.uk` and `.com.au` are open too, which
+ * is exactly why they are absent from `trustedHostSuffixes`, and they are still
+ * where a brand's genuine local site lives.
+ */
+const GENERIC_SOLD_TLDS = new Set(["co", "io"]);
+
+/**
+ * Whether a multi-label public suffix is a country's ordinary COMMERCIAL
+ * namespace — the place a global brand's genuine local site lives.
+ *
+ * Gates the "the brand owns the registrable label, so it is the real site"
+ * exemption for globally-impersonated brands. Those brands register in every
+ * country, so an allowlist of suffixes cannot serve them: `paypal.com.br`,
+ * `amazon.co.jp` and `netflix.co.za` are all real, and no region pack lists any
+ * of those suffixes. The default therefore inverts — an ordinary national
+ * commercial namespace grants the exemption, and this function is what says
+ * which ones are not.
+ *
+ * Three disqualifying shapes, two of them read straight off the PSL:
+ *
+ *   1. **A non-commercial second level.** `gov.co`, `gov.io` — a government
+ *      namespace is not where a retailer registers, whatever the country, so
+ *      the shape alone settles it without knowing anything about `.co`.
+ *   2. **A wildcard registry.** `com.np` exists only via the PSL's `*.np` rule,
+ *      meaning the registry publishes no enumerated second levels. There is no
+ *      established commercial namespace to be the real site of.
+ *   3. **A TLD sold as a generic.** See GENERIC_SOLD_TLDS — the judgement case.
+ *
+ * Single-label suffixes never reach this: `.com`, `.de`, `.fr` are where brands
+ * register worldwide and are exempt by default at the call site.
+ */
+export function isNationalCommercialSuffix(suffix: string): boolean {
+  const labels = suffix.split(".");
+  if (labels.length !== 2) return false;
+  const [second, tld] = labels;
+
+  // (1) Only genuinely commercial second levels. Listed positively rather than
+  // excluding "gov": these are the handful of forms registries actually use for
+  // general registration, and an unrecognised one should fail closed.
+  if (!["com", "co", "net", "or", "ne", "gr", "biz"].includes(second)) return false;
+
+  // (2) A wildcard registry publishes no enumerated second level, so `com.np`
+  // is not an established namespace — it is whatever label was asked for.
+  if (PSL_WILDCARDS.has(tld)) return false;
+
+  // (3) The judgement case.
+  if (GENERIC_SOLD_TLDS.has(tld)) return false;
+
+  return true;
+}

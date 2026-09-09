@@ -252,15 +252,15 @@ const TYPOSQUAT_BRANDS = [
   "eflow", "e-flow", "m50toll",
   // Telcos and ISPs.
   "vodafone", "threeireland", "virginmedia", "sky-ireland",
-  // Retail, delivery and streaming — global brands still get Ireland-targeted
-  // typosquats, and the local retailers are impersonated in refund lures.
-  "paypal", "amazon", "netflix", "dunnesstores", "tescoireland",
+  // Retail and delivery — the local retailers are impersonated in refund
+  // lures. paypal/amazon/netflix moved to base.
+  "dunnesstores", "tescoireland",
   "supervalu", "harveynorman", "littlewoodsireland",
   "fastway", "dpdireland",
   // Energy retailers — billing and rebate phishing.
   "electricireland", "bordgais", "sseairtricity", "energia",
-  // Crypto exchanges.
-  "coinbase", "binance", "kraken",
+  // Crypto exchanges: all three global names are in base. No Ireland-only
+  // exchange is impersonated often enough here to add.
 ];
 
 // Brands too short or too dictionary-colliding for substring matching. "aib",

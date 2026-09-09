@@ -309,16 +309,17 @@ const TYPOSQUAT_BRANDS = [
   // real domains (three.co.uk, three.ie) are better served by legitDomains.
   "vodafone", "giffgaff", "talktalk", "virginmedia",
   "plusnet", "skybroadband",
-  // Retail, delivery and streaming — global brands still get UK-targeted
-  // typosquats, and their real UK sites end in .co.uk, which the trusted-suffix
-  // guard excludes.
-  "paypal", "amazon", "netflix", "argos", "currys", "tesco",
+  // Retail and delivery. paypal/amazon/netflix moved to base — every pack
+  // listed them identically, and a squat of a global brand is a squat
+  // everywhere. Their real UK sites end in .co.uk, which the trusted-suffix
+  // guard excludes, and that is unchanged by where the name is listed.
+  "argos", "currys", "tesco",
   "sainsburys", "asda", "screwfix",
   "evridelivery", "yodel", "hermesparcel",
   // Energy retailers — Ofgem-era billing and rebate phishing.
   "britishgas", "octopusenergy", "ovoenergy", "scottishpower",
-  // Crypto exchanges.
-  "coinbase", "binance", "kraken",
+  // Crypto exchanges: all three global names are in base. No UK-only exchange
+  // is impersonated often enough here to add.
 ];
 
 // Brands too short or too dictionary-colliding for substring matching. "bt",

@@ -350,6 +350,70 @@ const CALLBACK_BRANDS = [
 const CRYPTO_EXCHANGES = ["binance", "coinbase", "kraken"];
 
 /**
+ * Brands impersonated in hostnames *everywhere*, not in one market.
+ *
+ * This is the list that makes the structural typosquat rules reach the whole
+ * world. Both the substring rule and keyboard-adjacency detection score against
+ * the pack's brand lists, so a region with no brands authored got no hits from
+ * either — which was every country outside the six `full` packs plus CA. The
+ * adjacency rule in particular is region-independent by construction (it is a
+ * QWERTY neighbour map and three string shapes) and was doing nothing for `ZZ`
+ * or for any `minimal` pack, i.e. for exactly the countries the tier exists to
+ * serve.
+ *
+ * **The bar is the same one that promoted courier collection and recovery
+ * fraud to base: the signal must already fire identically across the packs
+ * that authored it.** Every entry below was independently listed by all six
+ * `full` packs (paypal, amazon, netflix, binance) or by five of them (coinbase,
+ * kraken — AU omitted them from the URL checker while still carrying coinbase
+ * in its callback brands). Six copies of a global brand was never a regional
+ * judgement; it was duplication, and duplication that a `minimal` pack could
+ * not inherit.
+ *
+ * WHAT IS NOT HERE, AND WHY. This is not a "top impersonated brands" list, and
+ * it must not grow into one. Three filters, all of which a candidate must pass:
+ *
+ *   1. **Genuinely global.** The service operates in essentially every market,
+ *      so no country's user is surprised to see it named. A brand with a
+ *      national footprint belongs in that country's pack, however large it is
+ *      at home — that is what keeps `inferTargetRegion`'s uniqueness filter
+ *      able to tell where content was aimed.
+ *   2. **Long and distinctive enough for substring matching.** Entries here are
+ *      matched with `hostname.includes()` in every region at once, so a
+ *      collision is a false accusation in 190 countries rather than one. There
+ *      is deliberately no global `word` list: the word rule exists for short or
+ *      dictionary-colliding names, and those are exactly the names whose safety
+ *      depends on local knowledge nobody has for an unauthored region.
+ *   3. **Impersonated in hostnames**, not merely well known. The rule scores
+ *      domain names; a brand that appears in scam *text* but is not squatted
+ *      belongs in `brandMentions`.
+ *
+ * Notably absent under (1): the national banks, posts, telcos and tax offices
+ * that dominate the packs. Absent under (2): anything shorter than six
+ * characters, which the adjacency floor would reject anyway. Absent under (3):
+ * "bitcoin", which is a currency rather than a squattable brand and already
+ * sits in the callback list.
+ *
+ * `google`, `microsoft` and `apple` are the obvious omissions and are held back
+ * deliberately rather than forgotten. All three pass (1) and (3) easily, but
+ * their names are load-bearing components of enormous numbers of legitimate
+ * third-party hostnames — "googleapis.com", "microsoftonline.com" and every
+ * agency, plugin and integrator that builds a product name around them. A
+ * substring hit is +45 and reaches `likely_scam` alone, so shipping them means
+ * shipping that false positive worldwide. They need the co-signal the URL
+ * checker does not yet have; see the note in au.ts on short brands for the same
+ * argument at a different length.
+ */
+const GLOBAL_TYPOSQUAT_BRANDS = [
+  "paypal", "amazon", "netflix",
+  // Crypto exchanges. Also in CRYPTO_EXCHANGES above, which is the *message*
+  // signal ("your exchange account is suspended, call us"); this is the
+  // hostname signal. Same names, different rules — the lists are not
+  // interchangeable and neither is derived from the other.
+  "binance", "coinbase", "kraken",
+];
+
+/**
  * Chinese-authority impersonation terms, shared by every region pack.
  *
  * Exported rather than declared per-pack because the identical block was
@@ -404,6 +468,7 @@ export const BASE_SIGNALS: BaseSignals = {
   fakeInvestmentPlatforms: FAKE_INVESTMENT_PLATFORMS,
   callbackBrands: CALLBACK_BRANDS,
   cryptoExchanges: CRYPTO_EXCHANGES,
+  typosquatBrands: GLOBAL_TYPOSQUAT_BRANDS,
 };
 
 // Family-impersonation opener — the "Hi Mum" / "Hi Dad" script (D2 / #251).

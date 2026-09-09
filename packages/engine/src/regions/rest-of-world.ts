@@ -55,14 +55,30 @@ export const REST_OF_WORLD: RegionDefinition = {
   fakeInvestmentPlatformFlag: (platform: string) =>
     `Named fraudulent investment platform detected ("${platform}") — financial regulators have issued specific warnings that this is a scam. Do not invest.`,
 
-  // No national brand lists. Impersonated brands are the most region-specific
-  // signal we have, and a global "top brands" list would be mostly noise —
-  // typosquat detection here relies on the structural signals (hyphens, depth,
-  // suspicious TLDs, shorteners) that need no brand knowledge.
+  // No NATIONAL brand list. Impersonated brands are the most region-specific
+  // signal we have, and inventing a local one for an unauthored country would
+  // be noise at best and a false accusation at worst.
+  //
+  // This is no longer the whole story, and the change matters here more than
+  // anywhere: buildPack unions in BaseSignals.typosquatBrands, the handful of
+  // names squatted in every market (paypal, amazon, netflix, the global crypto
+  // exchanges). So `ZZ` now scores both the substring rule and keyboard-
+  // adjacency detection, where before it had no brand to match against and both
+  // rules were structurally unreachable. Everything else still rests on the
+  // signals that need no brand knowledge — hyphens, depth, abused TLDs,
+  // shorteners, homoglyphs.
+  //
+  // coverage stays "none". Six global brands is not local knowledge, and a
+  // clean result here still is not evidence of safety.
   typosquatBrands: { substring: [], word: [] },
   trustedHostSuffixes: [],
-  // No national layer, so no suffix is "this region's own". The brand lists are
-  // empty anyway, so the exemption this gates is never reached.
+  // No national layer, so no suffix is "this region's own" — this stays empty.
+  //
+  // It does NOT disable the base brands' ownership exemption, which would have
+  // flagged paypal.com worldwide. The checker reads the UNION of every pack's
+  // brandSuffixes, not this region's, precisely because brands are not confined
+  // to one country; single-label suffixes like `.com` are exempt by default in
+  // any case. See BRAND_SUFFIXES in scamDetector.
   brandSuffixes: [],
   brandMentions: { substring: [], word: [] },
   officialSenderNames: [],

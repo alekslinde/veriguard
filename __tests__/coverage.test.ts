@@ -4,6 +4,7 @@ import { overallCoverage, isClean, formatVerdictEmail } from "@/lib/verdictSumma
 import { FALLBACK_REGION, resolveRegionPack, supportedRegions, type RegionCoverage } from "@veriguard/engine/regions";
 import { toPrediction } from "@/eval/schema";
 import { analysePhone } from "@veriguard/engine/phoneIntel";
+import { BASE_SIGNALS } from "@veriguard/engine/regions/base";
 
 // The Phase 3 guarantee: a "safe" verdict asserts we looked and found nothing.
 // Where we have no rules to look with, that assertion isn't available — a clean
@@ -313,10 +314,17 @@ describe("minimal packs make no claims they have not verified", () => {
     expect(resolveRegionPack(code).legitDomains).toEqual([]);
   });
 
-  it.each(MINIMAL_PACKS)("%s claims no brand knowledge", (code) => {
-    // Having brands would make it a partial pack, not a minimal one.
+  it.each(MINIMAL_PACKS)("%s claims no brand knowledge of its own", (code) => {
+    // Having NATIONAL brands would make it a partial pack, not a minimal one.
+    //
+    // Asserted against the global floor rather than against `[]`, because
+    // buildPack unions BaseSignals.typosquatBrands into every pack — the names
+    // squatted in every market, which are not a claim about this country and
+    // are what lets the structural typosquat rules reach it at all. Equality
+    // with the base list is the stronger reading of the tier rule: not "has
+    // few brands" but "has contributed none".
     const pack = resolveRegionPack(code);
-    expect(pack.typosquatBrands.substring).toEqual([]);
+    expect(pack.typosquatBrands.substring).toEqual(BASE_SIGNALS.typosquatBrands);
     expect(pack.typosquatBrands.word).toEqual([]);
     expect(pack.brandMentions.substring).toEqual([]);
     expect(pack.brandMentions.word).toEqual([]);

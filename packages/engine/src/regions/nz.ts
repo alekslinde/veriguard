@@ -231,14 +231,15 @@ const TYPOSQUAT_BRANDS = [
   "tewhatuora", "nzpost", "courierpost",
   // Telcos and ISPs.
   "spark", "vodafonenz", "2degrees", "slingshot", "orcon",
-  // Retail, delivery and streaming — global brands still get NZ-targeted
-  // typosquats, and the local retailers are impersonated in refund lures.
-  "paypal", "amazon", "netflix", "trademe", "thewarehouse", "briscoes",
+  // Retail and delivery — the local retailers are impersonated in refund
+  // lures. paypal/amazon/netflix moved to base.
+  "trademe", "thewarehouse", "briscoes",
   "countdown", "woolworthsnz", "mightyape",
   // Energy retailers — billing and rebate phishing.
   "mercuryenergy", "meridianenergy", "contactenergy", "genesisenergy",
-  // Crypto exchanges.
-  "coinbase", "binance", "kraken", "easycrypto",
+  // Crypto exchanges. The three global names are in base; Easy Crypto is the
+  // NZ-specific addition.
+  "easycrypto",
 ];
 
 // Brands too short or too dictionary-colliding for substring matching. "anz",
