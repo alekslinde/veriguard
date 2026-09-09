@@ -5,6 +5,7 @@ import {
   applyStack,
   mulberry32,
 } from "@/eval/composite";
+import { formatCompositeSummary, type CompositeResult } from "@/eval/metamorphicRunner";
 import { TRANSFORMS } from "@/eval/metamorphic";
 import type { EvalCase } from "@/eval/schema";
 
@@ -179,5 +180,51 @@ describe("benign-padding header guard", () => {
 
   it("still applies to ordinary prose that merely contains a colon", () => {
     expect(pad.applies(c({ content: "Reminder: your parcel is held." }))).toBe(true);
+  });
+});
+
+describe("formatCompositeSummary", () => {
+  /** A result with `violating` violating stacks and `clean` clean ones. */
+  const build = (violating: number, clean: number): CompositeResult => {
+    const violations = Array.from({ length: violating }, (_, i) => ({
+      caseId: `c-${i}`, stack: `v-${i}`, steps: [], relation: "noWeaker" as const,
+      region: "AU",
+      before: { prediction: "flagged", score: 80, verdict: "likely_scam", coverage: "full" },
+      after: { prediction: "clean", score: 10, verdict: "safe", coverage: "full" },
+      transformed: "x", original: "y",
+    })) as unknown as CompositeResult["violations"];
+    const applied = new Map<string, number>();
+    for (let i = 0; i < violating; i++) applied.set(`v-${i}`, 3);
+    for (let i = 0; i < clean; i++) applied.set(`ok-${i}`, 3);
+    return { violations, applied, abandoned: new Map(), seed: 1, stacks: violating + clean };
+  };
+
+  it("never describes a truncated violating stack as clean", () => {
+    // 30 violating > the 25-row cap, so 5 fall past the cut. Counting those in
+    // a "no violation" tail contradicts the TOTAL row, and the weekly
+    // --stacks=400 --depth=2,3,4 run is exactly where the cap is exceeded.
+    const out = formatCompositeSummary(build(30, 5));
+    expect(out).toContain("5 further VIOLATING stack(s) not shown");
+    expect(out).toContain("5 exercised stack(s) with no violation");
+    expect(out).not.toContain("10 further stack(s) with no violation");
+  });
+
+  it("reports the clean tail alone when nothing is truncated", () => {
+    const out = formatCompositeSummary(build(2, 7));
+    expect(out).not.toContain("VIOLATING stack(s) not shown");
+    expect(out).toContain("7 exercised stack(s) with no violation");
+  });
+
+  it("says so plainly when no stack violated", () => {
+    const out = formatCompositeSummary(build(0, 4));
+    expect(out).toContain("(no stack violated)");
+    expect(out).toContain("4 exercised stack(s) with no violation");
+  });
+
+  it("keeps the shown violations consistent with the total", () => {
+    const out = formatCompositeSummary(build(30, 5));
+    const shown = out.split("\n").filter((l) => l.trimEnd().endsWith("←")).length;
+    const hidden = Number(/(\d+) further VIOLATING/.exec(out)?.[1] ?? 0);
+    expect(shown + hidden).toBe(30);
   });
 });

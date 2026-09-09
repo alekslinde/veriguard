@@ -104,9 +104,13 @@ jobs:
           INPUT_STACKS: ${{ github.event.inputs.stacks }}
         run: |
           set +e
-          # Week number as the seed: distinct ground each week, and reproducible
-          # from the issue body months later, which a timestamp would not be.
-          seed="${INPUT_SEED:-$(date -u +%V)}"
+          # Seed from the ISO year and week, not the week alone: `+%V` gives 53
+          # values that repeat annually, so a year later the "new" search covers
+          # ground already searched — and week 01 collides with the fixed PR
+          # seed 1, making that week's run a duplicate of every PR. Combining
+          # them keeps each week distinct for as long as the project lives while
+          # staying reproducible from the issue body, which a timestamp is not.
+          seed="${INPUT_SEED:-$(( $(date -u +%G) * 100 + 10#$(date -u +%V) ))}"
           stacks="${INPUT_STACKS:-400}"
           npm run eval:metamorphic -- \
             --seed="$seed" --stacks="$stacks" --depth=2,3,4 --markdown --issue \

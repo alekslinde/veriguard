@@ -427,7 +427,7 @@ because the families have different determinism:
 | | Seed | Sample | On a violation |
 |---|---|---|---|
 | **PR / push to main** | Fixed (1) | 120 stacks, depth 2–3 | Fails the build |
-| **Weekly (Mon 21:00 UTC)** | Week number | 400 stacks, depth 2–4 | Refreshes the 🧬 *Composite metamorphic drift* issue |
+| **Weekly (Mon 21:00 UTC)** | ISO year+week (`202637`) | 400 stacks, depth 2–4 | Refreshes the 🧬 *Composite metamorphic drift* issue |
 
 The single-transform and region relations are deterministic — same corpus, same
 engine, same result — so on a PR red means "this diff broke it" and nothing else.
@@ -439,6 +439,16 @@ learn to re-run until green, which costs more than the coverage buys.
 At a *fixed* seed the composite family is deterministic too, which is why exit 3
 still fails a PR. The separate code exists to route the weekly search's findings
 to an issue, not to make composites unenforceable.
+
+The weekly seed combines the ISO year and week rather than using the week alone:
+`+%V` yields 53 values that repeat annually, so a year later the "new" search
+would cover ground already searched, and week 01 would collide with the fixed PR
+seed 1.
+
+`--issue` refuses (exit 2) when no composite search ran — `--no-composites`,
+`--stacks=0`, or an `--only` pool too small to build a stack. Zero violations
+out of zero checks is not a clean result, and closing the drift issue on one
+would auto-resolve an open finding nobody looked at.
 
 Exit codes:
 

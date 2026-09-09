@@ -265,11 +265,18 @@ export function formatCompositeSummary(r: CompositeResult): string {
     "─".repeat(80),
   ];
 
-  // Only the stacks that violated, plus the busiest clean ones, so the table
-  // stays readable at any sample size. A clean run still shows its coverage
-  // through the TOTAL row.
-  const shown = ran.filter(([id]) => (byStack.get(id) ?? 0) > 0).slice(0, 25);
-  const rest = ran.length - shown.length;
+  // Only the stacks that violated, so the table stays readable at any sample
+  // size. A clean run still shows its coverage through the TOTAL row.
+  //
+  // The tail is split into its two real parts rather than summed. Lumping them
+  // together and calling the total "no violation" is a lie the TOTAL row then
+  // contradicts: at the weekly --stacks=400 --depth=2,3,4 setting the violating
+  // list can exceed the cap, and the reader is told the overflow was clean.
+  const CAP = 25;
+  const violating = ran.filter(([id]) => (byStack.get(id) ?? 0) > 0);
+  const shown = violating.slice(0, CAP);
+  const hiddenViolating = violating.length - shown.length;
+  const clean = ran.length - violating.length;
 
   for (const [id, checks] of shown) {
     const bad = byStack.get(id) ?? 0;
@@ -278,8 +285,13 @@ export function formatCompositeSummary(r: CompositeResult): string {
       `${id.length > 48 ? `${id.slice(0, 47)}…` : id.padEnd(48)} ${rel.padEnd(10)} ${String(checks).padStart(6)}  ${String(bad).padStart(10)}  ←`,
     );
   }
-  if (shown.length === 0) lines.push("  (no stack violated)");
-  if (rest > 0) lines.push(`  … and ${rest} further stack(s) with no violation`);
+  if (violating.length === 0) lines.push("  (no stack violated)");
+  if (hiddenViolating > 0) {
+    lines.push(
+      `  … and ${hiddenViolating} further VIOLATING stack(s) not shown — see the violation list below`,
+    );
+  }
+  if (clean > 0) lines.push(`  … and ${clean} exercised stack(s) with no violation`);
 
   lines.push("─".repeat(80));
   lines.push(

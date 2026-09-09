@@ -77,6 +77,25 @@ function flag(name: string): string | undefined {
   return hit?.split("=").slice(1).join("=");
 }
 
+/**
+ * A numeric flag, rejecting the empty string.
+ *
+ * `--stacks=` parses to "" rather than undefined, so `?? default` does not fire
+ * (an empty string is not nullish) and `Number("")` is 0 — which sampled no
+ * stacks, disabled the composite family and exited 0, looking exactly like a
+ * passing run. An unset workflow input expands to precisely that, so this is a
+ * shape CI can produce rather than only a typo.
+ */
+function numericFlag(name: string, fallback: number): number {
+  const raw = flag(name);
+  if (raw === undefined) return fallback;
+  if (raw.trim() === "") {
+    console.error(`--${name}= was given with no value.`);
+    process.exit(2);
+  }
+  return Number(raw);
+}
+
 const suspiciousAs = (flag("suspicious-as") ?? "flagged") as SuspiciousPolicy;
 const corpusDir = flag("corpus") ?? join(ROOT, "eval/corpus");
 const only = flag("only")?.split(",").map((s) => s.trim()).filter(Boolean);
@@ -84,16 +103,29 @@ const jsonOnly = args.includes("--json");
 const markdown = args.includes("--markdown");
 const issue = args.includes("--issue");
 const noComposites = args.includes("--no-composites");
-const seed = Number(flag("seed") ?? 1);
-const stackCount = Number(flag("stacks") ?? 60);
-const depths = (flag("depth") ?? "2,3").split(",").map((s) => Number(s.trim()));
+const seed = numericFlag("seed", 1);
+const stackCount = numericFlag("stacks", 60);
+const depthRaw = flag("depth") ?? "2,3";
+const depths = depthRaw.split(",").map((s) => Number(s.trim()));
 
-if (!Number.isFinite(seed) || !Number.isFinite(stackCount) || stackCount < 0) {
-  console.error("--seed and --stacks must be numbers, and --stacks must be >= 0");
+// Integers, not merely finite numbers. `Number("")` is 0, so `--stacks=` (a
+// blank shell variable, which is exactly what an unset workflow input expands
+// to) coerced to zero and silently disabled the whole composite family with a
+// clean exit 0. And the sampler floors its indices, so `--seed=1.5` and
+// `--seed=1.9` produce byte-identical samples to `--seed=1` — quietly breaking
+// the seed-based reproducibility this feature is built on. Both are rejected
+// rather than normalised: a run that searched nothing, or that did not search
+// the ground its seed names, must not look like a passing run.
+if (!Number.isInteger(seed)) {
+  console.error(`--seed must be an integer (got "${flag("seed")}")`);
   process.exit(2);
 }
-if (depths.some((d) => !Number.isInteger(d) || d < 2)) {
-  console.error("--depth takes integers >= 2 (a depth-1 stack is a single transform)");
+if (!Number.isInteger(stackCount) || stackCount < 0) {
+  console.error(`--stacks must be an integer >= 0 (got "${flag("stacks")}")`);
+  process.exit(2);
+}
+if (depths.length === 0 || depths.some((d) => !Number.isInteger(d) || d < 2)) {
+  console.error(`--depth takes integers >= 2 (a depth-1 stack is a single transform), got "${depthRaw}"`);
   process.exit(2);
 }
 
@@ -225,6 +257,20 @@ async function main(): Promise<void> {
     const repo = process.env.GITHUB_REPOSITORY;
     if (!token || !repo) {
       console.error("--issue needs GITHUB_TOKEN and GITHUB_REPOSITORY.");
+      process.exit(2);
+    }
+    // A search that did not run cannot certify anything clean. `--issue`
+    // alongside --no-composites, --stacks=0, or an --only pool too small to
+    // build a stack leaves `composites` empty by construction, violations at
+    // zero, and would CLOSE the drift issue — auto-resolving an open finding
+    // nobody looked at. Refuse instead: publishing a verdict from an empty
+    // search is worse than not publishing one.
+    if (composites.length === 0) {
+      console.error(
+        "--issue needs a composite search to report on, and none ran " +
+          `(${noComposites ? "--no-composites" : stackCount === 0 ? "--stacks=0" : "the transform pool is smaller than the shallowest depth"}). ` +
+          "Refusing to close the drift issue on an empty search.",
+      );
       process.exit(2);
     }
     const clean = compositeResult.violations.length === 0;
