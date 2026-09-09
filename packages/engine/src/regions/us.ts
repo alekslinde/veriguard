@@ -71,13 +71,12 @@ const URGENCY_PENSION = [
 // misfire on is elderly veterans reading real benefit mail — the wrong people
 // to hand a false alarm.
 //
-// To be clear about what the gate does and does not fix: "Your VA benefits
-// claim assistance appointment is confirmed for Tuesday" still measures
-// 37/suspicious, from the pre-existing "va" authority mention plus the "claim"
-// reward hit. That is untouched by this list — the gate's job is to avoid
-// ADDING to it, not to repair it. Lowering the floor for benign VA mail means
-// revisiting the authority/reward interaction, which is a wider change than
-// this issue.
+// The benign case this protects: "Your VA benefits claim assistance
+// appointment is confirmed for Tuesday". That measured 37/suspicious even with
+// this list gated, because "claim" in "benefits claim assistance" was scoring
+// as a reward word on top of the "va" authority mention. Fixed separately in
+// the claimIsAlwaysNoun heuristic in scamDetector — see
+// __tests__/claimNounSense.test.ts — and it now measures 0/safe.
 //
 // The composite in scamDetector requires a link or an information ask
 // alongside, which is what separates the lure from the appointment reminder.

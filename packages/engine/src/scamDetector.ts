@@ -1284,11 +1284,20 @@ export function checkSms(
   // sentence defuse a live lure — "Congratulations! Claim your $1000 prize now.
   // Your claim is ready." dropped from 40 to 24, a one-sentence evasion. The
   // word only stops counting when EVERY occurrence reads as the noun.
+  //
+  // The determiner and verb forms above miss the COMPOUND-NOUN use, where
+  // "claim" modifies another noun with nothing in front of it: "benefits claim
+  // assistance", "claim status", "claim number". That is administrative
+  // vocabulary — a benefits or insurance office writing about a case — and it
+  // was scoring +12 on ordinary VA correspondence ("Your VA benefits claim
+  // assistance appointment is confirmed for Tuesday" reached 37/suspicious
+  // alongside the authority mention). The following noun is what disambiguates:
+  // a reward lure says "claim your prize", never "claim assistance".
+  const CLAIM_AS_NOUN =
+    /\b(?:your|the|this|a|my|their|our)\s+claims?\b|\bclaims?\s+(?:has|have|was|were|is|are)\b|\bclaims?\s+(?:assistance|status|number|reference|form|history|decision|department|centre|center|processing|adjuster|handler|id)\b/gi;
   const claimIsAlwaysNoun =
     /\bclaims?\b/i.test(text) &&
-    (text.match(/\bclaims?\b/gi) ?? []).length ===
-      (text.match(/\b(?:your|the|this|a|my|their|our)\s+claims?\b|\bclaims?\s+(?:has|have|was|were|is|are)\b/gi) ?? [])
-        .length;
+    (text.match(/\bclaims?\b/gi) ?? []).length === (text.match(CLAIM_AS_NOUN) ?? []).length;
   const rewardHits = REWARD_WORDS.filter(
     (w) => mentions(lower, w) && !(w === "claim" && claimIsAlwaysNoun),
   );
