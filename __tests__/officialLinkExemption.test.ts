@@ -1,0 +1,102 @@
+import { describe, it, expect } from "vitest";
+import { checkSms, checkEmail } from "@veriguard/engine/scamDetector";
+
+// A message whose links all point at the agency's OWN allowlisted domain must
+// not be told to "verify directly via official channels" — the link already is
+// the official channel.
+//
+// Before this, a real Australia Post tracking SMS and a "log in at revenue.ie"
+// message both scored 55/likely_scam: the same score the engine gave an outright
+// lookalike (revenue-ie.top). Legitimate agency mail was indistinguishable from
+// phishing, which is the failure mode that trains people to ignore the verdict.
+
+const authorityFlag = (r: { flags: string[] }) =>
+  r.flags.find((f) => /Claims to be from a government agency/i.test(f));
+const noLinkFlag = (r: { flags: string[] }) =>
+  r.flags.find((f) => /never send texts with links/i.test(f));
+
+describe("official-link exemption (SMS)", () => {
+  it("clears an agency message whose only link is that agency's own domain", () => {
+    for (const [region, text] of [
+      ["IE", "Log in at https://revenue.ie to check your account."],
+      ["US", "Log in at https://irs.gov to check your account."],
+      ["GB", "Log in at https://gov.uk to check your account."],
+    ] as const) {
+      const r = checkSms(text, undefined, region);
+      expect(authorityFlag(r)).toBeFalsy();
+      expect(r.verdict).toBe("safe");
+    }
+  });
+
+  it("covers domains that live in authorityOwnDomains rather than legitDomains", () => {
+    // auspost.com.au is the case the narrower list exists for — its real mail
+    // comes from a commercial domain, not a government one. Checking only
+    // legitDomains left this at 55.
+    const r = checkSms("Track your parcel at https://auspost.com.au", undefined, "AU");
+    expect(authorityFlag(r)).toBeFalsy();
+    expect(r.verdict).toBe("safe");
+  });
+
+  it("accepts a subdomain of an allowlisted domain", () => {
+    const r = checkSms("Track your delivery at https://track.auspost.com.au/abc123", undefined, "AU");
+    expect(authorityFlag(r)).toBeFalsy();
+  });
+
+  it("suppresses the no-link-sender flag for the sender's own domain", () => {
+    // This rule's premise is "these bodies never put links in their texts",
+    // which cannot be the right call for a link to the body's own site.
+    const r = checkSms("Revenue: log in at https://revenue.ie to view your balance.", undefined, "IE");
+    expect(noLinkFlag(r)).toBeFalsy();
+  });
+
+  it("still flags a lookalike domain", () => {
+    const r = checkSms("Log in at https://revenue-ie.top to check your account.", undefined, "IE");
+    expect(r.verdict).toBe("likely_scam");
+  });
+
+  it("is not fooled by a subdomain-suffix evasion", () => {
+    // revenue.ie.evil.tk must not inherit Revenue's standing.
+    const r = checkSms("Revenue: verify at https://revenue.ie.evil.tk now.", undefined, "IE");
+    expect(r.verdict).toBe("likely_scam");
+  });
+
+  it("requires EVERY link to be official, not just one", () => {
+    // The obvious evasion: pad the message with a real link next to the payload.
+    const r = checkSms(
+      "Revenue: see https://revenue.ie then verify at http://revenue-verify.top now.",
+      undefined,
+      "IE",
+    );
+    expect(authorityFlag(r)).toBeTruthy();
+    expect(r.verdict).toBe("likely_scam");
+  });
+
+  it("still flags an agency-named scam pointing somewhere else entirely", () => {
+    const r = checkSms("AusPost: parcel held, pay fee at http://auspost-redelivery.top", undefined, "AU");
+    expect(r.verdict).toBe("likely_scam");
+  });
+
+  it("leaves link-free agency messages alone", () => {
+    // No links means no exemption — the deferred authority flag still applies.
+    const r = checkSms("Revenue: your tax return is due this month.", undefined, "IE");
+    expect(r.flags.join(" ")).toContain("government agency");
+  });
+});
+
+describe("official-link exemption does not apply to email", () => {
+  const auspostEmail = (from: string) =>
+    [`From: ${from}`, "Subject: Your parcel is on its way", "", "Track your delivery at https://auspost.com.au/track"].join("\n");
+
+  it("keeps trusting the sender domain, not the body link", () => {
+    // A spoofed sender quoting the real tracking link is ordinary phishing.
+    // Email has a verifiable sender, so the body link must not override it —
+    // isOwnDomainSender already covers the genuine case.
+    const r = checkEmail(auspostEmail("noreply@auspost.com.au.evil.tk"), undefined, "AU");
+    expect(r.verdict).toBe("likely_scam");
+  });
+
+  it("still flags a near-miss sender domain", () => {
+    const r = checkEmail(auspostEmail("noreply@notauspost.com.au"), undefined, "AU");
+    expect(authorityFlag(r)).toBeTruthy();
+  });
+});

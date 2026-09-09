@@ -842,6 +842,49 @@ export function checkUrl(
  * signal that would otherwise misfire, and never lowers a score by itself.
  * Header-based spoofing is caught separately by analyseEmailIdentities.
  */
+/**
+ * Do all the links in this message point at the region's own allowlisted
+ * agency/brand domains?
+ *
+ * The companion to isOwnDomainSender, for the case that has no sender metadata
+ * to trust. An SMS carries no verified sender domain, so the only thing the
+ * engine can check is where the message actually sends you — and a link to the
+ * agency's real domain is the one thing a phishing SMS cannot fake.
+ *
+ * Requires EVERY link to be allowlisted, not merely one: the standard evasion
+ * is to pad a message with a legitimate link alongside the payload one, so a
+ * .some() test here would hand attackers the exemption for free.
+ *
+ * Checks both allowlists the packs maintain. legitDomains is the broad
+ * region-wide list; authorityOwnDomains is the narrower set of organisations
+ * whose real mail demonstrably comes from a non-government domain
+ * (auspost.com.au), and its comment describes precisely this case. Consulting
+ * only the first left a real Australia Post tracking SMS scoring 55.
+ *
+ * Matching is exact-or-subdomain, identical to the allowlist branch in
+ * checkUrl, so "revenue.ie.evil.tk" does not qualify. Returns false when there
+ * are no links at all — the caller's rules are about links, and "no links"
+ * is not "safe links".
+ */
+function allLinksOnLegitDomains(
+  urls: string[] | null,
+  pack: { legitDomains: string[]; authorityOwnDomains: string[] },
+): boolean {
+  if (!urls || urls.length === 0) return false;
+  return urls.every((u) => {
+    let host: string;
+    try {
+      host = new URL(u.trim().startsWith("http") ? u.trim() : `https://${u.trim()}`).hostname.toLowerCase();
+    } catch {
+      return false;
+    }
+    return [...pack.legitDomains, ...pack.authorityOwnDomains].some((d) => {
+      const domain = d.toLowerCase();
+      return host === domain || host.endsWith("." + domain);
+    });
+  });
+}
+
 function isOwnDomainSender(
   channel: "sms" | "email",
   senderDomain: string | undefined,
@@ -1643,7 +1686,24 @@ export function checkSms(
   // and it was scoring a real Australia Post delivery notification as
   // suspicious. The domain is matched exactly or as a subdomain, so a lookalike
   // like `auspost.com.au.evil.tk` does not qualify (see isOwnDomainSender).
-  if (mentionsAny(lower, PACK.authorityMentions) && !isOwnDomainSender(channel, options?.senderDomain, PACK)) {
+  // SMS only. An email has a verifiable sender domain, and isOwnDomainSender
+  // already uses it — so for email the body link must NOT override the sender:
+  // a spoofed message from auspost.com.au.evil.tk quoting the real
+  // auspost.com.au/track link is an ordinary phishing shape, and treating its
+  // link as proof of identity would clear it. SMS carries no sender domain at
+  // all, which is exactly why the body link is the only evidence available
+  // there.
+  const linksAreOfficial = channel === "sms" && allLinksOnLegitDomains(urlMatch, PACK);
+  if (
+    mentionsAny(lower, PACK.authorityMentions) &&
+    !isOwnDomainSender(channel, options?.senderDomain, PACK) &&
+    // ...and not when every link in the message goes to that agency's own
+    // domain. "Verify directly via official channels" is wrong advice for a
+    // message whose only link IS the official channel. A real Australia Post
+    // tracking SMS scored 55/likely_scam here — the same score as an outright
+    // lookalike (revenue-ie.top) — which is the failure this prevents.
+    !linksAreOfficial
+  ) {
     // Naming an agency is not by itself evidence of anything: every genuine
     // message from the ATO says "ATO", and the real AusPost delivery notice
     // says "AusPost". Uncorroborated, this rule scored a 25 on ordinary mail
@@ -1678,7 +1738,10 @@ export function checkSms(
     // the flag text ("an SMS from one of these bodies...") is then plainly
     // wrong about what was checked. Found when a genuine Australia Post
     // delivery notification scored 38/suspicious on this rule.
-    if (channel === "sms" && urlMatch && mentionsAny(lower, PACK.noLinkSenders)) {
+    // The same official-link exemption applies, and matters more here: this
+    // rule's whole premise is "these bodies do not put links in their texts",
+    // which cannot be the right call for a link to the body's own domain.
+    if (channel === "sms" && urlMatch && !linksAreOfficial && mentionsAny(lower, PACK.noLinkSenders)) {
       sig.add("message", PACK.noLinkSendersFlag, 15);
     }
   }
