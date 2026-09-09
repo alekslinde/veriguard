@@ -34,8 +34,8 @@ import { readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
-import { lastUpdated } from "../lib/threatRadar";
-import { lastReviewed } from "../lib/scamCalendar";
+import { lastUpdated, authoredRadarRegions } from "../lib/threatRadar";
+import { lastReviewed, authoredCalendarRegions } from "../lib/scamCalendar";
 // Plain .mjs helper shared with check-sources.mjs / dependabot-triage.mjs;
 // `allowJs` resolves it and infers its shape from JSDoc.
 import { publishDigestIssue } from "./lib/digestIssue.mjs";
@@ -43,16 +43,13 @@ import { publishDigestIssue } from "./lib/digestIssue.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROADMAP_DIR = resolve(HERE, "../docs/threat-intel");
 
-// The radar and calendar are both authored primarily for AU (the only region
-// with a radar, and the sweep's home region), so their freshness is measured
-// against AU. If a second region ever grows its own radar, add it here.
-const REGION = "AU";
-
 const ROADMAP_RE = /^(\d{4}-\d{2}-\d{2})-threat-roadmap\.md$/;
 
 interface Surface {
   /** Human label for the report. */
   name: string;
+  /** Region whose authored data this row measures. */
+  region: string;
   /** File a promoter would edit. */
   file: string;
   /** The "as at" date the surface currently advertises, or null if empty. */
@@ -71,21 +68,36 @@ async function newestRoadmap(): Promise<string | null> {
   return dates.length ? dates[dates.length - 1] : null;
 }
 
+/**
+ * One row per authored (surface, region) pair.
+ *
+ * Enumerated from the data rather than a fixed "AU", so a region that grows a
+ * radar or calendar starts being measured the moment it is authored. A region
+ * with no authored data for a surface produces no row at all — that is not the
+ * same claim as "up to date", and inventing an empty row for every unauthored
+ * region would bury the real gaps under noise.
+ */
 function surfaces(): Surface[] {
-  return [
-    {
+  const rows: Surface[] = [];
+  for (const region of authoredRadarRegions()) {
+    rows.push({
       name: "Threat radar",
+      region,
       file: "lib/threatRadar.ts",
-      asAt: lastUpdated(REGION),
+      asAt: lastUpdated(region),
       derivedFrom: "lastUpdated() — the newest lastSeen across the entries",
-    },
-    {
+    });
+  }
+  for (const region of authoredCalendarRegions()) {
+    rows.push({
       name: "Scam calendar",
+      region,
       file: "lib/scamCalendar.ts",
-      asAt: lastReviewed(REGION),
+      asAt: lastReviewed(region),
       derivedFrom: "lastReviewed() — the newest reviewed date across the seasons",
-    },
-  ];
+    });
+  }
+  return rows;
 }
 
 interface Report {
@@ -130,14 +142,16 @@ function human(report: Report): string {
     lines.push("⚠️  A surface has fallen behind the newest sweep:");
     for (const { surface, gapDays } of report.behind) {
       const at = surface.asAt ?? "(empty)";
-      lines.push(`  • ${surface.name} (${surface.file}) — as at ${at}, ${gapDays} day(s) behind`);
+      lines.push(
+        `  • ${surface.name} [${surface.region}] (${surface.file}) — as at ${at}, ${gapDays} day(s) behind`,
+      );
     }
     lines.push("");
     lines.push("Promote the sweep into the surface(s) above — see");
     lines.push("docs/threat-intel/README.md, the Workflow section.");
   }
   for (const surface of report.inSync) {
-    lines.push(`  · ${surface.name} up to date (as at ${surface.asAt}).`);
+    lines.push(`  · ${surface.name} [${surface.region}] up to date (as at ${surface.asAt}).`);
   }
   return lines.join("\n");
 }
@@ -155,11 +169,13 @@ function markdown(report: Report): string {
   lines.push("The newest weekly sweep has landed in `docs/threat-intel/`, but a");
   lines.push("user-facing surface has not been promoted forward to match it:");
   lines.push("");
-  lines.push("| Surface | File | As at | Behind |");
-  lines.push("|---|---|---|---|");
+  lines.push("| Surface | Region | File | As at | Behind |");
+  lines.push("|---|---|---|---|---|");
   for (const { surface, gapDays } of report.behind) {
     const at = surface.asAt ?? "_(empty)_";
-    lines.push(`| ${surface.name} | \`${surface.file}\` | ${at} | ${gapDays} day(s) |`);
+    lines.push(
+      `| ${surface.name} | ${surface.region} | \`${surface.file}\` | ${at} | ${gapDays} day(s) |`,
+    );
   }
   lines.push("");
   lines.push("**What to do:** promote the cycle into the surface(s) above, then re-run");

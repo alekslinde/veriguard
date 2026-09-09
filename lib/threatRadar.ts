@@ -810,6 +810,23 @@ function isRadarRegion(code: RegionCode): code is RadarRegion {
 }
 
 /**
+ * The region codes with an authored radar.
+ *
+ * Derived from RADARS rather than hand-listed, so it can never drift from the
+ * data. Mirrors authoredCalendarRegions() in lib/scamCalendar.ts — the two
+ * modules are deliberately parallel.
+ *
+ * Today this is AU alone. That is the point of exporting it: the promotion
+ * freshness check reads this instead of a hardcoded "AU", so the day a second
+ * region grows a radar it is measured automatically rather than silently
+ * skipped — and until then, the gap between this list and the calendar's is
+ * itself the honest coverage signal.
+ */
+export function authoredRadarRegions(): RadarRegion[] {
+  return Object.keys(RADARS) as RadarRegion[];
+}
+
+/**
  * Entries authored for a region, or an empty list where we have none.
  *
  * Empty is the honest answer. Showing a British user Australian toll-road
