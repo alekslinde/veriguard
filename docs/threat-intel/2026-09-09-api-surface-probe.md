@@ -11,11 +11,71 @@ neither had been attacked.*
 
 ## Status — as at 2026-09-09
 
-| Finding | Severity | Shipped in | Status |
+| Finding | Issue | Shipped in | Status |
 |---|---|---|---|
-| P6 — `limit` bypasses the 100-row cap when negative | **HIGH** | — | ⬜ Outstanding |
-| P7 — Non-numeric `limit`/`offset` return 500 | MEDIUM | — | ⬜ Outstanding |
-| P8 — Target-region inference never runs on the email path | MEDIUM | — | ⬜ Outstanding |
+| P6 — `limit` bypasses the 100-row cap when negative | #278 | `8bec2bd` | ✅ Shipped |
+| P7 — Non-numeric `limit`/`offset` return 500 | #279 | `8bec2bd` | ✅ Shipped |
+| P8 — Target-region inference never runs on the email path | #280 | `e40b6ff` | ✅ Shipped |
+
+### Deviations
+
+- **P6 was fixed in two places, not one.** The finding named the route. The
+  store layer's `getPublicReports` carried the *identical* one-ended
+  `Math.min(limit, 100)`, so any caller bypassing the route's clamp could still
+  read unbounded. Both now clamp, and the store also bounds a negative `OFFSET`
+  that SQLite silently treats as 0. Fixing only the reported call site would
+  have left the defect reachable.
+
+- **P8's consent question was answered "infer, default on", with no opt-out.**
+  The finding left it open. Resolved to match `/api/check`, because the privacy
+  shape is what made default-on defensible there and it is identical here: a
+  day-bucketed counter keyed on `(day, surface, region, confidence)`, no
+  per-message row, no fragment of content. The `shareRegion` gate was
+  deliberately **not** replicated — a forwarding mail client cannot send one,
+  and a gate nothing can set is a comment pretending to be a control.
+
+### Corrections
+
+- **The cross-border test for P8 passed under both readings and proved
+  nothing.** Its first version used a `.com.au` *sender address* as the
+  forwarder's signal and asserted GB. It passed — and kept passing with the
+  code injected to infer from `raw` instead of `original`, which is the exact
+  defect it existed to catch. An email address is not a corroborated hostname,
+  so the AU signal never scored under either reading. Replaced with a fixture
+  whose AU signal is a real hostname in the forwarder's own header line, and so
+  is **absent from the extracted original entirely**: `raw` → AU, `original` →
+  GB. The injection now fails correctly (`expected 'AU' to be 'GB'`).
+  This is this archive's *"an injection that PASSES is a finding"* rule catching
+  a test written in the same hour the rule was re-read.
+
+- **Two assertions in the first draft were wrong about the code, not the code
+  wrong about itself.** `SCAM_FORWARD` (`ato-refund.xyz`) infers *nothing* — a
+  gTLD with no authority match — so asserting `AU` failed until the fixture
+  became a `.com.au` host. And `body.reply` is an object, not a string. Both
+  found by printing the actual value.
+
+- **Per-sender rate-limit state is shared across every test in the file**, so
+  the new block needed distinct sender addresses. Already documented in
+  `inboundRoute.test.ts` at the `outcome-probe@gmail.com` case — re-learned
+  rather than read.
+
+### Verification
+
+Every guard was verified by injecting the defect it catches. All four
+injections now fail loudly:
+
+| Injection | Result |
+|---|---|
+| Revert P6 to one-ended `Math.min` | 2 tests fail |
+| Revert P7 to raw `parseInt` | 4 tests fail |
+| Remove the P8 call site entirely | 4 tests fail |
+| P8 inferring from `raw` not `original` | 1 test fails — **only after the fixture was replaced** |
+
+Suite 2354 passing across 84 files (up 15). `npm run eval` and
+`npm run eval:metamorphic` produce **byte-identical output to `main`**, both
+region relations at 0 violations — no scoring behaviour was touched. Both
+harnesses carry one pre-existing failure (`au-sms-0013`) that reproduces on a
+clean checkout and is unrelated to this work.
 
 P6 and P7 are **cost/availability** findings on the free-tier read budget,
 not confidentiality: the feed is PII-scrubbed and already public at
