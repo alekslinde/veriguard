@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   radarForRegion,
+  authoredRadarRegions,
   threatsByStatus,
   activeThreats,
   lastUpdated,
@@ -163,6 +164,46 @@ describe("threatsByStatus", () => {
     for (const threat of threatsByStatus("AU", "active")) {
       if (PERSISTENT.has(threat.id)) continue;
       expect(sweeps.includes(threat.lastSeen), `${threat.id} last seen ${threat.lastSeen}`).toBe(true);
+    }
+  });
+
+  it("does not leave a recently-confirmed entry off the active list", () => {
+    // The converse of the rule above, and the direction that actually drifts.
+    // The existing check only catches an entry claiming `active` on a stale
+    // date; nothing caught the opposite — an entry a sweep re-confirmed that
+    // was never brought forward, which is how a promotion goes half-done and
+    // still passes CI (issue #194).
+    //
+    // `subsided` is a deliberate editorial statement that a campaign has
+    // stopped, so it is exempt: a sweep can record a last sighting without
+    // contradicting the call that it is over.
+    const sweeps = [...new Set(AU.map((t) => t.lastSeen))].sort().slice(-2);
+    for (const threat of AU) {
+      if (threat.status === "subsided") continue;
+      if (!sweeps.includes(threat.lastSeen)) continue;
+      expect(
+        threat.status,
+        `${threat.id} was confirmed by sweep ${threat.lastSeen} but is ${threat.status}`,
+      ).toBe("active");
+    }
+  });
+
+  it("keeps every authored radar region under the same status rule", () => {
+    // Generalises the rule past AU. Today AU is the only authored radar, so
+    // this adds no coverage — that is the point: it is the guard that makes a
+    // second region inherit the ageing discipline on the day it is authored,
+    // rather than the rule quietly remaining an AU-only convention.
+    const PERSISTENT = new Set(["hi-mum", "voice-clone-family"]);
+    for (const region of authoredRadarRegions()) {
+      const entries = radarForRegion(region);
+      const sweeps = [...new Set(entries.map((t) => t.lastSeen))].sort().slice(-2);
+      for (const threat of entries) {
+        if (threat.status !== "active" || PERSISTENT.has(threat.id)) continue;
+        expect(
+          sweeps.includes(threat.lastSeen),
+          `${region}/${threat.id} last seen ${threat.lastSeen}`,
+        ).toBe(true);
+      }
     }
   });
 
