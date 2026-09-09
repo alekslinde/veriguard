@@ -350,6 +350,14 @@ export interface RegionDefinition {
    * is the safe default — never "no such domains exist".
    */
   authorityOwnDomains?: string[];
+  /**
+   * Benefit-programme lure phrases that must never score on their own.
+   *
+   * Gated by the caller on a link or an information ask, because the wording is
+   * shared with the genuine programme's own correspondence. Optional: a pack
+   * with none omits it.
+   */
+  gatedBenefitPhrases?: string[];
   /** Copy for the legit-domain pass; names the jurisdiction, so it's regional. */
   legitDomainFlag: string;
   /** Details line for the legit-domain pass. */
@@ -439,6 +447,7 @@ export interface RegionPack {
   fakeInvestmentPlatformFlag: (platform: string) => string;
   legitDomains: string[];
   authorityOwnDomains: string[];
+  gatedBenefitPhrases: string[];
   legitDomainFlag: string;
   legitDomainDetails: string;
   senderIdFlag?: string;

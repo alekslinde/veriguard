@@ -71,6 +71,40 @@ describe("official-link exemption (SMS)", () => {
     expect(r.verdict).toBe("likely_scam");
   });
 
+  it("does not let one agency's message launder through another's domain", () => {
+    // The exemption tested only "is this domain allowlisted", so an ATO
+    // impersonation pointing at auspost.com.au was cleared. The link must not
+    // contradict the agency the message names.
+    const r = checkSms(
+      "ATO: your tax refund is pending. Log in at https://auspost.com.au/track",
+      undefined,
+      "AU",
+    );
+    expect(authorityFlag(r)).toBeTruthy();
+    expect(r.verdict).toBe("likely_scam");
+  });
+
+  it("keeps the exemption when the agency is named only by the link itself", () => {
+    // The other side of that rule. A genuine notification often names its
+    // sender nowhere but the URL, so "no authority named in prose" must keep
+    // the exemption — requiring a prose match would reintroduce the original bug.
+    const r = checkSms("Track your parcel at https://auspost.com.au", undefined, "AU");
+    expect(authorityFlag(r)).toBeFalsy();
+    expect(r.verdict).toBe("safe");
+  });
+
+  it("refuses an open redirect on an allowlisted host", () => {
+    // checkUrl already treats a nested URL as suspicious; the exemption must
+    // not override it, or gov.ie/redirect?url=... launders any destination.
+    const r = checkSms(
+      "Revenue: claim at https://www.gov.ie/redirect?url=https://revenue-ie.top/claim",
+      undefined,
+      "IE",
+    );
+    expect(authorityFlag(r)).toBeTruthy();
+    expect(r.verdict).toBe("likely_scam");
+  });
+
   it("still flags an agency-named scam pointing somewhere else entirely", () => {
     const r = checkSms("AusPost: parcel held, pay fee at http://auspost-redelivery.top", undefined, "AU");
     expect(r.verdict).toBe("likely_scam");

@@ -38,6 +38,28 @@ describe("#272 base — crypto seed-phrase solicitation", () => {
     expect(r.verdict).not.toBe("safe");
   });
 
+  it("does not flag anti-fraud advice that warns against sharing", () => {
+    // Wallet vendors, exchanges and banks publish this exact wording. Flagging
+    // the warning that protects people teaches them the verdict is noise.
+    for (const text of [
+      "Security tip: never share your seed phrase or recovery phrase with anyone.",
+      "Ledger will never ask you to enter your recovery phrase.",
+    ]) {
+      const r = checkSms(text, undefined, "AU");
+      expect(requestFlag(r)).toBeFalsy();
+    }
+  });
+
+  it("still flags a real ask carrying trailing reassurance boilerplate", () => {
+    // The negation is per clause, so appending a warning cannot disarm an ask.
+    const r = checkSms(
+      "Enter your seed phrase to restore access. We will never share it with anyone.",
+      undefined,
+      "AU",
+    );
+    expect(requestFlag(r)).toBeTruthy();
+  });
+
   it("does not double-score the longer recovery variants", () => {
     // "recovery phrase" substring-matches "wallet recovery phrase", so the
     // longer forms are deliberately absent from the list. One phrase, one hit.
@@ -93,6 +115,18 @@ describe("#275 US — jury duty / bench warrant SMS", () => {
 
   it("is scoped to the US pack", () => {
     expect(urgencyFlag(checkSms("missed jury duty", undefined, "AU"))).toBeFalsy();
+  });
+
+  it("leaves ordinary legal-professional usage alone", () => {
+    // Bare "bench warrant" is normal solicitor vocabulary. Only the
+    // second-person forms, which is how the scam always addresses you, score.
+    const r = checkSms(
+      "Client update: the bench warrant was recalled by the court this morning",
+      undefined,
+      "US",
+    );
+    expect(urgencyFlag(r)).toBeFalsy();
+    expect(r.verdict).toBe("safe");
   });
 
   it("does not double-score against the existing tax-threat warrant entry", () => {
