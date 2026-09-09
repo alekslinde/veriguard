@@ -276,16 +276,6 @@ tiers:
       region: IE
       check: manual
       note: Irish consumer protection authority; scam and unauthorised-firm alerts.
-    - domain: fraudsmart.ie
-      name: FraudSMART (Banking & Payments Federation Ireland)
-      url: https://www.fraudsmart.ie/alerts/
-      region: IE
-      check: manual
-      note: >-
-        Industry-run but the most specific Irish source for live smishing and
-        vishing campaigns. Tier 1 on specificity; corroborate a novel claim
-        against garda.ie or ccpc.ie before it justifies a score alone.
-
     # ── SG ──────────────────────────────────────────────────────────────────
     - domain: scamshield.gov.sg
       name: ScamShield (Singapore)
@@ -303,6 +293,19 @@ tiers:
       note: The Anti-Scam Command publishes named campaign advisories here.
 
   2:
+    - domain: fraudsmart.ie
+      name: FraudSMART (Banking & Payments Federation Ireland)
+      url: https://www.fraudsmart.ie/alerts/
+      region: IE
+      check: manual
+      note: >-
+        The most operationally specific Irish source for live smishing and
+        vishing campaigns — it names current lures while the regulators describe
+        categories. Tier 2 rather than 1 because BPFI is a bank industry
+        association, not a regulator or national body: member banks have an
+        interest in fraud being visible and attributed to channels they do not
+        control. Useful for spotting a campaign early; corroborate against
+        garda.ie or ccpc.ie before it justifies a score on its own.
     - domain: krebsonsecurity.com
       name: Krebs on Security
       url: https://krebsonsecurity.com
