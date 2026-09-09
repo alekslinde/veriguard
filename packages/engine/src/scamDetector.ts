@@ -952,7 +952,14 @@ function allLinksOnLegitDomains(
     } catch {
       return false;
     }
-    const host = link.hostname.toLowerCase();
+    // Trailing dot stripped for the same reason normaliseForAnalysis strips it:
+    // "auspost.com.au." is a valid FQDN for the identical host, but it survives
+    // URL parsing into `hostname` and defeats every comparison below. Left in,
+    // it fails in the costly direction here — a real Australia Post tracking
+    // SMS written with the root dot misses the allowlist and scores
+    // 55/likely_scam, which is exactly the false positive this exemption exists
+    // to prevent. Caught by the metamorphic host-trailing-dot relation.
+    const host = link.hostname.toLowerCase().replace(/\.+$/, "");
     const onAllowlist = allowed.some((d) => {
       const domain = d.toLowerCase();
       return host === domain || host.endsWith("." + domain);
