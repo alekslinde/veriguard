@@ -8,6 +8,41 @@ import { clientIpFromHeaders } from "@/lib/geo";
 const VALID_SORTS = new Set<SortOption>(["desc", "asc", "most", "least"]);
 
 /**
+ * Read an integer query parameter, falling back on anything non-finite.
+ *
+ * `parseInt("abc", 10)` is NaN, and a `?? default` on the raw string only fires
+ * when the parameter is ABSENT — never when it is present and malformed. The
+ * NaN then reaches the libSQL bind layer, which rejects it ("Only finite
+ * numbers … can be passed as arguments") and turns a bad query string into a
+ * 500. That throw lands AFTER the rate-limit check and the two DB queries, so
+ * it is the one call shape that reaches the database and cannot be absorbed by
+ * the edge cache — the reverse of this route's reject-before-querying order.
+ */
+function intParam(raw: string | null, fallback: number): number {
+  const n = parseInt(raw ?? "", 10);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/** As above, but absent and unparseable both yield undefined (no filter). */
+function intParamOrUndefined(raw: string | null): number | undefined {
+  const n = parseInt(raw ?? "", 10);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * Bound a caller-supplied value at BOTH ends.
+ *
+ * `Math.min(limit, 100)` alone caps the top and says nothing about the bottom,
+ * and SQLite reads a negative LIMIT as no limit at all — so `?limit=-5`
+ * returned the entire reports table, defeating the row cap that is this
+ * endpoint's whole cost control. The upper bound was tested; the lower one did
+ * not exist. Clamp both ends of anything a caller supplies.
+ */
+function clamp(n: number, min: number, max: number): number {
+  return Math.min(Math.max(n, min), max);
+}
+
+/**
  * Public submissions feed.
  *
  * The content is PII-scrubbed and already published at /submissions, so this is
@@ -54,11 +89,13 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url);
-  const limit  = Math.min(parseInt(searchParams.get("limit")  ?? "25", 10), 100);
-  const offset = Math.max(parseInt(searchParams.get("offset") ?? "0",  10), 0);
+  const limit  = clamp(intParam(searchParams.get("limit"),  25), 1, 100);
+  const offset = Math.max(intParam(searchParams.get("offset"), 0), 0);
   const type   = searchParams.get("type")   ?? undefined;
   const search = searchParams.get("search") ?? undefined;
-  const since  = searchParams.get("since")  ? parseInt(searchParams.get("since")!, 10) : undefined;
+  // undefined rather than a fallback: absent and unparseable both mean "no
+  // since filter", and NaN here would silently compare against submitted_at.
+  const since  = intParamOrUndefined(searchParams.get("since"));
   const sortRaw = searchParams.get("sort") ?? "desc";
   const sort: SortOption = VALID_SORTS.has(sortRaw as SortOption) ? sortRaw as SortOption : "desc";
 

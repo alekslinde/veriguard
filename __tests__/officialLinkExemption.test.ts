@@ -42,6 +42,39 @@ describe("official-link exemption (SMS)", () => {
     expect(authorityFlag(r)).toBeFalsy();
   });
 
+  // A trailing root dot is a valid FQDN for the identical host, but it survives
+  // URL parsing into `hostname` and defeated every comparison in the matcher —
+  // so the SAME message scored 15/safe without it and 55/likely_scam with it.
+  // normaliseForAnalysis already strips it for exactly this reason; the
+  // exemption's own matcher did not. Found by the metamorphic
+  // host-trailing-dot relation, which asserts the two must score equal, not by
+  // any fixture here.
+  //
+  // This covers the FALSE-POSITIVE direction only. The same dot also drops a
+  // suspicious-TLD flag on a scam, and the relation cannot see that half — see
+  // urlTrailingDot.test.ts for why, and for the tests that do cover it.
+  it("accepts an allowlisted domain written in fully-qualified form", () => {
+    const plain = checkSms("Track your parcel at https://auspost.com.au/mypost/track", undefined, "AU");
+    const fqdn  = checkSms("Track your parcel at https://auspost.com.au./mypost/track", undefined, "AU");
+    expect(authorityFlag(fqdn)).toBeFalsy();
+    expect(fqdn.verdict).toBe("safe");
+    // The property that matters: the root dot changes nothing at all.
+    expect(fqdn.score).toBe(plain.score);
+  });
+
+  it("accepts a subdomain in fully-qualified form", () => {
+    const r = checkSms("Track your delivery at https://track.auspost.com.au./abc123", undefined, "AU");
+    expect(authorityFlag(r)).toBeFalsy();
+    expect(r.verdict).toBe("safe");
+  });
+
+  // The strip must not become a way past the allowlist: a lookalike is still a
+  // lookalike in FQDN form.
+  it("does not let a trailing dot launder a lookalike domain", () => {
+    const r = checkSms("AusPost: parcel held, pay fee at http://auspost-redelivery.top./x", undefined, "AU");
+    expect(r.verdict).not.toBe("safe");
+  });
+
   it("suppresses the no-link-sender flag for the sender's own domain", () => {
     // This rule's premise is "these bodies never put links in their texts",
     // which cannot be the right call for a link to the body's own site.

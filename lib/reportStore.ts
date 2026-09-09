@@ -499,7 +499,11 @@ export async function getPublicReports(opts: {
           FROM reports WHERE ${where}
           ORDER BY ${orderBy}
           LIMIT ? OFFSET ?`,
-    args: [...args, Math.min(limit, 100), offset],
+    // Bounded at BOTH ends, and deliberately not only at the route. A negative
+    // LIMIT is "no limit" to SQLite, so a one-ended Math.min here would let any
+    // caller that skips the route's clamp read the whole table. Same reasoning
+    // for a negative OFFSET, which SQLite treats as 0.
+    args: [...args, Math.min(Math.max(limit, 1), 100), Math.max(offset, 0)],
   });
 
   return result.rows.map((r) => ({
