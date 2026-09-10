@@ -287,19 +287,6 @@ export function hasMixedScriptHost(raw: string): boolean {
  * Hostnames keep the wider CONFUSABLE_SCRIPTS: unit symbols do not appear in
  * domain names, so the ambiguity this resolves does not arise there.
  */
-/**
- * Schemeless hostnames, for the splice rule's strip only.
- *
- * Label characters include the confusable ranges, exactly as BARE_HOST_GLOBAL
- * does in scamDetector. An ASCII-only class matches from *after* the Cyrillic
- * character — "pаypal.com" yields "ypal.com" — which strips part of the token
- * and leaves the spliced prefix behind as a word, reintroducing the double
- * score this strip exists to prevent. The lookbehind mirrors BARE_HOST_GLOBAL's,
- * so a host already consumed by the scheme or email pass is not re-matched.
- */
-const BARE_HOST_FOR_STRIP =
-  /(?<![\w@./\\-])((?:[a-z0-9\u0370-\u03FF\u0400-\u04FF\u0500-\u052F](?:[a-z0-9\u0370-\u03FF\u0400-\u04FF\u0500-\u052F-]*[a-z0-9\u0370-\u03FF\u0400-\u04FF\u0500-\u052F])?\.)+([a-z]{2,24}))(\/\S*)?/gi;
-
 const TEXT_CONFUSABLES = /[\u0400-\u04FF\u0500-\u052F]|[ΑΒΕΖΗΙΚΜΝΟΡΤΥΧαεηικνορστυχ]/;
 
 /**
@@ -331,46 +318,22 @@ const TEXT_CONFUSABLES = /[\u0400-\u04FF\u0500-\u052F]|[ΑΒΕΖΗΙΚΜΝΟΡΤ
 export function mixedScriptWords(
   text: string,
   /**
-   * TLDs that mark a dotted token as a hostname rather than a missing space
-   * after a full stop. Pass the same union `extractBareHosts` uses; omitting it
-   * disables schemeless stripping rather than guessing.
+   * Removes the parts of `text` that belong to the URL checker — schemed URLs,
+   * email addresses and schemeless hostnames — leaving the prose this rule is
+   * about.
+   *
+   * Injected rather than done here, because deciding what is a hostname is not
+   * a TLD lookup: it is five guards in `extractBareHosts`, and every version of
+   * this rule that approximated them locally was wrong. The first gated on "a
+   * dot and two letters" and deleted prose; the second gated on the TLD set
+   * alone and was simultaneously too loose for `.co`/`.app` and too strict for
+   * `.bond`/`.zip`. The engine passes the real thing; the default is identity,
+   * so a direct caller reads the whole string rather than a guess.
    */
-  hostTlds: ReadonlySet<string> = new Set(),
+  stripHosts: (text: string) => string = (t) => t,
 ): string[] {
   const out: string[] = [];
-  // URLs and email addresses are removed before splitting, because a spliced
-  // hostname is already the URL checker's finding — hasMixedScriptHost scores
-  // it at 45, and the two rules are counterparts rather than a stack. Without
-  // this the word splitter shreds "http://pаypal.com" into the bare label
-  // "pаypal" and scores the same character twice, once as prose and once as a
-  // host, for 60 on a message the URL rule had already handled.
-  //
-  // Stripping rather than skipping matched words: the surrounding prose in the
-  // same message still gets read, so "Login at http://pаypal.com to reаctivate"
-  // reports the prose splice and leaves the host to the URL card.
-  const prose = text
-    .replace(/[a-z][a-z0-9+.-]*:\/\/\S+/gi, " ")
-    .replace(/\S+@\S+/g, " ")
-    // Schemeless hosts: scam SMS routinely drops the scheme, so leaving these
-    // in would reopen the double-count on the commoner shape.
-    //
-    // Gated on a KNOWN TLD, not on "a dot and two letters". The loose form was
-    // the first version and it deleted prose: "your ассount.has been suspended"
-    // and "verify your ассount.Then call us" both read as hosts, so a missing
-    // space after a full stop — which this codebase's own extractBareHosts
-    // comments call routine in pasted SMS — silently removed the spliced word
-    // and took the message from 35/suspicious to 10/safe.
-    //
-    // That is this rule's *third* instance of the same mistake: approximating a
-    // condition that already exists in a guarded form nearby. `hostTlds` is the
-    // same union extractBareHosts gates on, passed in because the pack owns the
-    // abuse-prone half. Omitted, no schemeless stripping happens at all — the
-    // safe default, since a missed strip double-scores a host while an
-    // over-broad one deletes evidence.
-    .replace(BARE_HOST_FOR_STRIP, (whole, _host, tld: string) =>
-      hostTlds.has(tld.toLowerCase()) ? " " : whole,
-    );
-  for (const word of prose.split(/[^\p{L}\p{M}\p{N}]+/u)) {
+  for (const word of stripHosts(text).split(/[^\p{L}\p{M}\p{N}]+/u)) {
     // Latin letters only — \p{L} would count the confusable characters
     // themselves as "letters" and make every wholly-Cyrillic word qualify.
     if (/[a-z]/i.test(word) && TEXT_CONFUSABLES.test(word)) out.push(word);
