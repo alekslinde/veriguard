@@ -292,6 +292,97 @@ tiers:
       check: manual
       note: The Anti-Scam Command publishes named campaign advisories here.
 
+    # ── DE ──────────────────────────────────────────────────────────────────
+    # The five entries below were registered alongside the `minimal` packs for
+    # these regions. Registering a source is not reading it (item 6): every one
+    # is `check: manual`, so it contributes nothing until a human opens it, and
+    # a sweep must not imply otherwise.
+    - domain: bsi.bund.de
+      name: BSI — Bundesamt für Sicherheit in der Informationstechnik
+      url: https://www.bsi.bund.de/DE/Service-Navi/Presse/Warnmeldungen/warnmeldungen_node.html
+      region: DE
+      check: manual
+      note: >-
+        Germany's federal information-security authority. Publishes public
+        warnings ("Warn- und Informationsmeldungen") including phishing waves.
+    - domain: verbraucherzentrale.de
+      name: Verbraucherzentrale — Phishing-Radar
+      url: https://www.verbraucherzentrale.de/wissen/digitale-welt/phishingradar
+      region: DE
+      check: manual
+      note: >-
+        Consumer-association phishing radar, updated weekly and the most
+        operationally specific German source for live lures — it names the
+        impersonated brand per wave where the BSI describes the class.
+
+    # ── ZA ──────────────────────────────────────────────────────────────────
+    - domain: saps.gov.za
+      name: South African Police Service — scam alerts
+      url: https://www.saps.gov.za/newsroom/alert.php
+      region: ZA
+      check: manual
+      note: National police; publishes named scam and fraud alerts.
+    - domain: sabric.co.za
+      name: SABRIC — South African Banking Risk Information Centre
+      url: https://www.sabric.co.za/media-and-news/
+      region: ZA
+      check: manual
+      note: >-
+        Bank-sector fraud body; the closest ZA equivalent to FraudSMART in IE
+        for named vishing and smishing campaigns.
+
+    # ── IN ──────────────────────────────────────────────────────────────────
+    - domain: cybercrime.gov.in
+      name: National Cyber Crime Reporting Portal (India)
+      url: https://cybercrime.gov.in
+      region: IN
+      check: manual
+      note: >-
+        India's national cybercrime reporting portal, run by MHA. Also the
+        reporting destination named in the IN pack.
+    - domain: cert-in.org.in
+      name: CERT-In — Indian Computer Emergency Response Team
+      url: https://www.cert-in.org.in/
+      region: IN
+      check: manual
+      note: National CERT; issues public advisories including phishing campaigns.
+
+    # ── JP ──────────────────────────────────────────────────────────────────
+    - domain: antiphishing.jp
+      name: Council of Anti-Phishing Japan
+      url: https://www.antiphishing.jp/news/alert/
+      region: JP
+      check: manual
+      note: >-
+        Industry anti-phishing council; publishes per-brand phishing alerts and
+        is the most campaign-specific Japanese source.
+    - domain: caa.go.jp
+      name: Consumer Affairs Agency (Japan)
+      url: https://www.caa.go.jp/policies/policy/consumer_policy/caution/
+      region: JP
+      check: manual
+      note: >-
+        National consumer authority; publishes consumer-harm alerts and is the
+        reporting destination named in the JP pack.
+
+    # ── BR ──────────────────────────────────────────────────────────────────
+    - domain: gov.br
+      name: gov.br — Ministério da Justiça, consumer protection
+      url: https://www.gov.br/mj/pt-br/assuntos/sua-protecao/consumidor
+      region: BR
+      check: manual
+      note: >-
+        Federal consumer-protection channel (SENACON) and the reporting
+        destination named in the BR pack.
+    - domain: cert.br
+      name: CERT.br
+      url: https://www.cert.br/alertas/
+      region: BR
+      check: manual
+      note: >-
+        Brazil's national CERT, run by NIC.br; publishes public alerts
+        including phishing and banking-malware campaigns.
+
   2:
     - domain: fraudsmart.ie
       name: FraudSMART (Banking & Payments Federation Ireland)

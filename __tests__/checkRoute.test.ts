@@ -61,7 +61,12 @@ describe("POST /api/check region resolution", () => {
   });
 
   it("uses the base-only pack for a known-but-uncovered country", async () => {
-    const res = await POST(check({ content: SCAM }, { "x-vercel-ip-country": "DE" }));
+    // "DE" until the DE pack shipped; kept as a country with no national layer
+    // rather than one that has since acquired one. regionResolver.test.ts
+    // derives its equivalent fixture from supportedRegions() — this one names a
+    // single country because the assertion is about the route's plumbing, not
+    // about which countries are covered.
+    const res = await POST(check({ content: SCAM }, { "x-vercel-ip-country": "FR" }));
     const json = await res.json();
     expect(json.region).toBe("ZZ");
     // Universal signals still fire — the .xyz link is caught regardless.

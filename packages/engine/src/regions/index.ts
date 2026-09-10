@@ -9,6 +9,11 @@ import { NZ } from "./nz";
 import { CA } from "./ca";
 import { IE } from "./ie";
 import { SG } from "./sg";
+import { DE } from "./de";
+import { ZA } from "./za";
+import { IN } from "./in";
+import { JP } from "./jp";
+import { BR } from "./br";
 import { REST_OF_WORLD } from "./rest-of-world";
 import type { RegionCode, RegionDefinition, RegionPack } from "./types";
 
@@ -40,6 +45,11 @@ const REGIONS: Record<RegionCode, RegionDefinition> = {
   CA,
   IE,
   SG,
+  DE,
+  ZA,
+  IN,
+  JP,
+  BR,
   ZZ: REST_OF_WORLD,
 };
 
