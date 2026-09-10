@@ -18,7 +18,7 @@
 // per-region number-plan semantics carried on the region pack's phonePlan.
 
 import { parsePhoneNumberFromString, isSupportedCountry, type PhoneNumber } from "libphonenumber-js/max";
-import { resolveRegionPack, DEFAULT_REGION, FALLBACK_REGION, type RegionInput } from "./regions";
+import { resolveRegionPack, DEFAULT_REGION, FALLBACK_REGION, ALL_EMERGENCY_NUMBERS, type RegionInput } from "./regions";
 import type { PhonePlan } from "./regions/types";
 
 export interface PhoneIntel {
@@ -517,8 +517,19 @@ export function analysePhone(raw: string, region?: RegionInput): PhoneIntel {
 
   // Emergency numbers are checked before anything else — they are short enough
   // to trip the "too short" guard, and must never be scored as suspicious.
-  // The universal set applies regardless of region; a pack may add its own.
-  if (EMERGENCY_NUMBERS.has(cleaned) || plan.emergencyNumbers?.includes(cleaned)) {
+  //
+  // Every pack's numbers apply regardless of the active region, not just the
+  // active pack's. The union is what makes the rule stated on EMERGENCY_NUMBERS
+  // actually true: an unrecognised emergency number must not be reported as
+  // fabricated, and which country the *user* is in does not change whether a
+  // number is one. Before this, checking Brazil's 190 from anywhere but BR
+  // returned `likely_scam` on the "too short to be real" guard.
+  // `plan.emergencyNumbers` is deliberately NOT consulted here. It would be dead
+  // code: every pack reachable through `plan` comes from the same REGIONS map
+  // the union is flat-mapped from, so the union already contains it. Reading it
+  // as a third source would imply per-region numbers still have an independent
+  // effect, which is exactly the belief that produced this defect.
+  if (EMERGENCY_NUMBERS.has(cleaned) || ALL_EMERGENCY_NUMBERS.includes(cleaned)) {
     return {
       lineType: "emergency",
       country: homeName,
