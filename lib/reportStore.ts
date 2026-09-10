@@ -104,6 +104,27 @@ export function checkAndRecordRateLimit(key: string, limit: number = RATE_LIMIT)
   return true;
 }
 
+/**
+ * Whether `key` is within budget, WITHOUT recording a hit.
+ *
+ * The combined check-and-record above is the right shape when every request
+ * that reaches it costs the same. It is the wrong shape when a request can
+ * still be rejected cheaply afterwards: the hit is charged before the work is
+ * known to be real, so a caller sending malformed requests burns the budget of
+ * whoever shares its key while causing none of the cost the limit exists to
+ * bound.
+ *
+ * Pair this with a later `checkAndRecordRateLimit` on the same key: peek first
+ * to reject an already-exhausted caller before doing any work, then record once
+ * the request is known to be worth charging for. See app/api/ocr/route.ts.
+ */
+export function isWithinRateLimit(key: string, limit: number = RATE_LIMIT): boolean {
+  cleanRateLimiter();
+  const now = Date.now();
+  const times = (rateLimiter.get(key) || []).filter((t) => now - t < RATE_WINDOW_MS);
+  return times.length < limit;
+}
+
 // ── Deduplication ─────────────────────────────────────────────────────────────
 
 /**

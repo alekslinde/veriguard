@@ -151,26 +151,59 @@ describe("POST /api/ocr", () => {
     expect(res.headers.get("vary")).toBe("Origin");
   });
 
+  /** A well-formed single-pixel PNG upload — the only request shape that
+   *  should cost the caller a slot. */
+  const imageRequest = (ip: string) => {
+    const png = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "base64",
+    );
+    const form = new FormData();
+    form.append("image", new Blob([png], { type: "image/png" }), "px.png");
+    return new Request(url, {
+      method: "POST",
+      body: form,
+      headers: { "x-forwarded-for": ip },
+    });
+  };
+
+  it("does not charge the budget for requests it refuses cheaply", async () => {
+    // Regression: the limit used to be recorded before the multipart, image-
+    // field and size checks, so body-less POSTs — which decode nothing — each
+    // burned a slot. x-forwarded-for is forgeable and browsers retry this
+    // fallback, so that let a caller spend someone else's budget for free.
+    const { POST } = await import("@/app/api/ocr/route");
+    const ip = "203.0.113.90";
+
+    // Well past the budget of 12, all rejected before any decode happens.
+    for (let i = 0; i < 30; i++) {
+      const res = await POST(
+        new Request(url, { method: "POST", headers: { "x-forwarded-for": ip } }) as never,
+      );
+      expect(res.status).toBe(400);
+    }
+
+    // The budget is untouched, so a real upload still gets through. Asserting
+    // "not 429" rather than a specific status: what matters here is that the
+    // limiter did not refuse it, not what OCR then makes of the image.
+    const res = await POST(imageRequest(ip) as never);
+    expect(res.status).not.toBe(429);
+  });
+
   it("rate-limits an identified caller past its budget", async () => {
     const { POST } = await import("@/app/api/ocr/route");
     // A distinct IP so this does not consume another test's budget.
     const ip = "203.0.113.77";
-    const send = () =>
-      POST(new Request(url, {
-        method: "POST",
-        headers: { "x-forwarded-for": ip },
-      }) as never);
 
-    // Exactly the budget: each of these gets past both guards and is then
-    // rejected as a non-multipart request (400), which is the expected shape
-    // for a body-less probe. Asserting 400 (not merely "not 429") is what
-    // proves they were admitted rather than refused for some other reason.
-    const withinBudget: number[] = [];
-    for (let i = 0; i < 12; i++) withinBudget.push((await send()).status);
-    expect(withinBudget).toEqual(Array(12).fill(400));
+    // Exactly the budget, in the shape that actually costs: a real upload.
+    // These reach the decode path, so each one charges a slot.
+    for (let i = 0; i < 12; i++) {
+      const res = await POST(imageRequest(ip) as never);
+      expect(res.status).not.toBe(429);
+    }
 
     // The next one is over budget and refused by the limiter.
-    const res = await send();
+    const res = await POST(imageRequest(ip) as never);
     expect(res.status).toBe(429);
     expect((await res.json()).code).toBe("rate_limited");
     expect(res.headers.get("cache-control")).toBe("no-store");
