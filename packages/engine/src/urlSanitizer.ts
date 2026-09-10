@@ -266,6 +266,42 @@ export function hasMixedScriptHost(raw: string): boolean {
     .some((label) => /[a-z]/i.test(label) && CONFUSABLE_SCRIPTS.test(label));
 }
 
+/**
+ * Words in free text that splice a confusable script into a Latin word.
+ *
+ * The body-text counterpart of hasMixedScriptHost, and it exists because the
+ * keyword layer is defeated by one character. "Your account has been
+ * suspended" scores 30; swapping two Latin letters for their Cyrillic
+ * lookalikes renders identically and scores 0, because every keyword list is
+ * matched as literal Latin text. Five of seven sampled scam messages evaded
+ * entirely this way, three of them dropping to zero.
+ *
+ * The unit is the WORD, not the message. A message that merely *contains* two
+ * scripts is ordinary — bilingual texting, a Latin brand name inside Greek
+ * prose, a signature line — and flagging it would tax people for writing in
+ * their own language, which is the failure mode that withdrew character
+ * entropy. Mixing within a single word is different in kind: there is no
+ * reason to write one, because the homoglyph only has value if the rest of the
+ * word still reads as the Latin word being impersonated.
+ *
+ * Scoped to Cyrillic and Greek by CONFUSABLE_SCRIPTS for the reason given
+ * there — those are the scripts that supply Latin lookalikes. Thai, Arabic,
+ * Hebrew, Han and Kana share no shapes with Latin, so a reader cannot be
+ * misled by them and their presence is not evidence of anything.
+ *
+ * Returns the offending words so the flag can quote them: the teaching value
+ * is in showing the reader a word that looks ordinary and is not.
+ */
+export function mixedScriptWords(text: string): string[] {
+  const out: string[] = [];
+  for (const word of text.split(/[^\p{L}\p{M}\p{N}]+/u)) {
+    // Latin letters only — \p{L} would count the confusable characters
+    // themselves as "letters" and make every wholly-Cyrillic word qualify.
+    if (/[a-z]/i.test(word) && CONFUSABLE_SCRIPTS.test(word)) out.push(word);
+  }
+  return out;
+}
+
 // ── Normalise for analysis ────────────────────────────────────────────────────
 // Closes common evasion tricks before pattern matching:
 //   - Lowercase hostname (checkers are case-insensitive but lists are lowercase)

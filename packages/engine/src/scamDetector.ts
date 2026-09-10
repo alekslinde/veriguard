@@ -1,5 +1,5 @@
 import { parseEmailHeaders, analyseEmailIdentities, domainOf } from "./emailHeaders";
-import { extractIdentifiers, normaliseForAnalysis, defang, refang, isDefanged, normaliseUnicode, hasMixedScriptHost, displayedHyphenCount } from "./urlSanitizer";
+import { extractIdentifiers, normaliseForAnalysis, defang, refang, isDefanged, normaliseUnicode, hasMixedScriptHost, mixedScriptWords, displayedHyphenCount } from "./urlSanitizer";
 import { registrableLabel, publicSuffix, isNationalCommercialSuffix } from "./publicSuffix";
 import { findKeyboardTypo } from "./keyboardAdjacency";
 import { BASE_SIGNALS } from "./regions/base";
@@ -1311,6 +1311,32 @@ function serviceNames(pack: RegionPack): Set<string> {
 export const FAMILY_IMPERSONATION_FLAG =
   'Reads as the "Hi Mum" family-impersonation script';
 
+/**
+ * Score homoglyph splicing in a message body, shared by every text checker.
+ *
+ * One rule at two call sites: checkSms (which checkEmail merges) and
+ * checkCustom, which keeps its own keyword pass rather than delegating and so
+ * inherits the same evasion independently. Wording and weight are shared
+ * deliberately — the same input must not score differently for the box it was
+ * pasted into, which is the defect #233 fixed for the keyword lists.
+ *
+ * Weighted to reach "suspicious" alone but not "likely_scam". The splice is
+ * deliberate — there is no innocent reason to write one word in two scripts —
+ * but this rule cannot see WHAT was evaded, so it must not deliver the verdict
+ * the keyword layer would have had to earn. It restores a floor, not a
+ * conviction.
+ */
+function addSplicedWordingSignal(sig: Signals, text: string): void {
+  const spliced = mixedScriptWords(text);
+  if (spliced.length === 0) return;
+  const many = spliced.length > 1;
+  sig.add(
+    "message",
+    `Disguised wording — ${many ? "the words" : "the word"} "${spliced.slice(0, 3).join('", "')}" mix${many ? "" : "es"} ordinary letters with Cyrillic or Greek lookalikes. It reads normally but is written to slip past filters that check the wording`,
+    25,
+  );
+}
+
 export function checkSms(
   text: string,
   blocklist?: Set<string>,
@@ -1331,6 +1357,15 @@ export function checkSms(
   const CRYPTO_TOAD_BRANDS = PACK.cryptoExchanges;
   const sig = new Signals();
   const lower = text.toLowerCase();
+
+  // Homoglyph splicing in the message body.
+  //
+  // Scored FIRST because it explains why the rest of this function is about to
+  // find nothing: every keyword list below is matched as literal Latin text, so
+  // one Cyrillic character inside a word removes that word from detection
+  // entirely. "Your account has been suspended" scores 30; the spliced form
+  // renders identically to the reader and scored 0 before this rule existed.
+  addSplicedWordingSignal(sig, text);
 
   const urgencyHits = URGENCY_WORDS.filter((w) => mentions(lower, w));
   if (urgencyHits.length > 0) {
@@ -2488,6 +2523,10 @@ export function checkCustom(text: string, blocklist?: Set<string>, region?: Regi
   } = PACK;
   const sig = new Signals();
   const lower = text.toLowerCase();
+
+  // Homoglyph splicing — the pasted-text path carries the same evasion as
+  // checkSms, and is the likelier one for a message copied out of a client.
+  addSplicedWordingSignal(sig, text);
 
   const allSignals = [...URGENCY_WORDS, ...REWARD_WORDS, ...REQUEST_WORDS];
   // Matched through mentions() for parity with checkSms (#233). A raw
