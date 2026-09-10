@@ -104,17 +104,103 @@ export function checkAndRecordRateLimit(key: string, limit: number = RATE_LIMIT)
   return true;
 }
 
+/**
+ * Whether `key` is within budget, WITHOUT recording a hit.
+ *
+ * The combined check-and-record above is the right shape when every request
+ * that reaches it costs the same. It is the wrong shape when a request can
+ * still be rejected cheaply afterwards: the hit is charged before the work is
+ * known to be real, so a caller sending malformed requests burns the budget of
+ * whoever shares its key while causing none of the cost the limit exists to
+ * bound.
+ *
+ * Pair this with a later `checkAndRecordRateLimit` on the same key: peek first
+ * to reject an already-exhausted caller before doing any work, then record once
+ * the request is known to be worth charging for. See app/api/ocr/route.ts.
+ */
+export function isWithinRateLimit(key: string, limit: number = RATE_LIMIT): boolean {
+  cleanRateLimiter();
+  const now = Date.now();
+  const times = (rateLimiter.get(key) || []).filter((t) => now - t < RATE_WINDOW_MS);
+  return times.length < limit;
+}
+
 // ── Deduplication ─────────────────────────────────────────────────────────────
 
-const MAX_SEEN = 5000;
-const seenContent: string[] = [];
+/**
+ * How long a submission stays "recently seen".
+ *
+ * Expiry is by AGE, not by count, and that distinction is the whole point.
+ * This was a 5000-entry FIFO array, which made eviction depend on how much
+ * traffic arrived rather than on how much time had passed — so an attacker
+ * could retire their own earlier submission by pushing MAX_SEEN unique entries
+ * in behind it, and resubmit the same payload as brand new. Volume is the one
+ * variable an attacker fully controls, so it must not be the thing that decides
+ * what the guard forgets.
+ *
+ * Matched to RATE_WINDOW_MS: the two guards answer the same question over the
+ * same period, and a dedupe window shorter than the rate window would leave a
+ * gap where a resubmission is neither rate-limited nor deduped.
+ */
+const SEEN_TTL_MS = RATE_WINDOW_MS;
+
+/**
+ * Hard ceiling on retained keys, as a memory bound only — NOT the eviction
+ * policy. TTL does the real work; this exists so a traffic spike inside one
+ * window cannot grow the map without limit. When it trips we drop the oldest
+ * entries, which is the same weakness the array had — but it now takes 20k
+ * distinct submissions inside a single TTL window to reach, and the per-IP rate
+ * limit sits in front of that.
+ */
+const MAX_SEEN = 20_000;
+
+/** key → unix ms when it was last seen. Map, not array: `includes` was a linear
+ *  scan over up to MAX_SEEN strings on every submission. */
+const seenContent = new Map<string, number>();
+
+function dedupeKey(type: string, content: string): string {
+  return `${type}:${content.slice(0, 200).toLowerCase().replace(/\s+/g, " ")}`;
+}
+
+/** Drop entries past their TTL. Map preserves insertion order, so the oldest
+ *  are first and we can stop at the first live one. */
+function cleanSeenContent(now: number): void {
+  const cutoff = now - SEEN_TTL_MS;
+  for (const [key, at] of seenContent) {
+    if (at > cutoff) break;
+    seenContent.delete(key);
+  }
+}
 
 export function isRecentDuplicate(type: string, content: string): boolean {
-  const key = `${type}:${content.slice(0, 200).toLowerCase().replace(/\s+/g, " ")}`;
-  if (seenContent.includes(key)) return true;
-  seenContent.push(key);
-  if (seenContent.length > MAX_SEEN) seenContent.shift();
+  const now = Date.now();
+  cleanSeenContent(now);
+
+  const key = dedupeKey(type, content);
+  const seenAt = seenContent.get(key);
+  if (seenAt !== undefined && now - seenAt < SEEN_TTL_MS) return true;
+
+  // Re-insert rather than update in place: deleting first moves the key to the
+  // end of the iteration order, which is what keeps cleanSeenContent's
+  // stop-at-first-live-entry scan correct.
+  seenContent.delete(key);
+  seenContent.set(key, now);
+
+  // Memory bound. Map iteration yields oldest-first, so this drops the entries
+  // closest to expiring anyway.
+  while (seenContent.size > MAX_SEEN) {
+    const oldest = seenContent.keys().next();
+    if (oldest.done) break;
+    seenContent.delete(oldest.value);
+  }
+
   return false;
+}
+
+/** Test seam: dedupe state is module-level and would otherwise leak between
+ *  cases. Not exported for production use. */
+export function __resetSeenContentForTests(): void {
+  seenContent.clear();
 }
 
 // ── Storage ───────────────────────────────────────────────────────────────────
