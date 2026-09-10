@@ -98,7 +98,7 @@ export function registrableLabel(hostname: string): string {
 }
 
 /**
- * TLDs whose second-level namespaces are sold internationally as `.com`
+ * TLDs whose SECOND-LEVEL namespaces are sold internationally as `.com`
  * lookalikes rather than serving a national registrant base.
  *
  * The one genuinely curated input to `isNationalCommercialSuffix` below, and
@@ -114,8 +114,20 @@ export function registrableLabel(hostname: string): string {
  * It is NOT "the registry is open" — `.co.uk` and `.com.au` are open too, which
  * is exactly why they are absent from `trustedHostSuffixes`, and they are still
  * where a brand's genuine local site lives.
+ *
+ * **This says nothing about the bare TLD, and must not be read as doing so.**
+ * `paypal.co` and `amazon.io` are single-label suffixes, which never reach this
+ * function at all: the call site exempts them by default, along with `.com`,
+ * `.de` and every other TLD where brands register worldwide. That default is
+ * load-bearing rather than an oversight — narrowing it to an enumerated union
+ * once flagged 216 of 216 real brand sites — and `paypal.co` may perfectly well
+ * be PayPal's Colombian site. Scoring the bare form needs a co-signal the URL
+ * checker does not have, the same open question that keeps `google` and
+ * `microsoft` out of the global brand floor. The entries here are TLD names
+ * only because that is the shape of the second-level suffix they gate
+ * (`com.co`, `co.io`); the behaviour is pinned in publicSuffix.test.ts.
  */
-const GENERIC_SOLD_TLDS = new Set(["co", "io"]);
+const GENERIC_SOLD_SECOND_LEVEL_TLDS = new Set(["co", "io"]);
 
 /**
  * Whether a multi-label public suffix is a country's ordinary COMMERCIAL
@@ -137,7 +149,9 @@ const GENERIC_SOLD_TLDS = new Set(["co", "io"]);
  *   2. **A wildcard registry.** `com.np` exists only via the PSL's `*.np` rule,
  *      meaning the registry publishes no enumerated second levels. There is no
  *      established commercial namespace to be the real site of.
- *   3. **A TLD sold as a generic.** See GENERIC_SOLD_TLDS — the judgement case.
+ *   3. **A second level under a TLD sold as a generic.** `com.co`, `co.io` —
+ *      see GENERIC_SOLD_SECOND_LEVEL_TLDS. The judgement case, and the only
+ *      curated input. Note this gates the second level, not the bare TLD.
  *
  * Single-label suffixes never reach this: `.com`, `.de`, `.fr` are where brands
  * register worldwide and are exempt by default at the call site.
@@ -156,8 +170,9 @@ export function isNationalCommercialSuffix(suffix: string): boolean {
   // is not an established namespace — it is whatever label was asked for.
   if (PSL_WILDCARDS.has(tld)) return false;
 
-  // (3) The judgement case.
-  if (GENERIC_SOLD_TLDS.has(tld)) return false;
+  // (3) The judgement case. Gates the SECOND LEVEL only — the bare `.co` and
+  // `.io` never arrive here, see the note on the set.
+  if (GENERIC_SOLD_SECOND_LEVEL_TLDS.has(tld)) return false;
 
   return true;
 }

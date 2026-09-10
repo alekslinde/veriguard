@@ -640,16 +640,35 @@ export function checkUrl(
     // already pinned by tests from the last time this reasoning was got wrong.
     // Same trap, one level up.
     //
-    // The single-label default is shared with the rule above and must survive
-    // the inversion: `.com`, `.de`, `.fr` are where brands register worldwide,
-    // and `isNationalCommercialSuffix` answers only the multi-label question —
-    // it returns false for a bare TLD, which would have flagged `paypal.com` in
-    // every region.
-    const onGlobalBrandSuffix =
-      !suffix.includes(".") || isNationalCommercialSuffix(suffix);
+    // The single-label default carries over untouched, because `onBrandSuffix`
+    // already holds it: `.com`, `.de`, `.fr` are where brands register
+    // worldwide. `isNationalCommercialSuffix` answers only the multi-label
+    // question and returns false for a bare TLD, so it could never have carried
+    // that default on its own — as the whole condition it flagged `paypal.com`
+    // in every region.
+    //
+    // WIDENS the existing test rather than replacing it. The two answer
+    // different questions — "is this an ordinary national commercial namespace"
+    // and "does some authored pack put its brands here" — and a global brand
+    // owning its label is genuine if EITHER says so. Writing this as a switch
+    // (`global ? a : b`) instead discarded the pack union for exactly the six
+    // brands, and flagged `amazon.org.uk`, `paypal.me.uk` and `netflix.org.au`
+    // as impersonation at 45/likely_scam where `main` scored them 0/safe. Nine
+    // of the 31 multi-label suffixes the packs author are second levels outside
+    // the commercial set — `org.uk`, `ltd.uk`, `plc.uk`, `me.uk`, `org.au`,
+    // `id.au`, `asn.au`, `org.nz`, `org.sg` — and a national brand on the same
+    // suffix (`tesco.org.uk`) stayed clean throughout, which is what isolated
+    // it to the global path.
+    //
+    // Widening cannot reopen the squat cases: those suffixes are in no pack's
+    // `brandSuffixes` either, so the union rejects them too.
+    // Written as `onBrandSuffix || extra` rather than as a ternary between two
+    // whole conditions, so that the widening is visible at a glance and cannot
+    // silently become a switch again.
     const brandOwnsLabel = (brand: string) =>
       registrable === brand
-      && (GLOBAL_BRANDS.has(brand) ? onGlobalBrandSuffix : onBrandSuffix);
+      && (onBrandSuffix
+        || (GLOBAL_BRANDS.has(brand) && isNationalCommercialSuffix(suffix)));
 
     // Separator-delimited words within the registrable label, so "agl-billing"
     // yields ["agl","billing"] — that's how a short brand is matched without

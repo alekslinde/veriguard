@@ -306,10 +306,12 @@ describe("pack invariants (every region)", () => {
   });
 
   it.each(packs)("%s: still squats a global brand in a lookalike namespace", (code) => {
-    // The other half. Inverting the default for global brands must not hand the
+    // The other half. Widening the default for global brands must not hand the
     // ownership exemption to the namespaces the multi-label rule exists to
-    // catch: `.co` and `.io` second-levels are sold worldwide as `.com`
+    // catch: `.co` and `.io` SECOND LEVELS are sold worldwide as `.com`
     // lookalikes, so a brand owning the label there is evidence of a squat.
+    // (The bare `.co` and `.io` are a different question and are exempt by
+    // default — pinned in publicSuffix.test.ts.)
     // `gov.uk`, `ac.uk` and `edu.au` are the restricted namespaces, and they are
     // here because the unit test for that rule was the ONLY thing covering it:
     // removing the non-commercial second-level check failed six unit cases and
@@ -323,15 +325,21 @@ describe("pack invariants (every region)", () => {
       "paypal.gov.co", "amazon.com.co", "netflix.co.io",
       // Wildcard registry — no enumerated commercial second level.
       "paypal.com.np",
-      // Eligibility-restricted, so not a commercial namespace in any country.
+      // Non-commercial second levels in countries NO pack authors — the only
+      // fixtures that reach the second-level rule on their own.
       //
-      // `ac.uk` rather than `gov.uk`: the GB pack lists `.gov.uk` in
-      // trustedHostSuffixes, which exempts the whole namespace BEFORE the
-      // ownership rule is reached. That is deliberate and predates this — the
-      // registry vets who may register, so nothing under it is a squat — but it
-      // means `gov.uk` cannot carry this assertion in every pack. `ac.uk` is
-      // restricted the same way and is in no pack's trusted list.
-      "netflix.ac.uk", "paypal.edu.au",
+      // The country matters as much as the second level, and getting that wrong
+      // is what an earlier cut of this test did: it used `netflix.ac.uk` and
+      // `paypal.edu.au`, which the GB and AU packs list in `brandSuffixes`
+      // precisely because those registries vet registrants ("a brand name under
+      // either is genuine" — gb.ts). Both were clean on `main`; asserting them
+      // as squats invented a stricter behaviour rather than pinning an existing
+      // one, and it only looked right because a separate bug was suppressing
+      // the pack union for these brands.
+      //
+      // `gov.br` and `ac.jp` carry the same shape with no pack claiming them,
+      // so the exemption has to be withheld by the rule itself.
+      "paypal.gov.br", "amazon.ac.jp", "netflix.edu.pl",
     ];
     for (const host of hosts) {
       const flags = checkUrl(`http://${host}/login`, undefined, code).flags.join(" | ").toLowerCase();

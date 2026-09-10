@@ -228,6 +228,24 @@ describe("isNationalCommercialSuffix", () => {
     }
   });
 
+  it("does not treat a bare .co or .io as a squat namespace", () => {
+    // Reads as a gap and is not one, which is why it is pinned rather than left
+    // to the comment: GENERIC_SOLD_SECOND_LEVEL_TLDS names `co` and `io`, but
+    // gates `com.co` and `co.io` — the bare TLDs never reach the function,
+    // because the call site exempts every single-label suffix by default.
+    //
+    // Deliberate, unchanged from before the global brand floor, and true of
+    // national brands too (`barclays.co`, `hmrc.co` are equally clean).
+    // `paypal.co` may genuinely be PayPal's Colombian site, and narrowing the
+    // single-label default once flagged 216 of 216 real brand sites. Scoring
+    // the bare form needs a co-signal the URL checker does not have.
+    for (const host of ["paypal.co", "amazon.io", "netflix.co", "kraken.co"]) {
+      const flags = checkUrl(`https://${host}/`, undefined, "ZZ").flags.join(" | ");
+      expect({ host, impersonating: /Impersonates/.test(flags) })
+        .toEqual({ host, impersonating: false });
+    }
+  });
+
   it("fails closed on an unrecognised second level", () => {
     // The commercial second levels are listed positively, so a namespace nobody
     // anticipated withholds the exemption rather than granting it. That is the
