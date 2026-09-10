@@ -1,6 +1,6 @@
 {
   "name": "veriguard",
-  "version": "0.19.1",
+  "version": "0.19.2",
   "private": true,
   "workspaces": [
     "packages/*"
@@ -39,7 +39,8 @@
   },
   "overrides": {
     "postcss": "^8.5.18",
-    "sharp": "^0.35.4"
+    "sharp": "^0.35.4",
+    "js-yaml": "^4.3.2"
   },
   "allowScripts": {
     "unrs-resolver": true,
