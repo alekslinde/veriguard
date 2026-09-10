@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { mixedScriptWords } from "@veriguard/engine/urlSanitizer";
+
+// mixedScriptWords takes the host-strip as a function, because deciding what is
+// a hostname is five guards in extractBareHosts rather than a TLD lookup. The
+// cases about the strip therefore run through checkSms, where the engine
+// injects the real guard; the cases about word splitting call it directly,
+// where the default identity strip is what they want.
 import { checkSms, checkCustom, checkEmail } from "@veriguard/engine/scamDetector";
 
 // Homoglyph splicing in the MESSAGE BODY, as distinct from the hostname case
@@ -89,22 +95,52 @@ describe("mixedScriptWords", () => {
     expect(mixedScriptWords(input)).toEqual(expected);
   });
 
-  // A spliced hostname is the URL checker's finding, not this one's. Without
-  // the strip, the word splitter shreds a URL into its bare label and the same
-  // character is scored twice — once as prose, once as a host.
+  // The strip cases run through checkSms, not mixedScriptWords directly: the
+  // decision they are about lives in isBareHostMatch, which the engine injects
+  // and a bare unit call does not have. Testing them with a no-op strip would
+  // assert the opposite of production behaviour.
+  const flagged = (t: string) =>
+    checkSms(t, NO_BLOCKLIST, "AU").flags.some((f) => /Disguised wording/i.test(f));
+  const splicedWord = (t: string) =>
+    checkSms(t, NO_BLOCKLIST, "AU").flags.find((f) => /Disguised wording/i.test(f))?.match(/"([^"]+)"/)?.[1];
+
   it.each([
-    ["a schemed URL", "Login at http://p\u0430ypal.com now"],
-    ["a schemeless host", "Go to p\u0430ypal.com/verify"],
-    ["a deeper host", "visit https://c\u03bfmmbank.com.au/login today"],
-    ["an email address", "email support@p\u0430ypal.com"],
+    ["a schemed URL", "Login at http://pаypal.com now"],
+    ["a host with a path", "Go to pаypal.com/verify"],
+    ["an email address", "email support@pаypal.com"],
   ])("leaves %s to the URL rule", (_label, input) => {
-    expect(mixedScriptWords(input)).toEqual([]);
+    expect(flagged(input)).toBe(false);
   });
 
   it("still reads the prose around a spliced URL", () => {
-    // Stripping the URL must not blind the rule to the rest of the message.
-    expect(mixedScriptWords("Login at http://p\u0430ypal.com to re\u0430ctivate your account"))
-      .toEqual(["re\u0430ctivate"]);
+    expect(splicedWord("Login at http://pаypal.com to reаctivate your account")).toBe("reаctivate");
+  });
+
+  it("does not truncate a spliced host into a fragment", () => {
+    // A hyphen before the host put the match at a later offset, so the strip
+    // removed only part of the token and the leftover "pа" was reported as the
+    // disguised word — a fragment no reader can act on, on a host that was also
+    // being scored by the URL rule.
+    const word = splicedWord("Urgent: click -pаypal.com to verify your account now");
+    expect(word).not.toBe("pа");
+  });
+
+  // The strip must agree with extractBareHosts in BOTH directions. Gating on a
+  // TLD set alone got each of these wrong, in opposite ways.
+  it.each([
+    ["a word-like TLD", "Your ассount.co has been suspended, verify now", "ассount"],
+    ["another word-like TLD", "Verify your ассount.app immediately", "ассount"],
+    ["an ambiguous TLD", "Your depоsit.bond is refundable", "depоsit"],
+    ["a file-extension TLD", "Send the аrchive.zip file when you can", "аrchive"],
+  ])("reads %s as prose, as extractBareHosts does", (_label, input, expected) => {
+    expect(splicedWord(input)).toBe(expected);
+  });
+
+  it("strips nothing when given no strip function", () => {
+    // The safe default is identity: a direct caller reads the whole string
+    // rather than a guess at what a hostname is. Every local guess at that has
+    // been wrong — twice in this rule alone.
+    expect(mixedScriptWords("Go to pаypal.com/verify")).toEqual(["pаypal"]);
   });
 
   it("does not treat a wholly-Cyrillic word as mixed", () => {

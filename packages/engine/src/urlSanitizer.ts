@@ -315,26 +315,25 @@ const TEXT_CONFUSABLES = /[\u0400-\u04FF\u0500-\u052F]|[ΑΒΕΖΗΙΚΜΝΟΡΤ
  * Returns the offending words so the flag can quote them: the teaching value
  * is in showing the reader a word that looks ordinary and is not.
  */
-export function mixedScriptWords(text: string): string[] {
+export function mixedScriptWords(
+  text: string,
+  /**
+   * Removes the parts of `text` that belong to the URL checker — schemed URLs,
+   * email addresses and schemeless hostnames — leaving the prose this rule is
+   * about.
+   *
+   * Injected rather than done here, because deciding what is a hostname is not
+   * a TLD lookup: it is five guards in `extractBareHosts`, and every version of
+   * this rule that approximated them locally was wrong. The first gated on "a
+   * dot and two letters" and deleted prose; the second gated on the TLD set
+   * alone and was simultaneously too loose for `.co`/`.app` and too strict for
+   * `.bond`/`.zip`. The engine passes the real thing; the default is identity,
+   * so a direct caller reads the whole string rather than a guess.
+   */
+  stripHosts: (text: string) => string = (t) => t,
+): string[] {
   const out: string[] = [];
-  // URLs and email addresses are removed before splitting, because a spliced
-  // hostname is already the URL checker's finding — hasMixedScriptHost scores
-  // it at 45, and the two rules are counterparts rather than a stack. Without
-  // this the word splitter shreds "http://pаypal.com" into the bare label
-  // "pаypal" and scores the same character twice, once as prose and once as a
-  // host, for 60 on a message the URL rule had already handled.
-  //
-  // Stripping rather than skipping matched words: the surrounding prose in the
-  // same message still gets read, so "Login at http://pаypal.com to reаctivate"
-  // reports the prose splice and leaves the host to the URL card.
-  const prose = text
-    .replace(/[a-z][a-z0-9+.-]*:\/\/\S+/gi, " ")
-    .replace(/\S+@\S+/g, " ")
-    // Schemeless hosts: a dot-separated run ending in a plausible TLD. Scam SMS
-    // routinely drops the scheme, and extractBareHosts exists for exactly that,
-    // so leaving them here would reopen the double-count on the commoner shape.
-    .replace(/\S+\.[a-z]{2,}(?:\/\S*)?/gi, " ");
-  for (const word of prose.split(/[^\p{L}\p{M}\p{N}]+/u)) {
+  for (const word of stripHosts(text).split(/[^\p{L}\p{M}\p{N}]+/u)) {
     // Latin letters only — \p{L} would count the confusable characters
     // themselves as "letters" and make every wholly-Cyrillic word qualify.
     if (/[a-z]/i.test(word) && TEXT_CONFUSABLES.test(word)) out.push(word);

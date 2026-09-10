@@ -1328,8 +1328,38 @@ export const FAMILY_IMPERSONATION_FLAG =
  */
 export const SPLICED_WORDING_FLAG = "Disguised wording";
 
-function addSplicedWordingSignal(sig: Signals, text: string): void {
-  const spliced = mixedScriptWords(text);
+/**
+ * Remove everything the URL checker owns, leaving the prose the splice rule
+ * reads: schemed URLs, email addresses, and schemeless hostnames.
+ *
+ * The last of those is the whole difficulty, and it is delegated to
+ * `isBareHostMatch` — the SAME guard `extractBareHosts` uses — rather than
+ * approximated. Two earlier versions approximated it and both were wrong: one
+ * gated on "a dot and two letters" and deleted prose (`ассount.has`), the next
+ * gated on the TLD set alone, which is only the last of that guard's five
+ * checks, and was too loose for word-like TLDs (`ассount.co`) and too strict
+ * for the ambiguous ones (`depоsit.bond`) at the same time.
+ *
+ * Sharing the guard is also what makes the invariant true rather than merely
+ * stated: a token this strips is exactly a token `extractBareHosts` raises a
+ * URL card for, so nothing is scored twice and nothing falls between them.
+ */
+function stripUrlOwnedText(text: string, pack: RegionPack): string {
+  const flagged = bareHostFlaggedTlds(pack.suspiciousTlds);
+  return text
+    .replace(/[a-z][a-z0-9+.-]*:\/\/\S+/gi, " ")
+    .replace(/\S+@\S+/g, " ")
+    .replace(BARE_HOST_GLOBAL, (...args) => {
+      const groups = args.slice(0, -2) as string[];
+      const index = args[args.length - 2] as number;
+      const input = args[args.length - 1] as string;
+      const match = Object.assign(groups.slice(), { index, input }) as RegExpMatchArray;
+      return isBareHostMatch(match, input, flagged) ? " " : groups[0];
+    });
+}
+
+function addSplicedWordingSignal(sig: Signals, text: string, pack: RegionPack): void {
+  const spliced = mixedScriptWords(text, (t) => stripUrlOwnedText(t, pack));
   if (spliced.length === 0) return;
   const many = spliced.length > 1;
   sig.add(
@@ -1367,7 +1397,7 @@ export function checkSms(
   // one Cyrillic character inside a word removes that word from detection
   // entirely. "Your account has been suspended" scores 30; the spliced form
   // renders identically to the reader and scored 0 before this rule existed.
-  addSplicedWordingSignal(sig, text);
+  addSplicedWordingSignal(sig, text, PACK);
 
   const urgencyHits = URGENCY_WORDS.filter((w) => mentions(lower, w));
   if (urgencyHits.length > 0) {
@@ -2537,7 +2567,7 @@ export function checkCustom(text: string, blocklist?: Set<string>, region?: Regi
 
   // Homoglyph splicing — the pasted-text path carries the same evasion as
   // checkSms, and is the likelier one for a message copied out of a client.
-  addSplicedWordingSignal(sig, text);
+  addSplicedWordingSignal(sig, text, PACK);
 
   const allSignals = [...URGENCY_WORDS, ...REWARD_WORDS, ...REQUEST_WORDS];
   // Matched through mentions() for parity with checkSms (#233). A raw
@@ -2778,106 +2808,141 @@ const BARE_HOST_GLOBAL = new RegExp(
  * `suspiciousTlds` comes from the resolved region pack, so a host is picked up
  * when its TLD is either mainstream or already flagged as abuse-prone.
  */
-function extractBareHosts(text: string, suspiciousTlds: string[]): string[] {
-  const flagged = new Set(
-    suspiciousTlds.map((t) => t.replace(/^\./, "").toLowerCase()),
-  );
+/**
+ * Whether one BARE_HOST_GLOBAL match is a hostname rather than prose.
+ *
+ * Extracted so `extractBareHosts` and the splice rule's strip answer this the
+ * SAME way, instead of each carrying its own approximation of it.
+ *
+ * They previously did not. The strip gated on the TLD set alone — which is the
+ * *last* of the checks below — and the guards above it are the ones that
+ * actually separate a hostname from a missing space after a full stop. That
+ * left it wrong in both directions at once: too loose for word-like TLDs
+ * (`ассount.co`, `ассount.app` read as hosts, so the spliced word was deleted
+ * and the message went back to scoring nothing), and too strict for the
+ * ambiguous ones (`depоsit.bond`, `аrchive.zip` stripped where this function
+ * would first have required a path or a `www.`).
+ *
+ * `text` is needed as well as the match: two guards read what follows and what
+ * precedes the match, not just the host itself.
+ */
+function isBareHostMatch(
+  match: RegExpMatchArray,
+  text: string,
+  flagged: ReadonlySet<string>,
+): boolean {
+  const [whole, hostname] = match;
+  const labels = hostname.toLowerCase().split(".");
+  const tld = labels[labels.length - 1];
 
+  // Sentence boundary with the space missing after the full stop — "the
+  // plumber came by.Work is done", "Mum's in hospital.ICU visiting hours".
+  // Missing spaces after a full stop are routine in pasted SMS, and every
+  // word-like TLD in the list (.work, .live, .online, .click, .top, .store,
+  // .icu, .loan …) can end up on the right of one.
+  //
+  // The tell is Capitalised-Then-Lowercase on the last label: that is a new
+  // sentence's first word, not a TLD. Deliberately NOT "starts uppercase" —
+  // scam SMS shout in full caps ("AUSPOST-TRACK.SHOP/verify"), so an
+  // all-uppercase label must still be treated as a host. Checked against the
+  // RAW hostname because `labels` has already been lowercased.
+  const rawTld = hostname.slice(hostname.lastIndexOf(".") + 1);
+  if (/^[A-Z][a-z]/.test(rawTld)) return false;
+
+  // Prose connective on the left ("in.live", "or.online"). Only ever skips
+  // the BARE form — a path or a www. prefix means a host was meant, and both
+  // are checked below.
+  if (
+    labels.length === 2 &&
+    PROSE_LEFT_LABELS.has(labels[0]) &&
+    !match[2] &&
+    !/^www\./i.test(hostname)
+  ) return false;
+
+  // Sentence break with prose running on past it — "i finished early.live
+  // music starts at 8", "sign up here.online registration closes friday".
+  //
+  // The two guards above read only the two labels either side of the dot, and
+  // at that scope there is not enough information: the capitalisation tell
+  // misses a lowercase new sentence, and PROSE_LEFT_LABELS is a closed list
+  // that cannot hold every word an English sentence can end on ("desk.work",
+  // "lunch.top"). Both are the same defect seen from two sides.
+  //
+  // The wider signal is what follows the match. A real bare host is the
+  // message's payload and ends the clause — "Pay at secure-billing.top",
+  // "claim now at freemoney.tk". Prose continuing straight after an
+  // uncorroborated host is the shape of a missing space after a full stop.
+  //
+  // This SUPPRESSES THE URL CARD ONLY. The text still reaches message-level
+  // scoring, which is what keeps the guard from becoming a bypass: appending
+  // a word to evade the card ("claim now at freemoney.tk urgently") leaves
+  // the urgency and call-to-action rules untouched, so the message is still
+  // flagged — just without naming the link. An attacker has to drop the
+  // persuasion to buy silence, which costs them the scam.
+  //
+  // Deliberately narrow, so a hostname that could not be a sentence is never
+  // caught by it:
+  //   · two labels only — a subdomain is host structure, not prose;
+  //   · left label a plain word — no hyphen or digit, so "secure-billing.top
+  //     now" and "mygov-verify.tk please" stay;
+  //   · no path and no www. — either means a host was meant, per above.
+  if (
+    labels.length === 2 &&
+    /^[a-z]+$/.test(labels[0]) &&
+    !match[2] &&
+    !/^www\./i.test(hostname) &&
+    // Prose continues: whitespace then a letter. A following digit,
+    // punctuation or end-of-input is not a sentence carrying on.
+    /^\s+[A-Za-z]/.test(text.slice((match.index ?? 0) + whole.length))
+  ) return false;
+
+  const isFlaggedTld = flagged.has(tld);
+  if (!BARE_HOST_TLDS.has(tld) && !isFlaggedTld) return false;
+
+  // A mainstream TLD on its own is usually a mention, not a link — "send me
+  // the notes.org file", "our team is dev.io". Requiring a path or a www.
+  // prefix keeps those from raising a URL card on an innocent message, while
+  // still catching "auspost.com.au/track". An abuse-prone TLD needs no such
+  // corroboration: nobody mentions a .tk domain in passing.
+  //
+  // The exception is AMBIGUOUS_BARE_TLDS — TLDs that are also ordinary words
+  // ("the deposit.bond is refundable", "archive.zip"). Those are high-risk as
+  // domains but common as prose, so they need the same corroboration as a
+  // mainstream TLD rather than the abuse-prone shortcut.
+  const needsCorroboration = !isFlaggedTld || AMBIGUOUS_BARE_TLDS.has(tld);
+  const hasPath = Boolean(match[2]);
+  const hasWww = /^www\./i.test(hostname);
+  if (needsCorroboration && !hasPath && !hasWww) return false;
+  // A single label plus TLD is the minimum for a real host; "e.g" and "No.5"
+  // are already excluded by the TLD check, this guards the rest.
+  if (labels.length < 2 || labels.some((l) => l.length === 0)) return false;
+
+  // Skip anything already carried by a scheme'd URL — URL_GLOBAL has it.
+  const before = text.slice(0, match.index ?? 0);
+  if (/https?:\/\/\S*$/i.test(before)) return false;
+
+  return true;
+}
+
+/**
+ * Schemeless hostnames in free text that are worth analysing as URLs.
+ *
+ * `suspiciousTlds` comes from the resolved region pack, so a host is picked up
+ * when its TLD is either mainstream or already flagged as abuse-prone.
+ */
+function extractBareHosts(text: string, suspiciousTlds: string[]): string[] {
+  const flagged = bareHostFlaggedTlds(suspiciousTlds);
   const found: string[] = [];
   for (const match of text.matchAll(BARE_HOST_GLOBAL)) {
-    const [whole, hostname] = match;
-    const labels = hostname.toLowerCase().split(".");
-    const tld = labels[labels.length - 1];
-
-    // Sentence boundary with the space missing after the full stop — "the
-    // plumber came by.Work is done", "Mum's in hospital.ICU visiting hours".
-    // Missing spaces after a full stop are routine in pasted SMS, and every
-    // word-like TLD in the list (.work, .live, .online, .click, .top, .store,
-    // .icu, .loan …) can end up on the right of one.
-    //
-    // The tell is Capitalised-Then-Lowercase on the last label: that is a new
-    // sentence's first word, not a TLD. Deliberately NOT "starts uppercase" —
-    // scam SMS shout in full caps ("AUSPOST-TRACK.SHOP/verify"), so an
-    // all-uppercase label must still be treated as a host. Checked against the
-    // RAW hostname because `labels` has already been lowercased.
-    const rawTld = hostname.slice(hostname.lastIndexOf(".") + 1);
-    if (/^[A-Z][a-z]/.test(rawTld)) continue;
-
-    // Prose connective on the left ("in.live", "or.online"). Only ever skips
-    // the BARE form — a path or a www. prefix means a host was meant, and both
-    // are checked below.
-    if (
-      labels.length === 2 &&
-      PROSE_LEFT_LABELS.has(labels[0]) &&
-      !match[2] &&
-      !/^www\./i.test(hostname)
-    ) continue;
-
-    // Sentence break with prose running on past it — "i finished early.live
-    // music starts at 8", "sign up here.online registration closes friday".
-    //
-    // The two guards above read only the two labels either side of the dot, and
-    // at that scope there is not enough information: the capitalisation tell
-    // misses a lowercase new sentence, and PROSE_LEFT_LABELS is a closed list
-    // that cannot hold every word an English sentence can end on ("desk.work",
-    // "lunch.top"). Both are the same defect seen from two sides.
-    //
-    // The wider signal is what follows the match. A real bare host is the
-    // message's payload and ends the clause — "Pay at secure-billing.top",
-    // "claim now at freemoney.tk". Prose continuing straight after an
-    // uncorroborated host is the shape of a missing space after a full stop.
-    //
-    // This SUPPRESSES THE URL CARD ONLY. The text still reaches message-level
-    // scoring, which is what keeps the guard from becoming a bypass: appending
-    // a word to evade the card ("claim now at freemoney.tk urgently") leaves
-    // the urgency and call-to-action rules untouched, so the message is still
-    // flagged — just without naming the link. An attacker has to drop the
-    // persuasion to buy silence, which costs them the scam.
-    //
-    // Deliberately narrow, so a hostname that could not be a sentence is never
-    // caught by it:
-    //   · two labels only — a subdomain is host structure, not prose;
-    //   · left label a plain word — no hyphen or digit, so "secure-billing.top
-    //     now" and "mygov-verify.tk please" stay;
-    //   · no path and no www. — either means a host was meant, per above.
-    if (
-      labels.length === 2 &&
-      /^[a-z]+$/.test(labels[0]) &&
-      !match[2] &&
-      !/^www\./i.test(hostname) &&
-      // Prose continues: whitespace then a letter. A following digit,
-      // punctuation or end-of-input is not a sentence carrying on.
-      /^\s+[A-Za-z]/.test(text.slice((match.index ?? 0) + whole.length))
-    ) continue;
-
-    const isFlaggedTld = flagged.has(tld);
-    if (!BARE_HOST_TLDS.has(tld) && !isFlaggedTld) continue;
-
-    // A mainstream TLD on its own is usually a mention, not a link — "send me
-    // the notes.org file", "our team is dev.io". Requiring a path or a www.
-    // prefix keeps those from raising a URL card on an innocent message, while
-    // still catching "auspost.com.au/track". An abuse-prone TLD needs no such
-    // corroboration: nobody mentions a .tk domain in passing.
-    //
-    // The exception is AMBIGUOUS_BARE_TLDS — TLDs that are also ordinary words
-    // ("the deposit.bond is refundable", "archive.zip"). Those are high-risk as
-    // domains but common as prose, so they need the same corroboration as a
-    // mainstream TLD rather than the abuse-prone shortcut.
-    const needsCorroboration = !isFlaggedTld || AMBIGUOUS_BARE_TLDS.has(tld);
-    const hasPath = Boolean(match[2]);
-    const hasWww = /^www\./i.test(hostname);
-    if (needsCorroboration && !hasPath && !hasWww) continue;
-    // A single label plus TLD is the minimum for a real host; "e.g" and "No.5"
-    // are already excluded by the TLD check, this guards the rest.
-    if (labels.length < 2 || labels.some((l) => l.length === 0)) continue;
-
-    // Skip anything already carried by a scheme'd URL — URL_GLOBAL has it.
-    const before = text.slice(0, match.index ?? 0);
-    if (/https?:\/\/\S*$/i.test(before)) continue;
-
-    found.push(whole.replace(/[.,;:!?)]+$/, ""));
+    if (!isBareHostMatch(match, text, flagged)) continue;
+    found.push(match[0].replace(/[.,;:!?)]+$/, ""));
   }
   return found;
+}
+
+/** The pack's abuse-prone TLDs, normalised for the guards above. */
+function bareHostFlaggedTlds(suspiciousTlds: string[]): ReadonlySet<string> {
+  return new Set(suspiciousTlds.map((t) => t.replace(/^\./, "").toLowerCase()));
 }
 
 // Expands a shortened URL and merges the destination analysis into the base result.
