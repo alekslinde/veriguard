@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { publicSuffix, registrableDomain, registrableLabel } from "@veriguard/engine/publicSuffix";
+import { publicSuffix, registrableDomain, registrableLabel, isNationalCommercialSuffix } from "@veriguard/engine/publicSuffix";
 import { checkUrl } from "@veriguard/engine/scamDetector";
 import { resolveRegionPack, supportedRegions } from "@veriguard/engine/regions";
 
@@ -185,5 +185,72 @@ describe("brandSuffixes as pack data", () => {
         expect(suffixes, `${code} must not list ${bad}`).not.toContain(bad);
       }
     }
+  });
+});
+
+describe("isNationalCommercialSuffix", () => {
+  // Gates the brand-owns-the-label exemption for the GLOBAL brand floor, where
+  // an allowlist of suffixes cannot work: those brands register in every
+  // country, and no region pack lists `.com.br` or `.co.jp`. Asserted at the
+  // unit level as well as through checkUrl because the rule is three separate
+  // disqualifications, and a behavioural test only ever exercises whichever one
+  // the chosen hostname happens to hit.
+
+  it.each([
+    // The suffixes packs already author — these must not regress.
+    "co.uk", "com.au", "co.nz", "com.sg",
+    // The ones no pack authors, which is the case the function exists for.
+    "com.br", "co.jp", "co.za", "com.tr", "com.mx", "co.kr",
+    "com.ar", "co.il", "com.my", "com.ph", "com.hk", "com.tw",
+    "gr.jp", "com.pl", "co.id", "co.th", "com.vn",
+  ])("treats %s as a national commercial namespace", (suffix) => {
+    expect(isNationalCommercialSuffix(suffix)).toBe(true);
+  });
+
+  it.each([
+    // (1) Non-commercial second level — settled by shape, no country knowledge.
+    "gov.co", "gov.io", "gov.uk", "ac.uk", "nhs.uk", "edu.au", "police.uk",
+    // (2) Wildcard registry — no enumerated second level to be the real site of.
+    "com.np",
+    // (3) TLD sold as a generic — the judgement case.
+    "com.co", "net.co", "co.io", "com.io",
+  ])("refuses %s", (suffix) => {
+    expect(isNationalCommercialSuffix(suffix)).toBe(false);
+  });
+
+  it("answers only the multi-label question", () => {
+    // Single-label suffixes are exempt by DEFAULT at the call site — `.com` and
+    // `.de` are where brands register worldwide. This returning false for them
+    // is correct and load-bearing: an earlier cut used it as the whole test and
+    // flagged paypal.com in every region.
+    for (const tld of ["com", "de", "fr", "io", "co"]) {
+      expect(isNationalCommercialSuffix(tld)).toBe(false);
+    }
+  });
+
+  it("does not treat a bare .co or .io as a squat namespace", () => {
+    // Reads as a gap and is not one, which is why it is pinned rather than left
+    // to the comment: GENERIC_SOLD_SECOND_LEVEL_TLDS names `co` and `io`, but
+    // gates `com.co` and `co.io` — the bare TLDs never reach the function,
+    // because the call site exempts every single-label suffix by default.
+    //
+    // Deliberate, unchanged from before the global brand floor, and true of
+    // national brands too (`barclays.co`, `hmrc.co` are equally clean).
+    // `paypal.co` may genuinely be PayPal's Colombian site, and narrowing the
+    // single-label default once flagged 216 of 216 real brand sites. Scoring
+    // the bare form needs a co-signal the URL checker does not have.
+    for (const host of ["paypal.co", "amazon.io", "netflix.co", "kraken.co"]) {
+      const flags = checkUrl(`https://${host}/`, undefined, "ZZ").flags.join(" | ");
+      expect({ host, impersonating: /Impersonates/.test(flags) })
+        .toEqual({ host, impersonating: false });
+    }
+  });
+
+  it("fails closed on an unrecognised second level", () => {
+    // The commercial second levels are listed positively, so a namespace nobody
+    // anticipated withholds the exemption rather than granting it. That is the
+    // safe direction: the cost is a missed exemption on an unusual real site,
+    // not a global brand squat waved through.
+    expect(isNationalCommercialSuffix("weird.br")).toBe(false);
   });
 });

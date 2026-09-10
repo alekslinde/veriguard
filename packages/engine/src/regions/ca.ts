@@ -229,14 +229,15 @@ const TYPOSQUAT_BRANDS = [
   "canadapost", "postescanada", "purolator",
   // Telcos and ISPs.
   "rogers", "telus", "bellcanada", "shawcable", "videotron", "freedommobile",
-  // Retail and streaming — global brands still get Canada-targeted typosquats,
-  // and the local retailers are impersonated in refund lures.
-  "paypal", "amazon", "netflix", "canadiantire", "loblaws",
+  // Retail — the local retailers are impersonated in refund lures.
+  // paypal/amazon/netflix moved to base.
+  "canadiantire", "loblaws",
   "shoppersdrugmart", "walmartca",
   // Payment rails.
   "interac", "e-transfer",
-  // Crypto exchanges.
-  "coinbase", "binance", "kraken", "wealthsimple", "shakepay", "netcoins",
+  // Crypto exchanges. The three global names are in base; these are the
+  // Canadian platforms.
+  "wealthsimple", "shakepay", "netcoins",
 ];
 
 // Brands too short or too dictionary-colliding for substring matching. "rbc",

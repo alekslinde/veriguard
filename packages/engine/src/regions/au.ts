@@ -334,7 +334,8 @@ const CALLBACK_BRANDS = ["coinspot", "swyftx", "binance"];
 // the ones that aren't.
 const TYPOSQUAT_BRANDS = [
   "commbank", "westpac", "anz", "nab", "mybank", "mygov", "centrelink",
-  "medicare", "paypal", "ebay", "amazon", "netflix", "telstra", "optus", "tpg",
+  // paypal, amazon and netflix moved to base — every pack listed them.
+  "medicare", "ebay", "telstra", "optus", "tpg",
   // Toll operators (D1 / #53) and immigration portals (D14 / #50)
   "linkt", "eastlink", "etoll", "homeaffairs", "dibp", "immi",
   // Food delivery platforms (D6 / #66)
@@ -367,8 +368,10 @@ const TYPOSQUAT_BRANDS = [
   // deliberately absent — it lives in the word-boundary list below, because
   // substring matching would score eagle.org, flagler.com and bagelshop.io.
   "originenergy", "energyaustralia", "alintaenergy",
-  // Crypto exchanges (D6 / #123). "binance" is long enough to be distinctive.
-  "coinspot", "swyftx", "binance",
+  // Crypto exchanges (D6 / #123). "binance" is global and now sits in base,
+  // which also gives AU the coinbase/kraken coverage the other five packs had
+  // and this one did not.
+  "coinspot", "swyftx",
   // Private health insurers (D4 / 2026-08-09 roadmap). Credential-harvest pages
   // for the big four AU funds.
   //

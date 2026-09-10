@@ -1,7 +1,8 @@
 import { parseEmailHeaders, analyseEmailIdentities, domainOf } from "./emailHeaders";
 import { extractIdentifiers, normaliseForAnalysis, defang, refang, isDefanged, normaliseUnicode, hasMixedScriptHost, displayedHyphenCount } from "./urlSanitizer";
-import { registrableLabel, publicSuffix } from "./publicSuffix";
+import { registrableLabel, publicSuffix, isNationalCommercialSuffix } from "./publicSuffix";
 import { findKeyboardTypo } from "./keyboardAdjacency";
+import { BASE_SIGNALS } from "./regions/base";
 import { detectType } from "./detectType";
 import { analysePhone, PhoneIntel } from "./phoneIntel";
 import { isShortened, expandUrl, type ExpandFetch } from "./urlExpander";
@@ -404,6 +405,16 @@ const BRAND_SUFFIXES: ReadonlySet<string> = new Set(
   supportedRegions().flatMap((code) => resolveRegionPack(code).brandSuffixes),
 );
 
+/**
+ * The brands from the global floor, as a set for the ownership rule.
+ *
+ * These are the entries every pack inherits, so "is this brand global" cannot
+ * be asked of the resolved pack — by then the two layers are unioned and
+ * indistinguishable. Read from BASE_SIGNALS directly, which is the one place
+ * that distinction survives.
+ */
+const GLOBAL_BRANDS: ReadonlySet<string> = new Set(BASE_SIGNALS.typosquatBrands);
+
 // ────────────────────────────────────────────────────────────────────────────
 // URL checker
 // ────────────────────────────────────────────────────────────────────────────
@@ -603,7 +614,61 @@ export function checkUrl(
     // covered region actually uses.
     const suffix = publicSuffix(hostname);
     const onBrandSuffix = !suffix.includes(".") || BRAND_SUFFIXES.has(suffix);
-    const brandOwnsLabel = (brand: string) => onBrandSuffix && registrable === brand;
+
+    // A GLOBAL brand inverts the multi-label default, and has to.
+    //
+    // The rule above asks "would a covered region's brands be on this suffix",
+    // answered from the union of the authored packs. That reading holds only
+    // while every brand is authored in the pack whose national suffixes it
+    // registers under — and the global brand floor is exactly the set of brands
+    // for which that is false. PayPal registers in every country's commercial
+    // namespace, so `paypal.com.br`, `paypal.co.jp` and `amazon.co.za` are real
+    // sites, and the union flagged all three as impersonation because no
+    // authored pack lists `.com.br`, `.co.jp` or `.co.za`. A sweep of the six
+    // global brands across 18 national suffixes produced 96 such flags.
+    //
+    // Enumerating the world's commercial namespaces is not the fix — that is
+    // the "scoped to the ccTLDs the packs actually cover" mistake the PSL
+    // adoption already had to unpick. So the exemption applies on any ordinary
+    // NATIONAL COMMERCIAL namespace, and `isNationalCommercialSuffix` answers
+    // that from the PSL's own data plus one small judgement (see there) rather
+    // than from a list someone remembered to enumerate. `barclays.gov.co`,
+    // `chase.co.io` and `paypal.com.np` keep scoring.
+    //
+    // An earlier cut DID enumerate the squat namespaces, and shipped two
+    // regressions on contact — `paypal.gov.io` and `paypal.com.np`, both
+    // already pinned by tests from the last time this reasoning was got wrong.
+    // Same trap, one level up.
+    //
+    // The single-label default carries over untouched, because `onBrandSuffix`
+    // already holds it: `.com`, `.de`, `.fr` are where brands register
+    // worldwide. `isNationalCommercialSuffix` answers only the multi-label
+    // question and returns false for a bare TLD, so it could never have carried
+    // that default on its own — as the whole condition it flagged `paypal.com`
+    // in every region.
+    //
+    // WIDENS the existing test rather than replacing it. The two answer
+    // different questions — "is this an ordinary national commercial namespace"
+    // and "does some authored pack put its brands here" — and a global brand
+    // owning its label is genuine if EITHER says so. Writing this as a switch
+    // (`global ? a : b`) instead discarded the pack union for exactly the six
+    // brands, and flagged `amazon.org.uk`, `paypal.me.uk` and `netflix.org.au`
+    // as impersonation at 45/likely_scam where `main` scored them 0/safe. Nine
+    // of the 31 multi-label suffixes the packs author are second levels outside
+    // the commercial set — `org.uk`, `ltd.uk`, `plc.uk`, `me.uk`, `org.au`,
+    // `id.au`, `asn.au`, `org.nz`, `org.sg` — and a national brand on the same
+    // suffix (`tesco.org.uk`) stayed clean throughout, which is what isolated
+    // it to the global path.
+    //
+    // Widening cannot reopen the squat cases: those suffixes are in no pack's
+    // `brandSuffixes` either, so the union rejects them too.
+    // Written as `onBrandSuffix || extra` rather than as a ternary between two
+    // whole conditions, so that the widening is visible at a glance and cannot
+    // silently become a switch again.
+    const brandOwnsLabel = (brand: string) =>
+      registrable === brand
+      && (onBrandSuffix
+        || (GLOBAL_BRANDS.has(brand) && isNationalCommercialSuffix(suffix)));
 
     // Separator-delimited words within the registrable label, so "agl-billing"
     // yields ["agl","billing"] — that's how a short brand is matched without

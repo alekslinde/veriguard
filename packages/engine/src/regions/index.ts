@@ -88,7 +88,25 @@ function buildPack(region: RegionDefinition): RegionPack {
     callbackBrands: [...BASE_SIGNALS.callbackBrands, ...(region.callbackBrands ?? [])],
     cryptoExchanges: [...BASE_SIGNALS.cryptoExchanges, ...(region.cryptoExchanges ?? [])],
 
-    typosquatBrands: region.typosquatBrands,
+    // Global brands first, then the national layer. Base-merged like
+    // callbackBrands and cryptoExchanges above, and for the same reason: the
+    // names were identical in every pack that authored them, so six copies was
+    // duplication rather than judgement — and duplication a `minimal` or `ZZ`
+    // pack could not inherit, which left the structural typosquat rules with
+    // nothing to match against in exactly the countries they exist to reach.
+    //
+    // Only the `substring` half merges. There is no global `word` list, by
+    // design — see BaseSignals.typosquatBrands.
+    //
+    // The union is NOT deduplicated here, and must not need to be: the URL
+    // checker adds one signal per matching entry, so a brand in both layers
+    // scores +90 rather than +45. Silently collapsing that would hide the
+    // authoring mistake instead of surfacing it, so the disjointness is a
+    // pack invariant asserted in regions.test.ts.
+    typosquatBrands: {
+      substring: [...BASE_SIGNALS.typosquatBrands, ...region.typosquatBrands.substring],
+      word: region.typosquatBrands.word,
+    },
     trustedHostSuffixes: region.trustedHostSuffixes,
     brandSuffixes: region.brandSuffixes,
     authorityOwnDomains: region.authorityOwnDomains ?? [],

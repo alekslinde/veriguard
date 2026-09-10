@@ -20,7 +20,9 @@
 // false accusation or a false reassurance:
 //   · typosquatBrands / brandMentions — which brands get impersonated HERE is
 //     the most region-specific signal there is, and guessing produces false
-//     positives on ordinary commerce
+//     positives on ordinary commerce. (The globally-squatted names in
+//     BaseSignals.typosquatBrands are merged in by buildPack and are not this
+//     pack's claim to make or withhold.)
 //   · legitDomains — an allowlist short-circuits URL scoring to "safe". A
 //     wrong entry is a scam waved through
 //   · noLinkSenders — the flag copy asserts an organisation has publicly
@@ -128,7 +130,16 @@ export const SG: RegionDefinition = {
   fakeInvestmentPlatformFlag: (platform: string) =>
     `Named fraudulent investment platform detected ("${platform}") — the Monetary Authority of Singapore maintains a public Investor Alert List of unregulated entities of this kind. Do not invest.`,
 
-  // No brand knowledge — the defining property of the tier.
+  // No NATIONAL brand knowledge — the defining property of the tier, and what
+  // this field asserts. The pack claims nothing about which brands Singaporean
+  // scammers impersonate, because finding that out is the research a `minimal`
+  // pack does not do.
+  //
+  // buildPack still unions in BaseSignals.typosquatBrands — the few names
+  // squatted in every market. That is not a tier violation and not local
+  // knowledge: it is the same global list every other pack gets, and it is what
+  // makes the structural typosquat rules (substring, keyboard adjacency) reach
+  // a country before anyone authors it.
   typosquatBrands: { substring: [], word: [] },
   // `.gov.sg` is restricted to Singapore government agencies, so a brand name
   // under it is genuine. `.edu.sg` is likewise restricted to accredited
@@ -142,8 +153,14 @@ export const SG: RegionDefinition = {
   trustedHostSuffixes: [".gov.sg", ".edu.sg"],
   // Public-registry facts, which is all a `minimal` pack may assert: these are
   // Singapore's registrable namespaces, not a judgement about which brands use
-  // which. The pack has no brand lists, so this gates nothing today — it is
-  // here so a promotion to `full` does not have to rediscover it.
+  // which.
+  //
+  // This is load-bearing now rather than merely forward-looking. With the base
+  // brands merged in, `paypal.com.sg` reaches the brand-owns-the-label
+  // exemption only because `com.sg` is a multi-label suffix some pack lists —
+  // and this is the pack that lists it. It is the same fix the PSL adoption
+  // shipped for `barclays.com.sg`, which scored 55/likely_scam on a real bank's
+  // own site when SG's suffixes sat outside the checker's union.
   brandSuffixes: ["com.sg", "net.sg", "org.sg", "edu.sg", "gov.sg", "sg", "com", "net", "org"],
   brandMentions: { substring: [], word: [] },
   officialSenderNames: [],
