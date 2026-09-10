@@ -2,10 +2,28 @@ import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
 import { createWorker } from "tesseract.js";
 import path from "path";
+import { checkAndRecordRateLimit } from "@/lib/reportStore";
+import { clientIpFromHeaders } from "@/lib/geo";
+import { isSameOriginRead } from "@/lib/readGuard";
 
 // Tesseract OCR can take 30–60 s on a cold start.
 // Default Vercel function timeout (10 s) is too short.
 export const maxDuration = 60;
+
+/**
+ * Per-IP budget over RATE_WINDOW_MS (ten minutes), for the app's single most
+ * expensive endpoint: a 20 MB upload, a native sharp decode and a 60-second
+ * OCR run, all unauthenticated.
+ *
+ * Every other route was throttled and this one was not, which made it the
+ * cheapest way to burn the function budget — post large images in a loop and
+ * the bill (or the quota) goes with it. Client-side OCR handles the common case
+ * on-device (lib/clientOcr.ts), so this route is only the fallback for browsers
+ * that cannot run the WASM core; 12 images per ten minutes is well clear of
+ * what one person checking screenshots does in a sitting, and nowhere near
+ * enough to sustain an attack.
+ */
+const OCR_RATE_LIMIT = 12;
 
 // Language data is committed to public/tessdata/ and served from there.
 // process.cwd() resolves to the project root in both dev and production.
@@ -32,6 +50,36 @@ function getWorker() {
 }
 
 export async function POST(req: NextRequest) {
+  // Cost controls first — before reading the body, let alone decoding it.
+  // Same two layers, and the same order, as /api/reports: reject before doing
+  // the expensive work.
+  //
+  // 1. Same-origin only. This serves the image-check flow on this site
+  //    (components/CheckFlow.tsx), which fetches it same-origin. Forgeable by
+  //    design — see isSameOriginRead — so it is a filter, not a lock; the rate
+  //    limit below is what actually bounds a determined caller.
+  if (!isSameOriginRead(req.headers)) {
+    return NextResponse.json(
+      { error: "This endpoint serves the image check on this site.", code: "forbidden_origin" },
+      { status: 403, headers: { Vary: "Origin", "Cache-Control": "no-store" } },
+    );
+  }
+
+  // 2. Per-IP rate limit, namespaced so OCR shares the limiter without starving
+  //    the submission and check budgets.
+  //
+  //    Only applied when the caller can be identified: clientIpFromHeaders
+  //    returns "unknown" for a missing or malformed x-forwarded-for, and keying
+  //    on that would put every such visitor in one bucket and take the fallback
+  //    down for all of them at once — the same reasoning /api/reports documents.
+  const ip = clientIpFromHeaders(req.headers);
+  if (ip !== "unknown" && !checkAndRecordRateLimit(`ocr:${ip}`, OCR_RATE_LIMIT)) {
+    return NextResponse.json(
+      { error: "Too many images — give it a few minutes and try again.", code: "rate_limited" },
+      { status: 429, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
   // Guard: only accept multipart uploads — direct API callers without a
   // proper Content-Type won't have a valid image and can be dropped early.
   const contentType = req.headers.get("content-type") ?? "";

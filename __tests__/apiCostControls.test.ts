@@ -121,3 +121,58 @@ describe("GET /api/stats", () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe("POST /api/ocr", () => {
+  const url = "https://veriguard.app/api/ocr";
+
+  // The app's only expensive function — a 20 MB upload, a native sharp decode
+  // and a 60-second OCR run, unauthenticated. It was the one route with neither
+  // guard, which made it the cheapest way to burn the function budget.
+  //
+  // Both assertions check the refusal happens BEFORE the body is read: the
+  // requests below carry no multipart body at all, so a handler that parsed
+  // first would fail with a 400 rather than the status asserted here.
+
+  it("refuses a foreign origin before reading the upload", async () => {
+    const { POST } = await import("@/app/api/ocr/route");
+    const res = await POST(
+      new Request(url, { method: "POST", headers: { origin: "https://evil.example" } }) as never,
+    );
+    expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe("forbidden_origin");
+  });
+
+  it("does not let a cache serve that refusal to a legitimate visitor", async () => {
+    const { POST } = await import("@/app/api/ocr/route");
+    const res = await POST(
+      new Request(url, { method: "POST", headers: { origin: "https://evil.example" } }) as never,
+    );
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(res.headers.get("vary")).toBe("Origin");
+  });
+
+  it("rate-limits an identified caller past its budget", async () => {
+    const { POST } = await import("@/app/api/ocr/route");
+    // A distinct IP so this does not consume another test's budget.
+    const ip = "203.0.113.77";
+    const send = () =>
+      POST(new Request(url, {
+        method: "POST",
+        headers: { "x-forwarded-for": ip },
+      }) as never);
+
+    // Exactly the budget: each of these gets past both guards and is then
+    // rejected as a non-multipart request (400), which is the expected shape
+    // for a body-less probe. Asserting 400 (not merely "not 429") is what
+    // proves they were admitted rather than refused for some other reason.
+    const withinBudget: number[] = [];
+    for (let i = 0; i < 12; i++) withinBudget.push((await send()).status);
+    expect(withinBudget).toEqual(Array(12).fill(400));
+
+    // The next one is over budget and refused by the limiter.
+    const res = await send();
+    expect(res.status).toBe(429);
+    expect((await res.json()).code).toBe("rate_limited");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+  });
+});
