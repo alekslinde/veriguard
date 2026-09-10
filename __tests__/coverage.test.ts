@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { checkUrl, checkSms, checkEmail, checkCustom, checkPhone, analyzeContent } from "@veriguard/engine/scamDetector";
 import { overallCoverage, isClean, formatVerdictEmail } from "@/lib/verdictSummary";
+import { reportingFor } from "@/lib/reportingResources";
 import { FALLBACK_REGION, resolveRegionPack, supportedRegions, type RegionCoverage } from "@veriguard/engine/regions";
 import { toPrediction } from "@/eval/schema";
 import { analysePhone } from "@veriguard/engine/phoneIntel";
@@ -512,7 +513,9 @@ describe("minimal pack phone plans (2026-09 wave)", () => {
 // This is NOT a defect introduced by the 2026-09 wave — SG has behaved this way
 // since it shipped. Nor is it every `minimal` pack: probing showed it fires
 // only where an authority entry is a substring of the body's own hostname, so
-// DE and ZA inherit it and IN, JP and BR do not. See the table below.
+// DE inherits it and ZA, IN, JP and BR do not. See the table below — ZA left
+// the list as a side effect of a review fix, which is the useful hint about
+// the remedy: prefer expanded agency names over bare acronyms.
 // It is recorded here because it is the tier's real false-positive cost and
 // nothing else in the repo stated it: the honest summary of `minimal` is
 // "positive-side value, at the price of over-flagging the government's own
@@ -546,17 +549,23 @@ describe("minimal tier: known cost on a region's own government domain", () => {
   // "every minimal pack" — it tracks whether an authority entry happens to be
   // a SUBSTRING of the body's own hostname:
   //
-  //   fires:        bsi.bund.de ("bsi"), saps.gov.za ("saps"), iras.gov.sg
-  //   does not:     caa.go.jp, cybercrime.gov.in, gov.br
+  //   fires:        bsi.bund.de ("bsi"), iras.gov.sg ("iras")
+  //   does not:     saps.gov.za, caa.go.jp, cybercrime.gov.in, gov.br
   //
   // So the real driver is short abbreviations in an agency list, and the
-  // remedy available to a pack author is to prefer expanded names — which is
-  // why DE keeps "bsi" (it is how a German message names the body) but BR
-  // dropped "gov.br". Pinned per region so a later change that shifts one
-  // region is visible rather than averaged away.
+  // remedy available to a pack author is to prefer expanded names. That is
+  // now visible as a *causal* row rather than a coincidence: ZA moved from
+  // "fires" to "does not" when the review dropped bare "saps" (an ordinary
+  // English word) in favour of "south african police service" — the same edit
+  // fixed a false-positive class and this cost at once. DE keeps "bsi"
+  // because that is how a German message names the body, and BR dropped
+  // "gov.br" because it named a domain where the rest name institutions.
+  //
+  // Pinned per region so a later change that shifts one region is visible
+  // rather than averaged away.
   it.each([
     ["DE", "bsi.bund.de", true],
-    ["ZA", "saps.gov.za", true],
+    ["ZA", "saps.gov.za", false],
     ["IN", "cybercrime.gov.in", false],
     ["JP", "caa.go.jp", false],
     ["BR", "gov.br", false],
@@ -564,6 +573,65 @@ describe("minimal tier: known cost on a region's own government domain", () => {
     const r = checkSms(`Check https://www.${host}/page for details`, undefined, code);
     expect({ code, flagged: r.flags.some((f) => f.toLowerCase().includes("government agency")) })
       .toEqual({ code, flagged: expected });
+  });
+});
+
+// Code-review findings on the 2026-09 wave, pinned so each stays fixed.
+describe("minimal pack review fixes (2026-09 wave)", () => {
+  it("does not flag ordinary English words as South African agencies", () => {
+    // "saps" and "hawks" were listed bare in ZA's authorityMentions. Both name
+    // real bodies and both are ordinary English words — and the matcher's
+    // structural protection cannot help, because single tokens are ALREADY
+    // matched on word boundaries: these were matching as whole words, which is
+    // what they are. An agency list has no substring/word split (unlike
+    // BrandSet), so a bare dictionary word has no safe form.
+    for (const text of [
+      "The saps and stems of plants need urgent care, click http://x.co/a",
+      "Hawks nest here every spring, urgent action needed http://x.co/a",
+    ]) {
+      const r = checkSms(text, undefined, "ZA");
+      expect({ text: text.slice(0, 20), gov: r.flags.some((f) => f.toLowerCase().includes("government agency")) })
+        .toEqual({ text: text.slice(0, 20), gov: false });
+    }
+  });
+
+  it("still names the South African police via its expanded name", () => {
+    // The coverage half of the trade: dropping the acronym must not drop the
+    // agency. Pinned so a later author does not "restore" the bare words.
+    const r = checkSms("South African Police Service: warrant issued, pay now http://x.co/a", undefined, "ZA");
+    expect(r.flags.some((f) => f.toLowerCase().includes("government agency"))).toBe(true);
+    const hawks = checkSms("Directorate for Priority Crime Investigation: pay now http://x.co/a", undefined, "ZA");
+    expect(hawks.flags.some((f) => f.toLowerCase().includes("government agency"))).toBe(true);
+  });
+
+  it("names only the ZA share-cost range that can actually reach the flag", () => {
+    // 0861 is a real ZA share-call range, but libphonenumber classifies it as
+    // UAN — which has no branch in analysePhone — so an 0861 number returns
+    // "unknown" with no notes. The copy therefore names 0860 only, or it would
+    // describe a range the flag can never be shown for. Same gap as JP 0570.
+    const eight60 = analysePhone("0860 123 456", "ZA");
+    expect(eight60.lineType).toBe("shared_cost");
+    expect(eight60.spoofingNotes.join(" ")).toContain("0860");
+    expect(eight60.spoofingNotes.join(" ")).not.toContain("0861");
+    // The unreachable half, asserted so the copy is re-checked if this changes.
+    expect(analysePhone("0861 123 456", "ZA").lineType).toBe("unknown");
+  });
+
+  it("renders every new pack's reporting label without a double parenthetical", () => {
+    // JP's reportingBody ended in "(188)", and reportingFor appends "(host)"
+    // when the host is not already named — rendering "…hotline (188)
+    // (caa.go.jp)" in verdict steps and the report footer.
+    for (const code of ["DE", "ZA", "IN", "JP", "BR"]) {
+      const label = reportingFor(code).label;
+      expect({ code, doubleParen: /\)\s*\(/.test(label) }).toEqual({ code, doubleParen: false });
+    }
+  });
+
+  it("keeps the Indian cyber-fraud helpline in the emergency list", () => {
+    // The comment above this list once enumerated 112 and omitted 1930, which
+    // invited deleting a live entry. 1930 must never score as suspicious.
+    expect(resolveRegionPack("IN").phonePlan.emergencyNumbers).toContain("1930");
+    expect(analysePhone("1930", "IN").lineType).toBe("emergency");
   });
 });
 

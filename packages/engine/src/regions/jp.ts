@@ -113,7 +113,12 @@ export const JP: RegionDefinition = {
   legitDomainFlag: "",
   legitDomainDetails: "",
 
-  reportingBody: "your local police or the Consumer Affairs Agency hotline (188)",
+  // No trailing parenthetical. lib/reportingResources.ts appends "(host)" to
+  // this string when the host is not already named in it, so a body ending in
+  // "(188)" rendered as "…hotline (188) (caa.go.jp)". The hotline number is
+  // still reachable — 188 is in emergencyNumbers below, so a user checking it
+  // gets the emergency line type rather than a suspicious verdict.
+  reportingBody: "your local police or the Consumer Affairs Agency consumer hotline",
   reportingUrl: "https://www.caa.go.jp/policies/policy/consumer_policy/caution/",
 
   phonePlan: {
@@ -170,6 +175,10 @@ export const JP: RegionDefinition = {
     // noLinkSendersFlag the tier rules require to be empty when its list is.
     // ZA's 0860 is not a counter-example — libphonenumber does classify that
     // one as SHARED_COST, which is why ZA authors the flag and JP does not.
+    // ZA's 0861 *is* the same gap as this one, though: it parses as UAN, so
+    // ZA's flag names 0860 only. Two instances now, both found by parsing the
+    // range rather than by reading the numbering plan — which is the check to
+    // run before naming any range in shared-cost copy.
     //
     // Giving UAN its own branch would be a base-layer change affecting every
     // region, so it is out of scope for a data-only pack and left unclaimed

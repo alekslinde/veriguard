@@ -26,9 +26,29 @@ import type { RegionDefinition } from "./types";
 const AUTHORITY_MENTIONS = [
   "sars",
   "south african revenue service",
-  "saps",
+  // "saps" and "hawks" are NOT listed, though both name real ZA bodies (the
+  // police service and the Directorate for Priority Crime Investigation).
+  // Both are ordinary English words, and the matcher's structural protection
+  // cannot help: single tokens are already matched on word boundaries, so
+  // these do not leak into other words — they match as whole words, because
+  // that is what they are. "The saps and stems of plants need urgent care"
+  // plus a link scored 50/likely_scam with a false "Claims to be from a
+  // government agency" flag.
+  //
+  // No coverage is lost that this tier was entitled to claim: the expanded
+  // "south african police service" below carries the SAPS case, and a
+  // realistic "SAPS Anti-Fraud Unit…" lure still reaches suspicious through
+  // it. The Hawks are dropped outright rather than approximated — their
+  // expanded name is the Directorate for Priority Crime Investigation, which
+  // is listed, and inventing a phrase that separates "the Hawks" the agency
+  // from "the hawks" the birds is exactly the researched judgement this tier
+  // excludes.
+  //
+  // The general rule this instance belongs to: an agency list has no
+  // substring/word split (unlike BrandSet), so a bare entry that is also a
+  // dictionary word has no safe form. Prefer the expanded name.
   "south african police service",
-  "hawks",
+  "directorate for priority crime investigation",
   "sassa",
   "south african social security agency",
   "nsfas",
@@ -148,8 +168,21 @@ export const ZA: RegionDefinition = {
     // line type, so this copy fires without an authored prefix.
     tollFreeFlag:
       "Free-call 0800 numbers are commonly faked by scammers posing as banks or government agencies — always verify by calling the number printed on your card or on the organisation's official website",
-    // 0860/0861 share-call: billed to the caller at local rates.
+    // 0860 share-call: billed to the caller at local rates.
+    //
+    // Names 0860 ONLY, deliberately. 0861 is also a ZA share-call range and the
+    // obvious thing to name alongside it — but libphonenumber classifies 0861
+    // as **UAN**, not SHARED_COST, and UAN has no branch in analysePhone, so an
+    // 0861 number returns lineType "unknown" with no notes at all. Naming it in
+    // copy that only ever fires on 0860 would describe a range the flag can
+    // never actually be shown for.
+    //
+    // Verified by parsing rather than assumed: +27 86 0123456 → SHARED_COST,
+    // +27 86 1123456 → UAN. This is the same UAN gap JP hit with 0570 Navi
+    // Dial, and the same remedy — say only what the reachable branch covers.
+    // Giving UAN its own branch is a base-layer change affecting every region
+    // and wants its own probe, so it is out of scope for a data-only pack.
     sharedCostFlag:
-      "South African 0860 and 0861 share-call numbers are billed to you at a local rate — a message pressing you to call one to 'verify' an account or claim a refund is a common cost-shifting tactic",
+      "South African 0860 share-call numbers are billed to you at a local rate — a message pressing you to call one to 'verify' an account or claim a refund is a common cost-shifting tactic",
   },
 };

@@ -121,9 +121,18 @@ export const IN: RegionDefinition = {
     // premiumFlag is omitted with it: a flag string with no prefix list is
     // unreachable copy, which is the shape sg.ts calls out for noLinkSenders.
     //
-    // 100 (police), 101 (fire), 102 (ambulance) and 112 (the unified
-    // emergency number) — 112 is already in the universal set; the rest are
-    // not, and are matched by exact equality so whole numbers only.
+    // Four entries, and the list must match this comment — an earlier cut named
+    // 112 here and did not name 1930, which invites deleting the live one.
+    //
+    //   100 police · 101 fire · 102 ambulance — India's own, NOT in the
+    //     universal EMERGENCY_NUMBERS set, so they come from this pack.
+    //   1930 — the national cyber-fraud helpline. Same role SG's 1799 plays:
+    //     a short official number that must never score as suspicious, which
+    //     is what this field is for. Test-covered; do not remove it.
+    //
+    // 112 (the unified emergency number) is deliberately ABSENT because it is
+    // already in the universal set — listing it again would be redundant, not
+    // wrong. Matched by exact equality, so whole numbers only.
     emergencyNumbers: ["100", "101", "102", "1930"],
     // India's toll-free range is 1800. libphonenumber classifies the line
     // type, so naming the right national range is all this copy must do —

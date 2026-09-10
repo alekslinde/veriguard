@@ -293,10 +293,15 @@ tiers:
       note: The Anti-Scam Command publishes named campaign advisories here.
 
     # ── DE ──────────────────────────────────────────────────────────────────
-    # The five entries below were registered alongside the `minimal` packs for
-    # these regions. Registering a source is not reading it (item 6): every one
-    # is `check: manual`, so it contributes nothing until a human opens it, and
-    # a sweep must not imply otherwise.
+    # The TEN entries below — two per region for DE, ZA, IN, JP and BR — were
+    # registered alongside the `minimal` packs for those regions.
+    #
+    # Registering a source is not reading it (item 6): all ten are
+    # `check: manual`, so each contributes nothing until a human opens it, and
+    # a sweep must not imply otherwise. Ten manual sources across five new
+    # jurisdictions is the check debt this wave added, stated as a number
+    # because understating it is how "no new threats identified" came to mean
+    # "nobody read anything".
     - domain: bsi.bund.de
       name: BSI — Bundesamt für Sicherheit in der Informationstechnik
       url: https://www.bsi.bund.de/DE/Service-Navi/Presse/Warnmeldungen/warnmeldungen_node.html
