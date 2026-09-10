@@ -214,13 +214,26 @@ describe("analysePhone — emergency numbers are never suspicious", () => {
     }
   });
 
-  it("keeps the union in sync with the packs automatically", () => {
-    // Built from REGIONS rather than hand-listed, so authoring a number in a
-    // pack is sufficient. If this drifts, the union was hardcoded somewhere.
-    for (const region of supportedRegions()) {
-      for (const number of resolveRegionPack(region).phonePlan?.emergencyNumbers ?? []) {
-        expect(ALL_EMERGENCY_NUMBERS, `${number} from ${region}`).toContain(number);
-      }
+  it("keeps the union in sync with the packs, in both directions", () => {
+    // Forward containment is true by construction — the union is DERIVED from
+    // these packs — so on its own it asserts nothing. The load-bearing half is
+    // the reverse: the union must contain nothing the packs do not author.
+    //
+    // That is the case a hand-written literal would fail. Replacing the derived
+    // export with one is the drift this guards against, and a superset literal
+    // (a stale entry left behind after a pack dropped a number) passes forward
+    // containment while failing here.
+    const authored = new Set(
+      supportedRegions().flatMap(
+        (region) => resolveRegionPack(region).phonePlan?.emergencyNumbers ?? [],
+      ),
+    );
+
+    for (const number of authored) {
+      expect(ALL_EMERGENCY_NUMBERS, `${number} is authored but missing`).toContain(number);
+    }
+    for (const number of ALL_EMERGENCY_NUMBERS) {
+      expect([...authored], `${number} is in the union but no pack authors it`).toContain(number);
     }
   });
 });

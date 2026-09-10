@@ -117,6 +117,17 @@ cycle re-running it.
   harmless today. If the hardcoded set is ever narrowed on the grounds that
   "the packs cover it", check `ZZ` first: a user in an unpacked region relies
   on the hardcoded set, and `REST_OF_WORLD` authors no numbers of its own.
+- **`+`-prefixed short codes match the emergency check.** `analysePhone("+190",
+  "AU")` returns `emergency`, because `cleaned` strips `+` before the check runs,
+  so an explicitly-international input matches a bare short code. **Pre-existing
+  and not a regression** — `+911` behaved this way before P12 — but the union
+  widened the surface from 8 numbers to 25, so more inputs reach it. Severity is
+  low for the same asymmetry that justified the fix: no scam is furthered by a
+  user being told `+190` is an emergency line. Recorded rather than fixed
+  because the tightening (require no explicit country code before matching a
+  short code) touches the pre-P12 hardcoded path too, which is a wider change
+  than this probe's finding warrants. Found by review of the P12 fix, not by
+  this probe.
 - **Not probed: the six agency lists as impersonation surface.** Whether a
   scam naming `BSI` or `SARS` scores appropriately is a question about the
   keyword layer, which for five of these six regions is English against
