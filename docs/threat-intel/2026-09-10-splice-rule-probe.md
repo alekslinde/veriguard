@@ -13,10 +13,14 @@ packs next.*
 
 | Finding | Issue | Shipped in | Status |
 |---|---|---|---|
-| P9 — Schemeless-host strip deletes prose, removing the splice signal | — | this branch | ✅ Fixed |
-| P10 — ASCII-only host labels strip a spliced host partially | — | this branch | ✅ Fixed |
+| P9 — Schemeless-host strip deletes prose, removing the splice signal | — | PR #289 | ✅ Fixed |
+| P10 — ASCII-only host labels strip a spliced host partially | — | PR #289 | ✅ Fixed |
+| P11 — Strip does not share `extractBareHosts`' guard (found on review of the P9 fix) | — | PR #289 | ✅ Fixed |
 
-Both were found and fixed in the same cycle, so neither was filed separately.
+All three were found and fixed in the same cycle, so none was filed separately.
+**P11 is the one worth reading:** it was introduced by the fix for P9 and found
+by review, not by this probe — the probe's own watchlist had named the symptom
+and deferred the cause.
 
 ---
 
@@ -108,18 +112,32 @@ was tried.
 
 ## Watchlist
 
-- **`AMBIGUOUS_BARE_TLDS` is not consulted by the strip — confirmed, not
-  theoretical.** `extractBareHosts` treats `.zip`, `.mov` and `.bond` as needing
-  a path or `www.` before they count as hosts, because they read as ordinary
-  words. The strip's TLD gate does not make that distinction, so:
+*Empty. The one item that stood here — the strip not consulting
+`AMBIGUOUS_BARE_TLDS` — was closed on review of PR #289, along with two further
+defects of the same cause found at the same time.*
 
-  ```
-  the deposіt.bond is refundable        0  safe   no flag
-  ```
+### Closed on review: the strip did not share `extractBareHosts`' guard
 
-  This is P9 surviving in miniature: the same class of word the fix was about,
-  through the corroboration rule the fix did not inherit. Left as a watchlist
-  item rather than fixed in this cycle, deliberately — the rule has now been
-  wrong three times about conditions, and the right fix is to consult
-  `extractBareHosts`'s judgement wholesale rather than to bolt on a fourth
-  condition. That is a refactor, and it wants its own change.
+The P9 fix gated the strip on a TLD set and its comment claimed this was "the
+same union `extractBareHosts` gates on". It was the last of that function's five
+checks. The four above it are what separate a hostname from a missing space
+after a full stop, and without them the strip was wrong in both directions:
+
+| Input | Before | Cause |
+|---|---|---|
+| `Your ассount.co has been suspended` | 10 / safe | too loose — word-like TLD |
+| `Verify your ассount.app immediately` | 10 / safe | too loose — word-like TLD |
+| `Your depоsit.bond is refundable` | 0 / safe | too strict — no corroboration rule |
+| `Send the аrchive.zip file when you can` | 0 / safe | too strict — no corroboration rule |
+| `Urgent: click -pаypal.com to verify…` | flags `"pа"` | lookbehind included `-`, truncating the match |
+
+Fixed by extracting `extractBareHosts`' per-match decision into
+`isBareHostMatch` and giving both callers the same guard. **The probe's own
+watchlist entry proposed exactly this and deferred it**; the review supplied the
+missing argument, which was that the gap ran in two directions rather than one.
+
+**The lesson is the one this probe already recorded, one level up.** P9 and P10
+were "approximated a condition that exists in a guarded form nearby". So was
+this — and it survived the fix *for* P9, because the fix approximated the same
+judgement more precisely instead of calling it. Precision is not the property
+that was missing; sharing is.
