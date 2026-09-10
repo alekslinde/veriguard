@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { mixedScriptWords } from "@veriguard/engine/urlSanitizer";
+
+// The same union extractBareHosts gates on, which is what the engine passes in
+// production. Without it mixedScriptWords does no schemeless stripping at all,
+// so a test omitting it would not exercise the strip these cases are about.
+const HOST_TLDS = new Set([
+  "com", "net", "org", "co", "io", "app", "info", "biz", "me", "tv", "cc",
+  "au", "uk", "nz", "ie", "ca", "us", "tk", "top", "shop", "icu",
+]);
 import { checkSms, checkCustom, checkEmail } from "@veriguard/engine/scamDetector";
 
 // Homoglyph splicing in the MESSAGE BODY, as distinct from the hostname case
@@ -98,13 +106,41 @@ describe("mixedScriptWords", () => {
     ["a deeper host", "visit https://c\u03bfmmbank.com.au/login today"],
     ["an email address", "email support@p\u0430ypal.com"],
   ])("leaves %s to the URL rule", (_label, input) => {
-    expect(mixedScriptWords(input)).toEqual([]);
+    expect(mixedScriptWords(input, HOST_TLDS)).toEqual([]);
   });
 
   it("still reads the prose around a spliced URL", () => {
     // Stripping the URL must not blind the rule to the rest of the message.
-    expect(mixedScriptWords("Login at http://p\u0430ypal.com to re\u0430ctivate your account"))
+    expect(mixedScriptWords("Login at http://p\u0430ypal.com to re\u0430ctivate your account", HOST_TLDS))
       .toEqual(["re\u0430ctivate"]);
+  });
+
+  // A missing space after a full stop is routine in pasted SMS — extractBareHosts
+  // carries three separate guards for it. The strip's first version gated on
+  // "a dot and two letters", so it read these as hostnames and deleted the
+  // spliced word: "Your ассount.has been suspended" went 35/suspicious to
+  // 10/safe on one keystroke. It now gates on a known TLD.
+  it.each([
+    ["a lowercase word after a full stop", "Your ассount.has been suspended", ["ассount"]],
+    ["a capitalised new sentence", "Verify your ассount.Then call us", ["ассount"]],
+    ["a non-TLD suffix", "Your ассount.xyzzy is locked", ["ассount"]],
+    ["prose either side of the dot", "ассount.has and reаctivate", ["ассount", "reаctivate"]],
+  ])("still reads %s", (_label, input, expected) => {
+    expect(mixedScriptWords(input, HOST_TLDS)).toEqual(expected);
+  });
+
+  it("strips a spliced host without eating its prefix", () => {
+    // An ASCII-only label class matches from after the Cyrillic character, so
+    // "pаypal.com" yields "ypal.com" — a partial strip that leaves the spliced
+    // prefix behind as a word and re-creates the double score.
+    expect(mixedScriptWords("Go to pаypal.com/verify", HOST_TLDS)).toEqual([]);
+    expect(mixedScriptWords("visit cоmmbank.com.au today", HOST_TLDS)).toEqual([]);
+  });
+
+  it("does no schemeless stripping when given no TLD set", () => {
+    // The safe default: a missed strip double-scores a host, an over-broad one
+    // deletes evidence. Guessing is the worse of the two.
+    expect(mixedScriptWords("Your ассount.has been suspended")).toEqual(["ассount"]);
   });
 
   it("does not treat a wholly-Cyrillic word as mixed", () => {

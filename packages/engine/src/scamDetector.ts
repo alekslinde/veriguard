@@ -1328,8 +1328,23 @@ export const FAMILY_IMPERSONATION_FLAG =
  */
 export const SPLICED_WORDING_FLAG = "Disguised wording";
 
-function addSplicedWordingSignal(sig: Signals, text: string): void {
-  const spliced = mixedScriptWords(text);
+/**
+ * The TLDs that mark a dotted token as a hostname for the splice rule.
+ *
+ * The same union extractBareHosts gates on: the curated mainstream set plus
+ * whatever this pack calls abuse-prone. Built per pack rather than hoisted,
+ * because the second half is regional — a pack that adds a suspicious TLD must
+ * have the splice rule agree with the URL card about what a host is, or the two
+ * rules disagree on whether a token was already scored.
+ */
+function bareHostTlds(pack: RegionPack): ReadonlySet<string> {
+  const out = new Set(BARE_HOST_TLDS);
+  for (const t of pack.suspiciousTlds) out.add(t.replace(/^\./, "").toLowerCase());
+  return out;
+}
+
+function addSplicedWordingSignal(sig: Signals, text: string, pack: RegionPack): void {
+  const spliced = mixedScriptWords(text, bareHostTlds(pack));
   if (spliced.length === 0) return;
   const many = spliced.length > 1;
   sig.add(
@@ -1367,7 +1382,7 @@ export function checkSms(
   // one Cyrillic character inside a word removes that word from detection
   // entirely. "Your account has been suspended" scores 30; the spliced form
   // renders identically to the reader and scored 0 before this rule existed.
-  addSplicedWordingSignal(sig, text);
+  addSplicedWordingSignal(sig, text, PACK);
 
   const urgencyHits = URGENCY_WORDS.filter((w) => mentions(lower, w));
   if (urgencyHits.length > 0) {
@@ -2537,7 +2552,7 @@ export function checkCustom(text: string, blocklist?: Set<string>, region?: Regi
 
   // Homoglyph splicing — the pasted-text path carries the same evasion as
   // checkSms, and is the likelier one for a message copied out of a client.
-  addSplicedWordingSignal(sig, text);
+  addSplicedWordingSignal(sig, text, PACK);
 
   const allSignals = [...URGENCY_WORDS, ...REWARD_WORDS, ...REQUEST_WORDS];
   // Matched through mentions() for parity with checkSms (#233). A raw
