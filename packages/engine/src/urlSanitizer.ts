@@ -267,6 +267,29 @@ export function hasMixedScriptHost(raw: string): boolean {
 }
 
 /**
+ * The subset of CONFUSABLE_SCRIPTS that can actually deceive in free text.
+ *
+ * Cyrillic passes through whole — it supplies a lookalike for most Latin
+ * letters and has no symbol use in English prose. Greek does not: μ, Ω, π, λ,
+ * Δ, φ and their neighbours are *units and symbols*, and they abut Latin
+ * letters and digits in ordinary writing. "500μg", "10μF" and "5μm" are one
+ * word in two scripts by any structural test, and a pharmacy dispatch note or
+ * an electronics order confirmation is exactly the message this rule must not
+ * accuse of being "written to slip past filters".
+ *
+ * So the Greek half is enumerated rather than taken as a range, and the
+ * enumeration sits on the side that is bounded: the letters that render close
+ * enough to a Latin one to carry a homoglyph. A symbol that looks like nothing
+ * in Latin cannot be used to disguise a Latin word, so excluding it costs no
+ * detection. Ranges were the first attempt and swept in Δ, which is the tell —
+ * the set is a judgement about shapes, not a contiguous block of the alphabet.
+ *
+ * Hostnames keep the wider CONFUSABLE_SCRIPTS: unit symbols do not appear in
+ * domain names, so the ambiguity this resolves does not arise there.
+ */
+const TEXT_CONFUSABLES = /[\u0400-\u04FF\u0500-\u052F]|[ΑΒΕΖΗΙΚΜΝΟΡΤΥΧαεηικνορστυχ]/;
+
+/**
  * Words in free text that splice a confusable script into a Latin word.
  *
  * The body-text counterpart of hasMixedScriptHost, and it exists because the
@@ -284,20 +307,37 @@ export function hasMixedScriptHost(raw: string): boolean {
  * reason to write one, because the homoglyph only has value if the rest of the
  * word still reads as the Latin word being impersonated.
  *
- * Scoped to Cyrillic and Greek by CONFUSABLE_SCRIPTS for the reason given
- * there — those are the scripts that supply Latin lookalikes. Thai, Arabic,
- * Hebrew, Han and Kana share no shapes with Latin, so a reader cannot be
- * misled by them and their presence is not evidence of anything.
+ * Scoped to Cyrillic and Greek, and within Greek to the letters that actually
+ * look Latin — see TEXT_CONFUSABLES. Thai, Arabic, Hebrew, Han and Kana share
+ * no shapes with Latin, so a reader cannot be misled by them and their
+ * presence is not evidence of anything.
  *
  * Returns the offending words so the flag can quote them: the teaching value
  * is in showing the reader a word that looks ordinary and is not.
  */
 export function mixedScriptWords(text: string): string[] {
   const out: string[] = [];
-  for (const word of text.split(/[^\p{L}\p{M}\p{N}]+/u)) {
+  // URLs and email addresses are removed before splitting, because a spliced
+  // hostname is already the URL checker's finding — hasMixedScriptHost scores
+  // it at 45, and the two rules are counterparts rather than a stack. Without
+  // this the word splitter shreds "http://pаypal.com" into the bare label
+  // "pаypal" and scores the same character twice, once as prose and once as a
+  // host, for 60 on a message the URL rule had already handled.
+  //
+  // Stripping rather than skipping matched words: the surrounding prose in the
+  // same message still gets read, so "Login at http://pаypal.com to reаctivate"
+  // reports the prose splice and leaves the host to the URL card.
+  const prose = text
+    .replace(/[a-z][a-z0-9+.-]*:\/\/\S+/gi, " ")
+    .replace(/\S+@\S+/g, " ")
+    // Schemeless hosts: a dot-separated run ending in a plausible TLD. Scam SMS
+    // routinely drops the scheme, and extractBareHosts exists for exactly that,
+    // so leaving them here would reopen the double-count on the commoner shape.
+    .replace(/\S+\.[a-z]{2,}(?:\/\S*)?/gi, " ");
+  for (const word of prose.split(/[^\p{L}\p{M}\p{N}]+/u)) {
     // Latin letters only — \p{L} would count the confusable characters
     // themselves as "letters" and make every wholly-Cyrillic word qualify.
-    if (/[a-z]/i.test(word) && CONFUSABLE_SCRIPTS.test(word)) out.push(word);
+    if (/[a-z]/i.test(word) && TEXT_CONFUSABLES.test(word)) out.push(word);
   }
   return out;
 }

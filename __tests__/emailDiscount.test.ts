@@ -60,6 +60,31 @@ describe("gated composites survive the email discount", () => {
   });
 });
 
+// Listed separately from the table above because it is the one undiscounted
+// entry deliberately pitched BELOW likely_scam: the rule restores a floor
+// rather than delivering a verdict the keyword layer would have had to earn.
+// The discount still must not touch it — at 0.7 its 25 became 17, under the 20
+// it is pitched at, so the email read "safe" where the same SMS body read
+// "suspicious".
+describe("the spliced-wording signal survives the email discount", () => {
+  const body = "Your ассount has been suspended";
+
+  it("keeps its SMS score and verdict on the email path", () => {
+    const sms = checkSms(body, undefined, "AU");
+    const email = checkEmail(asEmail(body), undefined, "AU");
+    expect(sms.verdict).toBe("suspicious");
+    expect(email.score).toBe(sms.score);
+    expect(email.verdict).toBe("suspicious");
+  });
+
+  it("restores the row rather than adding a padding one", () => {
+    const email = checkEmail(asEmail(body), undefined, "AU");
+    const summed = (email.signals ?? []).reduce((n, s) => n + s.points, 0);
+    expect(summed).toBe(email.score);
+    expect((email.flags ?? []).every((f) => f.trim().length > 0)).toBe(true);
+  });
+});
+
 describe("keyword signals stay discounted", () => {
   it("still softens a message scored by keyword frequency", () => {
     // The discount's actual purpose. This must keep working, or the fix above

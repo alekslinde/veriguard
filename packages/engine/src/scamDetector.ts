@@ -1326,13 +1326,15 @@ export const FAMILY_IMPERSONATION_FLAG =
  * the keyword layer would have had to earn. It restores a floor, not a
  * conviction.
  */
+export const SPLICED_WORDING_FLAG = "Disguised wording";
+
 function addSplicedWordingSignal(sig: Signals, text: string): void {
   const spliced = mixedScriptWords(text);
   if (spliced.length === 0) return;
   const many = spliced.length > 1;
   sig.add(
     "message",
-    `Disguised wording — ${many ? "the words" : "the word"} "${spliced.slice(0, 3).join('", "')}" mix${many ? "" : "es"} ordinary letters with Cyrillic or Greek lookalikes. It reads normally but is written to slip past filters that check the wording`,
+    `${SPLICED_WORDING_FLAG} — ${many ? "the words" : "the word"} "${spliced.slice(0, 3).join('", "')}" mix${many ? "" : "es"} ordinary letters with Cyrillic or Greek lookalikes. It reads normally but is written to slip past filters that check the wording`,
     25,
   );
 }
@@ -2199,6 +2201,15 @@ export function checkSms(
  * loudly rather than quietly scoring a tier low.
  */
 const UNDISCOUNTED_COMPOSITES: string[] = [
+  // Not a two-condition composite like the rest, but it belongs here for the
+  // same reason: its gate is structural, not a keyword count. The discount
+  // exists to soften hits whose false-positive rate rises with message length,
+  // and script-mixing inside a word does not become likelier in a longer email.
+  // Discounted it scored 17 — below the 20 the rule is deliberately pitched at
+  // — so an email carrying the evasion read as "safe" while the SMS with the
+  // same body read "suspicious". Email is the channel where this evasion
+  // matters most, so the discount voided the rule where it was needed.
+  SPLICED_WORDING_FLAG,
   FAMILY_IMPERSONATION_FLAG,
   TASK_PAYMENT_FLAG,
   MESSAGING_HIJACK_FLAG,

@@ -61,6 +61,52 @@ describe("mixedScriptWords", () => {
     expect(mixedScriptWords(input)).toEqual([]);
   });
 
+  // Greek supplies units and symbols as well as lookalikes, and those abut
+  // Latin letters and digits in ordinary writing. A pharmacy dispatch note or
+  // an electronics order confirmation is one word in two scripts by any
+  // structural test, so the Greek half of the range is enumerated down to the
+  // letters that can actually carry a homoglyph.
+  it.each([
+    ["a microgram dose", "Your order of 500\u03bcg supplement shipped"],
+    ["a capacitor value", "The 10\u03bcF capacitor arrived"],
+    ["a film thickness", "Temperature 20\u00b0C and 5\u03bcm film"],
+    ["an ohm rating", "Resistance 4\u03a9 speaker cable"],
+    ["a wavelength", "A 500\u03bbnm laser diode"],
+    ["a delta notation", "\u0394T of 5K measured"],
+  ])("does not flag %s, where the Greek character is a unit", (_label, input) => {
+    expect(mixedScriptWords(input)).toEqual([]);
+  });
+
+  // …but the Greek letters that DO look Latin must still carry the rule, or
+  // narrowing the range has simply removed half the detection.
+  it.each([
+    ["omicron for o", "Your acc\u03bfunt is locked", ["acc\u03bfunt"]],
+    ["alpha for a", "PayP\u03b1l payment failed", ["PayP\u03b1l"]],
+    ["iota for i", "verify your \u03b9dentity", ["\u03b9dentity"]],
+    ["capital rho for P", "\u03a1aypal alert", ["\u03a1aypal"]],
+    ["epsilon for e", "your account is susp\u03b5nded", ["susp\u03b5nded"]],
+  ])("still flags %s", (_label, input, expected) => {
+    expect(mixedScriptWords(input)).toEqual(expected);
+  });
+
+  // A spliced hostname is the URL checker's finding, not this one's. Without
+  // the strip, the word splitter shreds a URL into its bare label and the same
+  // character is scored twice — once as prose, once as a host.
+  it.each([
+    ["a schemed URL", "Login at http://p\u0430ypal.com now"],
+    ["a schemeless host", "Go to p\u0430ypal.com/verify"],
+    ["a deeper host", "visit https://c\u03bfmmbank.com.au/login today"],
+    ["an email address", "email support@p\u0430ypal.com"],
+  ])("leaves %s to the URL rule", (_label, input) => {
+    expect(mixedScriptWords(input)).toEqual([]);
+  });
+
+  it("still reads the prose around a spliced URL", () => {
+    // Stripping the URL must not blind the rule to the rest of the message.
+    expect(mixedScriptWords("Login at http://p\u0430ypal.com to re\u0430ctivate your account"))
+      .toEqual(["re\u0430ctivate"]);
+  });
+
   it("does not treat a wholly-Cyrillic word as mixed", () => {
     // The guard that makes this work is testing for [a-z] rather than \p{L}:
     // the confusable characters are themselves letters, so a Unicode-letter
@@ -102,9 +148,28 @@ describe("splicing no longer removes a message from detection", () => {
     expect(r.flags.some((f) => /Disguised wording/i.test(f))).toBe(true);
   });
 
-  it("applies on the email path via the merged SMS pass", () => {
-    const r = checkEmail("Subject: Alert\n\nYour ассount has been suspended", NO_BLOCKLIST, "AU");
-    expect(r.flags.some((f) => /Disguised wording/i.test(f))).toBe(true);
+  it("applies on the email path at its full SMS weight", () => {
+    // The flag being present is not enough, and asserting only that hid a real
+    // defect: the email path scores the body at 0.7, which cut this signal's
+    // 25 to 17 and put it under the 20 the rule is deliberately pitched at. An
+    // email carrying the evasion read "safe" while the identical SMS body read
+    // "suspicious" — on the channel where homoglyph phishing is commonest.
+    const body = "Your ассount has been suspended";
+    const sms = checkSms(body, NO_BLOCKLIST, "AU");
+    const email = checkEmail(`Subject: Alert\n\n${body}`, NO_BLOCKLIST, "AU");
+
+    expect(email.flags.some((f) => /Disguised wording/i.test(f))).toBe(true);
+    expect(email.score).toBe(sms.score);
+    expect(email.verdict).toBe(sms.verdict);
+    expect(email.verdict).not.toBe("safe");
+  });
+
+  it("does not score a spliced hostname twice", () => {
+    // The URL rule already scores a mixed-script host at 45. Counting the same
+    // characters again as prose stacked the two to 60 on a message the URL
+    // card had wholly covered.
+    const r = checkSms("Login at http://pаypal.com now", NO_BLOCKLIST, "AU");
+    expect(r.flags.some((f) => /Disguised wording/i.test(f))).toBe(false);
   });
 
   it("stays below likely_scam on the splice alone", () => {
