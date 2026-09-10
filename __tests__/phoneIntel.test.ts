@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { analysePhone } from "@veriguard/engine/phoneIntel";
 import { checkPhone } from "@veriguard/engine/scamDetector";
-import { FALLBACK_REGION } from "@veriguard/engine/regions";
+import {
+  FALLBACK_REGION,
+  ALL_EMERGENCY_NUMBERS,
+  supportedRegions,
+  resolveRegionPack,
+} from "@veriguard/engine/regions";
 
 // Phase 4 — phone number generalisation.
 //
@@ -164,6 +169,59 @@ describe("analysePhone — emergency numbers are never suspicious", () => {
 
   it("never reports an emergency number as a scam risk", () => {
     expect(checkPhone("999", "GB").score).toBeLessThanOrEqual(20);
+  });
+
+  // Same defect as the block above, one layer down, found by the 2026-09-11
+  // probe of the `minimal` wave. The hardcoded set was already region-independent;
+  // everything a PACK authored was not, so it was only recognised when that pack
+  // happened to be the active region. A user in AU checking Brazil's 190 — or
+  // India's 1930, or Japan's 188 — got `likely_scam` on the "too short to be
+  // real" guard, with "No obvious red flags" printed directly above it.
+  //
+  // Which country the USER is in does not change whether a number is an
+  // emergency line, so this asserts the cross-product rather than each pack
+  // against its own region.
+  it("recognises every pack's emergency numbers from any region", () => {
+    const authored = [
+      ["190", "BR"], ["180", "BR"], ["193", "BR"],   // Brazil
+      ["1930", "IN"], ["100", "IN"],                  // India
+      ["188", "JP"], ["189", "JP"],                   // Japan
+      ["10111", "ZA"], ["10177", "ZA"],               // South Africa
+      ["116117", "DE"],                               // Germany / Ireland
+      ["1799", "SG"],                                 // Singapore
+      ["101", "GB"], ["105", "NZ"], ["988", "US"],    // pre-wave packs
+    ] as const;
+    // Every authored number, checked from every region we ship a pack for.
+    for (const [number] of authored) {
+      for (const region of supportedRegions()) {
+        const intel = analysePhone(number, region);
+        expect(intel.lineType, `${number} in ${region}`).toBe("emergency");
+        expect(intel.spoofingRisk, `${number} in ${region}`).toBe("low");
+      }
+    }
+  });
+
+  it("does not flag another country's emergency number as fabricated", () => {
+    // The user-facing half: the guard that produced "caller ID has been
+    // manipulated" is what this fix is for.
+    for (const [number, home] of [["190", "AU"], ["1930", "GB"], ["188", "US"]] as const) {
+      const result = checkPhone(number, home);
+      expect(result.verdict, `${number} in ${home}`).not.toBe("likely_scam");
+      expect(
+        result.flags.join(" "),
+        `${number} in ${home}`,
+      ).not.toContain("too short to be real");
+    }
+  });
+
+  it("keeps the union in sync with the packs automatically", () => {
+    // Built from REGIONS rather than hand-listed, so authoring a number in a
+    // pack is sufficient. If this drifts, the union was hardcoded somewhere.
+    for (const region of supportedRegions()) {
+      for (const number of resolveRegionPack(region).phonePlan?.emergencyNumbers ?? []) {
+        expect(ALL_EMERGENCY_NUMBERS, `${number} from ${region}`).toContain(number);
+      }
+    }
   });
 });
 

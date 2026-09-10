@@ -53,6 +53,28 @@ const REGIONS: Record<RegionCode, RegionDefinition> = {
   ZZ: REST_OF_WORLD,
 };
 
+/**
+ * Every emergency number any pack authors, unioned across all regions.
+ *
+ * `phoneIntel` holds a hardcoded universal set (000/999/911/112…) and its
+ * comment states the rule this implements: *"dialling another country's
+ * emergency number is not a scam signal, and treating an unrecognised one as
+ * fabricated is the failure mode worth avoiding."* That was true of the
+ * hardcoded set and false of everything a pack added — a pack's numbers were
+ * only consulted when that pack happened to be the active region, so BR's 190,
+ * IN's 1930 and JP's 188 scored `likely_scam` ("too short to be real") for a
+ * user checking from anywhere else.
+ *
+ * Built from REGIONS rather than hand-listed, so a pack authoring a number gets
+ * this for free and the union cannot drift from the packs. Sorted for a stable
+ * shape; membership is what callers use.
+ */
+export const ALL_EMERGENCY_NUMBERS: readonly string[] = [
+  ...new Set(
+    Object.values(REGIONS).flatMap((r) => r.phonePlan?.emergencyNumbers ?? []),
+  ),
+].sort();
+
 function buildPack(region: RegionDefinition): RegionPack {
   const urgency = {
     generic: BASE_SIGNALS.urgency.generic,
