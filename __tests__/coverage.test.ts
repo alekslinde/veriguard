@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { checkUrl, checkSms, checkEmail, checkCustom, checkPhone, analyzeContent } from "@veriguard/engine/scamDetector";
 import { overallCoverage, isClean, formatVerdictEmail } from "@/lib/verdictSummary";
+import { reportingFor } from "@/lib/reportingResources";
 import { FALLBACK_REGION, resolveRegionPack, supportedRegions, type RegionCoverage } from "@veriguard/engine/regions";
 import { toPrediction } from "@/eval/schema";
 import { analysePhone } from "@veriguard/engine/phoneIntel";
@@ -285,6 +286,352 @@ describe("minimal pack phone plans", () => {
   it("leaves ordinary mobiles alone", () => {
     // Guards the premium fix against over-reaching onto normal numbers.
     expect(analysePhone("+65 9123 4567", "SG").lineType).toBe("mobile");
+  });
+});
+
+// Per-region phone plans for the 2026-09-10 `minimal` wave (DE, ZA, IN, JP, BR).
+//
+// Pinned per region for the reason the SG block above states: the numbering
+// plan IS the point, and a generic "some prefix fires" assertion passes against
+// every real defect this field has produced. All five plans were verified by
+// printing analysePhone output rather than by reading the types, and the suite
+// was green before these existed — which is exactly why they exist.
+//
+// One finding is pinned negatively at the end: JP 0570 cannot reach
+// sharedCostFlag, so the pack must not author one.
+describe("minimal pack phone plans (2026-09 wave)", () => {
+  // ── DE ──
+  // 0900 and 0137 are Bundesnetzagentur premium ranges. Authored WITH the trunk
+  // 0 because analysePhone matches against "0" + nationalNumber: "+49 900 …"
+  // arrives as "9001234567", so a bare "900" would silently never fire.
+  it("fires the premium rule on a German 0900 number", () => {
+    const r = analysePhone("0900 1234567", "DE");
+    expect(r.lineType).toBe("premium");
+    expect(r.spoofingNotes.join(" ")).toContain("0900");
+  });
+
+  it("fires it on the same number in +49 form", () => {
+    expect(analysePhone("+49 900 1234567", "DE").lineType).toBe("premium");
+  });
+
+  it("also covers the German 0137 mass-traffic range", () => {
+    expect(analysePhone("0137 7123456", "DE").lineType).toBe("premium");
+  });
+
+  it("reaches DE/ZA/JP premium verdicts through libphonenumber, not the prefixes", () => {
+    // An INJECTION FINDING, pinned so a green suite is not misread.
+    //
+    // Breaking DE's premiumPrefixes to a trunk-less "900"/"137" left every
+    // assertion above green: libphonenumber classifies these ranges as
+    // PREMIUM_RATE itself, and analysePhone pushes premiumFlag from that branch
+    // too — so lineType, the flag copy and the very_high bump are all reached
+    // without the pack's prefixes firing at all.
+    //
+    // That is the roadmap's NANP trap ("US and CA hide this class of bug")
+    // generalising to three more countries. SG is the exception that made the
+    // original defect visible, because libphonenumber rejects SG 1900 as
+    // invalid and the prefix rule is the only thing that fires.
+    //
+    // So this test asserts the mechanism rather than the outcome: if these
+    // ranges ever stop being classified upstream, the packs' prefixes become
+    // load-bearing and the assertions above start testing them for real.
+    // Compared in INTERNATIONAL form against the base-only pack. The national
+    // form would be confounded: ZZ has no number plan of its own and parses
+    // national-format input against DEFAULT_REGION (AU), so "0900 1234567"
+    // resolves as an Australian number and "1900 112 233" hits AU's OWN
+    // premium range — neither of which says anything about DE, ZA or JP.
+    for (const [region, intl] of [["DE", "+49 900 1234567"], ["ZA", "+27 86 2123 456"], ["JP", "+81 990 123456"]] as const) {
+      expect({ region, withPlan: analysePhone(intl, region).lineType })
+        .toEqual({ region, withPlan: "premium" });
+      // No plan in play at all, and still premium — so the verdict is upstream.
+      expect({ region, upstream: analysePhone(intl, FALLBACK_REGION).lineType })
+        .toEqual({ region, upstream: "premium" });
+    }
+  });
+
+  it("is the SG plan, not libphonenumber, that catches SG 1900", () => {
+    // The contrast case, and the reason the prefixes are kept rather than
+    // deleted as dead weight. libphonenumber rejects SG 1900 as invalid, so
+    // the pack's prefix is the only thing that produces a premium verdict.
+    expect(analysePhone("1900 112 233", "SG").lineType).toBe("premium");
+    // International form against the base-only pack: parsed as Singaporean,
+    // unclassified upstream, and no plan to rescue it.
+    expect(analysePhone("+65 1900 112 233", FALLBACK_REGION).lineType).not.toBe("premium");
+  });
+
+  it("names Germany's own toll-free and shared-cost ranges", () => {
+    // Naming the NANP 800 range to a German user is the SG tollFreeFlag defect.
+    const free = analysePhone("0800 1234567", "DE");
+    expect(free.lineType).toBe("freecall");
+    expect(free.spoofingNotes.join(" ")).toContain("0800");
+    const shared = analysePhone("0180 1234567", "DE");
+    expect(shared.lineType).toBe("shared_cost");
+    expect(shared.spoofingNotes.join(" ")).toContain("0180");
+  });
+
+  it("treats the German medical on-call line as an emergency number", () => {
+    expect(analysePhone("116117", "DE").lineType).toBe("emergency");
+  });
+
+  it("leaves an ordinary German mobile alone", () => {
+    expect(analysePhone("+49 151 12345678", "DE").lineType).toBe("mobile");
+  });
+
+  // ── ZA ──
+  it("fires the premium rule on a South African 0862 number", () => {
+    const r = analysePhone("086 2123 456", "ZA");
+    expect(r.lineType).toBe("premium");
+    expect(r.spoofingNotes.join(" ")).toContain("0862");
+  });
+
+  it("does NOT treat ZA 0860 share-call as premium", () => {
+    // The false-positive direction, and the reason 0860/0861 are not in
+    // premiumPrefixes: they are billed at local rates and carry the published
+    // service lines of real banks. Calling those premium would tell a user
+    // their own bank's number is charging them.
+    const r = analysePhone("0860 123 456", "ZA");
+    expect(r.lineType).toBe("shared_cost");
+    expect(r.spoofingNotes.join(" ")).toContain("0860");
+  });
+
+  it("recognises South Africa's own emergency numbers", () => {
+    // 10111/10177 are NOT in the universal EMERGENCY_NUMBERS set, so these come
+    // from the pack. Matched by exact equality, so whole numbers only.
+    expect(analysePhone("10111", "ZA").lineType).toBe("emergency");
+    expect(analysePhone("10177", "ZA").lineType).toBe("emergency");
+  });
+
+  it("leaves an ordinary South African mobile alone", () => {
+    expect(analysePhone("+27 82 123 4567", "ZA").lineType).toBe("mobile");
+  });
+
+  // ── IN ──
+  it("names India's 1800 toll-free range, not the NANP one", () => {
+    const r = analysePhone("1800 123 4567", "IN");
+    expect(r.lineType).toBe("freecall");
+    expect(r.spoofingNotes.join(" ")).toContain("1800");
+    expect(r.spoofingNotes.join(" ")).not.toMatch(/\b800 numbers\b/);
+  });
+
+  it("recognises India's emergency and cyber-fraud helplines", () => {
+    // 1930 is the cyber-fraud helpline — the same role SG's 1799 plays, and the
+    // reason it belongs in emergencyNumbers: a short official number that must
+    // never score as suspicious.
+    expect(analysePhone("100", "IN").lineType).toBe("emergency");
+    expect(analysePhone("1930", "IN").lineType).toBe("emergency");
+  });
+
+  it("leaves an ordinary Indian mobile alone", () => {
+    expect(analysePhone("+91 98765 43210", "IN").lineType).toBe("mobile");
+  });
+
+  it("claims no Indian premium range", () => {
+    // TRAI allocates no dialable consumer premium-rate level, so the pack
+    // authors neither a prefix nor a flag. Pinned so a later author does not
+    // add speculative copy — an unreachable flag is the shape this tier forbids.
+    const plan = resolveRegionPack("IN").phonePlan;
+    expect(plan.premiumPrefixes).toBeUndefined();
+    expect(plan.premiumFlag).toBeUndefined();
+  });
+
+  // ── JP ──
+  it("fires the premium rule on a Japanese 0990 number", () => {
+    const r = analysePhone("0990 123456", "JP");
+    expect(r.lineType).toBe("premium");
+    expect(r.spoofingNotes.join(" ")).toContain("0990");
+  });
+
+  it("names Japan's 0120 toll-free range", () => {
+    const r = analysePhone("0120 123456", "JP");
+    expect(r.lineType).toBe("freecall");
+    expect(r.spoofingNotes.join(" ")).toContain("0120");
+  });
+
+  it("recognises the Japanese consumer hotline as an emergency number", () => {
+    expect(analysePhone("188", "JP").lineType).toBe("emergency");
+  });
+
+  it("leaves an ordinary Japanese mobile alone", () => {
+    expect(analysePhone("+81 90 1234 5678", "JP").lineType).toBe("mobile");
+  });
+
+  it("authors no JP shared-cost flag, because 0570 cannot reach one", () => {
+    // A NEGATIVE pin on a real finding. sharedCostFlag is only pushed from the
+    // `type === "SHARED_COST"` branch, and libphonenumber classifies JP 0570
+    // (Navi Dial) as UAN — which has no branch and falls through to "unknown".
+    // Authoring the flag would ship copy no reader can ever see.
+    //
+    // Both halves are asserted: the classification that makes it unreachable,
+    // and the absence of the flag. If a UAN branch is added later, the first
+    // assertion fails and this comment is where to look.
+    expect(analysePhone("0570 123456", "JP").lineType).toBe("unknown");
+    expect(resolveRegionPack("JP").phonePlan.sharedCostFlag).toBeUndefined();
+  });
+
+  // ── BR ──
+  it("names Brazil's 0800 toll-free and 0300 shared-cost ranges", () => {
+    const free = analysePhone("0800 123 4567", "BR");
+    expect(free.lineType).toBe("freecall");
+    expect(free.spoofingNotes.join(" ")).toContain("0800");
+    // 0300 is the case that made the trunk-prefix question explicit: Brazilians
+    // dial the 0, but libphonenumber returns "3001234567" without it, and
+    // analysePhone prepends one — so "0300" is right for a reason unrelated to
+    // how it is dialled. See br.ts.
+    const shared = analysePhone("0300 123 4567", "BR");
+    expect(shared.lineType).toBe("shared_cost");
+    expect(shared.spoofingNotes.join(" ")).toContain("0300");
+  });
+
+  it("recognises Brazil's own emergency numbers", () => {
+    for (const n of ["190", "192", "193", "180"]) {
+      expect({ n, type: analysePhone(n, "BR").lineType }).toEqual({ n, type: "emergency" });
+    }
+  });
+
+  it("leaves an ordinary Brazilian mobile alone", () => {
+    expect(analysePhone("+55 11 91234 5678", "BR").lineType).toBe("mobile");
+  });
+
+  it("claims no Brazilian premium range", () => {
+    // ANATEL allocates no consumer premium level comparable to DE's 0900.
+    const plan = resolveRegionPack("BR").phonePlan;
+    expect(plan.premiumPrefixes).toBeUndefined();
+    expect(plan.premiumFlag).toBeUndefined();
+  });
+});
+
+// A KNOWN, DELIBERATE COST of the `minimal` tier, pinned so it stays visible.
+//
+// A link to a region's REAL government site scores 40/suspicious under a
+// `minimal` pack, where the same shape scores 15/safe under `full`. Mechanism,
+// isolated by probing rather than inferred: the authority name appears in the
+// HOSTNAME ("iras.gov.sg", "gov.br/inss"), which fires authorityMentions; the
+// trusted suffix suppresses brand scoring but not the authority flag, and a
+// `minimal` pack has no `legitDomains` to counterweight it because the tier
+// forbids one. Bare prose naming an agency correctly scores 0.
+//
+// This is NOT a defect introduced by the 2026-09 wave — SG has behaved this way
+// since it shipped. Nor is it every `minimal` pack: probing showed it fires
+// only where an authority entry is a substring of the body's own hostname, so
+// DE inherits it and ZA, IN, JP and BR do not. See the table below — ZA left
+// the list as a side effect of a review fix, which is the useful hint about
+// the remedy: prefer expanded agency names over bare acronyms.
+// It is recorded here because it is the tier's real false-positive cost and
+// nothing else in the repo stated it: the honest summary of `minimal` is
+// "positive-side value, at the price of over-flagging the government's own
+// domain", not "positive-side value only".
+//
+// Deliberately not fixed here. The fix is either an allowlist (a tier
+// violation — an entry waves a scam through) or suppressing the authority flag
+// under a trusted suffix (a base-layer change affecting every region, which
+// wants its own probe). Left as a named cost rather than a silent one.
+describe("minimal tier: known cost on a region's own government domain", () => {
+  it("over-flags a real government link where a full pack does not", () => {
+    const minimal = checkSms("Check https://www.iras.gov.sg/taxes for details", undefined, "SG");
+    expect(minimal.verdict).toBe("suspicious");
+    expect(minimal.flags.some((f) => f.toLowerCase().includes("government agency"))).toBe(true);
+
+    // The contrast that makes it a tier property rather than an engine bug.
+    const full = checkSms("Check https://www.gov.uk/hmrc for details", undefined, "GB");
+    expect(full.verdict).toBe("safe");
+    expect(full.flags.some((f) => f.toLowerCase().includes("government agency"))).toBe(false);
+  });
+
+  it("still scores a bare agency name in prose at zero", () => {
+    // The guard on the entry above: the cost is specific to the name appearing
+    // in a hostname. If this ever starts scoring, the authority layer has gone
+    // broad in a way that would light up ordinary conversation.
+    expect(checkSms("IRAS says your taxes are due", undefined, "SG").score).toBe(0);
+  });
+
+  // Which regions inherit the cost, asserted per pack. Written as a table
+  // rather than a blanket claim because probing showed the split is NOT
+  // "every minimal pack" — it tracks whether an authority entry happens to be
+  // a SUBSTRING of the body's own hostname:
+  //
+  //   fires:        bsi.bund.de ("bsi"), iras.gov.sg ("iras")
+  //   does not:     saps.gov.za, caa.go.jp, cybercrime.gov.in, gov.br
+  //
+  // So the real driver is short abbreviations in an agency list, and the
+  // remedy available to a pack author is to prefer expanded names. That is
+  // now visible as a *causal* row rather than a coincidence: ZA moved from
+  // "fires" to "does not" when the review dropped bare "saps" (an ordinary
+  // English word) in favour of "south african police service" — the same edit
+  // fixed a false-positive class and this cost at once. DE keeps "bsi"
+  // because that is how a German message names the body, and BR dropped
+  // "gov.br" because it named a domain where the rest name institutions.
+  //
+  // Pinned per region so a later change that shifts one region is visible
+  // rather than averaged away.
+  it.each([
+    ["DE", "bsi.bund.de", true],
+    ["ZA", "saps.gov.za", false],
+    ["IN", "cybercrime.gov.in", false],
+    ["JP", "caa.go.jp", false],
+    ["BR", "gov.br", false],
+  ] as const)("%s on %s: authority flag fires = %s", (code, host, expected) => {
+    const r = checkSms(`Check https://www.${host}/page for details`, undefined, code);
+    expect({ code, flagged: r.flags.some((f) => f.toLowerCase().includes("government agency")) })
+      .toEqual({ code, flagged: expected });
+  });
+});
+
+// Code-review findings on the 2026-09 wave, pinned so each stays fixed.
+describe("minimal pack review fixes (2026-09 wave)", () => {
+  it("does not flag ordinary English words as South African agencies", () => {
+    // "saps" and "hawks" were listed bare in ZA's authorityMentions. Both name
+    // real bodies and both are ordinary English words — and the matcher's
+    // structural protection cannot help, because single tokens are ALREADY
+    // matched on word boundaries: these were matching as whole words, which is
+    // what they are. An agency list has no substring/word split (unlike
+    // BrandSet), so a bare dictionary word has no safe form.
+    for (const text of [
+      "The saps and stems of plants need urgent care, click http://x.co/a",
+      "Hawks nest here every spring, urgent action needed http://x.co/a",
+    ]) {
+      const r = checkSms(text, undefined, "ZA");
+      expect({ text: text.slice(0, 20), gov: r.flags.some((f) => f.toLowerCase().includes("government agency")) })
+        .toEqual({ text: text.slice(0, 20), gov: false });
+    }
+  });
+
+  it("still names the South African police via its expanded name", () => {
+    // The coverage half of the trade: dropping the acronym must not drop the
+    // agency. Pinned so a later author does not "restore" the bare words.
+    const r = checkSms("South African Police Service: warrant issued, pay now http://x.co/a", undefined, "ZA");
+    expect(r.flags.some((f) => f.toLowerCase().includes("government agency"))).toBe(true);
+    const hawks = checkSms("Directorate for Priority Crime Investigation: pay now http://x.co/a", undefined, "ZA");
+    expect(hawks.flags.some((f) => f.toLowerCase().includes("government agency"))).toBe(true);
+  });
+
+  it("names only the ZA share-cost range that can actually reach the flag", () => {
+    // 0861 is a real ZA share-call range, but libphonenumber classifies it as
+    // UAN — which has no branch in analysePhone — so an 0861 number returns
+    // "unknown" with no notes. The copy therefore names 0860 only, or it would
+    // describe a range the flag can never be shown for. Same gap as JP 0570.
+    const eight60 = analysePhone("0860 123 456", "ZA");
+    expect(eight60.lineType).toBe("shared_cost");
+    expect(eight60.spoofingNotes.join(" ")).toContain("0860");
+    expect(eight60.spoofingNotes.join(" ")).not.toContain("0861");
+    // The unreachable half, asserted so the copy is re-checked if this changes.
+    expect(analysePhone("0861 123 456", "ZA").lineType).toBe("unknown");
+  });
+
+  it("renders every new pack's reporting label without a double parenthetical", () => {
+    // JP's reportingBody ended in "(188)", and reportingFor appends "(host)"
+    // when the host is not already named — rendering "…hotline (188)
+    // (caa.go.jp)" in verdict steps and the report footer.
+    for (const code of ["DE", "ZA", "IN", "JP", "BR"]) {
+      const label = reportingFor(code).label;
+      expect({ code, doubleParen: /\)\s*\(/.test(label) }).toEqual({ code, doubleParen: false });
+    }
+  });
+
+  it("keeps the Indian cyber-fraud helpline in the emergency list", () => {
+    // The comment above this list once enumerated 112 and omitted 1930, which
+    // invited deleting a live entry. 1930 must never score as suspicious.
+    expect(resolveRegionPack("IN").phonePlan.emergencyNumbers).toContain("1930");
+    expect(analysePhone("1930", "IN").lineType).toBe("emergency");
   });
 });
 

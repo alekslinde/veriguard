@@ -9,6 +9,11 @@ import { NZ } from "@veriguard/engine/regions/nz";
 import { CA } from "@veriguard/engine/regions/ca";
 import { IE } from "@veriguard/engine/regions/ie";
 import { SG } from "@veriguard/engine/regions/sg";
+import { DE } from "@veriguard/engine/regions/de";
+import { ZA } from "@veriguard/engine/regions/za";
+import { IN } from "@veriguard/engine/regions/in";
+import { JP } from "@veriguard/engine/regions/jp";
+import { BR } from "@veriguard/engine/regions/br";
 import { REST_OF_WORLD } from "@veriguard/engine/regions/rest-of-world";
 import { findKeyboardTypo } from "@veriguard/engine/keyboardAdjacency";
 import type { RegionCode, RegionDefinition } from "@veriguard/engine/regions/types";
@@ -20,8 +25,22 @@ import type { RegionCode, RegionDefinition } from "@veriguard/engine/regions/typ
  * the resolved pack (where the two layers are already unioned).
  */
 const REGION_DEFINITIONS: Record<RegionCode, RegionDefinition> = {
-  AU, GB, US, NZ, CA, IE, SG, ZZ: REST_OF_WORLD,
+  AU, GB, US, NZ, CA, IE, SG, DE, ZA, IN, JP, BR, ZZ: REST_OF_WORLD,
 };
+
+/**
+ * Every suffix any pack claims in `brandSuffixes`, as a set.
+ *
+ * Fixtures below need namespaces NO pack claims, and hand-picking them expires
+ * the moment a pack ships on that country — which is exactly what happened:
+ * `paypal.gov.br` and `amazon.ac.jp` were chosen because nothing claimed
+ * `gov.br` or `ac.jp`, and both stopped testing the rule the day the BR and JP
+ * packs shipped. Derived here so a stale fixture fails as a *fixture* problem
+ * with a named cause, rather than reading as a detection regression.
+ */
+const CLAIMED_BRAND_SUFFIXES = new Set(
+  supportedRegions().flatMap((code) => resolveRegionPack(code).brandSuffixes),
+);
 
 describe("resolveRegionPack", () => {
   it("resolves a known region", () => {
@@ -337,14 +356,31 @@ describe("pack invariants (every region)", () => {
       // one, and it only looked right because a separate bug was suppressing
       // the pack union for these brands.
       //
-      // `gov.br` and `ac.jp` carry the same shape with no pack claiming them,
-      // so the exemption has to be withheld by the rule itself.
-      "paypal.gov.br", "amazon.ac.jp", "netflix.edu.pl",
+      // These carry the same shape with no pack claiming them, so the
+      // exemption has to be withheld by the rule itself. Asserted unclaimed
+      // below rather than assumed — see CLAIMED_BRAND_SUFFIXES.
+      "paypal.gov.gr", "amazon.ac.kr", "netflix.edu.pl",
     ];
     for (const host of hosts) {
       const flags = checkUrl(`http://${host}/login`, undefined, code).flags.join(" | ").toLowerCase();
       expect({ code, host, impersonating: flags.includes("impersonates") })
         .toEqual({ code, host, impersonating: true });
+    }
+  });
+
+  it("uses non-commercial fixtures no pack has since claimed", () => {
+    // The guard on the fixtures above, not on the engine. A pack shipping on
+    // one of these countries hands the ownership exemption to its own national
+    // namespace legitimately — every shipped pack lists its own `gov.*` — so
+    // the fixture silently stops reaching the second-level rule and the failure
+    // reads as a detection regression instead of a stale test.
+    //
+    // Written as its own case so the diagnosis arrives with the failure: if
+    // this goes red, re-point the fixture at an unclaimed country rather than
+    // changing the rule.
+    for (const suffix of ["gov.gr", "ac.kr", "edu.pl"]) {
+      expect({ suffix, claimed: CLAIMED_BRAND_SUFFIXES.has(suffix) })
+        .toEqual({ suffix, claimed: false });
     }
   });
 

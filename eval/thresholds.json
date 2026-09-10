@@ -18,7 +18,12 @@
     "NZ": { "recall": null, "fpr": null, "coverage": null },
     "IE": { "recall": null, "fpr": null, "coverage": null },
     "CA": { "recall": null, "fpr": null, "coverage": null },
-    "SG": { "recall": null, "fpr": null, "coverage": null }
+    "SG": { "recall": null, "fpr": null, "coverage": null },
+    "DE": { "recall": null, "fpr": null, "coverage": null },
+    "ZA": { "recall": null, "fpr": null, "coverage": null },
+    "IN": { "recall": null, "fpr": null, "coverage": null },
+    "JP": { "recall": null, "fpr": null, "coverage": null },
+    "BR": { "recall": null, "fpr": null, "coverage": null }
   },
   "category": {},
   "type": {}

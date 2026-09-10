@@ -29,12 +29,21 @@ describe("resolveRegion", () => {
     // Applying AU agency and brand rules to a German user would be useless and
     // would wrongly claim full coverage.
     //
-    // "US" used to be the second fixture here and now has its own pack, which is
-    // the point of the change rather than a regression — so these are countries
-    // we still have no national layer for. They must be swapped out again as
-    // packs are added, which is the intended maintenance signal.
-    expect(resolveRegion(geo("DE"))).toBe(FALLBACK_REGION);
-    expect(resolveRegion(geo("JP"))).toBe(FALLBACK_REGION);
+    // "US", then "DE" and "JP", each used to be a fixture here and each now has
+    // its own pack — which is the point of the change rather than a regression.
+    // Hand-picked placeholders expire every time a pack ships, so the fixtures
+    // are DERIVED: any ISO code with no pack must resolve to the fallback, and
+    // the candidates are filtered against supportedRegions() rather than
+    // guessed at. Same lesson as the hand-kept COVERED set in
+    // scripts/region-demand.ts — derive the set from the thing it describes.
+    const covered = new Set(supportedRegions());
+    const uncovered = ["FR", "IT", "MX", "KR", "PL", "TR"].filter((c) => !covered.has(c as never));
+    // If this ever empties, the filter has silently stopped testing anything.
+    expect(uncovered.length).toBeGreaterThan(0);
+    for (const code of uncovered) {
+      expect({ code, resolved: resolveRegion(geo(code)) })
+        .toEqual({ code, resolved: FALLBACK_REGION });
+    }
   });
 
   // GB is the first geo-resolvable region besides AU, so these assert that
