@@ -8,6 +8,7 @@ vi.mock("@/lib/db", () => ({
 import {
   checkAndRecordRateLimit,
   isRecentDuplicate,
+  __resetSeenContentForTests,
   generateReportId,
   storeReport,
   incrementCheckCount,
@@ -99,6 +100,51 @@ describe("isRecentDuplicate", () => {
     const base = "x".repeat(200);
     isRecentDuplicate("custom", base + "ignored-suffix");
     expect(isRecentDuplicate("custom", base + "different-suffix")).toBe(true);
+  });
+
+  // Regression: eviction used to be count-based (a 5000-entry FIFO array), so
+  // flooding unique submissions retired an earlier one and let the attacker
+  // resubmit the same payload as brand new. Volume is attacker-controlled;
+  // expiry must depend on elapsed time instead.
+  it("does not forget a submission just because other traffic arrived", () => {
+    __resetSeenContentForTests();
+    const payload = "evictable-payload-content";
+    expect(isRecentDuplicate("sms", payload)).toBe(false);
+
+    // Far more distinct entries than the old MAX_SEEN of 5000.
+    for (let i = 0; i < 6000; i++) isRecentDuplicate("sms", `flood-${i}`);
+
+    expect(isRecentDuplicate("sms", payload)).toBe(true);
+  });
+
+  it("forgets a submission once the TTL has elapsed", () => {
+    __resetSeenContentForTests();
+    vi.useFakeTimers();
+    try {
+      const payload = "ttl-expiry-content";
+      expect(isRecentDuplicate("url", payload)).toBe(false);
+      expect(isRecentDuplicate("url", payload)).toBe(true);
+
+      // Just past the 10-minute dedupe window.
+      vi.advanceTimersByTime(10 * 60 * 1000 + 1);
+      expect(isRecentDuplicate("url", payload)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps a submission deduped for the whole TTL window", () => {
+    __resetSeenContentForTests();
+    vi.useFakeTimers();
+    try {
+      const payload = "ttl-hold-content";
+      expect(isRecentDuplicate("email", payload)).toBe(false);
+      // Still inside the window.
+      vi.advanceTimersByTime(9 * 60 * 1000);
+      expect(isRecentDuplicate("email", payload)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
