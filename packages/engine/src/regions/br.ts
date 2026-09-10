@@ -145,15 +145,34 @@ export const BR: RegionDefinition = {
     // pattern outright. Verified by printing real values, per the roadmap's
     // "print one real value before writing the code that depends on its shape".
     //
-    // 0300 is shared-cost rather than premium, so it is NOT listed as premium:
-    // Brazil allocates no consumer premium-rate range comparable to DE's 0900,
-    // so premiumPrefixes and premiumFlag are omitted rather than filled with a
-    // speculative entry.
+    // 0300 is shared-cost rather than premium, so it is NOT listed as premium.
+    //
+    // Brazil DOES allocate consumer premium-rate ranges, and an earlier cut of
+    // this pack asserted the opposite. libphonenumber classifies both 0500 and
+    // 0900 as PREMIUM_RATE, so the ranges were already reaching `analysePhone`'s
+    // PREMIUM_RATE branch and bumping spoofing risk to `very_high` — with no
+    // note attached, because that branch only pushes copy `if (plan.premiumFlag)`.
+    // The reader still saw the generic premium warning `checkPhone` adds, so the
+    // score was right and only the localised copy was missing; the claim in the
+    // comment was the actual defect.
+    //
+    // 0500 is the donation/charity-appeal range and 0900 the general premium
+    // range. Both bill the caller, both are dialled by consumers, and both are
+    // therefore named in the copy below.
+    //
+    // The check that would have caught this is the one the wave already
+    // recorded: parse the range, do not read the numbering plan.
     //
     // 190 (police), 192 (ambulance), 193 (fire) and 180 (women's helpline) are
     // Brazil's own emergency numbers and are NOT in the universal
     // EMERGENCY_NUMBERS set. Matched by exact equality, so whole numbers only.
     emergencyNumbers: ["190", "192", "193", "180", "181"],
+    // Premium ranges, in the "0" + nationalNumber form the prefix rule sees —
+    // see the trunk-0 note above. Verified by parsing, not by reading: both
+    // return PREMIUM_RATE from libphonenumber.
+    premiumPrefixes: ["0500", "0900"],
+    premiumFlag:
+      "Premium rate number — Brazilian 0500 and 0900 numbers bill the caller at elevated rates, and a message pushing you to call one is charging you for the privilege",
     // Brazil's toll-free range is 0800. libphonenumber classifies the line
     // type, so this copy only has to name the right national range.
     tollFreeFlag:

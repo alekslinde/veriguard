@@ -359,11 +359,13 @@ export const CA: RegionDefinition = {
   reportingUrl: "https://antifraudcentre-centreantifraude.ca",
 
   phonePlan: {
-    // NANP premium-rate, shared with the US: 900 is the premium range and 976
-    // the legacy premium exchange.
-    premiumPrefixes: ["1900", "900", "1976", "976"],
+    // NANP premium-rate, shared with the US: 900 is the premium range. See the
+    // long note in us.ts — the previous entries were in a form the prefix rule
+    // never matches, and 976 is dropped because libphonenumber rejects those
+    // numbers as invalid, so the range could never reach a reader.
+    premiumPrefixes: ["0900"],
     premiumFlag:
-      "Premium rate number — 900 and 976 numbers bill the caller at a premium rate, and a message pushing you to call one is charging you for the privilege",
+      "Premium rate number — 900 numbers bill the caller at a premium rate, and a message pushing you to call one is charging you for the privilege",
     // 911 is already in the universal EMERGENCY_NUMBERS set in phoneIntel; 988
     // (Suicide Crisis Helpline) and 211/311 (social services and municipal
     // non-emergency) are Canadian additions, matching the US numbering.
