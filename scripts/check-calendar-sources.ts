@@ -38,6 +38,8 @@ interface SourceRef {
   label: string;
   /** "AU/tax-time, GB/self-assessment" — where the URL is cited, for the report. */
   cited: string[];
+  /** Mirrors SeasonSource.expect — see lib/scamCalendar.ts. */
+  expect?: "blocked";
 }
 
 /** Every source URL cited anywhere in the calendar, deduped, with its call sites. */
@@ -48,6 +50,10 @@ function collectSources(): SourceRef[] {
       for (const source of season.sources) {
         const ref = byUrl.get(source.url) ?? { url: source.url, label: source.label, cited: [] };
         ref.cited.push(`${code}/${season.id}`);
+        // A URL is deduped across seasons, so one citation declaring it blocked
+        // declares it for all of them — the flag is about the HOST's behaviour,
+        // not about any one season's use of it.
+        if (source.expect) ref.expect = source.expect;
         byUrl.set(source.url, ref);
       }
     }
@@ -143,11 +149,27 @@ async function checkOne(ref: SourceRef): Promise<Result> {
         else if (browser === "moved") {
           result.state = "REDIRECTED";
           result.finalUrl = undefined;
+        } else if (ref.expect === "blocked") {
+          // Declared unverifiable-from-CI by a human who checked in a browser.
+          // Without this a site whose WAF refuses every agent is indistinguishable
+          // from a dead one, and the weekly run reports the same false rot forever
+          // until people stop reading it. Same flag as the threat-intel registry.
+          result.state = "BLOCKED";
+          result.error = `HTTP ${res.status} to any agent (expected: edge bot-protection)`;
         } else {
           result.state = "DEAD";
           result.error = `HTTP ${res.status} to any agent`;
         }
-      } else if (res.status >= 500) result.state = "SERVER_ERROR";
+      } else if (res.status >= 500) {
+        // A WAF that answers 5xx rather than 403 must honour the flag too, or
+        // it is a no-op on this path and the citation reports SERVER_ERROR —
+        // a PROBLEM state — every run. Cloudflare's edge codes (520-527) are
+        // the common shape. Same reasoning as the 403 branch above.
+        if (ref.expect === "blocked") {
+          result.state = "BLOCKED";
+          result.error = `HTTP ${res.status} (expected: edge bot-protection)`;
+        } else result.state = "SERVER_ERROR";
+      }
       else if (!res.ok) result.state = "DEAD";
       else if (landedElsewhere(ref.url, res.url)) result.state = "REDIRECTED";
       else result.state = "OK";
@@ -155,6 +177,16 @@ async function checkOne(ref: SourceRef): Promise<Result> {
       return result;
     } catch (err) {
       if (attempt === RETRIES) {
+        // A WAF that blackholes the connection hangs instead of answering, so
+        // the flag has to be honoured here as well — otherwise it does nothing
+        // on the very failure mode it exists for, and the weekly run exits 1.
+        // Action Fraud returns 403 today, which the branch above covers; that
+        // is one edge-config change away from becoming this path.
+        if (ref.expect === "blocked") {
+          result.state = "BLOCKED";
+          result.error = "no response to automated agents (expected: edge bot-protection)";
+          return result;
+        }
         const browser = await probeWithBrowserUa(ref.url);
         if (browser === "alive") {
           result.state = "BLOCKED";

@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   calendarForRegion,
   isActiveOn,
@@ -797,6 +799,63 @@ describe("labelPlacement", () => {
           expect(overlaps).toBe(false);
         }
       }
+    }
+  });
+});
+
+describe("expect: blocked citations", () => {
+  // The flag stops the weekly check reporting a bot-blocked host as rot. It
+  // WEAKENS a check, so it is worth asserting it stays rare and deliberate —
+  // an unchecked citation is the failure the calendar's provenance rule exists
+  // to prevent, and this flag is the one way to create one on purpose.
+  const flagged = authoredCalendarRegions()
+    .flatMap((code) => calendarForRegion(code).flatMap((s) => s.sources))
+    .filter((s) => s.expect);
+
+  it("only ever uses the one documented value", () => {
+    // A typo ("Blocked", "block") would be silently ignored by the checker and
+    // the citation would go back to reporting as dead, which is the confusing
+    // failure rather than a loud one.
+    for (const s of flagged) {
+      expect({ label: s.label, expect: s.expect }).toEqual({ label: s.label, expect: "blocked" });
+    }
+  });
+
+  it("stays a small minority of citations", () => {
+    // No principled threshold — this is a smell test. Each flag is a source CI
+    // has stopped genuinely checking, so if these ever outnumber the checked
+    // ones the weekly run has become decorative and the approach needs
+    // rethinking, not a bigger allowance.
+    const all = authoredCalendarRegions().flatMap((code) =>
+      calendarForRegion(code).flatMap((s) => s.sources),
+    );
+    const unique = new Set(all.map((s) => s.url));
+    const uniqueFlagged = new Set(flagged.map((s) => s.url));
+    expect(uniqueFlagged.size).toBeLessThan(unique.size / 4);
+  });
+
+  it("carries a comment explaining the verification", () => {
+    // The flag asserts a human opened the page in a browser. That claim needs
+    // to be written down next to it, or the next reader cannot tell a verified
+    // block from a silenced failure.
+    const src = readFileSync(resolve(__dirname, "../lib/scamCalendar.ts"), "utf8");
+    for (const s of flagged) {
+      const line = src.split("\n").findIndex((l) => l.includes(s.url) && l.includes("expect:"));
+      expect({ url: s.url, documented: line > 0 }).toEqual({ url: s.url, documented: true });
+      // A CONTIGUOUS comment block must sit directly above the entry, and it
+      // must say something about the blocking — any nearby `//` is not a
+      // justification, which an earlier version of this test accepted.
+      const lines = src.split("\n");
+      const block: string[] = [];
+      for (let i = line - 1; i >= 0 && lines[i].trim().startsWith("//"); i--) {
+        block.unshift(lines[i]);
+      }
+      const prose = block.join(" ").toLowerCase();
+      expect({ url: s.url, hasBlock: block.length > 0 }).toEqual({ url: s.url, hasBlock: true });
+      expect({
+        url: s.url,
+        justified: /block|403|bot|waf|browser/.test(prose),
+      }).toEqual({ url: s.url, justified: true });
     }
   });
 });
