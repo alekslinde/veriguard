@@ -129,8 +129,8 @@ are scammers doing that we don't detect?"* and answers it from sourced
 advisories. A probe asks *"can our existing rules be evaded?"* and answers it by
 attacking them.
 
-**Probe write-ups are kept outside this repository**, alongside the working
-roadmap, and are not part of this archive. The sweeps here are *provenance for
+**Probe write-ups are kept privately and are not part of this archive.** Their
+location is deliberately not recorded. The sweeps here are *provenance for
 shipped rules* — public evidence for why `.bond` scores +30 — and that is why
 they are published. A probe is the opposite artifact: a worked list of inputs
 that evade the detector, with the score before and after each one. Publishing

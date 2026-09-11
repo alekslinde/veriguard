@@ -63,9 +63,9 @@ our records before we ship`, the one that decided the gated design.
 ## Why this sweep is off-cycle
 
 It was triggered by a **residual gap left by a probe**, not by the calendar. The
-share-path probe of the same date (kept outside this repo — see *Adversarial
-probes* in the README) fixed a class of bare-host false positive, and in doing
-so removed a URL card that had been quietly compensating for a message-scoring
+share-path probe of the same date (not archived here — see *Adversarial probes*
+in the README) fixed a class of bare-host false positive, and in doing so
+removed a URL card that had been quietly compensating for a message-scoring
 weakness:
 
 > `Pay at shop.top now` scored 0/safe once the phantom URL card went away.

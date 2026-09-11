@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { execSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -11,19 +12,19 @@ import { resolve } from "node:path";
 // inputs that EVADE the detector, each with the score before and after, plus a
 // watchlist of weaknesses not yet fixed. That is a map for an evader, and it
 // buys none of the traceability the sweeps provide: no shipped rule cites a
-// probe as its evidence. Probe logs live outside the repo, alongside the
-// working roadmap — see "Where writing goes" in CLAUDE.md.
+// probe as its evidence. Such notes are kept privately and are not part of this
+// repository — see "Where writing goes" in CLAUDE.md.
 //
-// Six were moved out on 2026-09-11 after living here for one to two days. They
-// got here because the directory already contained some and nothing said not
-// to, which is exactly the kind of drift a convention enforced only by prose
-// invites. Hence this test.
+// This is enforced rather than documented because the failure mode is drift: a
+// directory that already contains something acts as precedent for adding more
+// of it, and a convention kept only in prose does not survive that.
 //
 // This is NOT a change of stance on open source: the detection logic stays
 // open, because obscuring keyword lists would not stop a sophisticated
 // scammer. A ranked list of *working evasions* is a different thing.
 
-const DIR = resolve(__dirname, "../docs/threat-intel");
+const ROOT = resolve(__dirname, "..");
+const DIR = resolve(ROOT, "docs/threat-intel");
 
 describe("docs/threat-intel holds public sweeps only", () => {
   const entries = readdirSync(DIR).filter((f) => f.endsWith(".md"));
@@ -50,6 +51,34 @@ describe("docs/threat-intel holds public sweeps only", () => {
       (f) => f !== "README.md" && !/^\d{4}-\d{2}-\d{2}-threat-roadmap\.md$/.test(f),
     );
     expect(offenders).toEqual([]);
+  });
+
+  it("points nowhere outside the repo", () => {
+    // A pointer to a private file is a pointer whether or not the file is
+    // reachable: naming the directory, the filename or the machine path tells
+    // a reader where the working notes live, which is the half worth keeping
+    // quiet. Checked across the whole repo's tracked text, not just this
+    // directory, because the leak is easiest to commit in a comment or a test.
+    // This file is excluded because it necessarily contains the patterns it
+    // searches for. That is the one legitimate exception; if a second file
+    // ever needs adding here, that is a reason to look hard at why.
+    const SELF = "__tests__/docsArePublic.test.ts";
+    const tracked = execSync("git ls-files -z", { cwd: ROOT, encoding: "utf8" })
+      .split("\0")
+      .filter((f) => f !== SELF && /\.(md|ts|tsx|yml|yaml|json)$/.test(f));
+
+    const leaks: string[] = [];
+    for (const file of tracked) {
+      const text = readFileSync(resolve(ROOT, file), "utf8");
+      text.split("\n").forEach((line, i) => {
+        // The private notes' own naming, and any absolute path into a home
+        // directory. Both are things only a private location would need.
+        if (/veriguard-probes|veriguard-roadmap|\/Users\/[a-z]+\/Desktop/i.test(line)) {
+          leaks.push(`${file}:${i + 1}`);
+        }
+      });
+    }
+    expect(leaks).toEqual([]);
   });
 
   it("carries no working-notes marker", () => {

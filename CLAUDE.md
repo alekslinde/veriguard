@@ -47,8 +47,8 @@ __tests__/      ← Vitest tests (engine + lib)
 scripts/        ← seed-db.ts, generate-icons.mjs
 workers/        ← inbound-email worker
 docs/           ← threat-intel/ — PUBLIC sweep research only, one file per
-                  sweep as `YYYY-MM-DD-threat-roadmap.md`. Probe logs and
-                  working notes live OUTSIDE the repo — see *Where writing goes*
+                  sweep as `YYYY-MM-DD-threat-roadmap.md`. Nothing else goes
+                  here — see *Where writing goes*
 ```
 
 **Import detection from the package, not `lib/`:**
@@ -114,38 +114,44 @@ Use these scopes in commit messages:
 
 ## Where writing goes
 
-**This repo is public.** Before creating any `.md` file, decide which of these
-it is. When it is not clearly the first, it goes outside the repo.
+**This repo is public.** Before creating any `.md` file, ask what it would tell
+a reader who is not on your side.
 
-**In the repo — `docs/threat-intel/*-threat-roadmap.md`**
+**Belongs here — `docs/threat-intel/YYYY-MM-DD-threat-roadmap.md`**
 Sweeps: outward-looking research citing public sources, kept as **provenance for
 shipped rules**. This is why `.bond` scores +30 and `"quantum ai"` +50. Being
 able to show the working is the point, so these are published deliberately.
 Two tests resolve these by name (`threatRadar.test.ts`, `sweepCoverage.test.ts`),
-so the filename pattern is load-bearing.
+and `docsArePublic.test.ts` enforces the rest of this section — so the naming is
+load-bearing, not cosmetic.
 
-**Outside the repo — `~/Desktop/Projects/roadmaps/`**
-- `veriguard-roadmap.md` — the working plan
-- `veriguard-probes/` — adversarial probe logs
+**Does not belong in this repo — anywhere**
+Anything that maps where the detector is *weak*: adversarial probe write-ups,
+worked evasions with before/after scores, watchlists of unfixed gaps, security
+working notes. These buy none of the traceability the sweeps provide — no
+shipped rule cites one as its evidence — and a reproducible list of working
+evasions is exactly what an evader would want.
 
-A **probe** is a worked list of inputs that *evade* the detector, each with the
-score before and after, plus a watchlist of gaps not yet fixed. That is a map
-for an evader, and it buys none of the traceability the sweeps provide — no
-shipped rule cites a probe as its evidence. Same for anything else that reads as
-"here is where we are weak".
+Such notes are kept privately, outside any repository. **Do not name their
+location, filenames, or directory** — not in code, comments, tests, commit
+messages, PR titles or descriptions, and not here. A pointer to a private file
+is a pointer whether or not the file is reachable, and a public repo that
+announces where the working notes live has given away the useful half. If you
+need to know where they are, ask.
+
+**Reference a finding by its content, never by its source.** State it inline and
+self-contained:
+
+```ts
+// Probed 2026-08-29 (share path): 9 of 11 innocent phrasings raised a scam card.
+```
+
+That survives on its own, tells a future reader what they need, and points
+nowhere.
 
 **This is not a change of stance on open source.** Detection logic stays open
 (see *Notes*) — obscuring keyword lists wouldn't stop a sophisticated scammer.
 A ranked list of *working evasions* is a different artifact from the rules.
-
-**Never reference the roadmap or a probe log** in commit messages, PR titles, PR
-descriptions or code comments. A finding goes into those in its own words. If a
-test or comment needs the context, state the finding inline —
-`// Probed 2026-08-29 (share path, P4/P5): 9 of 11 innocent phrasings flagged` —
-rather than linking a file that isn't there.
-
-> Six probe logs were moved out on 2026-09-11 (`acf90ff`). If `docs/threat-intel/`
-> appears to contain a probe, it is a mistake to fix, not a precedent to follow.
 
 ---
 
