@@ -440,13 +440,31 @@ export const US: RegionDefinition = {
   reportingUrl: "https://reportfraud.ftc.gov",
 
   phonePlan: {
-    // NANP premium-rate: 900 is the classic premium range, and 976 is the
-    // legacy premium exchange still in use in some NPAs. Both are billed at a
-    // premium regardless of the area code they sit behind, so they're matched on
-    // the national (1-stripped) form.
-    premiumPrefixes: ["1900", "900", "1976", "976"],
+    // NANP premium-rate. 900 is the classic premium range, and the ONLY one
+    // that reaches a reader — which is why the copy names it alone.
+    //
+    // The prefixes are authored in the "0" + nationalNumber form the rule
+    // actually compares against (see `national` in analysePhone), NOT the
+    // "1-stripped" form an earlier comment here claimed. All four previous
+    // entries — "1900", "900", "1976", "976" — were dead: the national form of
+    // a 900 number is "09005551212", which none of them prefixes. 900 still
+    // scored, but only because libphonenumber classifies it PREMIUM_RATE
+    // independently and that branch pushes the same `premiumFlag`.
+    //
+    // That is why breaking these prefixes was measured as changing nothing
+    // observable: they were never firing. The trunk-0 form is what SG's
+    // comment describes, and it applies here too.
+    //
+    // 976 is DELIBERATELY ABSENT rather than reauthored. libphonenumber rejects
+    // +1 976 numbers as invalid — the legacy premium exchange was withdrawn from
+    // the NANP — so no 976 number reaches the PREMIUM_RATE branch, and the
+    // prefix rule cannot rescue it either: `isDomesticFormat` holds, but a
+    // reader who types one gets "doesn't match any known format" and there is
+    // no range left to warn about. Naming it in the copy described a flag that
+    // could never be shown, which is the ZA 0861 / JP 0570 shape.
+    premiumPrefixes: ["0900"],
     premiumFlag:
-      "Premium rate number — 900 and 976 numbers bill the caller at a premium rate, and a message pushing you to call one is charging you for the privilege",
+      "Premium rate number — 900 numbers bill the caller at a premium rate, and a message pushing you to call one is charging you for the privilege",
     // 911 is already in the universal EMERGENCY_NUMBERS set in phoneIntel; 988
     // (Suicide & Crisis Lifeline) and 211/311 (social services and municipal
     // non-emergency) are US-specific additions.

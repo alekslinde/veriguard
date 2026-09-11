@@ -46,6 +46,9 @@ messages/       ← i18n string bundles (en.normal.json)
 __tests__/      ← Vitest tests (engine + lib)
 scripts/        ← seed-db.ts, generate-icons.mjs
 workers/        ← inbound-email worker
+docs/           ← threat-intel/ — PUBLIC sweep research only, one file per
+                  sweep as `YYYY-MM-DD-threat-roadmap.md`. Nothing else goes
+                  here — see *Where writing goes*
 ```
 
 **Import detection from the package, not `lib/`:**
@@ -104,18 +107,63 @@ Use these scopes in commit messages:
 - Don't weaken PII scrubbing or the submission guard (honeypot, rate limit,
   timing, dedupe) without explicit sign-off — they're abuse defences
 - Don't commit `local.db` or `.env.local`
+- **`docs/` takes dated sweep research and nothing else** — see *Where writing
+  goes*, below
+
+---
+
+## Where writing goes
+
+**This repo is public. Write for that audience.**
+
+`docs/` holds exactly one thing: `threat-intel/YYYY-MM-DD-threat-roadmap.md`,
+the dated sweep research. Sweeps are outward-looking, cite public sources, and
+exist as **provenance for shipped rules** — why `.bond` scores +30, why
+`"quantum ai"` scores +50. Showing that working is the point.
+
+**Nothing else belongs in `docs/`.** Not notes, not analysis, not findings —
+if it is not a dated sweep, it does not go there. Other documentation has its
+place (this file, `README.md`, `AGENTS.md`); when something fits none of them,
+ask rather than inventing a home for it.
+
+The naming is load-bearing: `threatRadar.test.ts` and `sweepCoverage.test.ts`
+resolve sweeps by filename, and `docsArePublic.test.ts` enforces this section.
+
+**Keep commit messages, PR titles and descriptions, code comments and tests
+self-contained.** Cite public sources freely; reference anything not in this
+repo by its content, never by its name or location:
+
+```ts
+// Probed 2026-08-29 (share path): 9 of 11 innocent phrasings raised a scam card.
+```
+
+That tells a future reader what they need and points nowhere.
+
+**None of this narrows what is open.** Detection logic stays open source (see
+*Notes*) — obscuring keyword lists wouldn't stop a sophisticated scammer.
 
 ---
 
 ## Commands to Know
 
 ```bash
-npm run dev      ← Start dev server (http://localhost:3000)
-npm test         ← Run Vitest tests (run before committing)
-npm run lint     ← ESLint (Next 16.3 + strict react-hooks rules)
-npm run seed     ← Seed the database
-npm run build    ← Production build
+npm run dev           ← Start dev server (http://localhost:3000)
+npm test              ← Run Vitest tests (run before committing)
+npm run lint          ← ESLint (Next 16.3 + strict react-hooks rules)
+npm run seed          ← Seed the database
+npm run build         ← Production build
+npm run check-readme  ← Which READMEs are behind the code they document
+npm run check-sources ← Threat-intel source registry (--validate | --stale)
+npm run check-calendar ← Scam-calendar citation reachability
 ```
+
+**READMEs carry a `*Last reviewed: YYYY-MM-DD.*` marker.** They make
+present-tense claims — paths, scripts, schedules, counts — that nothing fails
+when they rot. `check-readme` compares each marker against the last commit
+touching the directory that README documents, so it speaks up only when
+something could actually have drifted. Re-read, fix what moved, then update the
+marker — on checking, not on editing nearby. A new README needs a row in
+`scripts/check-readme-freshness.ts`; a test enforces that.
 
 ---
 

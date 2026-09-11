@@ -44,6 +44,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # --stale dates the registry from its last commit; a shallow clone
+          # would report the checkout date and never flag anything.
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -54,6 +58,24 @@ jobs:
       - name: Validate registry
         if: github.event_name == 'pull_request'
         run: node scripts/check-sources.mjs --validate
+
+      # The `updated:` header is printed in every report, so a PR that changes
+      # the registry and forgets the date ships a false freshness claim. Warns
+      # rather than blocks: the date is a judgement about whether the CONTENT
+      # changed, and a comment reflow legitimately leaves it alone.
+      - name: Check registry header freshness
+        if: github.event_name == 'pull_request'
+        run: |
+          set +e
+          node scripts/check-sources.mjs --stale
+          code=$?
+          set -e
+          if [ "$code" -eq 1 ]; then
+            echo "::warning::sources.yml changed but the updated: header was not — set it if the registry content changed."
+          elif [ "$code" -gt 1 ]; then
+            echo "::error::check-sources --stale failed (exit $code)."
+            exit "$code"
+          fi
 
       # Exit 1 (a source rotted) is a maintenance signal, not a broken build, so
       # it passes. Exit 2 means the job itself failed — invalid registry, or the

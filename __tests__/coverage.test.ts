@@ -492,11 +492,48 @@ describe("minimal pack phone plans (2026-09 wave)", () => {
     expect(analysePhone("+55 11 91234 5678", "BR").lineType).toBe("mobile");
   });
 
-  it("claims no Brazilian premium range", () => {
-    // ANATEL allocates no consumer premium level comparable to DE's 0900.
+  it("names Brazil's 0500 and 0900 premium ranges", () => {
+    // This test previously asserted the OPPOSITE — that ANATEL allocates no
+    // consumer premium level — and so pinned a false claim as verified. Brazil
+    // has two: libphonenumber returns PREMIUM_RATE for both 0500 (donation and
+    // charity-appeal lines) and 0900 (general premium).
+    //
+    // The defect was never in the score. `analysePhone`'s PREMIUM_RATE branch
+    // bumps spoofing risk to `very_high` from the line type alone, and
+    // `checkPhone` adds its own generic premium flag, so a 0500 number already
+    // scored 95/likely_scam. What was missing was the LOCALISED note: that
+    // branch pushes pack copy only `if (plan.premiumFlag)`, and the flag was
+    // omitted on the strength of the wrong claim. A Brazilian reader got
+    // generic copy where every other pack names their actual ranges.
+    //
+    // Found by parsing each range rather than reading the numbering plan —
+    // which is the check this wave already established, applied to the one
+    // pack that had asserted a negative instead of a positive.
     const plan = resolveRegionPack("BR").phonePlan;
-    expect(plan.premiumPrefixes).toBeUndefined();
-    expect(plan.premiumFlag).toBeUndefined();
+    expect(plan.premiumPrefixes).toEqual(["0500", "0900"]);
+    expect(plan.premiumFlag).toBeDefined();
+
+    for (const n of ["0500 123 456", "0900 123 456"]) {
+      const r = analysePhone(n, "BR");
+      expect({ n, type: r.lineType }).toEqual({ n, type: "premium" });
+      expect({ n, risk: r.spoofingRisk }).toEqual({ n, risk: "very_high" });
+      // The note the missing flag was suppressing.
+      expect(r.spoofingNotes.join(" ")).toContain("Brazilian");
+    }
+
+    // Each authored range is named in the copy, so the flag cannot drift from
+    // the list it explains — the JP "(188)" and ZA 0861 shape.
+    for (const prefix of plan.premiumPrefixes!) {
+      expect(plan.premiumFlag).toContain(prefix.replace(/^0/, ""));
+    }
+  });
+
+  it("keeps Brazil's 0300 shared-cost range out of the premium list", () => {
+    // 0300 bills the caller but is SHARED_COST, not PREMIUM_RATE. Listing it as
+    // premium would double-score it and misstate the rate in the copy.
+    const plan = resolveRegionPack("BR").phonePlan;
+    expect(plan.premiumPrefixes).not.toContain("0300");
+    expect(analysePhone("0300 123 4567", "BR").lineType).toBe("shared_cost");
   });
 });
 
@@ -683,5 +720,118 @@ describe("minimal packs make no claims they have not verified", () => {
     const pack = resolveRegionPack(code);
     expect(pack.reportingBody).not.toBe("");
     expect(pack.authorityMentions.length).toBeGreaterThan(0);
+  });
+});
+
+// Generalised from the BR 0500 finding, which was the third instance of one
+// shape: a pack asserting a NEGATIVE about its numbering plan — "this country
+// has no premium range" — where the assertion was made by reading the plan
+// rather than by parsing a number in it.
+//
+// The two earlier instances went the other way (copy naming a range that
+// libphonenumber classifies as UAN, so the flag was unreachable: ZA 0861,
+// JP 0570). Both directions are the same defect, and the same check catches
+// them: parse a number in the range and compare what comes back against what
+// the pack claims.
+//
+// Asserted over EVERY pack rather than the wave-1 five. The wave surfaced it,
+// but nothing about it is specific to `minimal` — a `full` pack omitting
+// `premiumFlag` suppresses exactly the same localised copy.
+describe("phone plans match what the parser actually returns", () => {
+  const WITH_PLANS = supportedRegions().filter(
+    (code) => Object.keys(resolveRegionPack(code).phonePlan).length > 0,
+  );
+
+  it("has at least one pack with a phone plan", () => {
+    expect(WITH_PLANS.length).toBeGreaterThan(0);
+  });
+
+  it.each(WITH_PLANS)("%s: every authored premium prefix reaches the reader", (code) => {
+    // The positive direction: a number in each authored range must come back
+    // premium AND carry the pack's own copy.
+    //
+    // Asserted on the OUTCOME rather than on libphonenumber's type, because the
+    // two deliberately disagree. `premiumPrefixes` exists precisely for ranges
+    // the library rejects — AU 190x and SG 1900 both parse as invalid, which is
+    // why the field is "deliberately ours rather than the library's" (see
+    // PhonePlan). Testing the library's classification would assert the
+    // opposite of what the field is for.
+    //
+    // Numbers are built by padding each prefix to every plausible national
+    // length and the range passes if ANY of them reaches premium. The sweep has
+    // to be wide in both directions: several prefixes are variable-length stems
+    // (GB "09", IE "15"), and national lengths differ by five digits across
+    // these packs. A single padded length reports the padding, not the range.
+    const plan = resolveRegionPack(code).phonePlan;
+    for (const prefix of plan.premiumPrefixes ?? []) {
+      // A prefix is authored in the INTERNAL "0" + nationalNumber form the rule
+      // compares against — it is not what a user types. Probe both the authored
+      // form and the trunk-stripped one, because which of the two a real reader
+      // enters differs by country: an AU 190x number is typed with its 0, a
+      // NANP 900 number never is.
+      const dialled = prefix.startsWith("0") ? [prefix, prefix.slice(1)] : [prefix];
+      const results: ReturnType<typeof analysePhone>[] = [];
+      for (const stem of dialled) {
+        for (const length of [7, 8, 9, 10, 11, 12]) {
+          const body = length - stem.length;
+          if (body < 0) continue;
+          for (const filler of ["1234567890", "5551234567", "0000000000"]) {
+            results.push(analysePhone(stem + filler.slice(0, body), code));
+          }
+        }
+      }
+      const premium = results.filter((r) => r.lineType === "premium");
+      expect({ code, prefix, reaches: premium.length > 0 }).toEqual({
+        code,
+        prefix,
+        reaches: true,
+      });
+      // And the pack's own copy is what gets shown, not a bare risk bump —
+      // the BR defect, where the branch fired with an empty note list.
+      expect({ code, prefix, noted: premium.some((r) => r.spoofingNotes.length > 0) }).toEqual({
+        code,
+        prefix,
+        noted: true,
+      });
+    }
+  });
+
+  it.each(WITH_PLANS)("%s: an authored premium prefix comes with copy to show", (code) => {
+    // The unreachable-copy rule, both ways round. A prefix list with no flag
+    // suppresses the localised note in analysePhone's PREMIUM_RATE branch,
+    // which pushes copy only `if (plan.premiumFlag)` — the BR defect. A flag
+    // with no list is the inverse, and the shape sg.ts calls out for
+    // noLinkSenders.
+    const plan = resolveRegionPack(code).phonePlan;
+    const hasPrefixes = (plan.premiumPrefixes ?? []).length > 0;
+    expect({ code, hasPrefixes, hasFlag: Boolean(plan.premiumFlag) }).toEqual({
+      code,
+      hasPrefixes,
+      hasFlag: hasPrefixes,
+    });
+  });
+
+  it.each(WITH_PLANS)("%s: claiming no premium range means the parser agrees", (code) => {
+    // The negative direction, and the one that was wrong for BR. A pack may
+    // omit `premiumPrefixes` — most do — but if it omits them while the
+    // country HAS a range the parser recognises, the omission is a false
+    // claim rather than a gap, and the reader loses the localised note.
+    //
+    // Probed across the plausible non-geographic ranges rather than a
+    // hand-picked list, so a future pack cannot pass by the author not having
+    // thought of the range that exists.
+    const plan = resolveRegionPack(code).phonePlan;
+    if ((plan.premiumPrefixes ?? []).length > 0) return;
+
+    const missed: string[] = [];
+    for (const hundred of ["0500", "0900", "0901", "0906", "0909", "1900", "0990", "0137"]) {
+      for (const length of [9, 10, 11]) {
+        const number = hundred + "1234567890".slice(0, Math.max(0, length - hundred.length));
+        if (analysePhone(number, code).lineType === "premium") {
+          missed.push(`${hundred} (as ${number})`);
+        }
+      }
+    }
+    expect({ code, missed: [...new Set(missed)] }).toEqual({ code, missed: [] });
   });
 });

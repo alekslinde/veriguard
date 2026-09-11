@@ -22,9 +22,12 @@
 //   node scripts/check-sources.mjs --markdown   # issue-body format
 //   node scripts/check-sources.mjs --issue      # refresh the digest issue
 //   node scripts/check-sources.mjs --validate   # parse + validate, no network
+//   node scripts/check-sources.mjs --stale      # is `updated:` behind the file?
 //
 // Exit codes: 0 all reachable · 1 rot found · 2 registry invalid.
+// With --stale: 0 header current · 1 header behind the file · 2 check failed.
 
+import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -277,6 +280,24 @@ function validate(reg) {
   for (const e of reg.errors || []) errors.push(`PARSE: ${e}`);
 
   if (all.length === 0) errors.push("registry parsed to zero sources — parser or file is broken");
+
+  // HEADER. Both fields are printed in every report ("Registry v1, updated
+  // 2026-09-09"), so a missing or malformed one publishes a claim about the
+  // registry that nobody can rely on. Cheap to assert, and the report is the
+  // only consumer that would otherwise notice.
+  if (!reg.version) errors.push("HEADER: missing `version:` — every report prints it");
+  else if (!/^\d+$/.test(reg.version)) errors.push(`HEADER: version must be an integer, got "${reg.version}"`);
+
+  if (!reg.updated) errors.push("HEADER: missing `updated:` — every report prints it");
+  else if (!/^\d{4}-\d{2}-\d{2}$/.test(reg.updated)) {
+    errors.push(`HEADER: updated must be YYYY-MM-DD, got "${reg.updated}"`);
+  } else if (Number.isNaN(Date.parse(`${reg.updated}T00:00:00Z`))) {
+    errors.push(`HEADER: updated is not a real date: "${reg.updated}"`);
+  } else if (reg.updated > new Date().toISOString().slice(0, 10)) {
+    // A future date is either a typo or someone pre-dating an edit. Both make
+    // the staleness comparison below meaningless.
+    errors.push(`HEADER: updated is in the future: "${reg.updated}"`);
+  }
 
   const seen = new Map();
   for (const e of all) {
@@ -748,12 +769,53 @@ function human(results, reg, retiredCount = 0) {
 // ---------------------------------------------------------------------------
 
 
+/**
+ * Is the `updated:` header behind the file's own last change?
+ *
+ * The header is printed in every report — "Registry v1, updated 2026-09-09" —
+ * so when someone edits the registry and forgets the date, every run afterwards
+ * publishes a freshness claim that is quietly false. That already happened: ten
+ * sources were added on 2026-09-10 while the header still read 2026-09-09.
+ *
+ * Compared against git rather than mtime, because a fresh clone or a checkout
+ * rewrites mtime for every file and would report the whole registry as touched
+ * today. Uses the last COMMIT that changed the file; an uncommitted edit in the
+ * working tree is reported separately, since that is the moment to fix the
+ * header rather than after it lands.
+ *
+ * Returns null when git is unavailable (a tarball, a shallow export), which is
+ * "cannot tell", not "stale" — the caller treats it as a skip.
+ */
+function headerStaleness(reg) {
+  let committed = null;
+  let dirty = false;
+  try {
+    committed =
+      execFileSync("git", ["log", "-1", "--format=%ad", "--date=short", "--", REGISTRY], {
+        cwd: HERE,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim() || null;
+    dirty =
+      execFileSync("git", ["status", "--porcelain", "--", REGISTRY], {
+        cwd: HERE,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim().length > 0;
+  } catch {
+    return null;
+  }
+  if (!committed) return null;
+  return { declared: reg.updated, committed, dirty, stale: committed > reg.updated };
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const asJson = args.includes("--json");
   const asMarkdown = args.includes("--markdown");
   const asIssue = args.includes("--issue");
   const validateOnly = args.includes("--validate");
+  const staleOnly = args.includes("--stale");
 
   const text = await readFile(REGISTRY, "utf8");
   const reg = parseRegistry(text);
@@ -765,6 +827,34 @@ async function main() {
     console.error("Registry is invalid:\n");
     for (const e of errors) console.error(`  • ${e}`);
     process.exitCode = 2;
+    return;
+  }
+
+  if (staleOnly) {
+    const st = headerStaleness(reg);
+    if (st === null) {
+      console.log("Cannot read git history for the registry — skipping the freshness check.");
+      return;
+    }
+    if (st.dirty) {
+      console.log(
+        `Registry has uncommitted changes. Declared updated: ${st.declared} — ` +
+        `set it to today if this edit changes what the registry claims.`,
+      );
+    }
+    if (st.stale) {
+      console.error(
+        `Registry header is behind the file.\n\n` +
+        `  declared updated: ${st.declared}\n` +
+        `  last changed:     ${st.committed}\n\n` +
+        `Every report prints the declared date, so it is currently publishing a\n` +
+        `freshness claim the file does not support. Set \`updated:\` to the date\n` +
+        `the registry's CONTENT last changed.`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+    console.log(`Registry header is current — updated ${st.declared}, last changed ${st.committed}.`);
     return;
   }
 
