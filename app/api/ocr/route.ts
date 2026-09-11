@@ -29,6 +29,21 @@ const OCR_RATE_LIMIT = 12;
 // process.cwd() resolves to the project root in both dev and production.
 const LANG_PATH = path.join(process.cwd(), "public", "tessdata");
 
+// Pin the WASM core explicitly instead of letting tesseract.js probe for
+// SIMD support: Node has no SIMD detection story the way a browser does, and
+// leaving corePath unset makes tesseract.js's loader consider all six core
+// variants in node_modules/tesseract.js-core, which in turn made
+// outputFileTracingIncludes below bundle every one of them (~18 MB) into
+// this function on every deployment. tesseract-core-lstm.wasm is the
+// non-SIMD, LSTM-only build — the same tier the client falls back to for
+// browsers without SIMD (lib/clientOcr.ts) — so it runs anywhere Node does.
+const CORE_PATH = path.join(
+  process.cwd(),
+  "node_modules",
+  "tesseract.js-core",
+  "tesseract-core-lstm.wasm",
+);
+
 // Singleton worker — created on first request, reused after that.
 // Using global so Next.js hot-reload doesn't create duplicate workers in dev.
 declare global {
@@ -39,6 +54,7 @@ function getWorker() {
   if (!global._ocrWorker) {
     global._ocrWorker = createWorker("eng", 1, {
       langPath: LANG_PATH,
+      corePath: CORE_PATH,
       // Suppress tesseract's internal progress/debug logging, but DO surface
       // errors — a swallowed errorHandler turns a worker-init failure (e.g. a
       // missing WASM core file) into a silent hang instead of a fast failure.
