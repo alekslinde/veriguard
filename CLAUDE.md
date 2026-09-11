@@ -153,6 +153,8 @@ npm run lint          ← ESLint (Next 16.3 + strict react-hooks rules)
 npm run seed          ← Seed the database
 npm run build         ← Production build
 npm run check-readme  ← Which READMEs are behind the code they document
+npm run check-sources ← Threat-intel source registry (--validate | --stale)
+npm run check-calendar ← Scam-calendar citation reachability
 ```
 
 **READMEs carry a `*Last reviewed: YYYY-MM-DD.*` marker.** They make
