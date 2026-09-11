@@ -62,6 +62,20 @@ export interface SeasonSource {
   label: string;
   /** https URL to the supporting page. Reachability is checked out of band. */
   url: string;
+  /**
+   * `"blocked"` — edge bot-protection refuses every automated request, so
+   * reachability is unverifiable from CI. The checker reports it as expected
+   * rather than as rot.
+   *
+   * Same flag and same semantics as the threat-intel registry's `expect:
+   * blocked`. Use sparingly: each one is a citation the job has stopped
+   * genuinely checking, so it must be verified in a browser when set and
+   * re-verified whenever the season is reviewed. It is NOT a way to silence a
+   * 403 that is really a moved page — Garda returned 403 on a path that had
+   * genuinely moved, and the root still answered, which is how to tell the two
+   * apart: if the site's root responds and the path does not, it is rot.
+   */
+  expect?: "blocked";
 }
 
 export interface ScamSeason {
@@ -109,10 +123,10 @@ export interface ScamSeason {
 const AU = {
   scamwatch: { label: "Scamwatch", url: "https://www.scamwatch.gov.au" },
   accc: { label: "ACCC", url: "https://www.accc.gov.au" },
-  ato: { label: "ATO", url: "https://www.ato.gov.au/about-ato/tax-avoidance/scams-and-identity-theft" },
-  auspost: { label: "Australia Post", url: "https://auspost.com.au/about-us/about-our-brand/scam-alerts" },
+  ato: { label: "ATO", url: "https://www.ato.gov.au/online-services/scams-cyber-safety-and-identity-protection" },
+  auspost: { label: "Australia Post", url: "https://auspost.com.au/about-us/about-our-site/online-security-scams-fraud/scam-alerts" },
   servicesaustralia: { label: "Services Australia", url: "https://www.servicesaustralia.gov.au/scams" },
-  moneysmart: { label: "MoneySmart", url: "https://moneysmart.gov.au/online-safety/scams" },
+  moneysmart: { label: "MoneySmart", url: "https://moneysmart.gov.au/online-safety/protect-yourself-from-scams" },
   acma: { label: "ACMA", url: "https://www.acma.gov.au/scams" },
   studyassist: { label: "StudyAssist", url: "https://www.studyassist.gov.au" },
 } satisfies Record<string, SeasonSource>;
@@ -135,7 +149,7 @@ const AU_SEASONS: ScamSeason[] = [
     ],
     advice: "The ATO never sends a link to log in, and never threatens arrest by SMS. Open the ATO app or type my.gov.au yourself — never follow the link in the message.",
     sources: [AU.ato, AU.scamwatch],
-    reviewed: "2026-08-27",
+    reviewed: "2026-09-11",
   },
   {
     id: "eofy-business",
@@ -186,7 +200,7 @@ const AU_SEASONS: ScamSeason[] = [
     ],
     advice: "Australia Post never asks for a fee by SMS link. Track parcels in the official app using the tracking number you were given at purchase.",
     sources: [AU.auspost, AU.scamwatch],
-    reviewed: "2026-08-16",
+    reviewed: "2026-09-11",
   },
   {
     id: "romance",
@@ -201,7 +215,7 @@ const AU_SEASONS: ScamSeason[] = [
     ],
     advice: "Anyone who won't video call, and anyone who moves the conversation to investing, is running a script. Money sent is money gone — reverse-image-search their photos.",
     sources: [AU.scamwatch, AU.moneysmart],
-    reviewed: "2026-08-16",
+    reviewed: "2026-09-11",
   },
   {
     id: "winter-energy",
@@ -309,7 +323,7 @@ const AU_SEASONS: ScamSeason[] = [
     ],
     advice: "Check a charity is a deductible-gift recipient on ABN Lookup, and give through its own website. A real charity is happy for you to donate next week — pressure to beat a deadline is the tell.",
     sources: [AU.accc, AU.ato],
-    reviewed: "2026-08-16",
+    reviewed: "2026-09-11",
   },
   {
     id: "spring-racing",
@@ -357,7 +371,11 @@ const AU_SEASONS: ScamSeason[] = [
 // name local couriers and bodies.
 
 const GB = {
-  actionfraud: { label: "Action Fraud", url: "https://www.actionfraud.police.uk" },
+  // Action Fraud's edge refuses every automated request, including its own root,
+  // so CI cannot verify it either way. Verified in a browser 2026-09-11 and it is
+  // still the UK's national reporting body. Contrast Garda, which 403'd on a path
+  // that had genuinely moved while its root answered — that asymmetry is the tell.
+  actionfraud: { label: "Action Fraud", url: "https://www.actionfraud.police.uk", expect: "blocked" },
   ncsc: { label: "NCSC", url: "https://www.ncsc.gov.uk/collection/phishing-scams" },
   hmrc: { label: "HMRC", url: "https://www.gov.uk/report-suspicious-emails-websites-phishing" },
   takefive: { label: "Take Five", url: "https://takefive-stopfraud.org.uk" },
@@ -584,7 +602,7 @@ const US_SEASONS: ScamSeason[] = [
 const CA = {
   cafc: { label: "Anti-Fraud Centre", url: "https://antifraudcentre-centreantifraude.ca" },
   cra: { label: "CRA", url: "https://www.canada.ca/en/revenue-agency/corporate/security/protect-yourself-against-fraud.html" },
-  competition: { label: "Competition Bureau", url: "https://competition-bureau.canada.ca/deceptive-marketing-practices/fraud-and-scams" },
+  competition: { label: "Competition Bureau", url: "https://competition-bureau.canada.ca/en/fraud-and-scams" },
   getcybersafe: { label: "Get Cyber Safe", url: "https://www.getcybersafe.gc.ca" },
 } satisfies Record<string, SeasonSource>;
 
@@ -619,7 +637,7 @@ const CA_SEASONS: ScamSeason[] = [
     ],
     advice: "Type the retailer's address in yourself rather than tapping the ad or the text. Pay by credit card for the protection it gives.",
     sources: [CA.competition, CA.cafc],
-    reviewed: "2026-08-10",
+    reviewed: "2026-09-11",
   },
   {
     id: "holiday-parcels",
@@ -666,7 +684,7 @@ const CA_SEASONS: ScamSeason[] = [
     ],
     advice: "Utilities give written notice and never demand gift cards or crypto. Hang up and call the number on a real bill to check your account.",
     sources: [CA.cafc, CA.competition],
-    reviewed: "2026-08-10",
+    reviewed: "2026-09-11",
   },
   {
     id: "summer-travel",
@@ -682,7 +700,7 @@ const CA_SEASONS: ScamSeason[] = [
     ],
     advice: "Book through a platform you know and pay by credit card, never a direct transfer to a person. If a listing pushes you off-platform to pay, walk away.",
     sources: [CA.cafc, CA.competition],
-    reviewed: "2026-08-10",
+    reviewed: "2026-09-11",
   },
 ];
 
@@ -695,8 +713,8 @@ const CA_SEASONS: ScamSeason[] = [
 const IE = {
   fraudsmart: { label: "FraudSMART", url: "https://www.fraudsmart.ie" },
   revenue: { label: "Revenue", url: "https://www.revenue.ie/en/online-services/support/security/index.aspx" },
-  ccpc: { label: "CCPC", url: "https://www.ccpc.ie/consumers/shopping/scams" },
-  garda: { label: "Garda", url: "https://www.garda.ie/en/crime-prevention/fraud-and-scams" },
+  ccpc: { label: "CCPC", url: "https://www.ccpc.ie/manage-your-money/scams-and-frauds" },
+  garda: { label: "Garda", url: "https://www.garda.ie/en/crime/fraud/" },
 } satisfies Record<string, SeasonSource>;
 
 const IE_SEASONS: ScamSeason[] = [
@@ -730,7 +748,7 @@ const IE_SEASONS: ScamSeason[] = [
     ],
     advice: "Type the retailer's address in yourself rather than tapping an ad or text. Pay by card, and be wary of a shop that only takes bank transfer.",
     sources: [IE.ccpc, IE.fraudsmart],
-    reviewed: "2026-08-10",
+    reviewed: "2026-09-11",
   },
   {
     id: "christmas-parcels",
@@ -746,7 +764,7 @@ const IE_SEASONS: ScamSeason[] = [
     ],
     advice: "An Post doesn't text you for a fee by link to release a parcel. Track it on the courier's own site using the reference from the sender.",
     sources: [IE.fraudsmart, IE.garda],
-    reviewed: "2026-08-10",
+    reviewed: "2026-09-11",
   },
   {
     id: "romance",
@@ -761,7 +779,7 @@ const IE_SEASONS: ScamSeason[] = [
     ],
     advice: "Anyone who won't video call, and anyone who steers the chat towards investing, is following a script. Never send money — and reverse-image-search their photos.",
     sources: [IE.fraudsmart, IE.garda],
-    reviewed: "2026-08-10",
+    reviewed: "2026-09-11",
   },
   {
     id: "winter-energy",
@@ -777,7 +795,7 @@ const IE_SEASONS: ScamSeason[] = [
     ],
     advice: "Government supports are applied automatically or through official channels — never a link asking for your bank details. Check any bill by logging in to your supplier directly.",
     sources: [IE.fraudsmart, IE.ccpc],
-    reviewed: "2026-08-10",
+    reviewed: "2026-09-11",
   },
   {
     id: "summer-holiday",
@@ -793,7 +811,7 @@ const IE_SEASONS: ScamSeason[] = [
     ],
     advice: "Book with a bonded, licensed travel agent and pay by card. If a listing pushes you to pay by transfer or off-platform, walk away.",
     sources: [IE.ccpc, IE.fraudsmart],
-    reviewed: "2026-08-10",
+    reviewed: "2026-09-11",
   },
   {
     id: "student-accommodation",
@@ -809,7 +827,7 @@ const IE_SEASONS: ScamSeason[] = [
     ],
     advice: "Never pay a deposit for a room you or someone you trust hasn't stood inside. A landlord who can't do a viewing and wants a transfer is the whole scam in one sentence.",
     sources: [IE.garda, IE.fraudsmart],
-    reviewed: "2026-08-27",
+    reviewed: "2026-09-11",
   },
 ];
 
@@ -820,7 +838,10 @@ const IE_SEASONS: ScamSeason[] = [
 // tracks the southern-hemisphere calendar — winter power, summer holidays.
 
 const NZ = {
-  cert: { label: "CERT NZ", url: "https://www.cert.govt.nz/individuals/common-threats/scams-and-fraud/" },
+  // CERT NZ was folded into the National Cyber Security Centre, and NCSC sends
+  // individuals to Own Your Online — so the BODY changed, not just the URL.
+  // Citing "CERT NZ" now names an organisation that no longer publishes.
+  cert: { label: "Own Your Online (NCSC)", url: "https://www.ownyouronline.govt.nz/personal/get-protected/" },
   netsafe: { label: "Netsafe", url: "https://netsafe.org.nz/scams/" },
   ird: { label: "Inland Revenue", url: "https://www.ird.govt.nz/managing-my-tax/scams" },
   consumerprotection: { label: "Consumer Protection", url: "https://www.consumerprotection.govt.nz/general-help/scamwatch/" },
@@ -857,7 +878,7 @@ const NZ_SEASONS: ScamSeason[] = [
     ],
     advice: "Type the retailer's address in yourself rather than tapping the ad or the text. Pay by credit card for the protection it gives.",
     sources: [NZ.consumerprotection, NZ.cert],
-    reviewed: "2026-08-10",
+    reviewed: "2026-09-11",
   },
   {
     id: "christmas-parcels",
@@ -904,7 +925,7 @@ const NZ_SEASONS: ScamSeason[] = [
     ],
     advice: "Log in to your power account directly to check any balance or credit. Government payments like the Winter Energy Payment are applied automatically — never after you enter card details.",
     sources: [NZ.consumerprotection, NZ.cert],
-    reviewed: "2026-08-10",
+    reviewed: "2026-09-11",
   },
   {
     id: "summer-holiday",

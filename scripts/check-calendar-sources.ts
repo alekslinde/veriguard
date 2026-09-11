@@ -38,6 +38,8 @@ interface SourceRef {
   label: string;
   /** "AU/tax-time, GB/self-assessment" — where the URL is cited, for the report. */
   cited: string[];
+  /** Mirrors SeasonSource.expect — see lib/scamCalendar.ts. */
+  expect?: "blocked";
 }
 
 /** Every source URL cited anywhere in the calendar, deduped, with its call sites. */
@@ -48,6 +50,10 @@ function collectSources(): SourceRef[] {
       for (const source of season.sources) {
         const ref = byUrl.get(source.url) ?? { url: source.url, label: source.label, cited: [] };
         ref.cited.push(`${code}/${season.id}`);
+        // A URL is deduped across seasons, so one citation declaring it blocked
+        // declares it for all of them — the flag is about the HOST's behaviour,
+        // not about any one season's use of it.
+        if (source.expect) ref.expect = source.expect;
         byUrl.set(source.url, ref);
       }
     }
@@ -143,6 +149,13 @@ async function checkOne(ref: SourceRef): Promise<Result> {
         else if (browser === "moved") {
           result.state = "REDIRECTED";
           result.finalUrl = undefined;
+        } else if (ref.expect === "blocked") {
+          // Declared unverifiable-from-CI by a human who checked in a browser.
+          // Without this a site whose WAF refuses every agent is indistinguishable
+          // from a dead one, and the weekly run reports the same false rot forever
+          // until people stop reading it. Same flag as the threat-intel registry.
+          result.state = "BLOCKED";
+          result.error = `HTTP ${res.status} to any agent (expected: edge bot-protection)`;
         } else {
           result.state = "DEAD";
           result.error = `HTTP ${res.status} to any agent`;
