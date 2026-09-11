@@ -1,0 +1,74 @@
+# Flags READMEs that document code which has moved on since they were last
+# reviewed.
+#
+# A README makes claims in the PRESENT TENSE — paths, scripts, schedules,
+# counts — and nothing fails when one goes stale. The file still renders, CI
+# stays green, and the drift surfaces only when someone follows an instruction
+# that no longer works.
+#
+# Deliberately not a "review the docs every N weeks" timer: that fires whether
+# or not anything changed, so it gets ignored on quiet weeks and carries no
+# information on busy ones. This compares each README's `Last reviewed` marker
+# against the last commit touching the directory it documents, so it only speaks
+# up when there is something that could actually have drifted.
+#
+# It FLAGS and never edits. Whether a claim is still true is a reading task; the
+# prompt to re-read is the only mechanical part.
+
+name: README freshness
+
+on:
+  schedule:
+    # Mondays 23:00 UTC ≈ 09:00 Tuesday Australia/Sydney — after the source and
+    # promotion checks, so the week's maintenance flags land together.
+    - cron: "0 23 * * 1"
+  push:
+    branches: [main]
+    paths:
+      - "**/README.md"
+      - "scripts/check-readme-freshness.ts"
+  pull_request:
+    paths:
+      - "**/README.md"
+      - "scripts/check-readme-freshness.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: readme-freshness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The check reads git log to date each README's subject; a shallow
+          # clone would report the checkout date for everything.
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      # Staleness never fails a build, on any trigger. A stale README is a
+      # maintenance signal, and blocking a PR on someone else's undocumented
+      # directory would train people to route around this. Only a broken
+      # checker (exit 2) goes red, or a silently broken check looks identical
+      # to a clean week forever.
+      - name: Report README freshness
+        run: |
+          set +e
+          npx tsx scripts/check-readme-freshness.ts --markdown >> "$GITHUB_STEP_SUMMARY"
+          code=$?
+          set -e
+          if [ "$code" -eq 0 ]; then
+            echo "Every README has been reviewed since its subject last changed."
+          elif [ "$code" -eq 1 ]; then
+            echo "::warning::One or more READMEs are behind the code they document — see the run summary."
+          else
+            echo "::error::check-readme-freshness failed (exit $code)."
+            exit "$code"
+          fi

@@ -1,11 +1,11 @@
 # Threat Intelligence Roadmaps
 
-Periodic research briefs for Veriguard. Each roadmap surveys new and
-evolving scam tactics targeting Australians, then proposes concrete detection
-changes to `lib/`.
+Periodic research briefs for Veriguard. Each roadmap surveys new and evolving
+scam tactics, then proposes concrete detection changes to the engine
+(`packages/engine/`).
 
-**Roadmaps are research-and-proposals only. They never modify `lib/`.** The
-detection code ships separately, via numbered issues, in its own PR with tests.
+**Roadmaps are research-and-proposals only. They never modify detection code.**
+That ships separately, via numbered issues, in its own PR with tests.
 That separation is deliberate — it keeps the evidence layer reviewable on its
 own terms, and keeps detection PRs small enough to review as code.
 
@@ -98,18 +98,21 @@ the time — rewriting it to match the outcome destroys that.
 
 ## Cadence — what runs when
 
-Three different rhythms, easy to conflate because all three touch this
-directory:
+Four different rhythms, easy to conflate because they all touch this directory
+or what it feeds:
 
 | | Rhythm | Automated? |
 |---|---|---|
 | **Sweep** (threat roadmap) | Roughly weekly, by hand | No |
 | **Probe** | Event-triggered — see below | No |
-| **Source check** | Weekly, Tuesday ~07:00 AEST | **Yes** — the only cron here |
+| **Source check** | Weekly, Tuesday ~07:00 AEST | **Yes** |
+| **Promotion freshness** | Weekly, Tuesday ~08:00 AEST | **Yes** |
 
-Only the source check is a machine. It verifies that citation links still
-resolve and nothing more; it never decides a sweep is due, and a green run says
-nothing about whether the research is current.
+Both crons check *bookkeeping*, never research. The source check verifies that
+citation links still resolve; promotion freshness flags a merged sweep whose
+findings never reached `/radar` or `/calendar` (step 5 below). Neither decides a
+sweep is due, and two green runs say nothing about whether the research is
+current — only that nothing has visibly rotted.
 
 **The sweep cadence is a habit, not a schedule.** Nothing enforces it and
 nothing will chase a missed week — the ~7-day spacing is visible in the
@@ -221,8 +224,8 @@ source has published anything new is research, not a cron job. It flags; it neve
 edits the registry.
 
 Link rot is the quiet failure here. When a citation 404s, the evidence for a
-hardcoded score in `lib/` is gone and only the magic number is left — the exact
-decay the archive exists to prevent.
+hardcoded score in the engine is gone and only the magic number is left — the
+exact decay the archive exists to prevent.
 
 ---
 
@@ -247,8 +250,9 @@ For each candidate phrase, record the current verdict and score, then:
 - **Substring of an existing entry** — drop it. Lists are substring-matched and
   `checkCustom` sums every hit, so an overlapping entry scores one phrase twice
   and can move a verdict on its own. The engine records three prior instances of
-  exactly this bug: `mygovid` and `new bsb` (`regions/au.ts`), and `updated bank details`
-  (`regions/base.ts`, with the fix in `scamDetector.ts`).
+  exactly this bug: `mygovid` and `new bsb` (`regions/au.ts`), and `updated bank
+  details` (`regions/base.ts`, with the fix in `scamDetector.ts`) — all under
+  `packages/engine/src/`.
 - **Covered by a composite** — propose extending the composite, not the word
   list. A phrase bolted onto a list to catch something a composite nearly
   catches will usually double-score against the composite's own regex.
@@ -319,6 +323,37 @@ Steps 4 and 5 are the ones that get skipped. See below.
 
 ---
 
+## Reviewing this file
+
+*Last reviewed: 2026-09-11.*
+
+**This file describes a moving target, so it rots differently from the sweeps
+it sits beside.** A sweep is a dated snapshot and is correct forever — the
+research was what it was on the day. This README makes claims in the present
+tense about paths, scripts, schedules and counts, and every one of them is a
+hostage to the next refactor. The two must not be maintained the same way:
+never rewrite a sweep to match the present, and never let this file describe
+the past.
+
+Re-read it when a sweep cycle turns over, and check the claims that reference
+something outside this directory, because those are the ones that break
+silently:
+
+- **Paths and filenames** — the detection engine has moved once already; this
+  file still said `lib/` for weeks afterwards.
+- **Scripts, npm commands and workflows** — run them, don't skim them.
+- **Counts and regions** — "all five regions" was true when written and wrong
+  three region packs later. Prefer a claim that stays true (*"every supported
+  region"*) or one an automated check enforces.
+- **Cron schedules** — compare against the workflow files, in UTC.
+- **Anything phrased "now" or "currently"** — the words are a reliable marker
+  for a sentence that has stopped being either.
+
+Update the date above when you have actually checked, not when you have edited
+something nearby.
+
+---
+
 ## Known gaps in this archive
 
 **The 2026-07-05 and 2026-07-12 roadmaps are missing.** Their detection code
@@ -352,12 +387,22 @@ in the registry, which is the clearest symptom — and CERT NZ had by then been
 folded into NZ's NCSC, so the body named in the prose no longer published under
 that name.
 
-Tier-1 sources for all five regions were registered on 2026-09-09, and
-[`check-source-coverage.ts`](../../scripts/check-source-coverage.ts) now reports
-any supported region with none (`npm run check-source-coverage`). What that does
-**not** do is backfill the cycles already written: the NZ, CA and IE sections of
-sweeps before 2026-09-09 remain unevidenced, and the surfaces promoted from them
-should not be treated as reviewed for those regions. The affected calendars are
-deliberately left showing their real, older `reviewed` dates rather than being
-bumped forward — a visibly stale date is the honest signal when the review did
-not happen.
+Tier-1 sources for the then-supported regions were registered on 2026-09-09,
+and [`check-source-coverage.ts`](../../scripts/check-source-coverage.ts) now
+reports any supported region with none (`npm run check-source-coverage`). It is
+wired into the build, so a new region pack cannot ship without at least one
+tier-1 source — the coupling is deliberate, and it is what keeps this section
+from going stale again as coverage grows.
+
+What that does **not** do is backfill the cycles already written: the NZ, CA and
+IE sections of sweeps before 2026-09-09 remain unevidenced, and the surfaces
+promoted from them should not be treated as reviewed for those regions. The
+affected calendars are deliberately left showing their real, older `reviewed`
+dates rather than being bumped forward — a visibly stale date is the honest
+signal when the review did not happen.
+
+**Registered is not the same as read.** Every supported region now has a tier-1
+source, but the registry is a citation list, not a feed: almost all of those
+sources are checked by hand, and reachability is the only thing automated. A
+region showing tier-1 coverage here has an authority worth citing — it does not
+mean anything has been read from it this cycle.

@@ -147,12 +147,21 @@ That tells a future reader what they need and points nowhere.
 ## Commands to Know
 
 ```bash
-npm run dev      ← Start dev server (http://localhost:3000)
-npm test         ← Run Vitest tests (run before committing)
-npm run lint     ← ESLint (Next 16.3 + strict react-hooks rules)
-npm run seed     ← Seed the database
-npm run build    ← Production build
+npm run dev           ← Start dev server (http://localhost:3000)
+npm test              ← Run Vitest tests (run before committing)
+npm run lint          ← ESLint (Next 16.3 + strict react-hooks rules)
+npm run seed          ← Seed the database
+npm run build         ← Production build
+npm run check-readme  ← Which READMEs are behind the code they document
 ```
+
+**READMEs carry a `*Last reviewed: YYYY-MM-DD.*` marker.** They make
+present-tense claims — paths, scripts, schedules, counts — that nothing fails
+when they rot. `check-readme` compares each marker against the last commit
+touching the directory that README documents, so it speaks up only when
+something could actually have drifted. Re-read, fix what moved, then update the
+marker — on checking, not on editing nearby. A new README needs a row in
+`scripts/check-readme-freshness.ts`; a test enforces that.
 
 ---
 
