@@ -107,51 +107,40 @@ Use these scopes in commit messages:
 - Don't weaken PII scrubbing or the submission guard (honeypot, rate limit,
   timing, dedupe) without explicit sign-off — they're abuse defences
 - Don't commit `local.db` or `.env.local`
-- **Don't add adversarial probe write-ups, evasion findings, or security
-  working notes to this repo** — see *Where writing goes*, below
+- **`docs/` takes dated sweep research and nothing else** — see *Where writing
+  goes*, below
 
 ---
 
 ## Where writing goes
 
-**This repo is public.** Before creating any `.md` file, ask what it would tell
-a reader who is not on your side.
+**This repo is public. Write for that audience.**
 
-**Belongs here — `docs/threat-intel/YYYY-MM-DD-threat-roadmap.md`**
-Sweeps: outward-looking research citing public sources, kept as **provenance for
-shipped rules**. This is why `.bond` scores +30 and `"quantum ai"` +50. Being
-able to show the working is the point, so these are published deliberately.
-Two tests resolve these by name (`threatRadar.test.ts`, `sweepCoverage.test.ts`),
-and `docsArePublic.test.ts` enforces the rest of this section — so the naming is
-load-bearing, not cosmetic.
+`docs/` holds exactly one thing: `threat-intel/YYYY-MM-DD-threat-roadmap.md`,
+the dated sweep research. Sweeps are outward-looking, cite public sources, and
+exist as **provenance for shipped rules** — why `.bond` scores +30, why
+`"quantum ai"` scores +50. Showing that working is the point.
 
-**Does not belong in this repo — anywhere**
-Anything that maps where the detector is *weak*: adversarial probe write-ups,
-worked evasions with before/after scores, watchlists of unfixed gaps, security
-working notes. These buy none of the traceability the sweeps provide — no
-shipped rule cites one as its evidence — and a reproducible list of working
-evasions is exactly what an evader would want.
+**Nothing else belongs in `docs/`.** Not notes, not analysis, not findings —
+if it is not a dated sweep, it does not go there. Other documentation has its
+place (this file, `README.md`, `AGENTS.md`); when something fits none of them,
+ask rather than inventing a home for it.
 
-Such notes are kept privately, outside any repository. **Do not name their
-location, filenames, or directory** — not in code, comments, tests, commit
-messages, PR titles or descriptions, and not here. A pointer to a private file
-is a pointer whether or not the file is reachable, and a public repo that
-announces where the working notes live has given away the useful half. If you
-need to know where they are, ask.
+The naming is load-bearing: `threatRadar.test.ts` and `sweepCoverage.test.ts`
+resolve sweeps by filename, and `docsArePublic.test.ts` enforces this section.
 
-**Reference a finding by its content, never by its source.** State it inline and
-self-contained:
+**Keep commit messages, PR titles and descriptions, code comments and tests
+self-contained.** Cite public sources freely; reference anything not in this
+repo by its content, never by its name or location:
 
 ```ts
 // Probed 2026-08-29 (share path): 9 of 11 innocent phrasings raised a scam card.
 ```
 
-That survives on its own, tells a future reader what they need, and points
-nowhere.
+That tells a future reader what they need and points nowhere.
 
-**This is not a change of stance on open source.** Detection logic stays open
-(see *Notes*) — obscuring keyword lists wouldn't stop a sophisticated scammer.
-A ranked list of *working evasions* is a different artifact from the rules.
+**None of this narrows what is open.** Detection logic stays open source (see
+*Notes*) — obscuring keyword lists wouldn't stop a sophisticated scammer.
 
 ---
 

@@ -129,24 +129,16 @@ are scammers doing that we don't detect?"* and answers it from sourced
 advisories. A probe asks *"can our existing rules be evaded?"* and answers it by
 attacking them.
 
-**Probe write-ups are kept privately and are not part of this archive.** Their
-location is deliberately not recorded. The sweeps here are *provenance for
-shipped rules* — public evidence for why `.bond` scores +30 — and that is why
-they are published. A probe is the opposite artifact: a worked list of inputs
-that evade the detector, with the score before and after each one. Publishing
-that hands an evader the map, and it buys none of the traceability the sweeps
-exist to provide, since no shipped rule cites a probe as its evidence.
+This archive holds sweeps. Probing is a working practice rather than a
+published one, and what follows is the method — when to run one, and why the
+trigger matters more than a schedule. Same workflow as a sweep: research first,
+then implementation in a separate PR with tests, then a Status block. Two
+differences:
 
-What remains public is the *practice*, below, because the trigger rule is the
-transferable part. Same workflow as a sweep: a research doc, then implementation
-in a separate PR with tests, then a Status block. Two differences:
-
-- **No sources.** The evidence is a reproduction — every finding states the
-  score before and after, measured against the live detector. `sources.yml` is
-  not involved.
-- **The negative results are most of the value.** A sweep's watchlist records
-  threats deferred; a probe's records attacks that *failed*, so the next run
-  doesn't re-test the same ground.
+- **No sources.** The evidence is a reproduction measured against the live
+  detector, so `sources.yml` is not involved.
+- **The negative results are most of the value.** As with a sweep's watchlist,
+  recording what was ruled out is what stops the next run re-covering it.
 
 ### When to run one
 
@@ -164,16 +156,13 @@ the defects have actually been. Run one when:
   the one the ecosystem roadmap cares about: breadth multiplies whatever the
   engine already gets wrong across every new client.
 
-**The evidence for the trigger rule.** Every probe run so far was prompted by
-one of the triggers above rather than by a due date, and every one found a real
-defect — nine for nine as at 2026-09-11, across six probes. Two of those
-findings were in code the triggering change had not touched, which sharpens the
-rule rather than weakening it: **aim at the machinery the new code uses, not
-only at the new code.**
+**Why the trigger beats a schedule.** A due date sends you at whatever is
+quiet; a trigger sends you at what just moved, which is where defects are. Aim
+at the machinery the new code *uses*, not only at the lines it changed — a
+change's blind spots are inherited by anything scoped to its diff.
 
-That is the argument for the trigger, and also the honest limit on it: **a probe
-only finds what the person running it thought to try.** A probe's *held up*
-section is a record of attempts, never a clean bill of health.
+The honest limit: **a probe only finds what the person running it thought to
+try.** A record of attempts is never a clean bill of health.
 
 ---
 
