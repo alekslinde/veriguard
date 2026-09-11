@@ -48,9 +48,24 @@
 # domains quoted as evidence in the roadmaps. They must never be fetched. The
 # checker asserts they are absent from the source tiers rather than ignoring
 # them, so one pasted into the wrong block fails the build.
+#
+# THE HEADER BELOW
+#
+#   version:  Schema version for the parser in check-sources.mjs. Bump only on a
+#             breaking shape change — a new key readers must understand. Adding
+#             sources is not a schema change.
+#   updated:  The date this registry's CONTENT last changed — a source added,
+#             removed, retired or re-tiered. Not the date of a comment reflow.
+#
+# Both are printed in every report ("Registry v1, updated …"), which is why they
+# are checked rather than trusted: `--validate` asserts their shape, and
+# `--stale` compares `updated:` against the file's last commit. Forgetting the
+# date does not fail quietly — it publishes a freshness claim the file does not
+# support, which is what happened when ten sources landed on 2026-09-10 under a
+# 09-09 header.
 
 version: 1
-updated: 2026-09-09
+updated: 2026-09-10
 
 tiers:
   1:

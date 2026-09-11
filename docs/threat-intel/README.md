@@ -214,8 +214,18 @@ Two conventions matter:
 ```bash
 node scripts/check-sources.mjs             # human-readable report
 node scripts/check-sources.mjs --validate  # structure only, no network
+node scripts/check-sources.mjs --stale     # is the `updated:` header behind the file?
 node scripts/check-sources.mjs --markdown  # issue-body format
 ```
+
+**The registry's `updated:` header is checked, not trusted.** Every report
+prints it — *"Registry v1, updated …"* — so a change that forgets the date
+publishes a freshness claim the file does not support. `--validate` asserts the
+header's shape (and rejects a future date, which would make the comparison
+meaningless); `--stale` compares the declared date against the file's last
+commit and runs on any PR touching the registry. It warns rather than blocks,
+because whether the *content* changed is a judgement — a comment reflow
+legitimately leaves the date alone.
 
 [`.github/workflows/source-check.yml`](../../.github/workflows/source-check.yml)
 runs it weekly (Tuesday ~07:00 AEST) and refreshes a single

@@ -172,6 +172,45 @@ describe("registry validity", () => {
     expect(validate(reg)).toEqual([]);
   });
 
+  // The header is printed in every report ("Registry v1, updated …"), so a
+  // missing or malformed field publishes a claim about the registry that
+  // nothing supports. It is the one part of the file with no other consumer to
+  // notice, which is why it is asserted rather than trusted.
+  describe("header", () => {
+    const withHeader = (over: Partial<Registry>) => ({ ...reg, ...over });
+
+    it("requires both fields", () => {
+      expect(validate(withHeader({ version: null })).some((e) => e.includes("missing `version:`"))).toBe(true);
+      expect(validate(withHeader({ updated: null })).some((e) => e.includes("missing `updated:`"))).toBe(true);
+    });
+
+    it("requires an integer version", () => {
+      expect(validate(withHeader({ version: "1.2" })).some((e) => e.startsWith("HEADER:"))).toBe(true);
+    });
+
+    it("requires an ISO date, and a real one", () => {
+      for (const bad of ["09-09-2026", "2026-9-9", "2026-13-01", "not-a-date"]) {
+        expect(
+          { bad, flagged: validate(withHeader({ updated: bad })).some((e) => e.startsWith("HEADER:")) },
+        ).toEqual({ bad, flagged: true });
+      }
+    });
+
+    it("rejects a future date", () => {
+      // A future date is a typo or a pre-dated edit, and either way it makes
+      // the --stale comparison meaningless: the header can never be behind.
+      const future = new Date(Date.now() + 86_400_000 * 3).toISOString().slice(0, 10);
+      expect(validate(withHeader({ updated: future })).some((e) => e.includes("future"))).toBe(true);
+    });
+
+    it("accepts today", () => {
+      // The boundary the future check must not catch — the common case of
+      // updating the registry and dating it now.
+      const today = new Date().toISOString().slice(0, 10);
+      expect(validate(withHeader({ updated: today }))).toEqual([]);
+    });
+  });
+
   it("has no domain in two tiers at once", () => {
     const seen = new Set<string>();
     for (const s of allSources) {
