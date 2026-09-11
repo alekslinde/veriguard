@@ -46,6 +46,9 @@ messages/       ← i18n string bundles (en.normal.json)
 __tests__/      ← Vitest tests (engine + lib)
 scripts/        ← seed-db.ts, generate-icons.mjs
 workers/        ← inbound-email worker
+docs/           ← threat-intel/ — PUBLIC sweep research only, one file per
+                  sweep as `YYYY-MM-DD-threat-roadmap.md`. Probe logs and
+                  working notes live OUTSIDE the repo — see *Where writing goes*
 ```
 
 **Import detection from the package, not `lib/`:**
@@ -104,6 +107,45 @@ Use these scopes in commit messages:
 - Don't weaken PII scrubbing or the submission guard (honeypot, rate limit,
   timing, dedupe) without explicit sign-off — they're abuse defences
 - Don't commit `local.db` or `.env.local`
+- **Don't add adversarial probe write-ups, evasion findings, or security
+  working notes to this repo** — see *Where writing goes*, below
+
+---
+
+## Where writing goes
+
+**This repo is public.** Before creating any `.md` file, decide which of these
+it is. When it is not clearly the first, it goes outside the repo.
+
+**In the repo — `docs/threat-intel/*-threat-roadmap.md`**
+Sweeps: outward-looking research citing public sources, kept as **provenance for
+shipped rules**. This is why `.bond` scores +30 and `"quantum ai"` +50. Being
+able to show the working is the point, so these are published deliberately.
+Two tests resolve these by name (`threatRadar.test.ts`, `sweepCoverage.test.ts`),
+so the filename pattern is load-bearing.
+
+**Outside the repo — `~/Desktop/Projects/roadmaps/`**
+- `veriguard-roadmap.md` — the working plan
+- `veriguard-probes/` — adversarial probe logs
+
+A **probe** is a worked list of inputs that *evade* the detector, each with the
+score before and after, plus a watchlist of gaps not yet fixed. That is a map
+for an evader, and it buys none of the traceability the sweeps provide — no
+shipped rule cites a probe as its evidence. Same for anything else that reads as
+"here is where we are weak".
+
+**This is not a change of stance on open source.** Detection logic stays open
+(see *Notes*) — obscuring keyword lists wouldn't stop a sophisticated scammer.
+A ranked list of *working evasions* is a different artifact from the rules.
+
+**Never reference the roadmap or a probe log** in commit messages, PR titles, PR
+descriptions or code comments. A finding goes into those in its own words. If a
+test or comment needs the context, state the finding inline —
+`// Probed 2026-08-29 (share path, P4/P5): 9 of 11 innocent phrasings flagged` —
+rather than linking a file that isn't there.
+
+> Six probe logs were moved out on 2026-09-11 (`acf90ff`). If `docs/threat-intel/`
+> appears to contain a probe, it is a mistake to fix, not a precedent to follow.
 
 ---
 
