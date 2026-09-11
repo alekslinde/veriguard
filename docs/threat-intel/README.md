@@ -129,11 +129,17 @@ are scammers doing that we don't detect?"* and answers it from sourced
 advisories. A probe asks *"can our existing rules be evaded?"* and answers it by
 attacking them.
 
-Named `YYYY-MM-DD-adversarial-probe.md`, or
-`YYYY-MM-DD-<target>-probe.md` when a date already holds one — the trigger is an
-event, so two probes can genuinely land on the same day, as they did on
-2026-08-29. Same workflow as a sweep: a research doc, then implementation in a
-separate PR with tests, then a Status block. Two differences:
+**Probe write-ups are kept outside this repository**, alongside the working
+roadmap, and are not part of this archive. The sweeps here are *provenance for
+shipped rules* — public evidence for why `.bond` scores +30 — and that is why
+they are published. A probe is the opposite artifact: a worked list of inputs
+that evade the detector, with the score before and after each one. Publishing
+that hands an evader the map, and it buys none of the traceability the sweeps
+exist to provide, since no shipped rule cites a probe as its evidence.
+
+What remains public is the *practice*, below, because the trigger rule is the
+transferable part. Same workflow as a sweep: a research doc, then implementation
+in a separate PR with tests, then a Status block. Two differences:
 
 - **No sources.** The evidence is a reproduction — every finding states the
   score before and after, measured against the live detector. `sources.yml` is
@@ -158,17 +164,15 @@ the defects have actually been. Run one when:
   the one the ecosystem roadmap cares about: breadth multiplies whatever the
   engine already gets wrong across every new client.
 
-**The evidence for the trigger rule.** Both probes so far were prompted, not
-due, and both found real defects:
+**The evidence for the trigger rule.** Every probe run so far was prompted by
+one of the triggers above rather than by a due date, and every one found a real
+defect — nine for nine as at 2026-09-11, across six probes. Two of those
+findings were in code the triggering change had not touched, which sharpens the
+rule rather than weakening it: **aim at the machinery the new code uses, not
+only at the new code.**
 
-| Probe | Trigger | Found |
-|---|---|---|
-| [2026-08-29 (email path)](2026-08-29-adversarial-probe.md) | Three false positives surfaced in two days once verdict emails started explaining themselves | 3 findings, 2 HIGH — including a display-name bypass that flipped a phishing email to **safe** |
-| [2026-08-29 (share path)](2026-08-29-share-path-probe.md) | The PWA share target shipped that morning — a new input form, never probed | 2 findings, both HIGH, both false-positive |
-
-Aimed at recently-changed code, a probe has found something every time it has
-been run. That is the argument for the trigger, and also the honest limit on it:
-**a probe only finds what the person running it thought to try.** The *held up*
+That is the argument for the trigger, and also the honest limit on it: **a probe
+only finds what the person running it thought to try.** A probe's *held up*
 section is a record of attempts, never a clean bill of health.
 
 ---

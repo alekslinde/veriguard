@@ -101,8 +101,8 @@ describe("bare-host extraction does not disturb scheme'd URLs", () => {
 // existed for this and each saw only the two labels either side of the dot: a
 // capitalisation tell on the right (blind to a lowercase new sentence) and a
 // closed word list on the left (which cannot hold every word a sentence can end
-// on). Probed 2026-08-29: 9 of 11 innocent phrasings raised a scam card.
-// See docs/threat-intel/2026-08-29-share-path-probe.md, P4 and P5.
+// on). Probed 2026-08-29 (share path, findings P4 and P5): 9 of 11 innocent
+// phrasings raised a scam card.
 //
 // The wider signal is what FOLLOWS the host: prose running on past an
 // uncorroborated bare host is a sentence continuing, where a real bare host is
