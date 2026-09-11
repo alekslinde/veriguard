@@ -397,7 +397,7 @@ const GB_SEASONS: ScamSeason[] = [
     ],
     advice: "HMRC never texts or emails a link to claim a refund or to pay. Sign in through GOV.UK yourself, and report suspicious messages to phishing@hmrc.gov.uk.",
     sources: [GB.hmrc, GB.actionfraud],
-    reviewed: "2026-08-10",
+    reviewed: "2026-09-11",
   },
   {
     id: "black-friday",
@@ -413,7 +413,7 @@ const GB_SEASONS: ScamSeason[] = [
     ],
     advice: "Type the retailer's address in yourself rather than tapping an ad or text. Pay by card for the protection it gives, and be wary of a shop that only takes bank transfer.",
     sources: [GB.takefive, GB.actionfraud],
-    reviewed: "2026-08-10",
+    reviewed: "2026-09-11",
   },
   {
     id: "christmas-parcels",
@@ -429,7 +429,7 @@ const GB_SEASONS: ScamSeason[] = [
     ],
     advice: "Couriers don't ask for card details by text to release a parcel. Track it on the courier's own app or site using the reference from the sender.",
     sources: [GB.actionfraud, GB.ncsc],
-    reviewed: "2026-08-10",
+    reviewed: "2026-09-11",
   },
   {
     id: "romance",
@@ -444,7 +444,7 @@ const GB_SEASONS: ScamSeason[] = [
     ],
     advice: "Anyone who won't video call, and anyone who steers the chat towards investing, is following a script. Never send money — and reverse-image-search their photos.",
     sources: [GB.actionfraud, GB.citizensadvice],
-    reviewed: "2026-08-10",
+    reviewed: "2026-09-11",
   },
   {
     id: "winter-energy",
@@ -479,7 +479,7 @@ const GB_SEASONS: ScamSeason[] = [
     ],
     advice: "Book with an ATOL/ABTA-protected provider and pay by card. If a listing pushes you to pay by transfer or off-platform, walk away.",
     sources: [GB.actionfraud, GB.citizensadvice],
-    reviewed: "2026-08-10",
+    reviewed: "2026-09-11",
   },
 ];
 

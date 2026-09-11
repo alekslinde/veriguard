@@ -160,7 +160,16 @@ async function checkOne(ref: SourceRef): Promise<Result> {
           result.state = "DEAD";
           result.error = `HTTP ${res.status} to any agent`;
         }
-      } else if (res.status >= 500) result.state = "SERVER_ERROR";
+      } else if (res.status >= 500) {
+        // A WAF that answers 5xx rather than 403 must honour the flag too, or
+        // it is a no-op on this path and the citation reports SERVER_ERROR —
+        // a PROBLEM state — every run. Cloudflare's edge codes (520-527) are
+        // the common shape. Same reasoning as the 403 branch above.
+        if (ref.expect === "blocked") {
+          result.state = "BLOCKED";
+          result.error = `HTTP ${res.status} (expected: edge bot-protection)`;
+        } else result.state = "SERVER_ERROR";
+      }
       else if (!res.ok) result.state = "DEAD";
       else if (landedElsewhere(ref.url, res.url)) result.state = "REDIRECTED";
       else result.state = "OK";
@@ -168,6 +177,16 @@ async function checkOne(ref: SourceRef): Promise<Result> {
       return result;
     } catch (err) {
       if (attempt === RETRIES) {
+        // A WAF that blackholes the connection hangs instead of answering, so
+        // the flag has to be honoured here as well — otherwise it does nothing
+        // on the very failure mode it exists for, and the weekly run exits 1.
+        // Action Fraud returns 403 today, which the branch above covers; that
+        // is one edge-config change away from becoming this path.
+        if (ref.expect === "blocked") {
+          result.state = "BLOCKED";
+          result.error = "no response to automated agents (expected: edge bot-protection)";
+          return result;
+        }
         const browser = await probeWithBrowserUa(ref.url);
         if (browser === "alive") {
           result.state = "BLOCKED";
