@@ -35,6 +35,25 @@ const nextConfig: NextConfig = {
   // directly from node_modules at runtime.
   serverExternalPackages: ["sharp", "tesseract.js"],
 
+  // `sharp` ships prebuilt binaries for every platform (darwin, wasm32, etc.)
+  // under one package, and marking it external (above) makes Next's file
+  // tracer include the whole package tree in EVERY function's deployment
+  // bundle, not just the one route (app/api/ocr) that imports it. Vercel's
+  // runtime is linux x64, so every other platform's binary is dead weight —
+  // exclude them globally or each function ships ~27 MB it never runs.
+  outputFileTracingExcludes: {
+    "*": [
+      "./node_modules/@img/sharp-libvips-darwin-*/**",
+      "./node_modules/@img/sharp-libvips-linuxmusl-*/**",
+      "./node_modules/@img/sharp-libvips-linux-arm/**",
+      "./node_modules/@img/sharp-darwin-*/**",
+      "./node_modules/@img/sharp-linuxmusl-*/**",
+      "./node_modules/@img/sharp-linux-arm/**",
+      "./node_modules/@img/sharp-wasm32/**",
+      "./node_modules/@img/sharp-win32-*/**",
+    ],
+  },
+
   // Tesseract resolves two runtime assets by string path, neither of which
   // Next.js file tracing can detect statically, so both must be declared here
   // or Vercel omits them from the function bundle:
