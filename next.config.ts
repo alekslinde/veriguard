@@ -35,36 +35,25 @@ const nextConfig: NextConfig = {
   // directly from node_modules at runtime.
   serverExternalPackages: ["sharp", "tesseract.js"],
 
-  // `sharp` ships prebuilt binaries for every platform+arch it supports
-  // (darwin, win32, wasm32, freebsd, webcontainers, and linux for
-  // arm/arm64/ppc64/s390x/riscv64/x64, each glibc and musl) under one
-  // package, and marking it external (above) makes Next's file tracer
-  // include the whole package tree in EVERY function's deployment bundle,
-  // not just the one route (app/api/ocr) that imports it. Vercel's runtime
-  // is linux glibc x64, so every other platform's binary is dead weight.
-  // Named explicitly per `npm view sharp optionalDependencies` (0.35.4) —
-  // a future sharp release adding an architecture needs a line added here.
+  // `sharp` is imported by exactly one route (app/api/ocr), but listing it in
+  // serverExternalPackages above makes Next's tracer resolve it for every
+  // route, putting its native binaries in all 18 function bundles. The libvips
+  // binary alone unpacks to ~18 MB, which was the entire baseline size of
+  // functions that never call sharp. So it is stripped from everything here
+  // and added back for the one route that needs it, under Includes below.
+  //
+  // Keys are route globs matched with picomatch, which does not cross a "/":
+  // "*" matches the "/" route and nothing else, so a rule meant for every
+  // route has to be "/**". Excludes are matched against the route path
+  // ("/api/ocr"), not the trace filename ("/api/ocr/route").
+  //
+  // Verify a change here against a production build's own file list, not the
+  // .nft.json traces: those resolve the binaries of whatever machine ran the
+  // build, so a local trace reports a bundle no deployment will have. The
+  // globs stay platform-agnostic for the same reason — naming an architecture
+  // pins the wrong one as soon as the build and dev machines differ.
   outputFileTracingExcludes: {
-    "*": [
-      "./node_modules/@img/sharp-darwin-*/**",
-      "./node_modules/@img/sharp-win32-*/**",
-      "./node_modules/@img/sharp-wasm32/**",
-      "./node_modules/@img/sharp-freebsd-*/**",
-      "./node_modules/@img/sharp-webcontainers-*/**",
-      "./node_modules/@img/sharp-linux-arm/**",
-      "./node_modules/@img/sharp-linux-arm64/**",
-      "./node_modules/@img/sharp-linux-ppc64/**",
-      "./node_modules/@img/sharp-linux-s390x/**",
-      "./node_modules/@img/sharp-linux-riscv64/**",
-      "./node_modules/@img/sharp-linuxmusl-*/**",
-      "./node_modules/@img/sharp-libvips-darwin-*/**",
-      "./node_modules/@img/sharp-libvips-linux-arm/**",
-      "./node_modules/@img/sharp-libvips-linux-arm64/**",
-      "./node_modules/@img/sharp-libvips-linux-ppc64/**",
-      "./node_modules/@img/sharp-libvips-linux-s390x/**",
-      "./node_modules/@img/sharp-libvips-linux-riscv64/**",
-      "./node_modules/@img/sharp-libvips-linuxmusl-*/**",
-    ],
+    "/**": ["./node_modules/@img/**", "./node_modules/sharp/**"],
   },
 
   // Tesseract resolves two runtime assets by string path, neither of which
@@ -84,6 +73,9 @@ const nextConfig: NextConfig = {
     "/api/ocr": [
       "./public/tessdata/**/*",
       "./node_modules/tesseract.js-core/tesseract-core-lstm.wasm",
+      // Added back after the blanket exclude above strips it from every route.
+      "./node_modules/sharp/**",
+      "./node_modules/@img/**",
     ],
   },
 
