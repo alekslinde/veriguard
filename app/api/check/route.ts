@@ -17,6 +17,10 @@ import { corsHeaders, corsPreflightHeaders } from "@/lib/cors";
 // The URLhaus blocklist fetch below is to a fixed trusted endpoint (abuse.ch),
 // NOT to any user-supplied URL — it does not violate the contract above.
 
+// Upper bound on the content this route will analyse, in characters. See the
+// rejection below for why it is a rejection and not a truncation.
+const MAX_CONTENT_LENGTH = 100_000;
+
 /**
  * CORS preflight.
  *
@@ -71,6 +75,28 @@ export async function POST(req: NextRequest) {
 
     if (!content?.trim()) {
       return NextResponse.json({ error: "Missing content" }, { status: 400, headers: cors });
+    }
+
+    // Analysis is superlinear in the length of the input: several detection
+    // patterns scan the whole content, and a long non-matching run costs far
+    // more than a matching one. Unbounded, a single request could occupy a CPU
+    // for a minute, which the rate limit alone does not prevent — it caps how
+    // often a caller asks, not how much each ask costs.
+    //
+    // Rejected rather than truncated: the tail of a pasted email is exactly
+    // where the scam signal often sits, and silently scoring half an input
+    // would return a confident verdict on evidence the user cannot see was
+    // dropped. The limit sits well above a real paste — a raw email with full
+    // headers runs to a few tens of KB — so reaching it means something other
+    // than a person checking a message.
+    if (content.length > MAX_CONTENT_LENGTH) {
+      return NextResponse.json(
+        {
+          error: "That's too long to check — paste just the suspicious message.",
+          code: "content_too_long",
+        },
+        { status: 413, headers: cors },
+      );
     }
 
     // Explicit choice wins over the platform geo header; falls back to the

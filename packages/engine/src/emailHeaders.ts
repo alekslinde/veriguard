@@ -57,10 +57,17 @@ const IMPERSONATED_BRANDS = [
 export function domainOf(address: string): string {
   const at = address.lastIndexOf("@");
   if (at === -1) return "";
-  return address.slice(at + 1).trim().toLowerCase().replace(/[>)\].,;:]+$/, "");
+  return address.slice(at + 1).trim().toLowerCase().replace(/[>)\].,;:]{0,64}$/, "");
 }
 
-const ADDRESS_RE = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/;
+// Every quantifier here is bounded, and deliberately so. The unbounded form of
+// this pattern backtracks quadratically on input that ends up not matching: a
+// 40KB display name took ~57s to reject, and free-text content reaches this
+// from an unauthenticated request. The bounds are RFC 5321's — 64 octets of
+// local part, 255 of domain — so they cost no real address anything. Keep them
+// bounded; see the address-shaped patterns below, which are bounded for the
+// same reason.
+const ADDRESS_RE = /[a-zA-Z0-9._%+\-]{1,64}@[a-zA-Z0-9.\-]{1,255}\.[a-zA-Z]{2,24}/;
 
 /**
  * The actual address from a header value.
@@ -250,7 +257,7 @@ export function analyseEmailIdentities(h: Partial<EmailHeaders>): IdentityAnalys
     }
     // Display name itself contains an email address whose domain differs from
     // the real one (e.g. "service@paypal.com" <noreply@evil.tk>).
-    const nameAddr = fromDisplay.match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/);
+    const nameAddr = fromDisplay.match(/[a-z0-9._%+\-]{1,64}@[a-z0-9.\-]{1,255}\.[a-z]{2,24}/);
     if (nameAddr && domainOf(nameAddr[0]) !== fromDom) {
       flags.push(
         `Display name shows an address (${nameAddr[0]}) that doesn't match the real sender (${fromAddress})`,
