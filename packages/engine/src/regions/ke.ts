@@ -22,7 +22,10 @@ const AUTHORITY_MENTIONS = [
   "kra",
   "kenya revenue authority",
   "nhif",
-  "sha",
+  // "sha" (bare acronym for Social Health Authority) is NOT listed: it reads
+  // as an ordinary technical term ("verify the SHA hash", "sha256 checksum"),
+  // the same MX sat/ine and NL duo class — found by adversarial re-probe. The
+  // expanded name below carries the same coverage without the collision.
   "social health authority",
   "nssf",
   "national social security fund",
