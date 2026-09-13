@@ -11,7 +11,14 @@ import { CHINESE_AUTHORITY_MENTIONS } from "./base";
 import type { RegionDefinition } from "./types";
 
 const AUTHORITY_MENTIONS = [
-  "sat",
+  // "sat" (the tax authority's own acronym) and "ine" (the electoral
+  // institute's) are NOT listed bare: both are ordinary English/Spanish words
+  // ("I sat down", "fine wine") and, like ZA's "saps"/"hawks", the matcher's
+  // word-boundary protection cannot help — these match as whole words because
+  // that is what they are. Found by adversarial probe (checkSms("I sat on the
+  // porch...", "MX") flagged "Names a government agency" on completely
+  // ordinary text). The expanded names below carry the same coverage without
+  // the collision.
   "servicio de administración tributaria",
   "imss",
   "instituto mexicano del seguro social",
@@ -22,7 +29,6 @@ const AUTHORITY_MENTIONS = [
   "correos de méxico",
   "guardia nacional",
   "fiscalía general de la república",
-  "ine",
   "instituto nacional electoral",
 ];
 

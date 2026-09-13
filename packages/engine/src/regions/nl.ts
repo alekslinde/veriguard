@@ -15,8 +15,11 @@ const AUTHORITY_MENTIONS = [
   "uwv",
   "svb",
   "sociale verzekeringsbank",
+  // "duo" (the bare acronym for Dienst Uitvoering Onderwijs) is NOT listed:
+  // it is an ordinary English/Dutch word ("the duo performed"), the same
+  // ZA saps/hawks and MX sat/ine class — found by adversarial probe. The
+  // expanded name above carries the same coverage without the collision.
   "dienst uitvoering onderwijs",
-  "duo",
   "postnl",
   "politie",
   "kvk",
