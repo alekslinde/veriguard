@@ -35,22 +35,35 @@ const nextConfig: NextConfig = {
   // directly from node_modules at runtime.
   serverExternalPackages: ["sharp", "tesseract.js"],
 
-  // `sharp` ships prebuilt binaries for every platform (darwin, wasm32, etc.)
-  // under one package, and marking it external (above) makes Next's file
-  // tracer include the whole package tree in EVERY function's deployment
-  // bundle, not just the one route (app/api/ocr) that imports it. Vercel's
-  // runtime is linux x64, so every other platform's binary is dead weight —
-  // exclude them globally or each function ships ~27 MB it never runs.
+  // `sharp` ships prebuilt binaries for every platform+arch it supports
+  // (darwin, win32, wasm32, freebsd, webcontainers, and linux for
+  // arm/arm64/ppc64/s390x/riscv64/x64, each glibc and musl) under one
+  // package, and marking it external (above) makes Next's file tracer
+  // include the whole package tree in EVERY function's deployment bundle,
+  // not just the one route (app/api/ocr) that imports it. Vercel's runtime
+  // is linux glibc x64, so every other platform's binary is dead weight.
+  // Named explicitly per `npm view sharp optionalDependencies` (0.35.4) —
+  // a future sharp release adding an architecture needs a line added here.
   outputFileTracingExcludes: {
     "*": [
-      "./node_modules/@img/sharp-libvips-darwin-*/**",
-      "./node_modules/@img/sharp-libvips-linuxmusl-*/**",
-      "./node_modules/@img/sharp-libvips-linux-arm/**",
       "./node_modules/@img/sharp-darwin-*/**",
-      "./node_modules/@img/sharp-linuxmusl-*/**",
-      "./node_modules/@img/sharp-linux-arm/**",
-      "./node_modules/@img/sharp-wasm32/**",
       "./node_modules/@img/sharp-win32-*/**",
+      "./node_modules/@img/sharp-wasm32/**",
+      "./node_modules/@img/sharp-freebsd-*/**",
+      "./node_modules/@img/sharp-webcontainers-*/**",
+      "./node_modules/@img/sharp-linux-arm/**",
+      "./node_modules/@img/sharp-linux-arm64/**",
+      "./node_modules/@img/sharp-linux-ppc64/**",
+      "./node_modules/@img/sharp-linux-s390x/**",
+      "./node_modules/@img/sharp-linux-riscv64/**",
+      "./node_modules/@img/sharp-linuxmusl-*/**",
+      "./node_modules/@img/sharp-libvips-darwin-*/**",
+      "./node_modules/@img/sharp-libvips-linux-arm/**",
+      "./node_modules/@img/sharp-libvips-linux-arm64/**",
+      "./node_modules/@img/sharp-libvips-linux-ppc64/**",
+      "./node_modules/@img/sharp-libvips-linux-s390x/**",
+      "./node_modules/@img/sharp-libvips-linux-riscv64/**",
+      "./node_modules/@img/sharp-libvips-linuxmusl-*/**",
     ],
   },
 
