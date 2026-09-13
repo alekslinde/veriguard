@@ -658,7 +658,10 @@ describe("minimal pack review fixes (2026-09 wave)", () => {
     // JP's reportingBody ended in "(188)", and reportingFor appends "(host)"
     // when the host is not already named — rendering "…hotline (188)
     // (caa.go.jp)" in verdict steps and the report footer.
-    for (const code of ["DE", "ZA", "IN", "JP", "BR"]) {
+    for (const code of [
+      "DE", "ZA", "IN", "JP", "BR",
+      "FR", "ES", "IT", "MX", "ID", "NL", "SE", "PH", "NG", "KE", "KR", "TH", "VN", "PL", "AE",
+    ]) {
       const label = reportingFor(code).label;
       expect({ code, doubleParen: /\)\s*\(/.test(label) }).toEqual({ code, doubleParen: false });
     }

@@ -403,6 +403,273 @@ tiers:
         Brazil's national CERT, run by NIC.br; publishes public alerts
         including phishing and banking-malware campaigns.
 
+    # ── item 4 step 5 wave 2 ───────────────────────────────────────────────
+    # Two entries per region for FR, ES, IT, MX, ID, NL, SE, PH, NG, KE, KR,
+    # TH, VN, PL and AE — registered alongside the `minimal` packs for those
+    # regions, same discipline as the DE/ZA/IN/JP/BR block above: all
+    # `check: manual`, contributing nothing until a human opens them.
+
+    # ── FR ─────────────────────────────────────────────────────────────────
+    - domain: cybermalveillance.gouv.fr
+      name: Cybermalveillance.gouv.fr
+      url: https://www.cybermalveillance.gouv.fr/tous-nos-contenus/actualites
+      region: FR
+      check: manual
+      note: >-
+        National cybersecurity awareness platform, run jointly by the state and
+        industry; publishes named campaign alerts and is the reporting
+        destination named in the FR pack.
+    - domain: economie.gouv.fr
+      name: DGCCRF — consumer fraud alerts
+      url: https://www.economie.gouv.fr/dgccrf/alertes-consommation
+      region: FR
+      check: manual
+      note: Consumer-protection authority; publishes named scam and fraud alerts.
+
+    # ── ES ─────────────────────────────────────────────────────────────────
+    - domain: incibe.es
+      name: INCIBE — Instituto Nacional de Ciberseguridad
+      url: https://www.incibe.es/ciudadania/avisos
+      region: ES
+      check: manual
+      note: >-
+        National cybersecurity institute; publishes public advisories and is
+        the reporting destination named in the ES pack.
+    - domain: policia.es
+      name: Policía Nacional — alertas de fraude
+      url: https://www.policia.es/consejos/
+      region: ES
+      check: manual
+      note: National police; publishes fraud and scam-prevention advisories.
+
+    # ── IT ─────────────────────────────────────────────────────────────────
+    - domain: commissariatodips.it
+      name: Polizia Postale — Commissariato di P.S. Online
+      url: https://www.commissariatodips.it/
+      region: IT
+      check: manual
+      note: >-
+        National postal and cybercrime police; publishes named phishing and
+        fraud alerts and is the reporting destination named in the IT pack.
+    - domain: agenziaentrate.gov.it
+      name: Agenzia delle Entrate — phishing alerts
+      url: https://www.agenziaentrate.gov.it/portale/web/guest/aree-tematiche/phishing
+      region: IT
+      check: manual
+      note: Tax authority's own list of confirmed phishing campaigns impersonating it.
+
+    # ── MX ─────────────────────────────────────────────────────────────────
+    - domain: gob.mx
+      name: Guardia Nacional — alertas de fraude
+      url: https://www.gob.mx/guardianacional
+      region: MX
+      check: manual
+      note: >-
+        National guard; publishes fraud and scam advisories and is the
+        reporting destination named in the MX pack.
+    - domain: condusef.gob.mx
+      name: CONDUSEF — alertas
+      url: https://www.condusef.gob.mx/?p=alertas
+      region: MX
+      check: manual
+      note: >-
+        Financial-consumer protection commission; publishes named financial
+        fraud and phishing alerts.
+
+    # ── ID ──────────────────────────────────────────────────────────────────
+    - domain: ojk.go.id
+      name: OJK — Otoritas Jasa Keuangan, investor alerts
+      url: https://www.ojk.go.id/id/berita-dan-kegiatan/info-terkini/
+      region: ID
+      check: manual
+      note: >-
+        Financial services authority; publishes public warning lists of
+        unauthorised investment providers, named in the ID pack's flag copy.
+    - domain: bssn.go.id
+      name: BSSN — Badan Siber dan Sandi Negara
+      url: https://bssn.go.id/berita/
+      region: ID
+      check: manual
+      note: National cyber and crypto agency; publishes public security advisories.
+
+    # ── NL ──────────────────────────────────────────────────────────────────
+    - domain: fraudehelpdesk.nl
+      name: Fraudehelpdesk
+      url: https://www.fraudehelpdesk.nl/actuele-fraude/
+      region: NL
+      check: manual
+      note: >-
+        National fraud-reporting helpline; publishes named current-scam alerts
+        and is the reporting destination named in the NL pack.
+    - domain: afm.nl
+      name: AFM — Autoriteit Financiële Markten, investor warnings
+      url: https://www.afm.nl/nl-nl/consumenten/actueel
+      region: NL
+      check: manual
+      note: >-
+        Financial markets authority; publishes public warnings about
+        unauthorised investment providers, named in the NL pack's flag copy.
+
+    # ── SE ──────────────────────────────────────────────────────────────────
+    - domain: polisen.se
+      name: Polisen — bedrägeri
+      url: https://polisen.se/utsatt-for-brott/olika-typer-av-brott/bedrageri/
+      region: SE
+      check: manual
+      note: >-
+        National police; publishes fraud-type guidance and is the reporting
+        destination named in the SE pack.
+    - domain: fi.se
+      name: Finansinspektionen — varningslista
+      url: https://www.fi.se/sv/vara-register/varningslista/
+      region: SE
+      check: manual
+      note: >-
+        Financial supervisory authority; publishes a public warning list of
+        unauthorised investment providers, named in the SE pack's flag copy.
+
+    # ── PH ──────────────────────────────────────────────────────────────────
+    - domain: pnp.gov.ph
+      name: PNP Anti-Cybercrime Group
+      url: https://acg.pnp.gov.ph/
+      region: PH
+      check: manual
+      note: >-
+        National police cybercrime unit; publishes advisories and is the
+        reporting destination named in the PH pack.
+    - domain: sec.gov.ph
+      name: SEC Philippines — advisories
+      url: https://www.sec.gov.ph/advisories/
+      region: PH
+      check: manual
+      note: >-
+        Securities regulator; publishes a public advisory list of unauthorised
+        investment providers, named in the PH pack's flag copy.
+
+    # ── NG ──────────────────────────────────────────────────────────────────
+    - domain: efccnigeria.org
+      name: EFCC — Economic and Financial Crimes Commission
+      url: https://efccnigeria.org/efcc/news
+      region: NG
+      check: manual
+      note: >-
+        National financial-crimes agency; publishes named scam alerts and is
+        the reporting destination named in the NG pack.
+    - domain: sec.gov.ng
+      name: SEC Nigeria — investor alerts
+      url: https://sec.gov.ng/category/press-release/
+      region: NG
+      check: manual
+      note: >-
+        Securities regulator; publishes public warnings about unauthorised
+        investment providers, named in the NG pack's flag copy.
+
+    # ── KE ──────────────────────────────────────────────────────────────────
+    - domain: dci.go.ke
+      name: Directorate of Criminal Investigations (Kenya)
+      url: https://www.dci.go.ke/index.php/news
+      region: KE
+      check: manual
+      note: >-
+        National criminal-investigations directorate; publishes advisories and
+        is the reporting destination named in the KE pack.
+    - domain: cma.or.ke
+      name: Capital Markets Authority (Kenya) — investor alerts
+      url: https://www.cma.or.ke/index.php/media-center/press-releases
+      region: KE
+      check: manual
+      note: >-
+        Capital markets regulator; publishes public warnings about
+        unauthorised investment providers, named in the KE pack's flag copy.
+
+    # ── KR ──────────────────────────────────────────────────────────────────
+    - domain: police.go.kr
+      name: National Police Agency (South Korea) — cyber safety
+      url: https://www.police.go.kr/www/security/cyber.jsp
+      region: KR
+      check: manual
+      note: >-
+        National police; publishes cybercrime and phishing advisories and is
+        the reporting destination named in the KR pack.
+    - domain: fss.or.kr
+      name: Financial Supervisory Service (South Korea)
+      url: https://www.fss.or.kr/fss/bbs/B0000188/list.do
+      region: KR
+      check: manual
+      note: >-
+        Financial supervisory service; publishes public warnings about
+        unauthorised investment providers, named in the KR pack's flag copy.
+
+    # ── TH ──────────────────────────────────────────────────────────────────
+    - domain: tcsd.in.th
+      name: Technology Crime Suppression Division (Thailand)
+      url: https://www.tcsd.in.th/
+      region: TH
+      check: manual
+      note: >-
+        National technology-crime police unit; publishes advisories and is the
+        reporting destination named in the TH pack.
+    - domain: sec.or.th
+      name: SEC Thailand — investor alerts
+      url: https://www.sec.or.th/EN/Pages/News/PressRelease.aspx
+      region: TH
+      check: manual
+      note: >-
+        Securities regulator; publishes public warnings about unauthorised
+        investment providers, named in the TH pack's flag copy.
+
+    # ── VN ──────────────────────────────────────────────────────────────────
+    - domain: ncsc.gov.vn
+      name: National Cyber Security Center (Vietnam)
+      url: https://khonggianmang.vn/
+      region: VN
+      check: manual
+      note: >-
+        National cybersecurity center; runs the public scam-reporting platform
+        named in the VN pack, and publishes named phishing campaign alerts.
+    - domain: mps.gov.vn
+      name: Ministry of Public Security (Vietnam) — announcements
+      url: https://bocongan.gov.vn/tin-tuc-su-kien/
+      region: VN
+      check: manual
+      note: National police ministry; publishes fraud and scam advisories.
+
+    # ── PL ──────────────────────────────────────────────────────────────────
+    - domain: cert.pl
+      name: CERT Polska
+      url: https://cert.pl/ostrzezenia/
+      region: PL
+      check: manual
+      note: >-
+        National CERT, run by NASK; publishes named phishing campaign alerts
+        and is the reporting destination named in the PL pack.
+    - domain: knf.gov.pl
+      name: KNF — Komisja Nadzoru Finansowego
+      url: https://www.knf.gov.pl/dla_konsumenta/ostrzezenia_publiczne
+      region: PL
+      check: manual
+      note: >-
+        Financial supervision authority; publishes a public warning list of
+        unauthorised investment providers, named in the PL pack's flag copy.
+
+    # ── AE ──────────────────────────────────────────────────────────────────
+    - domain: ecrime.ae
+      name: Dubai Police — eCrime
+      url: https://ecrime.ae/
+      region: AE
+      check: manual
+      note: >-
+        Dubai Police's cybercrime reporting platform, named in the AE pack;
+        publishes public scam-awareness advisories.
+    - domain: sca.gov.ae
+      name: Securities and Commodities Authority (UAE) — investor alerts
+      url: https://www.sca.gov.ae/en/media-center/news.aspx
+      region: AE
+      check: manual
+      note: >-
+        Securities regulator; publishes public warnings about unauthorised
+        investment providers, named in the AE pack's flag copy.
+
   2:
     - domain: fraudsmart.ie
       name: FraudSMART (Banking & Payments Federation Ireland)

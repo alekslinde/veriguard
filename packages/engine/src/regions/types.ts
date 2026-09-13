@@ -18,6 +18,8 @@
 export type RegionCode =
   | "AU" | "GB" | "US" | "NZ" | "CA" | "IE"
   | "SG" | "DE" | "ZA" | "IN" | "JP" | "BR"
+  | "FR" | "ES" | "IT" | "MX" | "ID" | "NL" | "SE"
+  | "PH" | "NG" | "KE" | "KR" | "TH" | "VN" | "PL" | "AE"
   | "ZZ";
 
 /**
