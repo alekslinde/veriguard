@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { isSameOriginRead } from "@/lib/readGuard";
 import { SITE_URL } from "@/lib/siteUrl";
 
@@ -207,5 +207,59 @@ describe("POST /api/ocr", () => {
     expect(res.status).toBe(429);
     expect((await res.json()).code).toBe("rate_limited");
     expect(res.headers.get("cache-control")).toBe("no-store");
+  });
+});
+
+// The rate limit caps how OFTEN a caller asks. It says nothing about how much
+// each ask costs, and analysis is superlinear in input length — so an
+// unbounded /api/check body was a way to spend a lot of CPU inside the budget.
+// These two guard the halves of that fix: the route refuses oversized input,
+// and the address patterns it reaches stay bounded.
+describe("analysis cost is bounded by input length", () => {
+  it("refuses content past the analysis limit rather than truncating it", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/urlhausBlocklist", () => ({
+      getUrlhausBlocklist: async () => new Set<string>(),
+    }));
+    vi.doMock("@/lib/reportStore", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("@/lib/reportStore")>();
+      return { ...actual, incrementCheckCount: async () => {} };
+    });
+    const { POST } = await import("@/app/api/check/route");
+    const { NextRequest } = await import("next/server");
+
+    const req = new NextRequest("http://localhost/api/check", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-forwarded-for": "198.51.100.9",
+      },
+      body: JSON.stringify({ content: "a".repeat(100_001) }),
+    });
+
+    const res = await POST(req);
+    // Refused, not silently scored on a truncated body: a half-analysed input
+    // would return a confident verdict on evidence the user cannot see was cut.
+    expect(res.status).toBe(413);
+    expect((await res.json()).code).toBe("content_too_long");
+
+    vi.resetModules();
+  });
+
+  it("analyses a hostile display name in linear time", async () => {
+    const { analyseEmailIdentities, parseEmailHeaders } = await import(
+      "@veriguard/engine/emailHeaders"
+    );
+
+    // An address-shaped display name that never completes a match. Against the
+    // unbounded pattern this backtracked quadratically — 40KB took ~57s. The
+    // assertion is deliberately loose: it is catching a return to superlinear
+    // behaviour, not measuring a machine.
+    const hostile = (n: number) =>
+      `From: "${"a".repeat(n)}@${"b".repeat(n)}" <real@example.com>\n\nbody`;
+
+    const started = Date.now();
+    analyseEmailIdentities(parseEmailHeaders(hostile(40_000)));
+    expect(Date.now() - started).toBeLessThan(1_000);
   });
 });

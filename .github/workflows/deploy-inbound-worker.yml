@@ -12,6 +12,12 @@ on:
   # Allow a manual run from the Actions tab (e.g. to re-push the secret).
   workflow_dispatch:
 
+# Checkout is all this needs; deployment authenticates with its own credential
+# rather than the workflow token. Stated explicitly so the job does not inherit
+# a broader default.
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest

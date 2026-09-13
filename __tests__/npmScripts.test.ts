@@ -69,7 +69,7 @@ describe("npm scripts resolve", () => {
     // that need a memorable name. check-sources.mjs was the odd one out for
     // months purely because it predates the others.
     const unaliased = tracked("scripts/check-*").filter(
-      (f) => !Object.values(SCRIPTS).some((body) => body.includes(f.replace("scripts/", "scripts/"))),
+      (f) => !Object.values(SCRIPTS).some((body) => body.includes(f)),
     );
     expect(unaliased).toEqual([]);
   });

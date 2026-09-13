@@ -72,6 +72,15 @@ function decodeBody(body: string, encoding: string): string {
 // blocks and MSO conditional comments wholesale, turn <a> links and block
 // elements into something legible, strip remaining tags, decode basic entities,
 // and collapse the blank-line storm Word/Outlook HTML produces.
+//
+// NOT a sanitizer, despite the shape. It makes hostile HTML *readable*, and its
+// output is only ever rendered as text or stored — never as markup. The tag
+// stripping below is defeatable on purpose-built input and known to be: a
+// "</style >" with a space survives it, a nested "<scr<script>ipt>" leaves
+// residue, and "&amp;lt;" decodes to "<" because the entity pass runs after the
+// tag pass. That is acceptable for readability and would not be for safety, so
+// if you ever need to render this output as HTML, do not reach for this
+// function — escape at the render site or bring in a real sanitizer.
 function htmlToText(html: string): string {
   let s = html;
   // Remove non-content blocks entirely (including their inner text).
