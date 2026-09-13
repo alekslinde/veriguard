@@ -14,6 +14,21 @@ import { ZA } from "@veriguard/engine/regions/za";
 import { IN } from "@veriguard/engine/regions/in";
 import { JP } from "@veriguard/engine/regions/jp";
 import { BR } from "@veriguard/engine/regions/br";
+import { FR } from "@veriguard/engine/regions/fr";
+import { ES } from "@veriguard/engine/regions/es";
+import { IT } from "@veriguard/engine/regions/it";
+import { MX } from "@veriguard/engine/regions/mx";
+import { ID } from "@veriguard/engine/regions/id";
+import { NL } from "@veriguard/engine/regions/nl";
+import { SE } from "@veriguard/engine/regions/se";
+import { PH } from "@veriguard/engine/regions/ph";
+import { NG } from "@veriguard/engine/regions/ng";
+import { KE } from "@veriguard/engine/regions/ke";
+import { KR } from "@veriguard/engine/regions/kr";
+import { TH } from "@veriguard/engine/regions/th";
+import { VN } from "@veriguard/engine/regions/vn";
+import { PL } from "@veriguard/engine/regions/pl";
+import { AE } from "@veriguard/engine/regions/ae";
 import { REST_OF_WORLD } from "@veriguard/engine/regions/rest-of-world";
 import { findKeyboardTypo } from "@veriguard/engine/keyboardAdjacency";
 import type { RegionCode, RegionDefinition } from "@veriguard/engine/regions/types";
@@ -25,7 +40,9 @@ import type { RegionCode, RegionDefinition } from "@veriguard/engine/regions/typ
  * the resolved pack (where the two layers are already unioned).
  */
 const REGION_DEFINITIONS: Record<RegionCode, RegionDefinition> = {
-  AU, GB, US, NZ, CA, IE, SG, DE, ZA, IN, JP, BR, ZZ: REST_OF_WORLD,
+  AU, GB, US, NZ, CA, IE, SG, DE, ZA, IN, JP, BR,
+  FR, ES, IT, MX, ID, NL, SE, PH, NG, KE, KR, TH, VN, PL, AE,
+  ZZ: REST_OF_WORLD,
 };
 
 /**
@@ -359,7 +376,12 @@ describe("pack invariants (every region)", () => {
       // These carry the same shape with no pack claiming them, so the
       // exemption has to be withheld by the rule itself. Asserted unclaimed
       // below rather than assumed — see CLAIMED_BRAND_SUFFIXES.
-      "paypal.gov.gr", "amazon.ac.kr", "netflix.edu.pl",
+      //
+      // ac.kr and edu.pl were the original fixtures here; both were reclaimed
+      // when the KR and PL packs shipped (item 4 step 5 wave 2), the exact
+      // staleness this comment warned about — re-pointed at ac.at and edu.tr,
+      // still unclaimed by any pack.
+      "paypal.gov.gr", "amazon.ac.at", "netflix.edu.tr",
     ];
     for (const host of hosts) {
       const flags = checkUrl(`http://${host}/login`, undefined, code).flags.join(" | ").toLowerCase();
@@ -378,7 +400,7 @@ describe("pack invariants (every region)", () => {
     // Written as its own case so the diagnosis arrives with the failure: if
     // this goes red, re-point the fixture at an unclaimed country rather than
     // changing the rule.
-    for (const suffix of ["gov.gr", "ac.kr", "edu.pl"]) {
+    for (const suffix of ["gov.gr", "ac.at", "edu.tr"]) {
       expect({ suffix, claimed: CLAIMED_BRAND_SUFFIXES.has(suffix) })
         .toEqual({ suffix, claimed: false });
     }

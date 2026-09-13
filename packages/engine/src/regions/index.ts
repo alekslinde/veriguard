@@ -14,6 +14,21 @@ import { ZA } from "./za";
 import { IN } from "./in";
 import { JP } from "./jp";
 import { BR } from "./br";
+import { FR } from "./fr";
+import { ES } from "./es";
+import { IT } from "./it";
+import { MX } from "./mx";
+import { ID } from "./id";
+import { NL } from "./nl";
+import { SE } from "./se";
+import { PH } from "./ph";
+import { NG } from "./ng";
+import { KE } from "./ke";
+import { KR } from "./kr";
+import { TH } from "./th";
+import { VN } from "./vn";
+import { PL } from "./pl";
+import { AE } from "./ae";
 import { REST_OF_WORLD } from "./rest-of-world";
 import type { RegionCode, RegionDefinition, RegionPack } from "./types";
 
@@ -50,6 +65,21 @@ const REGIONS: Record<RegionCode, RegionDefinition> = {
   IN,
   JP,
   BR,
+  FR,
+  ES,
+  IT,
+  MX,
+  ID,
+  NL,
+  SE,
+  PH,
+  NG,
+  KE,
+  KR,
+  TH,
+  VN,
+  PL,
+  AE,
   ZZ: REST_OF_WORLD,
 };
 
