@@ -35,18 +35,23 @@ const nextConfig: NextConfig = {
   // directly from node_modules at runtime.
   serverExternalPackages: ["sharp", "tesseract.js"],
 
-  // Tesseract resolves three runtime assets by string path, none of which
-  // Next.js file tracing can detect statically, so all must be declared here
+  // Tesseract resolves two runtime assets by string path, neither of which
+  // Next.js file tracing can detect statically, so both must be declared here
   // or Vercel omits them from the function bundle:
-  //   1. eng.traineddata.gz   — language data (process.cwd()/public/tessdata)
-  //   2. tesseract-core*.wasm — the WASM core, readFileSync'd by the JS shim
-  //      at runtime (the .js shims ARE traced, the .wasm binaries are not).
-  // Without the .wasm files the worker fails to initialise; the failure is
+  //   1. eng.traineddata.gz  — language data (process.cwd()/public/tessdata)
+  //   2. tesseract-core-lstm.wasm — the WASM core, readFileSync'd by the JS
+  //      shim at runtime (the .js shim IS traced, the .wasm binary is not).
+  // Without the .wasm file the worker fails to initialise; the failure is
   // otherwise silent and the request hangs until the client aborts.
+  //
+  // Only the one core variant app/api/ocr/route.ts pins via corePath is
+  // listed — the glob this used to be (./node_modules/tesseract.js-core/*.wasm)
+  // bundled all six variants tesseract.js ships (~18 MB) into every
+  // deployment of this function, when only one is ever loaded at runtime.
   outputFileTracingIncludes: {
     "/api/ocr": [
       "./public/tessdata/**/*",
-      "./node_modules/tesseract.js-core/*.wasm",
+      "./node_modules/tesseract.js-core/tesseract-core-lstm.wasm",
     ],
   },
 
