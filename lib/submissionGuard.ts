@@ -18,10 +18,23 @@ export interface GuardInput {
   content: string;
   description: string;
   hp: string;           // honeypot — must be empty
-  loadedAt: number;     // unix ms when the form was rendered, set by client
+  // unix ms the form was rendered. Server-verified when loadedAtVerified is
+  // true (see lib/formToken.ts) — otherwise this is the client's own claim
+  // and worth treating as a soft signal only, since it costs an attacker
+  // nothing to fabricate.
+  loadedAt: number;
+  loadedAtVerified: boolean;
   ip: string;
   userAgent: string;
   contentLength: number;
+  // The scam identifier the reporter is accusing, if any — used to cross-check
+  // that the accusation is actually about something scam-shaped rather than
+  // an innocent third party's domain riding along behind unrelated
+  // scam-flavoured free text. `kind` says which scorer applies: content.type
+  // is the REPORT's type (e.g. "email" for a forwarded scam email) and is not
+  // always the identifier's own shape — an email report still names a
+  // scamUrl. See scoreContent below.
+  scamIdentifier?: { kind: "url" | "phone" | "email"; value: string };
 }
 
 export interface GuardResult {
@@ -55,6 +68,14 @@ export function guardSubmission(input: GuardInput): GuardResult {
   // ── 3. Timing check ────────────────────────────────────────────────────────
   // A human takes at least a few seconds to read the form and fill it in.
   // If loadedAt is missing or the gap is under 2.5s it's automated.
+  //
+  // An unverified loadedAt is a claim, not evidence — an attacker who has read
+  // this file can fabricate Date.now() - 3000 and clear the bar instantly. It
+  // still gates *unauthenticated* submissions (no REPORT_FORM_SECRET
+  // configured) so local dev and any deploy that hasn't set the secret keep
+  // the old behaviour, but a verified timestamp is required to earn "accept"
+  // outright — see the plausibility step below, which additionally downgrades
+  // an otherwise-passing unverified submission.
   const elapsed = Date.now() - (input.loadedAt || 0);
   if (!input.loadedAt || elapsed < 2500) {
     return { verdict: "suspect", reason: "submitted_too_fast" };
@@ -92,6 +113,42 @@ export function guardSubmission(input: GuardInput): GuardResult {
   const score = scoreContent(input.type as ScamType, input.content);
   if (score < 8) {
     return { verdict: "suspect", reason: "content_appears_legitimate" };
+  }
+
+  // ── 8. Identifier plausibility ─────────────────────────────────────────────
+  // scoreContent above only checks the free-text `content` field — it never
+  // looks at the accused scamUrl/scamPhone/scamEmail itself. That gap lets an
+  // attacker name a real, innocent business's domain as the identifier while
+  // padding `content` with scam-flavoured filler that clears the score-8
+  // floor on its own: the plausibility check passes, but nothing about it was
+  // ever actually about the accused identifier. Since accepted reports appear
+  // on the public feed sorted by report_count, this is exploitable as
+  // targeted reputational harm, not just spam.
+  //
+  // Two independent checks, either of which downgrades to "suspect" (review
+  // queue) rather than blocking outright — a false positive here costs a
+  // legitimate reporter a delay, not a rejection:
+  //   - the identifier itself must not score as obviously legitimate
+  //   - the identifier must actually appear in the reported content, so the
+  //     accusation is demonstrably about the thing being named
+  if (input.scamIdentifier) {
+    const { kind, value } = input.scamIdentifier;
+    const identifierScore =
+      kind === "url"   ? checkUrl(value).score :
+      kind === "phone" ? checkPhone(value).score :
+                          checkEmail(value).score;
+    const mentioned = input.content.toLowerCase().includes(value.toLowerCase());
+    if (identifierScore < 8 || !mentioned) {
+      return { verdict: "suspect", reason: "identifier_not_substantiated" };
+    }
+  }
+
+  // A submission that cleared every other gate but whose timing proof was
+  // never verified (no signed token) still only earns a review-queue slot,
+  // not an automatic public listing — this is the one case where "accept" is
+  // withheld purely on the strength of an unprovable claim.
+  if (!input.loadedAtVerified) {
+    return { verdict: "suspect", reason: "timing_unverified" };
   }
 
   return { verdict: "accept", reason: "ok" };

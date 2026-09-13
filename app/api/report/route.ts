@@ -7,10 +7,25 @@ import { scrubPii } from "@/lib/piiScrubber";
 import { distillEmailContent } from "@/lib/emailDistiller";
 import { clientIpFromHeaders, locationFromHeaders } from "@/lib/geo";
 import { resolveRegion } from "@/lib/regionResolver";
+import { issueFormToken, verifyFormToken } from "@/lib/formToken";
 
 // The client IP is used ONLY for transient, in-memory rate limiting inside
 // guardSubmission. It is never written to the database — the only geographic
 // trace a report carries is the coarse region string from locationFromHeaders.
+
+// Same priority order as reportStore.getPrimaryIdentifier — a report only
+// ever has one "accused" identifier, so the guard should cross-check the
+// same one that will end up driving report_count aggregation.
+function identifierFor(
+  url: string,
+  phone: string,
+  email: string,
+): { kind: "url" | "phone" | "email"; value: string } | undefined {
+  if (url)   return { kind: "url",   value: url };
+  if (phone) return { kind: "phone", value: phone };
+  if (email) return { kind: "email", value: email };
+  return undefined;
+}
 
 export async function POST(req: NextRequest) {
   let body: Record<string, unknown>;
@@ -54,15 +69,27 @@ export async function POST(req: NextRequest) {
     dmarc:      String(body.dmarc ?? "").slice(0, 20),
   });
 
+  // formToken carries a server-issued, signed render timestamp. When present
+  // and valid it replaces the client-asserted loadedAt entirely — a value the
+  // client can't choose is the only one worth timing against. Falls back to
+  // the raw client timestamp only when REPORT_FORM_SECRET isn't configured
+  // (local dev) or the token is missing/invalid, same as before.
+  const verifiedIssuedAt = verifyFormToken(
+    Number(body.formTokenIssuedAt ?? 0),
+    String(body.formToken ?? ""),
+  );
+
   const guardResult = guardSubmission({
     type,
     content: safeContent,
     description: String(body.description ?? "").slice(0, 1000),
     hp: String(body.hp ?? ""),
-    loadedAt: Number(body.loadedAt ?? 0),
+    loadedAt: verifiedIssuedAt ?? Number(body.loadedAt ?? 0),
+    loadedAtVerified: verifiedIssuedAt !== null,
     ip: clientIpFromHeaders(req.headers),
     userAgent: req.headers.get("user-agent") ?? "",
     contentLength: rawContent.length,
+    scamIdentifier: identifierFor(safeScamUrl, String(body.scamPhone ?? ""), String(body.scamEmail ?? "")),
   });
 
   // All verdicts return the same shape — the caller never learns which path was taken.
@@ -97,5 +124,9 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   const { reports } = await getStats();
-  return NextResponse.json({ totalReports: reports });
+  const formToken = issueFormToken();
+  return NextResponse.json({
+    totalReports: reports,
+    ...(formToken ? { formToken: formToken.token, formTokenIssuedAt: formToken.issuedAt } : {}),
+  });
 }

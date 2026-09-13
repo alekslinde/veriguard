@@ -17,6 +17,7 @@ function validInput(overrides: Partial<GuardInput> = {}): GuardInput {
     description: "",
     hp: "",
     loadedAt: Date.now() - 5_000,       // 5 seconds ago — human speed
+    loadedAtVerified: true,             // server-signed timing proof present
     ip: "1.2.3.4",
     userAgent: "Mozilla/5.0 (Macintosh) AppleWebKit/537.36",
     contentLength: 100,
@@ -156,6 +157,50 @@ describe("guardSubmission — content plausibility", () => {
     const result = guardSubmission(validInput({ content: "https://ato.gov.au" }));
     expect(result.verdict).toBe("suspect");
     expect(result.reason).toBe("content_appears_legitimate");
+  });
+});
+
+describe("guardSubmission — timing verification", () => {
+  it("returns suspect when the timing proof isn't server-verified, even though every other gate passes", () => {
+    const result = guardSubmission(validInput({ loadedAtVerified: false }));
+    expect(result.verdict).toBe("suspect");
+    expect(result.reason).toBe("timing_unverified");
+  });
+});
+
+describe("guardSubmission — identifier plausibility", () => {
+  it("returns suspect when the accused URL scores as legitimate", () => {
+    const result = guardSubmission(
+      validInput({
+        content: "http://bit.ly/scam123 verify your account now",
+        scamIdentifier: { kind: "url", value: "https://ato.gov.au" },
+      })
+    );
+    expect(result.verdict).toBe("suspect");
+    expect(result.reason).toBe("identifier_not_substantiated");
+  });
+
+  it("returns suspect when the accused identifier never appears in the reported content", () => {
+    // content is scam-flavoured and scores fine on its own, but the accused
+    // URL is never mentioned in it — an attacker naming an unrelated domain.
+    const result = guardSubmission(
+      validInput({
+        content: "URGENT: verify your account now or it will be suspended",
+        scamIdentifier: { kind: "url", value: "http://totally-unrelated-domain.example" },
+      })
+    );
+    expect(result.verdict).toBe("suspect");
+    expect(result.reason).toBe("identifier_not_substantiated");
+  });
+
+  it("accepts when the accused identifier is scam-shaped and mentioned in content", () => {
+    const result = guardSubmission(
+      validInput({
+        content: "Got this scam link: http://bit.ly/scam123 — verify your account now",
+        scamIdentifier: { kind: "url", value: "http://bit.ly/scam123" },
+      })
+    );
+    expect(result.verdict).toBe("accept");
   });
 });
 

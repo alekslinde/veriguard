@@ -128,6 +128,22 @@ async function setup(): Promise<void> {
   // `location`, which is display text: this records which detection ruleset ran,
   // so coverage gaps by region are measurable. Empty for rows predating it.
   await db.execute(`ALTER TABLE reports ADD COLUMN region       TEXT    NOT NULL DEFAULT ''`).catch(() => {});
+
+  // Every public-feed read (getPublicReports, getPublicReportsCount,
+  // getFeedStats) filters on `suspect = 0` first, then usually `type` or an
+  // ordering over `submitted_at`/`report_count` — none of that had an index,
+  // so each request was a full table scan. `search` still is (leading-wildcard
+  // LIKE can't use a B-tree index either way), but the unfiltered/typed/sorted
+  // paths, which are the common case, now are not.
+  await db.execute(
+    `CREATE INDEX IF NOT EXISTS idx_reports_suspect_submitted ON reports (suspect, submitted_at)`
+  ).catch(() => {});
+  await db.execute(
+    `CREATE INDEX IF NOT EXISTS idx_reports_suspect_type ON reports (suspect, type)`
+  ).catch(() => {});
+  await db.execute(
+    `CREATE INDEX IF NOT EXISTS idx_reports_suspect_count ON reports (suspect, report_count)`
+  ).catch(() => {});
 }
 
 export async function getDb(): Promise<Client> {

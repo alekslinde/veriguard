@@ -149,6 +149,17 @@ describe("scrubPii", () => {
     // A single hex group with no colon must not be mistaken for an IPv6 address.
     expect(scrubPii("order deadbeef confirmed")).toBe("order deadbeef confirmed");
   });
+
+  it("redacts an AU mobile written in fullwidth Unicode digits", () => {
+    // ０-９ are fullwidth 0-9 — visually a phone number, invisible to \d.
+    expect(scrubPii("Call ０４１２ ３４５ ６７８ now")).toBe(
+      "Call [phone removed] now"
+    );
+  });
+
+  it("redacts an AU mobile with zero-width characters spliced between digits", () => {
+    expect(scrubPii("Ring 0412​345​678 thanks")).toBe("Ring [phone removed] thanks");
+  });
 });
 
 describe("stripReporterHeaders", () => {

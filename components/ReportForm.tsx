@@ -179,12 +179,21 @@ export default function ReportForm({ initialType, initialContent, initialScamUrl
   const [totalReports, setTotalReports] = useState<number | null>(null);
 
   const loadedAt = useRef(0);
+  // Server-signed render timestamp (see lib/formToken.ts) — replaces the raw
+  // client loadedAt as the anti-bot timing signal when the server has a
+  // REPORT_FORM_SECRET configured. Empty until the GET below resolves.
+  const formToken = useRef({ token: "", issuedAt: 0 });
 
   useEffect(() => {
     loadedAt.current = Date.now();
     fetch("/api/report")
       .then((r) => r.json())
-      .then((d) => setTotalReports(d.totalReports))
+      .then((d) => {
+        setTotalReports(d.totalReports);
+        if (d.formToken && d.formTokenIssuedAt) {
+          formToken.current = { token: d.formToken, issuedAt: d.formTokenIssuedAt };
+        }
+      })
       .catch(() => null);
   }, []);
 
@@ -239,6 +248,8 @@ export default function ReportForm({ initialType, initialContent, initialScamUrl
           contact,
           hp,
           loadedAt: loadedAt.current,
+          formToken: formToken.current.token,
+          formTokenIssuedAt: formToken.current.issuedAt,
         }),
       });
 
