@@ -7,10 +7,25 @@ import { scrubPii } from "@/lib/piiScrubber";
 import { distillEmailContent } from "@/lib/emailDistiller";
 import { clientIpFromHeaders, locationFromHeaders } from "@/lib/geo";
 import { resolveRegion } from "@/lib/regionResolver";
+import { issueFormToken, verifyFormToken } from "@/lib/formToken";
 
 // The client IP is used ONLY for transient, in-memory rate limiting inside
 // guardSubmission. It is never written to the database — the only geographic
 // trace a report carries is the coarse region string from locationFromHeaders.
+
+// Same priority order as reportStore.getPrimaryIdentifier — a report only
+// ever has one "accused" identifier, so the guard should cross-check the
+// same one that will end up driving report_count aggregation.
+function identifierFor(
+  url: string,
+  phone: string,
+  email: string,
+): { kind: "url" | "phone" | "email"; value: string } | undefined {
+  if (url)   return { kind: "url",   value: url };
+  if (phone) return { kind: "phone", value: phone };
+  if (email) return { kind: "email", value: email };
+  return undefined;
+}
 
 export async function POST(req: NextRequest) {
   let body: Record<string, unknown>;
@@ -24,6 +39,12 @@ export async function POST(req: NextRequest) {
   const rawContent = String(body.content ?? "");
   const type = String(body.type ?? "");
   const rawScamUrl = String(body.scamUrl ?? "").slice(0, 2000);
+  const rawDescription = String(body.description ?? "").slice(0, 1000);
+  // Bounded here rather than only at storeReport: these reach guardSubmission
+  // first, and an unclamped field would be matched and scored before anything
+  // trimmed it.
+  const rawScamPhone = String(body.scamPhone ?? "").slice(0, 50);
+  const rawScamEmail = String(body.scamEmail ?? "").slice(0, 200);
 
   // For URL/QR reports strip tracking parameters before storing — keeping them
   // would let the scammer correlate which of their campaigns got reported.
@@ -54,15 +75,33 @@ export async function POST(req: NextRequest) {
     dmarc:      String(body.dmarc ?? "").slice(0, 20),
   });
 
+  // formToken carries a server-issued, signed render timestamp. When present
+  // and valid it replaces the client-asserted loadedAt entirely — a value the
+  // client can't choose is the only one worth timing against. Falls back to
+  // the raw client timestamp only when REPORT_FORM_SECRET isn't configured
+  // (local dev) or the token is missing/invalid, same as before.
+  const verifiedIssuedAt = verifyFormToken(
+    Number(body.formTokenIssuedAt ?? 0),
+    String(body.formToken ?? ""),
+  );
+
+  // Pre-scrub text for the identifier-substantiation match only — see the note
+  // on GuardInput.substantiationText. This is passed to the guard and then
+  // dropped; only the scrubbed values below are ever stored.
+  const substantiationText = [rawContent, rawDescription].join("\n");
+
   const guardResult = guardSubmission({
     type,
     content: safeContent,
-    description: String(body.description ?? "").slice(0, 1000),
+    description: rawDescription,
     hp: String(body.hp ?? ""),
-    loadedAt: Number(body.loadedAt ?? 0),
+    loadedAt: verifiedIssuedAt ?? Number(body.loadedAt ?? 0),
+    loadedAtVerified: verifiedIssuedAt !== null,
     ip: clientIpFromHeaders(req.headers),
     userAgent: req.headers.get("user-agent") ?? "",
     contentLength: rawContent.length,
+    scamIdentifier: identifierFor(safeScamUrl, rawScamPhone, rawScamEmail),
+    substantiationText,
   });
 
   // All verdicts return the same shape — the caller never learns which path was taken.
@@ -97,5 +136,18 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   const { reports } = await getStats();
-  return NextResponse.json({ totalReports: reports });
+  const formToken = issueFormToken();
+  return NextResponse.json(
+    {
+      totalReports: reports,
+      ...(formToken ? { formToken: formToken.token, formTokenIssuedAt: formToken.issuedAt } : {}),
+    },
+    {
+      // no-store because the body now carries a per-request signed timestamp.
+      // A shared cache would hand one issuedAt to every visitor, and once it
+      // aged past the token TTL every submission behind it would silently land
+      // in the review queue.
+      headers: { "Cache-Control": "no-store" },
+    },
+  );
 }

@@ -2,6 +2,24 @@
 // Covers patterns with reliable regex shapes. Names and street addresses
 // cannot be reliably detected without NLP and are out of scope.
 
+// Every PATTERN below assumes ASCII digits with at most one ordinary
+// separator between groups. An attacker who has read this file can defeat
+// every one of them for free by writing a phone number in fullwidth Unicode
+// digits (０-９, which \d never matches) or by interleaving
+// zero-width/invisible characters between ordinary digits — the number still
+// reads as a phone number to a human, and still round-trips through most
+// clients, but no PATTERN's character class contains it.
+//
+// NFKC normalization folds fullwidth/compatibility digit forms down to plain
+// ASCII ("０４１２" → "0412"), and stripping the zero-width/invisible block
+// closes the interleaving trick — both applied once, up front, rather than
+// widening every regex's character classes individually.
+const ZERO_WIDTH_RE = /[​-‍﻿­⁠]/g;
+
+function normalizeForScrubbing(text: string): string {
+  return text.normalize("NFKC").replace(ZERO_WIDTH_RE, "");
+}
+
 const PATTERNS: Array<[RegExp, string]> = [
   // Email addresses
   [/\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b/g, "[email removed]"],
@@ -34,7 +52,7 @@ const PATTERNS: Array<[RegExp, string]> = [
 ];
 
 export function scrubPii(text: string): string {
-  let result = text;
+  let result = normalizeForScrubbing(text);
   for (const [pattern, replacement] of PATTERNS) {
     result = result.replace(pattern, replacement);
   }
@@ -42,7 +60,7 @@ export function scrubPii(text: string): string {
 }
 
 /**
- * The literal substrings scrubPii would redact, in order of appearance.
+ * The substrings scrubPii would redact, in order of appearance.
  *
  * Exposed for callers that must reason about *which* identifiers a text
  * contains rather than just removing them — the eval corpus check requires each
@@ -57,8 +75,19 @@ export function scrubPii(text: string): string {
  * Later patterns are applied to text where earlier ones already matched, so a
  * span already covered is skipped — mirroring scrubPii's sequential replace,
  * where an IPv4 inside a mapped IPv6 is consumed by the IPv4 pass first.
+ *
+ * Spans are reported in NORMALISED form, so for input containing fullwidth
+ * digits or zero-width separators a returned span is not a literal substring
+ * of the input — "０４１２…" is reported as "0412…". That is
+ * the useful answer rather than a leak: these report what scrubPii redacts,
+ * and it redacts the normalised form. A caller comparing against hand-declared
+ * identifiers should declare them in normal ASCII.
  */
-export function findPii(text: string): string[] {
+export function findPii(rawText: string): string[] {
+  // Scanned against the same normalized text scrubPii actually redacts —
+  // reporting spans from the raw input would miss exactly the fullwidth/
+  // zero-width evasions normalization exists to catch.
+  const text = normalizeForScrubbing(rawText);
   const spans: Array<[number, number]> = [];
   const covered = (start: number, end: number): boolean =>
     spans.some(([s, e]) => start < e && end > s);

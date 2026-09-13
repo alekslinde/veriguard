@@ -149,6 +149,17 @@ describe("scrubPii", () => {
     // A single hex group with no colon must not be mistaken for an IPv6 address.
     expect(scrubPii("order deadbeef confirmed")).toBe("order deadbeef confirmed");
   });
+
+  it("redacts an AU mobile written in fullwidth Unicode digits", () => {
+    // ０-９ are fullwidth 0-9 — visually a phone number, invisible to \d.
+    expect(scrubPii("Call ０４１２ ３４５ ６７８ now")).toBe(
+      "Call [phone removed] now"
+    );
+  });
+
+  it("redacts an AU mobile with zero-width characters spliced between digits", () => {
+    expect(scrubPii("Ring 0412​345​678 thanks")).toBe("Ring [phone removed] thanks");
+  });
 });
 
 describe("stripReporterHeaders", () => {
@@ -321,8 +332,16 @@ describe("findPii", () => {
     }
   });
 
-  it("returns spans that are literal substrings of the input", () => {
+  it("returns spans that are literal substrings of already-normal input", () => {
     const text = "From: \"myGov\" <noreply@evil.tk> ring 0412 345 678";
     for (const hit of findPii(text)) expect(text).toContain(hit);
+  });
+
+  it("reports normalised spans for fullwidth digits, not input substrings", () => {
+    // Documented contract: spans mirror what scrubPii redacts, and it redacts
+    // the normalised form. Reporting the raw fullwidth run instead would mean
+    // callers comparing against ASCII-declared identifiers never match.
+    const text = "Call ０４１２ ３４５ ６７８ now";
+    expect(findPii(text)).toEqual(["0412 345 678"]);
   });
 });
