@@ -27,14 +27,18 @@ export interface GuardInput {
   ip: string;
   userAgent: string;
   contentLength: number;
-  // The scam identifier the reporter is accusing, if any — used to cross-check
-  // that the accusation is actually about something scam-shaped rather than
-  // an innocent third party's domain riding along behind unrelated
-  // scam-flavoured free text. `kind` says which scorer applies: content.type
-  // is the REPORT's type (e.g. "email" for a forwarded scam email) and is not
-  // always the identifier's own shape — an email report still names a
-  // scamUrl. See scoreContent below.
+  // The scam identifier the reporter is accusing, if any — cross-checked
+  // against substantiationText so an innocent third party's domain cannot
+  // ride along behind unrelated scam-flavoured free text. `kind` is the
+  // identifier's own shape, which is NOT the report's `type`: an email report
+  // still names a scamUrl.
   scamIdentifier?: { kind: "url" | "phone" | "email"; value: string };
+  // The reporter's text BEFORE PII scrubbing, used only for the substantiation
+  // match above and never stored or returned. Scrubbing redacts the very
+  // phone/email shapes an identifier holds, so the scrubbed `content` cannot
+  // answer "did they actually mention this?". Includes the description and,
+  // for email reports, the raw source the scammer's address was parsed from.
+  substantiationText: string;
 }
 
 export interface GuardResult {
@@ -115,7 +119,7 @@ export function guardSubmission(input: GuardInput): GuardResult {
     return { verdict: "suspect", reason: "content_appears_legitimate" };
   }
 
-  // ── 8. Identifier plausibility ─────────────────────────────────────────────
+  // ── 8. Identifier substantiation ───────────────────────────────────────────
   // scoreContent above only checks the free-text `content` field — it never
   // looks at the accused scamUrl/scamPhone/scamEmail itself. That gap lets an
   // attacker name a real, innocent business's domain as the identifier while
@@ -125,20 +129,40 @@ export function guardSubmission(input: GuardInput): GuardResult {
   // on the public feed sorted by report_count, this is exploitable as
   // targeted reputational harm, not just spam.
   //
-  // Two independent checks, either of which downgrades to "suspect" (review
-  // queue) rather than blocking outright — a false positive here costs a
-  // legitimate reporter a delay, not a rejection:
-  //   - the identifier itself must not score as obviously legitimate
-  //   - the identifier must actually appear in the reported content, so the
-  //     accusation is demonstrably about the thing being named
+  // The test is whether the accusation is ABOUT the thing being named, not
+  // whether the named thing scores as a scam. Scoring it is tempting and
+  // wrong in both directions: a genuine first-seen scam domain scores 0
+  // because no rule has met it yet, while a typosquat like "paypa1.com"
+  // also scores 0 — so a score floor would reject honest reports and admit
+  // the exact lookalike this check exists to stop.
+  //
+  // Matching runs against `substantiationText`, which is the text as the
+  // reporter typed it. It cannot run against `content`: that has already been
+  // through scrubPii, which redacts precisely the phone and email shapes an
+  // identifier holds, so searching it for an unredacted number can only ever
+  // fail. Email reports are the case that makes this load-bearing — the
+  // scammer's address is parsed from headers the reporter never submits, so
+  // it is checked against the source text rather than presumed absent.
+  //
+  // Downgrades to "suspect" (review queue) rather than rejecting: a false
+  // positive costs a legitimate reporter a delay, not their report.
+  //
+  // Email identifiers on an email report are EXEMPT, and deliberately so. The
+  // scammer's address there is parsed from headers on the reporter's device
+  // and the raw source is never transmitted — a privacy guarantee the product
+  // makes on purpose — so the address is structurally absent from everything
+  // the server receives. Any test against submitted text would therefore fail
+  // for every genuine email report, which is the product's main flow.
+  //
+  // Corroborating it against the parsed Reply-To was the obvious alternative
+  // and is worse than nothing: a From/Reply-To domain mismatch is itself a
+  // classic scam signal, so that rule would send the MOST suspicious real
+  // reports to review while an attacker simply supplies two matching
+  // addresses. Leaving the exemption visible is better than a check that
+  // inverts its own intent.
   if (input.scamIdentifier) {
-    const { kind, value } = input.scamIdentifier;
-    const identifierScore =
-      kind === "url"   ? checkUrl(value).score :
-      kind === "phone" ? checkPhone(value).score :
-                          checkEmail(value).score;
-    const mentioned = input.content.toLowerCase().includes(value.toLowerCase());
-    if (identifierScore < 8 || !mentioned) {
+    const exempt = input.type === "email" && input.scamIdentifier.kind === "email";
+    if (!exempt && !isSubstantiated(input.scamIdentifier, input.substantiationText)) {
       return { verdict: "suspect", reason: "identifier_not_substantiated" };
     }
   }
@@ -152,6 +176,54 @@ export function guardSubmission(input: GuardInput): GuardResult {
   }
 
   return { verdict: "accept", reason: "ok" };
+}
+
+/**
+ * Whether the reporter's own text actually references the identifier they are
+ * accusing.
+ *
+ * Comparison is per-kind because the same identifier is legitimately written
+ * several ways, and a plain substring test would reject honest reports:
+ *
+ *   - phone: compared digits-only, so "0412 345 678", "0412-345-678" and
+ *     "+61 412 345 678" all match the stored "0412345678". The trailing 8-9
+ *     digits are used so a national-format mention matches an international
+ *     one, which is how people actually paste numbers.
+ *   - url: compared on hostname, so a reporter naming "scam.example" matches
+ *     content carrying "https://scam.example/path?utm=x". Falls back to a
+ *     substring test when the value will not parse as a URL.
+ *   - email: plain case-insensitive substring; addresses are written one way.
+ */
+function isSubstantiated(
+  identifier: { kind: "url" | "phone" | "email"; value: string },
+  text: string,
+): boolean {
+  const { kind, value } = identifier;
+  if (!value.trim() || !text.trim()) return false;
+  const haystack = text.toLowerCase();
+
+  if (kind === "phone") {
+    const digits = value.replace(/\D/g, "");
+    if (digits.length < 6) return false;
+    const textDigits = text.replace(/\D/g, "");
+    return textDigits.includes(digits.slice(-9)) || textDigits.includes(digits);
+  }
+
+  if (kind === "url") {
+    const host = hostnameOf(value);
+    return host ? haystack.includes(host) : haystack.includes(value.toLowerCase());
+  }
+
+  return haystack.includes(value.toLowerCase());
+}
+
+function hostnameOf(value: string): string | null {
+  try {
+    const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? value : `http://${value}`;
+    return new URL(withScheme).hostname.toLowerCase() || null;
+  } catch {
+    return null;
+  }
 }
 
 function scoreContent(type: ScamType, content: string): number {

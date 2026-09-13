@@ -14,6 +14,17 @@ export interface FormToken {
   token: string;
 }
 
+/**
+ * How long an issued token stays valid.
+ *
+ * Matches the guard's own upper timing bound, which already treats a form open
+ * longer than an hour as suspicious — a token outliving that would be accepted
+ * here only to be rejected one check later. Without any expiry a harvested
+ * token would be replayable forever, since the signature alone says nothing
+ * about age.
+ */
+export const FORM_TOKEN_TTL_MS = 3_600_000;
+
 function secret(): string | null {
   return process.env.REPORT_FORM_SECRET || null;
 }
@@ -48,5 +59,9 @@ export function verifyFormToken(issuedAt: number, token: string): number | null 
   const a = Buffer.from(token);
   const b = Buffer.from(expected);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  // Signature valid — now check age. A signature proves the timestamp is ours
+  // and unmodified; it says nothing about whether it is still current.
+  const age = Date.now() - issuedAt;
+  if (age < 0 || age > FORM_TOKEN_TTL_MS) return null;
   return issuedAt;
 }

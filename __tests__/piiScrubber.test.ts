@@ -332,8 +332,16 @@ describe("findPii", () => {
     }
   });
 
-  it("returns spans that are literal substrings of the input", () => {
+  it("returns spans that are literal substrings of already-normal input", () => {
     const text = "From: \"myGov\" <noreply@evil.tk> ring 0412 345 678";
     for (const hit of findPii(text)) expect(text).toContain(hit);
+  });
+
+  it("reports normalised spans for fullwidth digits, not input substrings", () => {
+    // Documented contract: spans mirror what scrubPii redacts, and it redacts
+    // the normalised form. Reporting the raw fullwidth run instead would mean
+    // callers comparing against ASCII-declared identifiers never match.
+    const text = "Call ０４１２ ３４５ ６７８ now";
+    expect(findPii(text)).toEqual(["0412 345 678"]);
   });
 });

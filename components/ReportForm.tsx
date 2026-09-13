@@ -197,6 +197,34 @@ export default function ReportForm({ initialType, initialContent, initialScamUrl
       .catch(() => null);
   }, []);
 
+  // Tokens expire, and a stale one is invisible to the reporter: every verdict
+  // returns the same success screen, so an expired token would silently route
+  // a real report to the review queue.
+  //
+  // Refreshed only when close to expiry, never unconditionally before submit.
+  // The token's issuedAt IS the render time the guard measures against, so a
+  // freshly minted one reads as "submitted 0ms after loading" and trips the
+  // too-fast check — refreshing on every submit would fail every submission.
+  // Re-fetching near the end of the window trades that for a timestamp still
+  // old enough to look human. Failure is non-fatal: the existing token is
+  // kept and the server falls back to its unverified-timing path.
+  async function refreshFormTokenIfStale() {
+    const { issuedAt } = formToken.current;
+    const age = Date.now() - issuedAt;
+    // 55 min against a 60 min server TTL — enough headroom for a slow submit.
+    if (!issuedAt || age < 55 * 60 * 1000) return;
+    try {
+      const d = await fetch("/api/report", { cache: "no-store" }).then((r) => r.json());
+      if (d.formToken && d.formTokenIssuedAt) {
+        formToken.current = { token: d.formToken, issuedAt: d.formTokenIssuedAt };
+        // Keep the heuristic fallback consistent with the token we now hold.
+        loadedAt.current = d.formTokenIssuedAt;
+      }
+    } catch {
+      // Keep whatever token we already hold.
+    }
+  }
+
   // Parse pasted email source / a dropped .eml entirely client-side and
   // auto-fill the From and Reply-To fields. The raw source is NEVER submitted —
   // only the two extracted scammer addresses are. This keeps the reporter's own
@@ -228,6 +256,8 @@ export default function ReportForm({ initialType, initialContent, initialScamUrl
     if (!content.trim() || status === "submitting") return;
 
     setStatus("submitting");
+
+    await refreshFormTokenIfStale();
 
     try {
       const res = await fetch("/api/report", {
@@ -283,6 +313,9 @@ export default function ReportForm({ initialType, initialContent, initialScamUrl
     setReportId(null);
     setStatus("idle");
     loadedAt.current = Date.now();
+    // A second report through the same mounted form starts a fresh timing
+    // window; the token from the first one is already minutes old.
+    void refreshFormTokenIfStale();
   }
 
   if (status === "success") {

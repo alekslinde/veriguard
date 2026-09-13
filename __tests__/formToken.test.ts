@@ -56,6 +56,28 @@ describe("formToken", () => {
       expect(verifyFormToken(Date.now(), "")).toBeNull();
     });
 
+    it("rejects a correctly-signed token that has aged past its TTL", async () => {
+      // Replay protection: a valid signature says the timestamp is ours and
+      // unmodified, but says nothing about how old it is.
+      const { verifyFormToken, FORM_TOKEN_TTL_MS } = await import("@/lib/formToken");
+      const { createHmac } = await import("crypto");
+      const stale = Date.now() - FORM_TOKEN_TTL_MS - 1000;
+      const token = createHmac("sha256", process.env.REPORT_FORM_SECRET!)
+        .update(String(stale))
+        .digest("hex");
+      expect(verifyFormToken(stale, token)).toBeNull();
+    });
+
+    it("accepts a correctly-signed token still inside its TTL", async () => {
+      const { verifyFormToken, FORM_TOKEN_TTL_MS } = await import("@/lib/formToken");
+      const { createHmac } = await import("crypto");
+      const recent = Date.now() - FORM_TOKEN_TTL_MS / 2;
+      const token = createHmac("sha256", process.env.REPORT_FORM_SECRET!)
+        .update(String(recent))
+        .digest("hex");
+      expect(verifyFormToken(recent, token)).toBe(recent);
+    });
+
     it("rejects a token signed with a different secret", async () => {
       const { issueFormToken } = await import("@/lib/formToken");
       const issued = issueFormToken()!;

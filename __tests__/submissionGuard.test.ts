@@ -18,6 +18,7 @@ function validInput(overrides: Partial<GuardInput> = {}): GuardInput {
     hp: "",
     loadedAt: Date.now() - 5_000,       // 5 seconds ago — human speed
     loadedAtVerified: true,             // server-signed timing proof present
+    substantiationText: "http://bit.ly/scam123",  // pre-scrub reporter text
     ip: "1.2.3.4",
     userAgent: "Mozilla/5.0 (Macintosh) AppleWebKit/537.36",
     contentLength: 100,
@@ -168,36 +169,93 @@ describe("guardSubmission — timing verification", () => {
   });
 });
 
-describe("guardSubmission — identifier plausibility", () => {
-  it("returns suspect when the accused URL scores as legitimate", () => {
-    const result = guardSubmission(
-      validInput({
-        content: "http://bit.ly/scam123 verify your account now",
-        scamIdentifier: { kind: "url", value: "https://ato.gov.au" },
-      })
-    );
-    expect(result.verdict).toBe("suspect");
-    expect(result.reason).toBe("identifier_not_substantiated");
-  });
-
-  it("returns suspect when the accused identifier never appears in the reported content", () => {
-    // content is scam-flavoured and scores fine on its own, but the accused
-    // URL is never mentioned in it — an attacker naming an unrelated domain.
+describe("guardSubmission — identifier substantiation", () => {
+  it("returns suspect when the accused identifier never appears in the reporter's text", () => {
+    // The defamation case: scam-flavoured content that scores fine on its own,
+    // with an innocent third party's domain named as the culprit.
     const result = guardSubmission(
       validInput({
         content: "URGENT: verify your account now or it will be suspended",
-        scamIdentifier: { kind: "url", value: "http://totally-unrelated-domain.example" },
+        substantiationText: "URGENT: verify your account now or it will be suspended",
+        scamIdentifier: { kind: "url", value: "https://innocent-business.example" },
       })
     );
     expect(result.verdict).toBe("suspect");
     expect(result.reason).toBe("identifier_not_substantiated");
   });
 
-  it("accepts when the accused identifier is scam-shaped and mentioned in content", () => {
+  it("accepts a typosquat the scorer rates 0 when the reporter actually named it", () => {
+    // paypa1.com scores 0 — a score floor here would have rejected a real
+    // report of a textbook typosquat. Substantiation is about whether the
+    // accusation is on-topic, not whether our rules already know the domain.
     const result = guardSubmission(
       validInput({
-        content: "Got this scam link: http://bit.ly/scam123 — verify your account now",
-        scamIdentifier: { kind: "url", value: "http://bit.ly/scam123" },
+        content: "Scam link: https://paypa1.com verify your account now urgent suspended",
+        substantiationText: "Scam link: https://paypa1.com verify your account now urgent suspended",
+        scamIdentifier: { kind: "url", value: "https://paypa1.com" },
+      })
+    );
+    expect(result.verdict).toBe("accept");
+  });
+
+  it("matches a URL identifier on hostname despite differing path and query", () => {
+    const result = guardSubmission(
+      validInput({
+        content: "Got this: http://bit.ly/scam123 urgent verify account suspended",
+        substantiationText: "Got this: https://bit.ly/scam123?utm_source=sms urgent verify",
+        scamIdentifier: { kind: "url", value: "https://bit.ly/different-path" },
+      })
+    );
+    expect(result.verdict).toBe("accept");
+  });
+
+  it("substantiates a phone identifier against the PRE-scrub text", () => {
+    // The regression the review caught: scrubPii redacts the number out of
+    // `content`, so matching against content alone could never succeed.
+    const result = guardSubmission(
+      validInput({
+        type: "sms",
+        content: "URGENT: your parcel is held. Call [phone removed] to release it.",
+        substantiationText: "URGENT: your parcel is held. Call 0412345678 to release it.",
+        scamIdentifier: { kind: "phone", value: "0412345678" },
+      })
+    );
+    expect(result.verdict).toBe("accept");
+  });
+
+  it("matches a phone identifier across formatting differences", () => {
+    const result = guardSubmission(
+      validInput({
+        type: "sms",
+        content: "URGENT: parcel held, verify now. Call [phone removed]",
+        substantiationText: "URGENT: parcel held, verify now. Call +61 412 345 678",
+        scamIdentifier: { kind: "phone", value: "0412 345 678" },
+      })
+    );
+    expect(result.verdict).toBe("accept");
+  });
+
+  it("substantiates an identifier mentioned only in the description", () => {
+    const result = guardSubmission(
+      validInput({
+        content: "URGENT: verify your account now or it will be suspended",
+        substantiationText:
+          "URGENT: verify your account now or it will be suspended\nIt linked to scam-site.example",
+        scamIdentifier: { kind: "url", value: "https://scam-site.example" },
+      })
+    );
+    expect(result.verdict).toBe("accept");
+  });
+
+  it("exempts an email identifier on an email report, whose address is never transmitted", () => {
+    // The scammer's From is parsed client-side from headers the reporter
+    // deliberately never submits, so it cannot appear in substantiationText.
+    const result = guardSubmission(
+      validInput({
+        type: "email",
+        content: "Dear Customer, open the attached invoice immediately.",
+        substantiationText: "Dear Customer, open the attached invoice immediately.",
+        scamIdentifier: { kind: "email", value: "scammer@dodgy.example" },
       })
     );
     expect(result.verdict).toBe("accept");

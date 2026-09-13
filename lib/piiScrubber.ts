@@ -60,7 +60,7 @@ export function scrubPii(text: string): string {
 }
 
 /**
- * The literal substrings scrubPii would redact, in order of appearance.
+ * The substrings scrubPii would redact, in order of appearance.
  *
  * Exposed for callers that must reason about *which* identifiers a text
  * contains rather than just removing them — the eval corpus check requires each
@@ -75,6 +75,13 @@ export function scrubPii(text: string): string {
  * Later patterns are applied to text where earlier ones already matched, so a
  * span already covered is skipped — mirroring scrubPii's sequential replace,
  * where an IPv4 inside a mapped IPv6 is consumed by the IPv4 pass first.
+ *
+ * Spans are reported in NORMALISED form, so for input containing fullwidth
+ * digits or zero-width separators a returned span is not a literal substring
+ * of the input — "０４１２…" is reported as "0412…". That is
+ * the useful answer rather than a leak: these report what scrubPii redacts,
+ * and it redacts the normalised form. A caller comparing against hand-declared
+ * identifiers should declare them in normal ASCII.
  */
 export function findPii(rawText: string): string[] {
   // Scanned against the same normalized text scrubPii actually redacts —

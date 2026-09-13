@@ -39,6 +39,12 @@ export async function POST(req: NextRequest) {
   const rawContent = String(body.content ?? "");
   const type = String(body.type ?? "");
   const rawScamUrl = String(body.scamUrl ?? "").slice(0, 2000);
+  const rawDescription = String(body.description ?? "").slice(0, 1000);
+  // Bounded here rather than only at storeReport: these reach guardSubmission
+  // first, and an unclamped field would be matched and scored before anything
+  // trimmed it.
+  const rawScamPhone = String(body.scamPhone ?? "").slice(0, 50);
+  const rawScamEmail = String(body.scamEmail ?? "").slice(0, 200);
 
   // For URL/QR reports strip tracking parameters before storing — keeping them
   // would let the scammer correlate which of their campaigns got reported.
@@ -79,17 +85,23 @@ export async function POST(req: NextRequest) {
     String(body.formToken ?? ""),
   );
 
+  // Pre-scrub text for the identifier-substantiation match only — see the note
+  // on GuardInput.substantiationText. This is passed to the guard and then
+  // dropped; only the scrubbed values below are ever stored.
+  const substantiationText = [rawContent, rawDescription].join("\n");
+
   const guardResult = guardSubmission({
     type,
     content: safeContent,
-    description: String(body.description ?? "").slice(0, 1000),
+    description: rawDescription,
     hp: String(body.hp ?? ""),
     loadedAt: verifiedIssuedAt ?? Number(body.loadedAt ?? 0),
     loadedAtVerified: verifiedIssuedAt !== null,
     ip: clientIpFromHeaders(req.headers),
     userAgent: req.headers.get("user-agent") ?? "",
     contentLength: rawContent.length,
-    scamIdentifier: identifierFor(safeScamUrl, String(body.scamPhone ?? ""), String(body.scamEmail ?? "")),
+    scamIdentifier: identifierFor(safeScamUrl, rawScamPhone, rawScamEmail),
+    substantiationText,
   });
 
   // All verdicts return the same shape — the caller never learns which path was taken.
@@ -125,8 +137,17 @@ export async function POST(req: NextRequest) {
 export async function GET() {
   const { reports } = await getStats();
   const formToken = issueFormToken();
-  return NextResponse.json({
-    totalReports: reports,
-    ...(formToken ? { formToken: formToken.token, formTokenIssuedAt: formToken.issuedAt } : {}),
-  });
+  return NextResponse.json(
+    {
+      totalReports: reports,
+      ...(formToken ? { formToken: formToken.token, formTokenIssuedAt: formToken.issuedAt } : {}),
+    },
+    {
+      // no-store because the body now carries a per-request signed timestamp.
+      // A shared cache would hand one issuedAt to every visitor, and once it
+      // aged past the token TTL every submission behind it would silently land
+      // in the review queue.
+      headers: { "Cache-Control": "no-store" },
+    },
+  );
 }
