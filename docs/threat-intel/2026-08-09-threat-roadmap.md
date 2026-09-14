@@ -294,16 +294,9 @@ escalates only by compounding with the sender-spoof and urgency signals.
 
 ## Region Demand Signal
 
-Production Turso database is not reachable in this cloud environment (no
-credentials configured). The local fallback `local.db` contains 14 rows, all
-with an empty `region` column — these are pre-Phase-2 submissions that were
-stored before the `region` column existed and are not representative of
-production traffic.
-
-No meaningful demand data is available this run. The `npm run region-demand`
-script requires Turso credentials and should be run in a context where they are
-available (e.g. a local dev environment or a CI job with the Turso secrets
-injected). It reports submission volume per region, flagging any volume from
+No meaningful demand data available this run. The `npm run region-demand`
+script requires production database credentials and should be run where they
+are available. It reports submission volume per region, flagging any volume from
 outside the six covered packs (AU, GB, US, NZ, CA, IE).
 
 That number gates a real decision: meaningful non-AU volume argues for adding

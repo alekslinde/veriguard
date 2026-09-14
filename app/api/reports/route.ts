@@ -32,11 +32,9 @@ function intParamOrUndefined(raw: string | null): number | undefined {
 /**
  * Bound a caller-supplied value at BOTH ends.
  *
- * `Math.min(limit, 100)` alone caps the top and says nothing about the bottom,
- * and SQLite reads a negative LIMIT as no limit at all — so `?limit=-5`
- * returned the entire reports table, defeating the row cap that is this
- * endpoint's whole cost control. The upper bound was tested; the lower one did
- * not exist. Clamp both ends of anything a caller supplies.
+ * Cap the top and the bottom: an unclamped lower bound defeats the row cap
+ * that is this endpoint's whole cost control. Clamp both ends of anything a
+ * caller supplies.
  */
 function clamp(n: number, min: number, max: number): number {
   return Math.min(Math.max(n, min), max);
@@ -68,16 +66,14 @@ export async function GET(req: NextRequest) {
 
   // Only rate-limited when the caller can actually be identified.
   //
-  // clientIpFromHeaders returns "unknown" for a missing or malformed
-  // x-forwarded-for, and keying on that puts EVERY such visitor in one shared
-  // bucket — so the feed would go dark site-wide after a couple of people
-  // browsed it. That converts a cost control into an availability bug, which is
-  // a strictly worse failure than the one it guards against.
+  // An unidentifiable caller shares one bucket with all such callers, so
+  // keying on it would turn a cost control into an availability bug — a
+  // strictly worse failure than the one it guards against.
   //
   // Failing open here is safe because it is not the only control: the origin
-  // guard above still applies, and the edge cache absorbs the volume. Vercel
-  // sets the header in production, so this is the degraded path rather than the
-  // normal one.
+  // guard above still applies, and the edge cache absorbs the volume. The
+  // platform sets the header in production, so this is the degraded path
+  // rather than the normal one.
   const ip = clientIpFromHeaders(req.headers);
   if (ip !== "unknown" && !checkAndRecordRateLimit(`feed:${ip}`, FEED_RATE_LIMIT)) {
     return NextResponse.json(
