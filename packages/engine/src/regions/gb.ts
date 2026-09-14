@@ -38,6 +38,13 @@ const URGENCY_TOLL = [
   // threat, because a vehicle is only untaxed once the deadline has passed.
   "your vehicle is untaxed", "vehicle tax is overdue",
   "untaxed vehicle",
+  // DVLA payment-failure variant (D2 / #310 / DVLA scam advisory Sep 2026).
+  // Distinct from the deadline-state framing above: "payment has failed"
+  // implies a recent action by the victim (a failed Direct Debit), which is
+  // psychologically more convincing than a generic overdue notice. Scoped to
+  // the vehicle-tax-qualified forms — bare "payment has failed" is ordinary
+  // bank/retailer vocabulary, the same reason "vehicle tax is due" stays out.
+  "vehicle tax payment has failed", "vehicle tax payment failed",
 ];
 
 // Royal Mail / Evri / DPD parcel-redelivery lures. "Redelivery fee" and
