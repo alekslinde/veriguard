@@ -13,7 +13,7 @@
 | D3 | BASE: Crypto seed-phrase solicitation | **Shipped** — `"seed phrase"`, `"recovery phrase"` (and variants) in `base.ts` `REQUEST_WORDS` |
 | D4 | US: Jury duty warrant SMS | **Shipped** — `"missed jury duty"`, `"failed to appear for jury duty"`, `"bench warrant for your arrest"` in `us.ts` `URGENCY_FOREIGN_AUTHORITY` |
 | D5 *(carry-forward)* | BASE: Money mule recruitment | **Shipped** — `"money mule"`, `"financial courier"`, `"act as a payment agent"` etc. in `base.ts` `REQUEST_WORDS` |
-| D6 *(carry-forward)* | US: Veterans benefits scam | **Shipped** — `"veterans savings program"`, `"va benefits claim assistance"`, `"veteran benefit entitlement review"` in `us.ts` `URGENCY_PENSION` |
+| D6 *(carry-forward)* | US: Veterans benefits scam | **Shipped (gated, not as filed)** — `"veterans savings program"`, `"va benefits claim assistance"`, `"veteran benefit entitlement review"` in `us.ts` `VETERANS_BENEFIT_PHRASES`, wired as `gatedBenefitPhrases` — deliberately **not** in `URGENCY_PENSION`, where flat entries would tip ordinary VA correspondence (see the `us.ts` comment and the #274 tests) |
 
 All six 2026-09-06 proposals are shipped or deliberately partially shipped. No carry-forwards from that cycle.
 
@@ -214,7 +214,7 @@ To `base.ts URGENCY_GENERIC`:
 "account compromised",
 ```
 
-No shadowing issue: `"account compromised"` is a proper substring of `"account was compromised"` — if both are in the list, only the longer needs to be listed (since matching is substring-based and the shorter will match anything the shorter does, plus more). Prefer the more specific form `"account was compromised"` and keep `"account compromised"` as a separate shorter-form entry — both have distinct surface forms.
+No shadowing issue: neither phrase contains the other — `"account compromised"` is not a substring of `"account was compromised"` (`"was"` sits between the shared words) — so both entries stay reachable. List both surface forms.
 
 **Implementation note:** Confirm that `"account was compromised"` does not shadow or duplicate the existing `"your account has been"` entry. They are independent: `"your account has been"` requires the possessive prefix; `"account was compromised"` is past-tense with no possessive. Adding both is correct.
 
