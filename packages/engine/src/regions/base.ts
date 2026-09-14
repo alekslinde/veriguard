@@ -35,6 +35,19 @@ const URGENCY_GENERIC = [
   "account is locked", "account is suspended", "account is on hold",
   "account has been locked", "account has been suspended",
   "account will be closed", "account will be suspended",
+  // Account-compromise lure variants (D3 / #311 / NASC crypto-exchange
+  // impersonation advisory Sep 2026; ACCC phone-spoofing advisory Sep 2026).
+  // The existing "your account has been" catches only the "your account has
+  // been compromised" surface; the past-tense and prefix-less forms are the
+  // documented lure openings. Neither contains the other ("was" sits between
+  // the shared words), so both stay reachable with no shadowing.
+  //
+  // Known edge, measured before shipping: the urgency scorer has no negation
+  // guard (NEGATED_ASK covers REQUEST_WORDS credential terms only), so a
+  // warning forward quoting the lure already scores on generic signals — the
+  // +10 here adds weight without changing its verdict class. Contained by the
+  // usual property: +10 alone cannot reach any threshold.
+  "account was compromised", "account compromised",
   "click here", "click link", "tap here", "don't ignore", "action required",
   // "respond immediately" is deliberately absent: "immediately" above already
   // matches it, so listing both scored one phrase twice (#234).
