@@ -144,7 +144,7 @@ npm run build    # production build
 
 ## Detection logic
 
-All scam detection is **rule-based** and runs in [`packages/engine/`](packages/engine/) — chiefly [`scamDetector.ts`](packages/engine/src/scamDetector.ts), with [`phoneIntel.ts`](packages/engine/src/phoneIntel.ts), [`emailHeaders.ts`](packages/engine/src/emailHeaders.ts), [`urlSanitizer.ts`](packages/engine/src/urlSanitizer.ts), and the per-country signal data in [`packages/engine/src/regions/`](packages/engine/src/regions/). It uses keyword lists, domain allowlists/denylists, regex patterns, and a weighted scoring system. **No machine learning, no LLM, and no user content sent anywhere for scoring.**
+All scam detection is **rule-based** and runs in [`packages/engine/`](packages/engine/) — chiefly [`scamDetector.ts`](packages/engine/src/scamDetector.ts), with [`phoneIntel.ts`](packages/engine/src/phoneIntel.ts), [`emailHeaders.ts`](packages/engine/src/emailHeaders.ts), [`urlSanitizer.ts`](packages/engine/src/urlSanitizer.ts), and the per-country signal data in [`packages/engine/src/regions/`](packages/engine/src/regions/). It uses keyword lists, domain allowlists/denylists, regex patterns, and a weighted scoring system. **No models in the scoring path today** — and no user content sent anywhere for scoring. ML, NLP or LLM help is on the table wherever it can meet that same privacy bar.
 
 The educational modules — [`threatRadar.ts`](lib/threatRadar.ts) and [`scamCalendar.ts`](lib/scamCalendar.ts) — are deliberately kept out of that path. Neither is imported by the scorer.
 

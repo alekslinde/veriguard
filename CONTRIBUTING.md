@@ -43,12 +43,14 @@ be turned away on principle.
 These are the rules a reviewer cannot waive. A change that breaks one will not
 be merged regardless of how good it otherwise is.
 
-1. **Detection is rule-based only.** Keyword lists, domain allow/denylists,
-   regex, and weighted scoring — **no machine learning, no LLM, no external
-   analysis API.** The value here is a verdict a person can read the reasoning
-   for, and detection nobody has to trust blindly. See
+1. **Detection is rule-based first.** Keyword lists, domain allow/denylists,
+   regex, and weighted scoring — no models in the scoring path today, no external
+   analysis API. The value here is a verdict a person can read the reasoning
+   for, and detection nobody has to trust blindly. A model (ML, NLP, LLM) is
+   welcome only if it keeps both properties: explainable verdicts and nothing
+   sent off-device for scoring. See
    [`SECURITY.md`](SECURITY.md) for why open, rule-based detection is also the
-   *safer* choice.
+   *safer* default.
 2. **User content never leaves the device for scoring.** Analysis runs
    client-side or in-memory on the server and is discarded. The only outbound
    calls are to fixed, trusted infrastructure (the URLhaus blocklist and HEAD

@@ -62,7 +62,7 @@ export default function AboutPage() {
       <PageHeader
         eyebrow="About & privacy"
         title="What we store, and what we **never** store"
-        lede="Detection here is hardcoded pattern logic — no machine learning, no external analysis services, nothing sent off-device for scoring."
+        lede="Detection here is hardcoded pattern logic — no models in the scoring path, nothing sent off-device for scoring."
       />
 
       <div className="space-y-10">
