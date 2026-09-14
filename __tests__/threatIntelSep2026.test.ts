@@ -294,6 +294,67 @@ describe("#270 GB — energy allowance / price-cap lures", () => {
   });
 });
 
+describe("#311 BASE — account-compromised variants", () => {
+  it("flags the past-tense lure opening as urgency language", () => {
+    // The gap the issue closed: "your account has been" catches only the
+    // "has been compromised" surface, so this scored link-only 15/safe.
+    const r = checkSms(
+      "Your account was compromised. Log in to verify: http://account-verify.com",
+      undefined,
+      "AU",
+    );
+    expect(urgencyFlag(r)).toContain("account was compromised");
+    expect(r.verdict).toBe("suspicious");
+  });
+
+  it("flags the prefix-less short form", () => {
+    expect(urgencyFlag(checkSms("account compromised", undefined, "AU"))).toBeTruthy();
+  });
+
+  it("reaches parity with the existing has-been entry", () => {
+    // Both forms must land in the same verdict class on the same shape —
+    // otherwise the new entries are either dead or over-weighted.
+    for (const text of [
+      "Your account was compromised. Log in to verify: http://account-verify.com",
+      "Your account has been compromised. Log in to verify: http://account-verify.com",
+    ]) {
+      expect(checkSms(text, undefined, "AU").verdict).toBe("suspicious");
+    }
+  });
+
+  it("fires regardless of region (base signal)", () => {
+    for (const region of ["AU", "GB", "NZ", "IE", "US"]) {
+      expect(urgencyFlag(checkSms("your account was compromised", undefined, region))).toBeTruthy();
+    }
+  });
+
+  it("leaves ordinary service messages alone", () => {
+    // The deliberate-absence guard at the top of URGENCY_GENERIC: owning an
+    // account is not a signal, and neither new entry may fire on these.
+    for (const text of [
+      "Your account balance is available.",
+      "Your account will renew on 3 September.",
+      "Your account is now active.",
+    ]) {
+      const r = checkSms(text, undefined, "AU");
+      expect(urgencyFlag(r)).toBeFalsy();
+      expect(r.verdict).toBe("safe");
+    }
+  });
+
+  it("does not escalate a warning forward quoting the lure", () => {
+    // Known edge, measured before shipping: urgency has no negation guard, so
+    // this already scored suspicious on generic "claim"/"click link" signals.
+    // D3 adds +10 without changing its verdict class.
+    const r = checkSms(
+      "Heads up, this is how scammers claim your account was compromised. Never click links like this.",
+      undefined,
+      "AU",
+    );
+    expect(r.verdict).toBe("suspicious");
+  });
+});
+
 describe("#307 US — FEMA impersonation", () => {
   it("flags the FEMA disaster-assistance lure carrying a link", () => {
     const r = checkSms(
