@@ -97,12 +97,24 @@ const URGENCY_RECALL = [
 // IRS refund and federal benefit lures. Economic-impact payments and the
 // various relief programmes are real, which is exactly why they work as bait —
 // so these compound with an authority mention rather than firing alone.
+//
+// FEMA disaster-relief lures (D1 / #307 / FTC National Preparedness Month
+// alert Sep 2026; FEMA "Beware of Disaster Fraud" advisory 17 Jul 2026).
+// September–October is peak US disaster season and the relief-payment script
+// is the seasonal analogue of the refund lure: a "disaster assistance
+// approved" text with a payment link. FEMA never initiates contact by text,
+// so the link-bearing variant is covered twice over — here and by the
+// no-link-sender rule. "disaster assistance approved" at +10 alone cannot
+// reach any verdict threshold, which is what keeps the false-positive risk
+// very low.
 const URGENCY_TAX = [
   "tax refund", "tax rebate", "you are eligible for a refund",
   "irs refund", "refund is waiting", "claim your refund",
   "economic impact payment", "stimulus payment", "stimulus check",
   "tax credit you are owed", "snap benefits", "ebt card",
   "medicaid renewal", "medicare card",
+  "fema disaster assistance", "fema relief payment",
+  "disaster assistance approved", "claim your fema benefit",
 ];
 
 // IRS collection / enforcement coercion. The IRS initiates contact by mail, not
@@ -186,6 +198,14 @@ const AUTHORITY_MENTIONS = [
   "ssa", "social security administration", "social security",
   "medicare", "medicaid", "cms", "centers for medicare",
   "uscis", "immigration and customs", "ice", "dhs", "homeland security",
+  // FEMA impersonation (D1 / #307 / FTC National Preparedness Month alert Sep
+  // 2026; FEMA "Beware of Disaster Fraud" advisory 17 Jul 2026). FEMA is the
+  // DHS component behind disaster assistance, and the relief-payment lure is
+  // the seasonal peak-September/October script. "fema" is a highly specific
+  // acronym with no consumer use outside disaster management, and the single
+  // token is boundary-matched by mentions(), so it cannot fire inside ordinary
+  // words. The full agency name is listed for the long-form variant.
+  "fema", "federal emergency management agency",
   "dmv", "department of motor vehicles",
   "usps", "united states postal service", "postal service",
   "va", "veterans affairs",
@@ -218,14 +238,17 @@ const AUTHORITY_MENTIONS = [
 
 // US bodies that have publicly confirmed they do not initiate contact by text.
 // The IRS states it never initiates contact by email, text or social media; the
-// SSA and Medicare carry equivalent published guidance; and USPS states it never
-// sends unsolicited texts with links (the USPS "smishing" advisory). Scoped to
+// SSA and Medicare carry equivalent published guidance; USPS states it never
+// sends unsolicited texts with links (the USPS "smishing" advisory); and FEMA
+// states it never initiates contact by text message (the "Beware of Disaster
+// Fraud" advisory, Jul 2026 — D1 / #307). Scoped to
 // the confirmed no-link senders so the flag wording stays accurate — the DMV and
 // the VA do send legitimate links in some states and programmes.
 const NO_LINK_SENDERS = [
   "irs", "internal revenue service",
   "ssa", "social security administration", "social security",
   "medicare", "usps", "united states postal service",
+  "fema", "federal emergency management agency",
 ];
 
 // Interpol/Europol plus the shared Chinese-authority terms (see base.ts).
@@ -271,6 +294,7 @@ const REWARD_WORDS = [
 const LEGIT_DOMAINS = [
   "irs.gov", "ssa.gov", "usa.gov", "medicare.gov", "medicaid.gov",
   "usps.com", "uscis.gov", "dhs.gov", "va.gov",
+  "fema.gov", "disasterassistance.gov",
   "ftc.gov", "consumer.ftc.gov", "reportfraud.ftc.gov", "identitytheft.gov",
   "fbi.gov", "ic3.gov",
   "sec.gov", "investor.gov", "fdic.gov", "consumerfinance.gov", "finra.org",
@@ -386,7 +410,7 @@ export const US: RegionDefinition = {
   authorityMentions: AUTHORITY_MENTIONS,
   noLinkSenders: NO_LINK_SENDERS,
   noLinkSendersFlag:
-    "The IRS, the Social Security Administration, Medicare and USPS all state they never initiate contact by text message — a text from one of these with a clickable link is a scam. The IRS in particular only initiates contact by mail. Go to the agency's .gov site directly instead.",
+    "The IRS, the Social Security Administration, Medicare, USPS and FEMA all state they never initiate contact by text message — a text from one of these with a clickable link is a scam. The IRS in particular only initiates contact by mail. Go to the agency's .gov site directly instead.",
 
   foreignAuthorityMentions: FOREIGN_AUTHORITY_MENTIONS,
   foreignAuthorityFlag:
