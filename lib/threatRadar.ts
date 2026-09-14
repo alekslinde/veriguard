@@ -368,7 +368,11 @@ const AU_THREATS: ThreatEntry[] = [
     id: "fake-gambling-platform",
     title: "Fake gambling platforms holding your \"winnings\"",
     channel: "mixed",
-    status: "active",
+    // Demoted 2026-09-13: neither the 09-06 nor the 09-13 sweep re-confirms
+    // this campaign, and the board's leading edge has moved to 09-13 — leaving
+    // it active would fail the recency ratchet (threatRadar.test.ts). The
+    // taskforce runs to December, so this is cooling off, not gone.
+    status: "watchlist",
     coverage: "covered",
     firstSeen: "2026-08-31",
     lastSeen: "2026-08-31",
@@ -432,22 +436,24 @@ const AU_THREATS: ThreatEntry[] = [
     id: "crypto-exchange-impersonation",
     title: "AU crypto exchange impersonation",
     channel: "mixed",
-    status: "watchlist",
+    status: "active",
     coverage: "covered",
     firstSeen: "2026-08-02",
-    lastSeen: "2026-08-02",
+    lastSeen: "2026-09-13",
     summary:
-      "CoinSpot and Swyftx impersonation with fake security alerts, following an AFP warning. Lookalike domains are used heavily since crypto transfers can't be reversed.",
+      "CoinSpot and Swyftx impersonation with fake security alerts, following an AFP warning. Lookalike domains are used heavily since crypto transfers can't be reversed. The September NASC alert confirms the campaign is current — CoinJar named alongside the other two — with a callback shape added: a \"your account was compromised\" text pushing you to ring \"support\", ending in a screen-share session.",
     lures: [
       "\"Suspicious login detected — verify your wallet\"",
       "\"Your withdrawal is pending approval\"",
       "Lookalike domains such as swyftx-account and coinspot-verify",
       "\"Complete verification or your account will be frozen\"",
+      "\"Your account was compromised — call support immediately\"",
+      "A \"support agent\" who moves you to a phone call and screen sharing",
     ],
     advice:
-      "Type the exchange address in yourself and check the domain character by character. A crypto transfer cannot be reversed — there is no chargeback, so the check has to happen first.",
+      "Type the exchange address in yourself and check the domain character by character. A crypto transfer cannot be reversed — there is no chargeback, so the check has to happen first. Real support never needs you to share your screen, and never asks to be rung on a number from a text.",
     detection: "Exchange names are matched, and lookalike domain patterns score separately.",
-    roadmap: "2026-08-02",
+    roadmap: "2026-09-13",
   },
   {
     id: "energy-utility",
@@ -650,22 +656,23 @@ const AU_THREATS: ThreatEntry[] = [
     id: "nbn-telco",
     title: "NBN and telco disconnection threats",
     channel: "phone",
-    status: "watchlist",
+    status: "active",
     coverage: "covered",
     firstSeen: "2026-07-01",
-    lastSeen: "2026-07-01",
+    lastSeen: "2026-09-13",
     summary:
-      "Calls and texts claiming your NBN or phone service is about to be disconnected, usually leading to a remote-access request to \"fix\" the connection.",
+      "Calls and texts claiming your NBN or phone service is about to be disconnected, usually leading to a remote-access request to \"fix\" the connection. Alongside the disconnection script, spoofed Telstra and NBN Co calls now open with an account-compromise claim instead, per the September ACCC advisory.",
     lures: [
       "\"Your NBN service will be disconnected today\"",
       "\"Technical fault detected on your line\"",
       "\"Install this app so we can fix your connection\"",
       "\"Your router has been compromised\"",
+      "\"Your Telstra account was compromised — we need to secure your service\"",
     ],
     advice:
-      "NBN Co has no customers and never calls you — your retailer does. Nobody legitimate needs remote access to your computer to fix a phone line.",
-    detection: "NBN and telco disconnection language plus remote-access requests are flagged.",
-    roadmap: "2026-07-01",
+      "NBN Co has no customers and never calls you — your retailer does. Nobody legitimate needs remote access to your computer to fix a phone line. The same goes for an account-compromise claim out of the blue — hang up and ring the company on its published number.",
+    detection: "NBN and telco disconnection language plus remote-access requests are flagged, as is account-compromise phrasing.",
+    roadmap: "2026-09-13",
   },
   {
     id: "voice-clone-family",
