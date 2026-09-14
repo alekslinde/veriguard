@@ -149,7 +149,10 @@ const AU_SEASONS: ScamSeason[] = [
     ],
     advice: "The ATO never sends a link to log in, and never threatens arrest by SMS. Open the ATO app or type my.gov.au yourself — never follow the link in the message.",
     sources: [AU.ato, AU.scamwatch],
-    reviewed: "2026-09-11",
+    // Re-checked against the 2026-09-13 sweep: no new tax phrasing, and every
+    // lure above still matches its au.ts group (refund/debt threats, TFN
+    // suspension, myGov/ATO authority). No content change.
+    reviewed: "2026-09-13",
   },
   {
     id: "eofy-business",
