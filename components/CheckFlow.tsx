@@ -1343,29 +1343,6 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
       <input ref={emlRef} type="file" accept=".eml,message/rfc822,text/plain" className="hidden" tabIndex={-1} aria-hidden="true"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) handleEmlUpload(f); }} />
 
-      {/* Region rides above the card as its own control rather than inside a
-          header row on the paper. It drives the check but is not the content, so
-          it reads as a setting for the box below — and lifting it out reclaims
-          the header row (and the "Suspicious content" label beside it) that
-          crowded the top of the input, worst of all on a phone. Right-aligned
-          and quiet; dark-surface styling, since this sits on the page rather
-          than the paper card. */}
-      <div className="flex items-center justify-end">
-        <CheckRegionPicker
-          id="check-region"
-          value={checkRegion}
-          onChange={(code) => {
-            setCheckRegion(code);
-            writeStoredCheckRegion(code);
-          }}
-          disabled={busy}
-          compact
-          small
-          prefix={t("check.region.shortLabel")}
-          selectClassName="max-w-[150px]"
-        />
-      </div>
-
       {/* The check card is deliberately light on a dark page: it reads as paper,
           the thing you put a message onto. Pasting is the primary action, so the
           textarea leads and the capture options sit in the footer beside the
