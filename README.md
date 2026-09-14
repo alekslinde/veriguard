@@ -1,6 +1,6 @@
 # Veriguard
 
-A no-nonsense scam detector. Paste a suspicious link, text message, phishing email, or scam phone number and get an instant verdict — no account required, nothing kept, no data sold.
+A no-nonsense scam detector. Paste a suspicious link, text message, phishing email, or scam phone number and get an instant verdict — no account required, check content kept nowhere, no data sold.
 
 Detection is region-aware: local government domains, banks, phone number formats, and the scams actually in circulation, with full coverage for Australia, the UK, US, New Zealand and Ireland.
 
@@ -9,7 +9,7 @@ Detection is region-aware: local government domains, banks, phone number formats
 ## What it does
 
 ### Scam Checker
-Paste in anything that looks off — a link, a text, a whole email, a phone number, or a screenshot — and get back a verdict (safe / suspicious / likely scam) with a plain-English breakdown of every red flag found.
+Paste in anything that looks off — a link, a text, a whole email, a phone number, or a screenshot — and get back a verdict (safe / suspicious / likely scam — or unknown where there is no local coverage to give a clean bill of health) with a plain-English breakdown of every red flag found.
 
 There's no input-type picker to fuss with. **The app works out what you gave it** and runs the right checks, tagging each thing it finds as a link 🔗, email 📧, phone 📞, or message 💬. Paste a blob with several of these in it and it'll analyse each one.
 
@@ -17,12 +17,12 @@ Under the hood it runs:
 
 - **Links** — checks URLs against a live malware/phishing blocklist ([URLhaus](https://urlhaus.abuse.ch), from abuse.ch), URL-shortener expansion, suspicious TLDs, IP-address hosting, typosquatted brand domains, and phishing keywords. Defanged links (`hxxp://evil[.]tk`) and schemeless ones (`evil.tk/login`) are recognised too, so sharing a link safely doesn't cost you the check.
 - **Text messages** — urgency language, reward bait, requests for sensitive info, embedded suspicious links, and government-agency impersonation.
-- **Emails** — all the message checks plus sender-domain analysis, generic greetings, and **email authentication** (SPF / DKIM / DMARC) parsed straight from the raw headers. Forwarded emails are unwrapped back to the original scam, and **tracking pixels** are detected and flagged.
+- **Emails** — all the message checks plus sender-domain analysis, generic greetings, and **email authentication** (SPF / DKIM / DMARC) parsed straight from the raw headers. Forwarded emails are unwrapped back to the original scam, and **tracking pixels** are detected and flagged — both in the app pipeline around the scorer.
 - **Phone numbers** — line-type detection (mobile / fixed / VoIP / premium / free-call), region-specific premium-rate ranges, wangiri (one-ring) and premium-rate country risk, and spoofing-risk notes.
 
-**Screenshots and QR codes:** drop or upload an image and it'll try to decode a QR code first (client-side via jsQR), then fall back to OCR (Tesseract.js) to pull out the text — then run all the checks above on whatever it finds. **Both run on your own device** — the image never leaves it. A server-side OCR fallback exists only for browsers that can't run the WASM engine.
+**Screenshots and QR codes:** drop or upload an image and it'll try to decode a QR code first (client-side via jsQR), then fall back to OCR (Tesseract.js) to pull out the text — then run all the checks above on whatever it finds. **Both run on your own device** — the image never leaves it. A server-side OCR fallback exists for browsers that can't run the WASM engine — or when on-device processing fails or times out.
 
-**Forward it in:** on your phone? Forward a suspicious email to the app's inbox and it emails you back a plain verdict — including *why*, signal by signal, so you know what to look for next time. It's read on arrival and no copy is kept.
+**Forward it in:** on your phone? Forward a suspicious email to the app's inbox and it emails you back a plain verdict — including *why*, signal by signal, so you know what to look for next time. It's read on arrival and no copy is kept. (Available where inbound mail is enabled.)
 
 ### Region-aware detection
 
@@ -32,15 +32,16 @@ Detection is country-aware. A **region pack** ([`packages/engine/src/regions/`](
 | --- | --- |
 | 🇦🇺 Australia, 🇬🇧 United Kingdom, 🇺🇸 United States, 🇳🇿 New Zealand, 🇮🇪 Ireland | `full` |
 | 🇨🇦 Canada | `partial` |
+| 21 further packs (see [`packages/engine/src/regions/`](packages/engine/src/regions/)) | `minimal` — agencies + reporting body |
 | Everywhere else | `none` — base signals only |
 
-The region comes from an explicit choice first, then a coarse country code from the edge, then a default; the IP itself is never read. **Coverage is stated honestly:** where a pack is `partial` or `none`, a clean result is downgraded from "safe" to "unknown" and a notice explains that nothing matched *because no local rule exists* — plus the patterns to judge it yourself. If the geo guess is wrong (roaming, VPN), you can correct the region right there and re-run.
+The region comes from an explicit choice first, then a coarse country code from the edge, then a default; the IP itself is never read for region resolution. **Coverage is stated honestly:** where a pack is `partial`, `minimal` or `none`, a clean result is downgraded from "safe" to "unknown" and a notice explains that nothing matched *because no local rule exists* — plus the patterns to judge it yourself. If the geo guess is wrong (roaming, VPN), you can correct the region right there and re-run.
 
 A region pack is **data, not logic** — the scoring engine is shared, only the signals change.
 
 ### Threat Radar
 
-[`/radar`](app/radar/page.tsx) — campaigns actually circulating in the last few weeks: what the message looks like, what the tell is, and **whether we catch it yet** (`covered` / `partial` / `n/a`). Entries are promoted by hand from the weekly intel sweeps in [`docs/threat-intel/`](docs/), not auto-polled from vendor feeds, and only campaigns a person could plausibly *receive* qualify — infrastructure research stays in `docs/`.
+[`/radar`](app/radar/page.tsx) — campaigns actually circulating in the last few weeks: what the message looks like, what the tell is, and **whether we catch it yet** (`covered` / `partial` / `none` / `n/a`). Entries are promoted by hand from the weekly intel sweeps in [`docs/threat-intel/`](docs/), not auto-polled from vendor feeds, and only campaigns a person could plausibly *receive* qualify — infrastructure research stays in `docs/`. (Currently AU-authored; other regions fall back to empty.)
 
 ### Scam Calendar
 
@@ -61,9 +62,9 @@ The interface ships one neutral English voice. Internally the copy is keyed on t
 
 ## Latest submissions
 
-The homepage shows a live feed of the most recent community-reported scams. Contact emails, IP addresses, and any other structured PII are automatically stripped from descriptions before display.
+The [/submissions](app/submissions/page.tsx) page shows a live feed of the most recent community-reported scams. Contact emails, IP addresses, and any other structured PII are automatically stripped from descriptions before display.
 
-The same data is available as JSON at `GET /api/reports?limit=50` (max 200).
+The same data is available as same-origin JSON at `GET /api/reports?limit=25` (max 100).
 
 ---
 
@@ -83,7 +84,7 @@ cp .env.local.example .env.local
 # fill in TURSO_DATABASE_URL and TURSO_AUTH_TOKEN
 ```
 
-The schema is created automatically on first run — no migrations to run.
+The schema is created automatically on first run — no migration runner (small inline `ALTER`s handle older dev databases).
 
 Open [http://localhost:3000](http://localhost:3000).
 
@@ -121,7 +122,7 @@ are people relying on a verdict.
 
 ```bash
 npm test         # run the Vitest suite
-npm run lint     # ESLint (Next 16.3 + strict react-hooks rules)
+npm run lint     # ESLint (Next core-web-vitals + TypeScript)
 npm run seed     # seed the database with sample reports
 npm run build    # production build
 ```
