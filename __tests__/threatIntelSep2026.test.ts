@@ -383,3 +383,48 @@ describe("#307 US — FEMA impersonation", () => {
     ).not.toContain("government agency");
   });
 });
+
+describe("#310 GB — DVLA vehicle-tax payment-failure phrasing", () => {
+  it("flags the bare payment-failure variant the deadline-state entries miss", () => {
+    // The gap the issue closed: the link-bearing lure already reached
+    // likely_scam via generic urgency, but this bare form measured 0/safe.
+    const r = checkSms(
+      "DVLA: Your last vehicle tax payment has failed. Your vehicle will be flagged unless you update your payment details.",
+      undefined,
+      "GB",
+    );
+    expect(urgencyFlag(r)).toContain("vehicle tax payment has failed");
+    expect(r.verdict).toBe("suspicious");
+  });
+
+  it("flags the short form without the auxiliary", () => {
+    expect(urgencyFlag(checkSms("vehicle tax payment failed", undefined, "GB"))).toBeTruthy();
+  });
+
+  it("reaches likely_scam with a link", () => {
+    const r = checkSms(
+      "DVLA: Your last vehicle tax payment has failed. Update here: http://dvla-pay.top",
+      undefined,
+      "GB",
+    );
+    expect(r.verdict).toBe("likely_scam");
+  });
+
+  it("leaves ordinary billing and bank-failure language alone", () => {
+    // Bare "vehicle tax is due" was deliberately removed from URGENCY_TOLL as
+    // genuine renewal-reminder vocabulary, and bare "payment has failed" is
+    // ordinary bank/retailer English — only the qualified forms score.
+    for (const text of [
+      "Your vehicle tax is due on 1 October. Pay by Direct Debit as usual.",
+      "Your card payment has failed. Please update your details in the app.",
+    ]) {
+      const r = checkSms(text, undefined, "GB");
+      expect(urgencyFlag(r)).toBeFalsy();
+      expect(r.verdict).toBe("safe");
+    }
+  });
+
+  it("is scoped to the GB pack", () => {
+    expect(urgencyFlag(checkSms("vehicle tax payment has failed", undefined, "AU"))).toBeFalsy();
+  });
+});
