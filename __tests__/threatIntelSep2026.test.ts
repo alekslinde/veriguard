@@ -6,6 +6,10 @@ import { checkSms } from "@veriguard/engine/scamDetector";
 // the right flag, the region scoping holds, and the false-positive near-miss the
 // issue called out stays clean.
 //
+// Also covers #307 (2026-09-13 roadmap D1, US FEMA impersonation) in the same
+// shape: lure verdict, region scoping, and the near-misses (bare mention,
+// lone urgency phrase, genuine .gov domains).
+//
 // Several of these issues proposed phrase sets that were measured against the
 // engine before implementation and adjusted — the notes below record where the
 // shipped behaviour deliberately differs from the filing.
@@ -287,5 +291,95 @@ describe("#270 GB — energy allowance / price-cap lures", () => {
 
   it("is scoped to the GB pack", () => {
     expect(urgencyFlag(checkSms("energy support allowance", undefined, "AU"))).toBeFalsy();
+  });
+});
+
+describe("#307 US — FEMA impersonation", () => {
+  it("flags the FEMA disaster-assistance lure carrying a link", () => {
+    const r = checkSms(
+      "Your FEMA disaster assistance payment has been approved — update at http://fema-benefits.top",
+      undefined,
+      "US",
+    );
+    expect(r.verdict).toBe("likely_scam");
+  });
+
+  it("flags the issue's scoring example even as a bare hostname", () => {
+    // "click to claim" carries the reward signal on top of the authority and
+    // urgency hits, which is what takes the schemeless variant over the line.
+    // The shortened "update at" form with no recognised link stays suspicious —
+    // the same bare-hostname conservatism the jury-duty variant (#275) shows.
+    const r = checkSms(
+      "Your FEMA disaster assistance payment of $1,800 has been approved — click to claim at fema-benefits.top",
+      undefined,
+      "US",
+    );
+    expect(r.verdict).toBe("likely_scam");
+  });
+
+  it("flags each relief-lure phrasing as urgency language", () => {
+    for (const phrase of [
+      "fema disaster assistance",
+      "fema relief payment",
+      "disaster assistance approved",
+      "claim your fema benefit",
+    ]) {
+      expect(urgencyFlag(checkSms(phrase, undefined, "US"))).toBeTruthy();
+    }
+  });
+
+  it("treats FEMA as an authority mention with the no-link-sender signal", () => {
+    const r = checkSms("FEMA: update your details.", undefined, "US");
+    expect(r.flags.join(" ")).toContain("government agency");
+    const withLink = checkSms(
+      "FEMA: update your details http://fema-benefits.top",
+      undefined,
+      "US",
+    );
+    const withoutLink = checkSms(
+      "FEMA: visit your local recovery center.",
+      undefined,
+      "US",
+    );
+    expect(withLink.score).toBeGreaterThan(withoutLink.score);
+    expect(withLink.flags.join(" ")).toContain("never initiate contact by text");
+  });
+
+  it("leaves bare FEMA mentions and lone urgency phrasing below threshold", () => {
+    // "fema" is boundary-matched, so the mention alone is the deferred
+    // zero-weight flag; "disaster assistance approved" at +10 alone cannot
+    // reach any verdict threshold — the VERY LOW FP case from the filing.
+    for (const text of [
+      "FEMA opened a disaster recovery center downtown.",
+      "FEMA published its preparedness guide for National Preparedness Month.",
+    ]) {
+      const r = checkSms(text, undefined, "US");
+      expect(r.verdict).toBe("safe");
+      expect(r.score).toBe(0);
+    }
+    const lone = checkSms(
+      "Your disaster assistance approved notice is available at the county office.",
+      undefined,
+      "US",
+    );
+    expect(lone.verdict).toBe("safe");
+  });
+
+  it("keeps the real FEMA estate out of the dodgy-link bucket", () => {
+    // Same parity assertion as #271: the no-link-sender flag points readers at
+    // the .gov site, so the genuine domains must not trip brand scoring.
+    for (const host of ["https://fema.gov", "https://disasterassistance.gov"]) {
+      const r = checkSms(`Log in at ${host} to check your account.`, undefined, "US");
+      expect(r.verdict).toBe("safe");
+      expect(r.flags.join(" ")).not.toContain("looks dodgy");
+    }
+  });
+
+  it("is scoped to the US pack", () => {
+    expect(urgencyFlag(checkSms("fema disaster assistance", undefined, "AU"))).toBeFalsy();
+    expect(urgencyFlag(checkSms("disaster assistance approved", undefined, "GB"))).toBeFalsy();
+    expect(
+      checkSms("FEMA: update your details.", undefined, "AU").flags.join(" "),
+    ).not.toContain("government agency");
   });
 });
