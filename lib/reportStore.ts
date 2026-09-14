@@ -60,13 +60,7 @@ export const CHECK_RATE_LIMIT = 30;
  *
  * The window matters more than the number and is easy to misread: this shares
  * `rateLimiter` with the submission and check budgets, so it inherits their
- * 10-minute window. Sized at 60 the first time against an assumed 1-minute
- * window, which made the real budget a tenth of the intended one and would have
- * cut off an ordinary reader paging the feed.
- *
- * 240 over ten minutes is roughly one request every 2.5 seconds sustained.
- * Browsing the submissions browser hard — paging, filtering, searching — stays
- * comfortably under it; a loop pulling pages does not.
+ * 10-minute window.
  *
  * The real saving is the edge cache on those routes; this is the floor under it
  * for requests that miss the cache or vary their query string to defeat it.
@@ -91,9 +85,7 @@ function cleanRateLimiter() {
  * this limiter without starving each other. `limit` defaults to the submission
  * budget; pass CHECK_RATE_LIMIT for read-only analysis.
  *
- * NOTE: this is per-process memory. On serverless each instance keeps its own
- * counts, so the effective limit is looser than it reads under horizontal
- * scaling. It stops casual scripted abuse, not a distributed attacker.
+ * NOTE: this is per-process memory and best-effort under horizontal scaling.
  */
 export function checkAndRecordRateLimit(key: string, limit: number = RATE_LIMIT): boolean {
   cleanRateLimiter();
@@ -130,27 +122,16 @@ export function isWithinRateLimit(key: string, limit: number = RATE_LIMIT): bool
 /**
  * How long a submission stays "recently seen".
  *
- * Expiry is by AGE, not by count, and that distinction is the whole point.
- * This was a 5000-entry FIFO array, which made eviction depend on how much
- * traffic arrived rather than on how much time had passed — so an attacker
- * could retire their own earlier submission by pushing MAX_SEEN unique entries
- * in behind it, and resubmit the same payload as brand new. Volume is the one
- * variable an attacker fully controls, so it must not be the thing that decides
- * what the guard forgets.
- *
- * Matched to RATE_WINDOW_MS: the two guards answer the same question over the
- * same period, and a dedupe window shorter than the rate window would leave a
- * gap where a resubmission is neither rate-limited nor deduped.
+ * Expiry is by AGE, not by count: eviction must not depend on traffic volume,
+ * which a caller fully controls. Matched to RATE_WINDOW_MS so a resubmission
+ * is never neither rate-limited nor deduped.
  */
 const SEEN_TTL_MS = RATE_WINDOW_MS;
 
 /**
  * Hard ceiling on retained keys, as a memory bound only — NOT the eviction
  * policy. TTL does the real work; this exists so a traffic spike inside one
- * window cannot grow the map without limit. When it trips we drop the oldest
- * entries, which is the same weakness the array had — but it now takes 20k
- * distinct submissions inside a single TTL window to reach, and the per-IP rate
- * limit sits in front of that.
+ * window cannot grow the map without limit.
  */
 const MAX_SEEN = 20_000;
 

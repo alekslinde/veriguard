@@ -71,15 +71,12 @@ export function guardSubmission(input: GuardInput): GuardResult {
 
   // ── 3. Timing check ────────────────────────────────────────────────────────
   // A human takes at least a few seconds to read the form and fill it in.
-  // If loadedAt is missing or the gap is under 2.5s it's automated.
   //
-  // An unverified loadedAt is a claim, not evidence — an attacker who has read
-  // this file can fabricate Date.now() - 3000 and clear the bar instantly. It
-  // still gates *unauthenticated* submissions (no REPORT_FORM_SECRET
-  // configured) so local dev and any deploy that hasn't set the secret keep
-  // the old behaviour, but a verified timestamp is required to earn "accept"
-  // outright — see the plausibility step below, which additionally downgrades
-  // an otherwise-passing unverified submission.
+  // An unverified loadedAt is a claim, not evidence. It still gates
+  // submissions without a configured secret so local dev keeps working, but a
+  // verified timestamp is required to earn "accept" outright — see the
+  // plausibility step below, which additionally downgrades an
+  // otherwise-passing unverified submission.
   const elapsed = Date.now() - (input.loadedAt || 0);
   if (!input.loadedAt || elapsed < 2500) {
     return { verdict: "suspect", reason: "submitted_too_fast" };
@@ -121,13 +118,11 @@ export function guardSubmission(input: GuardInput): GuardResult {
 
   // ── 8. Identifier substantiation ───────────────────────────────────────────
   // scoreContent above only checks the free-text `content` field — it never
-  // looks at the accused scamUrl/scamPhone/scamEmail itself. That gap lets an
-  // attacker name a real, innocent business's domain as the identifier while
-  // padding `content` with scam-flavoured filler that clears the score-8
-  // floor on its own: the plausibility check passes, but nothing about it was
-  // ever actually about the accused identifier. Since accepted reports appear
-  // on the public feed sorted by report_count, this is exploitable as
-  // targeted reputational harm, not just spam.
+  // looks at the accused identifier itself. That gap would let a submission
+  // name an innocent third party while padding `content` with filler that
+  // clears the plausibility floor on its own. Since accepted reports appear
+  // on the public feed, this guards against targeted reputational harm, not
+  // just spam.
   //
   // The test is whether the accusation is ABOUT the thing being named, not
   // whether the named thing scores as a scam. Scoring it is tempting and

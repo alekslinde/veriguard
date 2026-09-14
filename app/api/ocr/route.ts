@@ -11,17 +11,11 @@ import { isSameOriginRead } from "@/lib/readGuard";
 export const maxDuration = 60;
 
 /**
- * Per-IP budget over RATE_WINDOW_MS (ten minutes), for the app's single most
- * expensive endpoint: a 20 MB upload, a native sharp decode and a 60-second
- * OCR run, all unauthenticated.
- *
- * Every other route was throttled and this one was not, which made it the
- * cheapest way to burn the function budget — post large images in a loop and
- * the bill (or the quota) goes with it. Client-side OCR handles the common case
- * on-device (lib/clientOcr.ts), so this route is only the fallback for browsers
- * that cannot run the WASM core; 12 images per ten minutes is well clear of
- * what one person checking screenshots does in a sitting, and nowhere near
- * enough to sustain an attack.
+ * Per-IP budget over RATE_WINDOW_MS for the app's most expensive endpoint.
+ * Client-side OCR handles the common case on-device (lib/clientOcr.ts), so
+ * this route is only the fallback; the budget stays well clear of what one
+ * person checking screenshots does in a sitting, and nowhere near enough to
+ * sustain abuse.
  */
 const OCR_RATE_LIMIT = 12;
 
@@ -84,19 +78,16 @@ export async function POST(req: NextRequest) {
   // 2. Per-IP rate limit, namespaced so OCR shares the limiter without starving
   //    the submission and check budgets.
   //
-  //    Only applied when the caller can be identified: clientIpFromHeaders
-  //    returns "unknown" for a missing or malformed x-forwarded-for, and keying
-  //    on that would put every such visitor in one bucket and take the fallback
-  //    down for all of them at once — the same reasoning /api/reports documents.
+  //    Only applied when the caller can be identified: unidentifiable callers
+  //    share one bucket, and keying on it would take the fallback down for all
+  //    of them at once — the same reasoning /api/reports documents.
   //
   //    Split into a peek here and a record further down, deliberately. This
   //    endpoint can still reject a request cheaply after this point — wrong
   //    content type, no image field, over the size cap — none of which decode
-  //    anything. Charging the budget here would let a caller spend someone
-  //    else's slots (x-forwarded-for is forgeable, and browsers retry this
-  //    fallback) with body-less POSTs that cost nothing to refuse. So: reject
-  //    an already-exhausted caller before doing any work, but charge only once
-  //    the upload is known to be well-formed and about to be decoded.
+  //    anything. So: reject an already-exhausted caller before doing any work,
+  //    but charge only once the upload is known to be well-formed and about to
+  //    be decoded.
   const ip = clientIpFromHeaders(req.headers);
   const rateKey = ip !== "unknown" ? `ocr:${ip}` : null;
   if (rateKey && !isWithinRateLimit(rateKey, OCR_RATE_LIMIT)) {

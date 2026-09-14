@@ -1,11 +1,9 @@
 // Server-proof of "when the report form was actually rendered."
 //
-// The old timing check trusted a client-supplied `loadedAt` timestamp, which
-// is worthless against anyone who read submissionGuard.ts: fabricate
-// `Date.now() - 3000` and the "did a human take a few seconds" heuristic
-// passes on the very first request. A form-render timestamp only means
-// anything if the client cannot choose it — so the server issues it, signs
-// it, and later verifies the signature instead of trusting the number back.
+// A client-supplied timestamp is only a claim, not evidence — a form-render
+// timestamp only means anything if the client cannot choose it, so the server
+// issues it, signs it, and later verifies the signature instead of trusting
+// the number back.
 
 import { createHmac, timingSafeEqual } from "crypto";
 

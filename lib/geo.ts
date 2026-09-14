@@ -55,10 +55,9 @@ export function locationFromHeaders(headers: Headers): string {
  * Takes Headers rather than NextRequest so this stays framework-free and
  * usable from any route handler or worker.
  */
-// Structural validation, not a full IP parse. The point is that a forged value
-// must collapse to "unknown" and share one bucket — a loose shape check lets an
-// attacker mint an unlimited number of distinct keys (`1.1.1.1.1`, `1.1.1.1.2`,
-// …) and walk straight through the rate limiter it feeds.
+// Structural validation, not a full IP parse. A forged value must collapse to
+// "unknown" and share one bucket — a loose shape check would let distinct
+// keys walk straight through the rate limiter it feeds.
 const IPV4 = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
 // IPv6 in any of its forms, including "::" compression, and the IPv4-mapped
 // tail (::ffff:203.0.113.5) that dual-stack proxies emit.
