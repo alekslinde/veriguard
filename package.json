@@ -1,6 +1,6 @@
 {
   "name": "veriguard",
-  "version": "0.23.4",
+  "version": "0.24.1",
   "private": true,
   "workspaces": [
     "packages/*"
@@ -34,8 +34,8 @@
     "@veriguard/engine": "*",
     "jsqr": "^1.4.0",
     "next": "^16.3.4",
-    "react": "19.2.8",
-    "react-dom": "19.2.8",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "sharp": "^0.35.4",
     "tesseract.js": "^7.0.0"
   },

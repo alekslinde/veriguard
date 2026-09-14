@@ -52,6 +52,7 @@
   "check.forward.copied": "Copied",
   "check.forward.note": "Forwarding goes via your mail provider's servers; pasting stays on your device. For anything highly sensitive, paste it instead.",
   "check.submit": "Check this now",
+  "check.emptyPrompt": "Paste something to check first — a link, text message, email, or phone number. You can also add a screenshot or an email file.",
   "check.region.label": "Region for this check",
   "check.region.shortLabel": "region",
   "check.region.auto": "Auto",

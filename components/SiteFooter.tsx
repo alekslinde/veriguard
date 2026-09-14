@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useLang } from "@/lib/lang";
+import { useBugReport, BugIcon } from "./BugReportProvider";
 
 export default function SiteFooter() {
   const { t } = useLang();
+  const { openManual } = useBugReport();
   return (
     <footer
       className="border-t border-[var(--rule)] bg-[var(--ink)] mt-auto"
@@ -38,6 +40,21 @@ export default function SiteFooter() {
         >
           {t("footer.about")}
         </Link>
+        <span aria-hidden="true" className="text-[var(--ink-3)]">
+          ·
+        </span>
+        {/* Bug reporting is an inline footer item now, not a floating chip that
+            sat over the check input on a phone. Same modal, reached through the
+            shared context's openManual. */}
+        <button
+          type="button"
+          onClick={openManual}
+          aria-haspopup="dialog"
+          className="inline-flex items-center gap-1.5 underline underline-offset-2 hover:text-[var(--foreground)] transition-colors"
+        >
+          <BugIcon />
+          {t("bug.button")}
+        </button>
       </div>
     </footer>
   );

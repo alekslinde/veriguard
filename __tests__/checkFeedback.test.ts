@@ -266,17 +266,22 @@ describe("coverage notice — our limits, in the colour reserved for them", () =
     expect(resultPicker).toBeLessThan(warningGuard);
   });
 
-  it("lets the reader correct the region before the first check, not just after", () => {
-    // The geo guess used to be uncorrectable until a result existed — and only
-    // then when coverage was partial. The input step carries its own picker so
-    // the first check can run against the right pack.
-    expect(FLOW).toContain('id="check-region"');
+  it("keeps region off the input step — the picker lives only on the result", () => {
+    // The input step used to carry its own region picker; it crowded the top of
+    // the paste card (a label plus a dropdown) for a control most readers never
+    // touch, since Auto resolves the pack from the geo header. Region is now
+    // corrected on the result step alone (id="result-region"), and a choice made
+    // there persists to drive the next first check. So the input step carries no
+    // region UI at all.
+    expect(FLOW).not.toContain('id="check-region"');
+    expect(FLOW).toContain('id="result-region"');
   });
 
   it("sends the persisted choice on the first check", () => {
     // Auto sends nothing (the server resolves from geo headers); an explicit
-    // choice travels as the region field. Asserted on the payload shape rather
-    // than prose, which is translated.
+    // choice — persisted from an earlier result-step correction — travels as the
+    // region field. Asserted on the payload shape rather than prose, which is
+    // translated.
     const run_ = FLOW.slice(FLOW.indexOf("async function runCheck"), FLOW.indexOf("async function shareResults"));
     expect(run_).toMatch(/\.\.\.\(payloadRegion \? \{ region: payloadRegion \}/);
     expect(run_).toMatch(/checkRegion \?\? undefined/);

@@ -502,6 +502,12 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
   // that has genuinely finished — it never gates the result.
   const [pipelineDone, setPipelineDone] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  // The submit button stays enabled on an empty box — it is the landing page's
+  // one job, and a dead primary control reads as broken rather than disciplined.
+  // Pressing it with nothing to check raises this instead of running an empty
+  // request: it points the cursor at the box and says what belongs there.
+  // Cleared the moment the reader types (or an upload fills the box).
+  const [emptyPrompt, setEmptyPrompt] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   // Forward-address copy confirmation. Copying is the one part of forwarding the
   // web can actually do for someone — the forward itself happens in their mail
@@ -527,6 +533,7 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
   const imageRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const emlRef = useRef<HTMLInputElement>(null);
+  const contentRef = useRef<HTMLTextAreaElement>(null);
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
 
   // Put back the message a check was run against, after a Back.
@@ -767,7 +774,18 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
   // but still counts as a re-check for feedback routing, so the reducer's
   // `region`-presence convention keeps working via dispatchRegion below.
   async function runCheck(overrideRegion?: string | null) {
-    if (!content.trim()) return;
+    if (!content.trim()) {
+      // The button is live even when the box is empty (see emptyPrompt), so a
+      // press here is a question — "what do I put in?" — not an empty check.
+      // Answer it in place: point the cursor at the box and surface the
+      // guidance. Only on the input step; a re-check re-runs content that
+      // already exists, so an empty one there is a no-op, not a prompt.
+      if (step === "input") {
+        setEmptyPrompt(true);
+        contentRef.current?.focus();
+      }
+      return;
+    }
     // A re-check is driven from the result step, where the pipeline panel and
     // the error block below the card are both off screen. It gets its own
     // in-place state on the region picker instead; the panel would otherwise
@@ -1356,36 +1374,12 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
       <div
         ref={swapRef}
         className={`check-swap bg-[var(--paper)] text-[var(--ink)] rounded-2xl overflow-hidden relative shadow-[0_18px_44px_-20px_rgba(0,0,0,0.6)] transition-shadow ${
-          dragOver ? "ring-2 ring-[var(--clear)]" : ""
+          dragOver ? "ring-2 ring-[var(--clear)]" : emptyPrompt && !content.trim() ? "ring-2 ring-[var(--caution)]" : ""
         }`}
         onDragOver={(e) => { e.preventDefault(); if (!busy) setDragOver(true); }}
         onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false); }}
         onDrop={handleDrop}
       >
-        {/* Names the surface and carries the region choice: the header is where
-            the eye starts, and "Suspicious content … region [Auto]" reads as
-            one line. The privacy badge it displaces moves below the card, so
-            the claim is still stated at the point of input. */}
-        <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-[var(--paper-dim)]">
-          <span className="font-[family-name:var(--font-mono-ui)] text-[11px] font-medium tracking-[0.09em] uppercase text-[#5D6675]">
-            {t("check.contentLabel")}
-          </span>
-          <CheckRegionPicker
-            id="check-region"
-            value={checkRegion}
-            onChange={(code) => {
-              setCheckRegion(code);
-              writeStoredCheckRegion(code);
-            }}
-            disabled={busy}
-            compact
-            small
-            onPaper
-            prefix={t("check.region.shortLabel")}
-            selectClassName="max-w-[150px]"
-          />
-        </div>
-
         {/* The pasted text steps aside for the work being done on it, rather
             than the two stacking — the panel is about that text, so occupying
             its place is what makes them read as one thing rather than two.
@@ -1402,12 +1396,14 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
             come back with its content and scroll position intact. */}
         <div className="min-w-0">
             <textarea
+              ref={contentRef}
               hidden={!!pipeStages}
               id="check-content"
               value={content}
-              onChange={(e) => { setContent(e.target.value); dispatch({ type: "content-replaced" }); }}
+              onChange={(e) => { setContent(e.target.value); dispatch({ type: "content-replaced" }); if (emptyPrompt) setEmptyPrompt(false); }}
               placeholder={t("check.placeholder")}
               rows={4}
+              aria-describedby={emptyPrompt ? "check-empty-hint" : undefined}
               className="w-full min-h-[118px] px-4 py-4 bg-transparent text-[var(--ink)] placeholder-[#8A93A1] border-0 resize-y text-base leading-relaxed focus:outline-none block"
             />
 
@@ -1473,8 +1469,13 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
               min-width stops the footer reflowing as the label changes. */}
           <button
             onClick={() => runCheck()}
-            disabled={busy || !content.trim()}
+            // Enabled even with an empty box: this is the landing page's primary
+            // action, and a greyed-out main button reads as broken. runCheck
+            // turns an empty press into guidance rather than an empty request.
+            // Still inert while a check or upload is in flight.
+            disabled={busy}
             aria-busy={feedback.busy}
+            aria-describedby={emptyPrompt ? "check-empty-hint" : undefined}
             className={`ml-auto max-sm:w-full max-sm:ml-0 min-w-[172px] inline-flex items-center justify-center gap-2.5 rounded-[9px] px-5 py-2.5 font-semibold text-[15px] transition-colors ${
               pipelineDone
                 ? "bg-[#00805B] text-white"
@@ -1508,6 +1509,25 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
         )}
       </div>
 
+      {/* Empty-submit guidance. The button no longer gates on content, so this
+          is where a press on an empty box lands: say what to paste rather than
+          doing nothing. role="alert" so it is announced, since the reader just
+          acted and got no verdict. Hidden the instant the box has anything in
+          it, or while a pipeline is running. */}
+      {emptyPrompt && !content.trim() && !pipeStages && (
+        <p
+          id="check-empty-hint"
+          role="alert"
+          className="flex items-start gap-2 text-sm text-[var(--caution)] px-0.5"
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="w-4 h-4 shrink-0 mt-0.5" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 8h.01M11 12h1v4h1" />
+          </svg>
+          <span>{t("check.emptyPrompt")}</span>
+        </p>
+      )}
+
       {/* The image path's handover: we read it, now you check it.
           Suppressed while the panel is up so the closing tick and this don't
           both claim the moment — this takes over as the panel retires. */}
@@ -1528,8 +1548,10 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
         </div>
       )}
 
-      {/* Paste guidance for users who aren't sure how to copy on mobile */}
-      {!content && !pipeStages && (
+      {/* Paste guidance for users who aren't sure how to copy on mobile. Stands
+          down while the empty-submit alert is up, so an empty press shows one
+          clear message rather than two stacked hints. */}
+      {!content && !pipeStages && !emptyPrompt && (
         <p className="text-xs text-[var(--faint)] px-0.5">
           {t("check.pasteHint")}{" "}
           <span className="hidden sm:inline">{t("check.dropHint")}</span>
