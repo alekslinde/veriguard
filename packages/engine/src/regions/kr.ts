@@ -42,6 +42,7 @@ export const KR: RegionDefinition = {
   code: "KR",
   name: "South Korea",
   coverage: "minimal",
+  languages: ["ko"],
 
   // No urgency keywords are authored: Korean lures are written in Korean, and
   // an English list would assert coverage this tier has not earned.

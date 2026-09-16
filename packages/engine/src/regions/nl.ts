@@ -42,6 +42,7 @@ export const NL: RegionDefinition = {
   code: "NL",
   name: "Netherlands",
   coverage: "minimal",
+  languages: ["nl"],
 
   urgency: {
     foreignAuthority: [],

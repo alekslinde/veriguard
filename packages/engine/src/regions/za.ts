@@ -81,6 +81,7 @@ export const ZA: RegionDefinition = {
   code: "ZA",
   name: "South Africa",
   coverage: "minimal",
+  languages: ["en", "af"],
 
   // No national campaign keywords. South Africa has eleven official languages
   // and its scam messaging runs across several of them, which is the SG

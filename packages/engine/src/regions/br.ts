@@ -69,6 +69,7 @@ export const BR: RegionDefinition = {
   code: "BR",
   name: "Brazil",
   coverage: "minimal",
+  languages: ["pt"],
 
   // No national campaign keywords: Brazilian lures are written in Portuguese,
   // and an English list would assert coverage this tier has not earned.

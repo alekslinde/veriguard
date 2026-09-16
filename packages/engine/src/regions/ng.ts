@@ -42,6 +42,7 @@ export const NG: RegionDefinition = {
   code: "NG",
   name: "Nigeria",
   coverage: "minimal",
+  languages: ["en"],
 
   urgency: {
     foreignAuthority: [],

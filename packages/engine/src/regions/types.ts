@@ -23,6 +23,30 @@ export type RegionCode =
   | "ZZ";
 
 /**
+ * ISO 639-1, lowercase — the languages a region's population actually reads
+ * scam messages in.
+ *
+ * **This is not a claim of detection coverage.** Every keyword list in the
+ * repo is English today; declaring `["ja"]` on JP says what Japanese users
+ * receive, not what the engine can score. The two are deliberately separate,
+ * because conflating them is what made the coverage tier overstate itself —
+ * see the note on RegionCoverage.
+ *
+ * What the axis buys immediately is *negative* knowledge: it lets a check know
+ * which language an entry must be safe in. A short agency acronym that is also
+ * an ordinary word is a false-positive source, but only in a language the
+ * region's readers write — "dia" collides with Spanish "día" and is harmless
+ * in New Zealand, where DIA is the Department of Internal Affairs. Without
+ * this field a collision check must consult every language at once and flags
+ * genuine acronyms; with it, the check is scoped and quiet. See
+ * acronymWordCollision.test.ts.
+ */
+export type LanguageCode =
+  | "en" | "fr" | "de" | "es" | "it" | "nl" | "sv" | "pl"
+  | "pt" | "id" | "ms" | "ta" | "zh" | "ja" | "ko" | "th"
+  | "vi" | "hi" | "af" | "sw" | "tl" | "ar";
+
+/**
  * How much detection coverage a region actually has.
  *
  * Consumed from Phase 3 onward: a low score from a region we have no rules for
@@ -207,6 +231,15 @@ export interface RegionDefinition {
   /** Display name for user-facing copy. */
   name: string;
   coverage: RegionCoverage;
+
+  /**
+   * Languages this region's users read scam messages in, most widely read
+   * first. Required, so a new pack cannot omit it by accident — a pack with no
+   * declared language would silently opt out of every language-scoped check.
+   *
+   * Declaring a language is not a claim to detect it; see LanguageCode.
+   */
+  languages: LanguageCode[];
 
   /** Campaign urgency groups this region contributes on top of base. */
   urgency: Omit<UrgencyGroups, "generic" | "voiceClone">;
@@ -429,6 +462,8 @@ export interface RegionPack {
   code: RegionCode;
   name: string;
   coverage: RegionCoverage;
+  /** Languages this region's users read, most widely read first. */
+  languages: LanguageCode[];
 
   /** Grouped urgency signals, base and region combined. */
   urgency: UrgencyGroups;

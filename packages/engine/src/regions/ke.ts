@@ -53,6 +53,7 @@ export const KE: RegionDefinition = {
   code: "KE",
   name: "Kenya",
   coverage: "minimal",
+  languages: ["sw", "en"],
 
   urgency: {
     foreignAuthority: [],

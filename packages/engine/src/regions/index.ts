@@ -116,6 +116,7 @@ function buildPack(region: RegionDefinition): RegionPack {
     code: region.code,
     name: region.name,
     coverage: region.coverage,
+    languages: region.languages,
 
     urgency,
     // Flat union the checkers match against. Membership is what matters —

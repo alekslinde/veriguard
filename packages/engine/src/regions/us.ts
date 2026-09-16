@@ -403,6 +403,7 @@ export const US: RegionDefinition = {
   code: "US",
   name: "United States",
   coverage: "full",
+  languages: ["en"],
 
   urgency: {
     foreignAuthority: URGENCY_FOREIGN_AUTHORITY,

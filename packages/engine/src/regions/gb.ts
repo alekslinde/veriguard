@@ -404,6 +404,7 @@ export const GB: RegionDefinition = {
   code: "GB",
   name: "United Kingdom",
   coverage: "full",
+  languages: ["en"],
 
   urgency: {
     foreignAuthority: URGENCY_FOREIGN_AUTHORITY,

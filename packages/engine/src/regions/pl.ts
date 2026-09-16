@@ -35,6 +35,7 @@ export const PL: RegionDefinition = {
   code: "PL",
   name: "Poland",
   coverage: "minimal",
+  languages: ["pl"],
 
   urgency: {
     foreignAuthority: [],

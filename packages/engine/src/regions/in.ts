@@ -56,6 +56,7 @@ export const IN: RegionDefinition = {
   code: "IN",
   name: "India",
   coverage: "minimal",
+  languages: ["hi", "en"],
 
   // No national campaign keywords, for the multilingual reason in the header.
   // The "digital arrest" script is a well-known Indian lure and would be the

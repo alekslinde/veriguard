@@ -42,6 +42,7 @@ export const MX: RegionDefinition = {
   code: "MX",
   name: "Mexico",
   coverage: "minimal",
+  languages: ["es"],
 
   urgency: {
     foreignAuthority: [],

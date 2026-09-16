@@ -368,6 +368,7 @@ export const IE: RegionDefinition = {
   code: "IE",
   name: "Ireland",
   coverage: "full",
+  languages: ["en"],
 
   urgency: {
     foreignAuthority: URGENCY_FOREIGN_AUTHORITY,

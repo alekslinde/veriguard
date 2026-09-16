@@ -55,6 +55,7 @@ export const FR: RegionDefinition = {
   code: "FR",
   name: "France",
   coverage: "minimal",
+  languages: ["fr"],
 
   // No national campaign keywords — French lures are written in French, and an
   // English list would assert coverage this tier has not earned.
