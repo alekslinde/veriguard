@@ -24,7 +24,12 @@ import type { RegionDefinition } from "./types";
 // rather than specific names, the same bar sg.ts and the targetRegion
 // attribution map apply.
 const AUTHORITY_MENTIONS = [
-  "sars",
+  // "sars" is NOT listed, for the same reason as "saps" and "hawks" below: it
+  // is the plural of an ordinary English word, and mentions() anchors on word
+  // boundaries, so it matches "sars" the noun exactly as it matches the
+  // agency. "Both sars outbreaks were studied for years" plus urgency scored
+  // 35/suspicious with a false "claims to be from a government agency" flag.
+  // The expanded name below carries the revenue-service case.
   "south african revenue service",
   // "saps" and "hawks" are NOT listed, though both name real ZA bodies (the
   // police service and the Directorate for Priority Crime Investigation).

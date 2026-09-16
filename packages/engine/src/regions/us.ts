@@ -197,7 +197,13 @@ const AUTHORITY_MENTIONS = [
   "irs", "internal revenue service",
   "ssa", "social security administration", "social security",
   "medicare", "medicaid", "cms", "centers for medicare",
-  "uscis", "immigration and customs", "ice", "dhs", "homeland security",
+  // "ice" is NOT listed, though ICE is heavily impersonated: it is an ordinary
+  // English word, and mentions() anchors on word boundaries, so it matches
+  // "grab some ice" exactly as it matches the agency. "immigration and
+  // customs" carries the agency, and a real lure names it in full or alongside
+  // DHS. Same rule as ZA's "saps" — an agency list has no substring/word
+  // split, so a bare entry that is also a dictionary word has no safe form.
+  "uscis", "immigration and customs", "dhs", "homeland security",
   // FEMA impersonation (D1 / #307 / FTC National Preparedness Month alert Sep
   // 2026; FEMA "Beware of Disaster Fraud" advisory 17 Jul 2026). FEMA is the
   // DHS component behind disaster assistance, and the relief-payment lure is
@@ -215,7 +221,10 @@ const AUTHORITY_MENTIONS = [
   "ftc", "federal trade commission",
   // Financial regulators and the deposit insurer. The SEC and FDIC never
   // cold-call consumers, and "FDIC insured" is a common false-legitimacy claim.
-  "sec", "securities and exchange commission", "fdic", "cfpb", "finra",
+  // "sec" is NOT listed: it is the ordinary abbreviation for "second" ("hang
+  // on a sec"), which a pasted message is far more likely to contain than a
+  // reference to the regulator. The expanded name carries the SEC.
+  "securities and exchange commission", "fdic", "cfpb", "finra",
   // E-ZPass and the state toll authorities function as the toll-lure authority
   // exactly as Linkt does for AU.
   "e-zpass", "ezpass", "sunpass", "fastrak", "txtag",

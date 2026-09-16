@@ -13,7 +13,9 @@ import { CHINESE_AUTHORITY_MENTIONS } from "./base";
 import type { RegionDefinition } from "./types";
 
 const AUTHORITY_MENTIONS = [
-  "firs",
+  // "firs" is NOT listed: it is the plural of an ordinary English word (the
+  // tree), matched on word boundaries exactly as the agency would be. The
+  // expanded name below carries the revenue-service case.
   "federal inland revenue service",
   "nimc",
   "national identity management commission",

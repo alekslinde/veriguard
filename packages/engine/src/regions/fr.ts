@@ -31,7 +31,10 @@ const AUTHORITY_MENTIONS = [
   "cnav",
   "police nationale",
   "gendarmerie nationale",
-  "ants",
+  // "ants" is NOT listed: it is the plural of an ordinary English word, and a
+  // French message pasted here is scored by the same matcher. "There are ants
+  // all over the kitchen floor" plus urgency reached 35/suspicious with a
+  // false government-agency flag. The expanded name carries the agency.
   "agence nationale des titres sécurisés",
   "franceconnect",
   "la poste",
