@@ -58,6 +58,7 @@ export const DE: RegionDefinition = {
   code: "DE",
   name: "Germany",
   coverage: "minimal",
+  languages: ["de"],
 
   // No national campaign keywords. German lures are written in German, and an
   // English list would assert coverage this tier has not earned. Base

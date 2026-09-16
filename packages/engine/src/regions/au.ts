@@ -526,6 +526,7 @@ export const AU: RegionDefinition = {
   code: "AU",
   name: "Australia",
   coverage: "full",
+  languages: ["en"],
 
   urgency: {
     foreignAuthority: URGENCY_FOREIGN_AUTHORITY,

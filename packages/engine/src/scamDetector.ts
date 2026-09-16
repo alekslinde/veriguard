@@ -269,8 +269,27 @@ export function containsLoose(text: string, entry: string): boolean {
   return new RegExp(escaped.replace(/\s+/g, "\\s+"), "i").test(text);
 }
 
+/**
+ * Strip combining accents so an accented entry matches an unaccented paste.
+ *
+ * Pack entries are authored with correct diacritics ("agence nationale des
+ * titres sécurisés", "pôle emploi", "autorité des marchés financiers"), but
+ * the text a user pastes frequently has none: SMS gateways transliterate,
+ * keyboards omit, and scammers write the plain form deliberately. Without
+ * folding, those entries matched only the accented spelling — so FR's agency
+ * names were unreachable from the most common way they are actually typed.
+ *
+ * Applied to BOTH sides, so it neither adds nor removes matches beyond the
+ * accent dimension: "sécurisés" and "securises" become one key, and a word
+ * that differs by an actual letter still fails.
+ */
+function foldAccents(value: string): string {
+  return value.normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
 export function mentions(text: string, entry: string): boolean {
-  const needle = entry.toLowerCase();
+  const needle = foldAccents(entry.toLowerCase());
+  text = foldAccents(text);
   const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // Multi-word phrases keep substring matching — their specificity is their
   // own protection, and \b would break matching across punctuation — but the
@@ -313,6 +332,61 @@ export function mentions(text: string, entry: string): boolean {
 
 function mentionsAny(text: string, entries: string[]): boolean {
   return entries.some((entry) => mentions(text, entry));
+}
+
+/**
+ * Short agency acronyms that are also ordinary words, matched on CASE.
+ *
+ * The collision these solve: "sec", "ice", "sars", "police" and the like are
+ * real agency names and ordinary vocabulary at once. mentions() is
+ * case-insensitive and anchors on word boundaries, so it cannot separate them —
+ * it matches "grab some ice" exactly as it matches "ICE:". Dropping the entry
+ * loses the acronym-only lure, which is the common SMS form ("SEC NOTICE: your
+ * brokerage account…"); keeping it flags innocent text, and that flag then
+ * supplies the authority half of a composite. Neither side is acceptable.
+ *
+ * Case carries the distinction that spelling does not. Agencies are written in
+ * caps in the impersonation scripts; the ordinary word is not. So these entries
+ * match only when the token appears in caps AND the message is not itself
+ * mostly caps — the second condition is what stops a shouty but innocent
+ * "GRAB SOME ICE ON THE WAY HOME" from reading as an agency.
+ *
+ * This is a narrow exception, not a general rule: it applies only to entries a
+ * pack marks as colliding, because every other entry is safer
+ * case-insensitive. A scammer typing "sec notice" in lower case defeats this
+ * one signal, which is the accepted cost — the alternative is a false
+ * accusation against ordinary messages, and the other signals in a real lure
+ * (a link, an urgency phrase, a credential ask) do not depend on it.
+ */
+const MOSTLY_CAPS_RATIO = 0.7;
+
+function messageIsMostlyCaps(text: string): boolean {
+  const letters = text.replace(/[^A-Za-z]/g, "");
+  if (letters.length === 0) return false;
+  const upper = letters.length - letters.replace(/[A-Z]/g, "").length;
+  return upper / letters.length > MOSTLY_CAPS_RATIO;
+}
+
+/**
+ * Whether `entry` appears in `text` in exactly the case the entry is authored
+ * in. `text` must be the ORIGINAL-CASE message — a lowercased one never
+ * matches.
+ *
+ * The entry's own spelling is the rule: "SEC" matches only "SEC", and a pack
+ * wanting the title-case form of a romanised name lists "Yubin" as well. That
+ * keeps the judgement in the pack, where the author knows whether a given
+ * capitalisation also begins ordinary sentences — "Police" and "Revenue" do,
+ * "Yubin" does not, and no property of the string itself distinguishes them.
+ */
+export function mentionsAsAcronym(text: string, entry: string): boolean {
+  if (messageIsMostlyCaps(text)) return false;
+  const folded = foldAccents(text);
+  // An all-lower entry means "the caps form of this", so that authors do not
+  // have to shout every acronym; any entry carrying a capital is taken
+  // literally.
+  const wanted = /[A-Z]/.test(entry) ? entry : entry.toUpperCase();
+  const escaped = foldAccents(wanted).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b${escaped}\\b`).test(folded);
 }
 
 const WIN_CLICKFIX_FLAG =
@@ -2006,11 +2080,23 @@ export function checkSms(
   // URL, call it a named authority, and clear the impersonation it was meant to
   // catch.
   const proseOnly = lower.replace(/https?:\/\/[^\s]+/gi, " ");
-  const namedAuthorities = PACK.authorityMentions.filter((a) => mentions(proseOnly, a));
+  // Same prose, original case kept — the only thing that separates "ICE:" the
+  // agency from "some ice" (see mentionsAsAcronym).
+  const proseOnlyCased = text.replace(/https?:\/\/[^\s]+/gi, " ");
+  const CASE_SENSITIVE = new Set(
+    PACK.caseSensitiveAuthorities.map((a) => a.toLowerCase()),
+  );
+  const authorityIn = (prose: string, cased: string, entry: string) =>
+    CASE_SENSITIVE.has(entry.toLowerCase())
+      ? mentionsAsAcronym(cased, entry)
+      : mentions(prose, entry);
+  const namedAuthorities = PACK.authorityMentions.filter((a) =>
+    authorityIn(proseOnly, proseOnlyCased, a),
+  );
   const linksAreOfficial =
     channel === "sms" && allLinksOnLegitDomains(urlMatch, PACK, namedAuthorities);
   if (
-    mentionsAny(lower, PACK.authorityMentions) &&
+    PACK.authorityMentions.some((a) => authorityIn(lower, text, a)) &&
     !isOwnDomainSender(channel, options?.senderDomain, PACK) &&
     // ...and not when every link in the message goes to that agency's own
     // domain. "Verify directly via official channels" is wrong advice for a

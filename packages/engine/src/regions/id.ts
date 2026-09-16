@@ -36,6 +36,7 @@ export const ID: RegionDefinition = {
   code: "ID",
   name: "Indonesia",
   coverage: "minimal",
+  languages: ["id"],
 
   urgency: {
     foreignAuthority: [],

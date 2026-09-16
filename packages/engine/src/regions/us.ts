@@ -197,6 +197,10 @@ const AUTHORITY_MENTIONS = [
   "irs", "internal revenue service",
   "ssa", "social security administration", "social security",
   "medicare", "medicaid", "cms", "centers for medicare",
+  // "ice" is listed but matched CASE-SENSITIVELY (caseSensitiveAuthorities
+  // below): ICE is heavily impersonated and "ICE:" is the common SMS form, but
+  // the lower-case word is frozen water. Dropping it lost the acronym-only
+  // lure; keeping it case-insensitive flagged "grab some ice for the party".
   "uscis", "immigration and customs", "ice", "dhs", "homeland security",
   // FEMA impersonation (D1 / #307 / FTC National Preparedness Month alert Sep
   // 2026; FEMA "Beware of Disaster Fraud" advisory 17 Jul 2026). FEMA is the
@@ -215,6 +219,8 @@ const AUTHORITY_MENTIONS = [
   "ftc", "federal trade commission",
   // Financial regulators and the deposit insurer. The SEC and FDIC never
   // cold-call consumers, and "FDIC insured" is a common false-legitimacy claim.
+  // "sec" is matched case-sensitively — see "ice" above. Lower-case "sec" is
+  // the ordinary abbreviation for "second"; "SEC NOTICE:" is the lure.
   "sec", "securities and exchange commission", "fdic", "cfpb", "finra",
   // E-ZPass and the state toll authorities function as the toll-lure authority
   // exactly as Linkt does for AU.
@@ -394,6 +400,9 @@ export const US: RegionDefinition = {
   code: "US",
   name: "United States",
   coverage: "full",
+  languages: ["en"],
+  // Ordinary words as well as agency names — matched only in caps.
+  caseSensitiveAuthorities: ["ice", "sec"],
 
   urgency: {
     foreignAuthority: URGENCY_FOREIGN_AUTHORITY,

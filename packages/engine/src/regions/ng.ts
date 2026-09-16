@@ -13,6 +13,8 @@ import { CHINESE_AUTHORITY_MENTIONS } from "./base";
 import type { RegionDefinition } from "./types";
 
 const AUTHORITY_MENTIONS = [
+  // "firs" is matched CASE-SENSITIVELY (caseSensitiveAuthorities below): the
+  // lower-case form is the plural of the tree; "FIRS NOTICE:" is the lure.
   "firs",
   "federal inland revenue service",
   "nimc",
@@ -40,6 +42,9 @@ export const NG: RegionDefinition = {
   code: "NG",
   name: "Nigeria",
   coverage: "minimal",
+  languages: ["en"],
+  // Ordinary words as well as agency names — matched only in caps.
+  caseSensitiveAuthorities: ["firs"],
 
   urgency: {
     foreignAuthority: [],

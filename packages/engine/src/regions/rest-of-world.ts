@@ -22,6 +22,7 @@ export const REST_OF_WORLD: RegionDefinition = {
   // sort in REGION_OPTIONS, which pins it last, not by the label.
   name: "Rest of the world",
   coverage: "none",
+  languages: ["en"],
 
   // No national campaign signals. The base groups (generic urgency,
   // voice-clone) still apply and are merged in by buildPack.

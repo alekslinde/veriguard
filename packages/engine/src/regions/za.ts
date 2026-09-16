@@ -24,6 +24,10 @@ import type { RegionDefinition } from "./types";
 // rather than specific names, the same bar sg.ts and the targetRegion
 // attribution map apply.
 const AUTHORITY_MENTIONS = [
+  // "sars" is matched CASE-SENSITIVELY (caseSensitiveAuthorities below): the
+  // lower-case form is the plural of an ordinary English word ("both sars
+  // outbreaks"), while "SARS NOTICE:" is the impersonation script. Case is
+  // what separates them; dropping the entry lost the acronym-only lure.
   "sars",
   "south african revenue service",
   // "saps" and "hawks" are NOT listed, though both name real ZA bodies (the
@@ -76,6 +80,9 @@ export const ZA: RegionDefinition = {
   code: "ZA",
   name: "South Africa",
   coverage: "minimal",
+  languages: ["en", "af"],
+  // Ordinary words as well as agency names — matched only in caps.
+  caseSensitiveAuthorities: ["sars"],
 
   // No national campaign keywords. South Africa has eleven official languages
   // and its scam messaging runs across several of them, which is the SG

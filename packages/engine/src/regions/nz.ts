@@ -313,6 +313,7 @@ export const NZ: RegionDefinition = {
   code: "NZ",
   name: "New Zealand",
   coverage: "full",
+  languages: ["en"],
 
   urgency: {
     foreignAuthority: URGENCY_FOREIGN_AUTHORITY,

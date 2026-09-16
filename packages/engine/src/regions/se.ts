@@ -33,6 +33,7 @@ export const SE: RegionDefinition = {
   code: "SE",
   name: "Sweden",
   coverage: "minimal",
+  languages: ["sv"],
 
   urgency: {
     foreignAuthority: [],

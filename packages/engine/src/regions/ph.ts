@@ -44,6 +44,7 @@ export const PH: RegionDefinition = {
   code: "PH",
   name: "Philippines",
   coverage: "minimal",
+  languages: ["tl", "en"],
 
   urgency: {
     foreignAuthority: [],
