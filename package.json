@@ -28,7 +28,10 @@
     "ocr-assets": "node scripts/copy-ocr-assets.mjs",
     "eval": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/eval.ts",
     "eval:metamorphic": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/eval-metamorphic.ts",
-    "check-deploy-drift": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/check-deploy-drift.ts"
+    "check-deploy-drift": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/check-deploy-drift.ts",
+    "ext:chrome": "TARGET=chrome vite build --config extension/vite.config.mts",
+    "ext:firefox": "TARGET=firefox vite build --config extension/vite.config.mts",
+    "ext": "npm run ext:chrome && npm run ext:firefox"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

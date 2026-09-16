@@ -3031,6 +3031,17 @@ function bareHostFlaggedTlds(suspiciousTlds: string[]): ReadonlySet<string> {
   return new Set(suspiciousTlds.map((t) => t.replace(/^\./, "").toLowerCase()));
 }
 
+/**
+ * Emitted when a shortened link was found but its destination was not resolved.
+ *
+ * Exported because a client has to be able to *recognise* this case, not merely
+ * display it: a bundled engine with no transport hits it for every shortener,
+ * and a surface that cannot tell this note apart from an ordinary finding will
+ * present an incomplete verdict as a complete one. Consumers match on this
+ * constant rather than on the wording, so the sentence stays free to change.
+ */
+export const UNEXPANDED_SHORTENER_NOTE = "Shortened URL — destination could not be checked";
+
 // Expands a shortened URL and merges the destination analysis into the base result.
 // If expansion fails or times out, the base result is returned unchanged.
 async function applyExpansion(url: string, base: CheckResult, blocklist?: Set<string>, region?: RegionInput, fetcher?: ExpandFetch): Promise<CheckResult> {
@@ -3043,7 +3054,7 @@ async function applyExpansion(url: string, base: CheckResult, blocklist?: Set<st
     // no transport ("unavailable") and a timeout, missing Location or
     // exhausted hop budget ("failed"). The shortener is all we ever saw, and a
     // silent base result would present that as a complete answer.
-    const note = "Shortened URL — destination could not be checked";
+    const note = UNEXPANDED_SHORTENER_NOTE;
     return {
       ...base,
       flags: [...base.flags, note],

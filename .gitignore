@@ -64,6 +64,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# built WebExtension bundles — reproducible from source via `npm run ext`.
+# The unpacked build is what you load in the browser; the store uploads are
+# zipped from it. Neither is source.
+/extension/dist/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

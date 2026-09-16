@@ -16,7 +16,8 @@
     "./regions/*": "./src/regions/*.ts",
     "./scamDetector": "./src/scamDetector.ts",
     "./urlExpander": "./src/urlExpander.ts",
-    "./urlSanitizer": "./src/urlSanitizer.ts"
+    "./urlSanitizer": "./src/urlSanitizer.ts",
+    "./verdictRank": "./src/verdictRank.ts"
   },
   "dependencies": {
     "libphonenumber-js": "^1.13.13"

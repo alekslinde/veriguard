@@ -15,6 +15,10 @@ const eslintConfig = defineConfig([
     // Tesseract browser runtime copied from node_modules by
     // scripts/copy-ocr-assets.mjs — vendor minified output, not our source.
     "public/tesseract/**",
+    // Built WebExtension bundles (`npm run ext`). Generated output, and it
+    // contains the engine inlined — linting it reports the bundler's
+    // transformations as if they were ours.
+    "extension/dist/**",
   ]),
   // ── Privacy invariant: no low-level network access in the detector ─────────
   //

@@ -8,7 +8,9 @@
 //
 // Pure module: no React, no I/O. Safe to unit test and to import from a route.
 
-import { AnalyzedIdentifier, CheckResult } from "@veriguard/engine/scamDetector";
+import { AnalyzedIdentifier } from "@veriguard/engine/scamDetector";
+import { isWorse, worstBy } from "@veriguard/engine/verdictRank";
+import type { Verdict } from "@veriguard/engine/verdictRank";
 import type { RegionCoverage } from "@veriguard/engine/regions";
 import type { Signal } from "@veriguard/engine/engineTypes";
 import { TrackingPixelReport } from "@/lib/trackingPixel";
@@ -16,17 +18,12 @@ import { TrackingFinding } from "@/lib/emailTracking";
 import { defang, defangEmail, defangPhone, defangText } from "@veriguard/engine/urlSanitizer";
 import { buildReportQuery, ReportPrefill } from "@/lib/reportPrefill";
 
-export type Verdict = CheckResult["verdict"];
-
-// Severity ordering — higher wins when collapsing many identifiers into one
-// overall verdict. "unknown" sits just above "safe": it's not a clean pass,
-// but it's not a positive signal of a scam either.
-export const VERDICT_RANK: Record<Verdict, number> = {
-  safe: 0,
-  unknown: 1,
-  suspicious: 2,
-  likely_scam: 3,
-};
+// Severity ordering lives in the engine now: the WebExtension bundles the
+// engine and cannot reach `lib/`, and two rank tables that must agree is the
+// defect shape this codebase has paid for more than once. Re-exported here so
+// existing app-side call sites keep their import unchanged.
+export { VERDICT_RANK } from "@veriguard/engine/verdictRank";
+export type { Verdict } from "@veriguard/engine/verdictRank";
 
 // Defang an identifier for display, per its kind. Mirrors how every value on
 // the Check page is shown — nothing live or clickable ever surfaces.
@@ -62,13 +59,11 @@ export function composeVerdict(
   results: AnalyzedIdentifier[],
   pixelReport: TrackingPixelReport | null,
 ): OverallVerdict | null {
-  if (results.length === 0) return null;
-  const worst = results.reduce((acc, r) =>
-    VERDICT_RANK[r.result.verdict] > VERDICT_RANK[acc.result.verdict] ? r : acc,
-  );
+  const worst = worstBy(results, (r) => r.result.verdict);
+  if (!worst) return null;
   let verdict = worst.result.verdict;
   let score = worst.result.score;
-  if (pixelReport && VERDICT_RANK[verdict] < VERDICT_RANK.suspicious) {
+  if (pixelReport && isWorse("suspicious", verdict)) {
     verdict = "suspicious";
     score = Math.max(score, 40);
   }

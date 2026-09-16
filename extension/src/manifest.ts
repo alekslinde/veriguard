@@ -1,0 +1,90 @@
+// The manifest, as one source with two targets.
+//
+// Chrome/Edge and Firefox differ in ways that are cheap to decide now and
+// invasive to retrofit, so both variants are generated from this file rather
+// than maintained as two hand-edited JSON blobs that drift.
+//
+// The differences that actually matter here:
+//
+//   · MV3 background — Chrome takes `service_worker`, Firefox takes a `scripts`
+//     array. Firefox does support `service_worker` in newer releases but event
+//     pages remain the compatible choice, and this extension's background work
+//     is a context-menu listener, which an event page serves fine.
+//   · `browser_specific_settings` — Firefox requires an explicit add-on id to
+//     sign and to keep storage stable across updates. Chrome rejects the key
+//     outright, so it cannot simply be left in both.
+//
+// Not varied, deliberately: permissions. Both browsers get the same, minimal
+// set, so a review of one is a review of the other.
+
+export type Target = "chrome" | "firefox";
+
+/**
+ * Permissions, each with the reason it is requested.
+ *
+ * AMO reviews source and asks why each permission exists; so should we. Anything
+ * that cannot be justified in one line here does not belong in the manifest.
+ *
+ *   · contextMenus — the entire entry point: right-click selected text → check.
+ *   · storage      — remembers the region choice between popups. Local only.
+ *
+ * Deliberately absent, and each absence is a property worth keeping:
+ *
+ *   · No host permissions. The engine is bundled, so a text check reads nothing
+ *     from the page and talks to no server. An extension that can read every
+ *     site is a different product with a different risk profile.
+ *   · No `tabs`. The context menu passes the selected text directly; knowing the
+ *     URL of every tab is not needed to score a string.
+ *   · No `<all_urls>` content script. Nothing is injected into pages at all.
+ */
+const PERMISSIONS = ["contextMenus", "storage"] as const;
+
+interface ManifestOptions {
+  version: string;
+  /** Firefox add-on id. Required for signing; ignored on Chrome. */
+  geckoId: string;
+}
+
+export function buildManifest(target: Target, { version, geckoId }: ManifestOptions): object {
+  const base = {
+    manifest_version: 3,
+    name: "Veriguard — scam check",
+    // Reads as the sentence a user sees in the store listing, not as a feature
+    // list. The offline claim is the differentiator and is literally true for
+    // the text check this ships with.
+    description:
+      "Right-click any suspicious message to check it for scam signals. Runs entirely on your device — nothing is sent anywhere.",
+    version,
+    permissions: [...PERMISSIONS],
+    action: {
+      default_title: "Veriguard",
+      default_popup: "popup.html",
+    },
+    icons: {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png",
+    },
+    // The popup is the only page, and it loads one local script. Spelling the
+    // policy out rather than relying on the MV3 default means a later change
+    // that would loosen it shows up as an edit to this line.
+    content_security_policy: {
+      extension_pages: "script-src 'self'; object-src 'none'",
+    },
+  };
+
+  if (target === "firefox") {
+    return {
+      ...base,
+      background: { scripts: ["background.js"], type: "module" },
+      browser_specific_settings: {
+        gecko: { id: geckoId, strict_min_version: "115.0" },
+      },
+    };
+  }
+
+  return {
+    ...base,
+    background: { service_worker: "background.js", type: "module" },
+  };
+}

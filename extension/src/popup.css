@@ -1,0 +1,307 @@
+/* Popup styling.
+ *
+ * Plain CSS: Tailwind is a build-time dependency of the web app, and pulling it
+ * in to style one 380px panel would add a toolchain to a bundle whose
+ * reviewability by AMO is a feature.
+ *
+ * The tokens below are copied from `app/globals.css` — deliberately, and this is
+ * the one duplication in the extension. The alternative is importing the app's
+ * stylesheet, which drags in the whole Tailwind layer for four colours. The
+ * values carry their contrast reasoning with them so a later edit does not
+ * silently undo it: --scam is display-only at 3.37:1 on --ink-2, and --scam-text
+ * is the variant that clears AA for body copy. Using --scam for text is the
+ * mistake this note exists to prevent.
+ */
+
+:root {
+  --ink: #141c2b;
+  --ink-2: #1e2839;
+  --ink-3: #2b3648;
+  --rule: rgba(255, 255, 255, 0.12);
+  --foreground: #f4f3ef;
+  --text-dim: #a6b0c0;
+  --faint: #7c879a;
+  --clear: #00a676;
+  --caution: #e8a33d;
+  --scam: #d6453d; /* display only — see note above */
+  --scam-text: #e86b63; /* body copy */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  /* A fixed width: a popup has no responsive context to adapt to, and letting
+     it size to content makes it jump between checks. */
+  width: 380px;
+  background: var(--ink);
+  color: var(--foreground);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.shell {
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.head h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.mark {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--clear);
+  box-shadow: 0 0 0 3px rgba(0, 166, 118, 0.18);
+}
+
+.offline {
+  margin-left: auto;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+
+/* ── Input ──────────────────────────────────────────────────────────────── */
+
+.field,
+.region {
+  display: grid;
+  gap: 5px;
+}
+
+.label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--faint);
+}
+
+textarea,
+select {
+  width: 100%;
+  background: var(--ink-2);
+  color: var(--foreground);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 8px 9px;
+  font: inherit;
+  resize: vertical;
+}
+
+textarea::placeholder {
+  color: var(--faint);
+}
+
+/* Focus is drawn, never removed. A popup is keyboard-reachable and the default
+   ring is what a keyboard-only user navigates by. */
+textarea:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--clear);
+  outline-offset: 2px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 9px;
+  align-items: end;
+}
+
+.go {
+  background: var(--clear);
+  color: #06231a;
+  border: 0;
+  border-radius: 8px;
+  /* 38px tall, comfortably past the 24px minimum target size and close to the
+     44px recommendation, in a panel where vertical space is tight. */
+  padding: 0 18px;
+  height: 38px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.go:hover {
+  filter: brightness(1.08);
+}
+
+.go[disabled] {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* ── Verdict ────────────────────────────────────────────────────────────── */
+
+.out:empty {
+  display: none;
+}
+
+.card {
+  border: 1px solid var(--rule);
+  border-radius: 11px;
+  overflow: hidden;
+  background: var(--ink-2);
+}
+
+.verdict {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 13px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex: 0 0 auto;
+}
+
+.verdict h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.verdict p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.v-safe .dot { background: var(--clear); }
+.v-safe h2 { color: var(--clear); }
+.v-suspicious .dot { background: var(--caution); }
+.v-suspicious h2 { color: var(--caution); }
+.v-likely_scam .dot { background: var(--scam); }
+.v-likely_scam h2 { color: var(--scam-text); }
+.v-unknown .dot { background: var(--faint); }
+.v-unknown h2 { color: var(--text-dim); }
+
+/* Evidence rows: the weights are published here for the same reason they are on
+   the site — a score with no breakdown asks to be taken on faith. */
+.ev {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ev li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 8px 13px;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.09);
+  font-size: 13px;
+}
+
+.ev li:last-child {
+  border-bottom: 0;
+}
+
+.ev .src {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--faint);
+  margin-bottom: 2px;
+}
+
+.ev .pts {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.pts.up { color: var(--caution); }
+.pts.down { color: var(--clear); }
+.pts.zero { color: var(--faint); }
+
+.score {
+  background: rgba(0, 0, 0, 0.22);
+  padding: 10px 13px 12px;
+}
+
+.score .top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.score .n {
+  font-variant-numeric: tabular-nums;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.track {
+  margin-top: 7px;
+  height: 6px;
+  border-radius: 4px;
+  background: var(--ink-3);
+  overflow: hidden;
+}
+
+.track > div {
+  height: 6px;
+  border-radius: 4px;
+}
+
+/* ── Notices ────────────────────────────────────────────────────────────── */
+
+/* Amber is reserved for statements about our own coverage, never for the
+   verdict — the same rule the web app follows. */
+.notice {
+  border-top: 1px solid var(--rule);
+  padding: 9px 13px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  background: rgba(232, 163, 61, 0.07);
+}
+
+.notice strong {
+  color: var(--caution);
+  font-weight: 600;
+}
+
+.err {
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.foot {
+  font-size: 11.5px;
+  color: var(--faint);
+  text-align: center;
+}
