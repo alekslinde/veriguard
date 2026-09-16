@@ -250,6 +250,24 @@ export interface RegionDefinition {
    */
   authorityMentions: string[];
   /**
+   * The subset of authorityMentions that are also ordinary words in a language
+   * this region reads, and so match only when written in caps.
+   *
+   * "sec" is the SEC and "a sec"; "ice" is ICE and frozen water; "police" and
+   * "sars" and "revenue" likewise. A case-insensitive match cannot tell these
+   * apart, and both ways of resolving it by editing the list are wrong: drop
+   * the entry and the acronym-only lure ("SEC NOTICE: …") stops scoring, which
+   * is the common SMS form; keep it and ordinary messages are told they name a
+   * government agency.
+   *
+   * Entries listed here must also appear in authorityMentions — they are a
+   * matching rule for those entries, not an additional list. Enforced by
+   * acronymWordCollision.test.ts, which also fails if a colliding entry is
+   * missing from here.
+   */
+  caseSensitiveAuthorities?: string[];
+
+  /**
    * The subset of authorityMentions that have publicly committed to sending no
    * links in unsolicited SMS — a link alongside one of these is a scam signal.
    * Must be a subset of authorityMentions, else the flag copy would misstate.
@@ -464,6 +482,8 @@ export interface RegionPack {
   coverage: RegionCoverage;
   /** Languages this region's users read, most widely read first. */
   languages: LanguageCode[];
+  /** Authority entries that match only in caps — see RegionDefinition. */
+  caseSensitiveAuthorities: string[];
 
   /** Grouped urgency signals, base and region combined. */
   urgency: UrgencyGroups;

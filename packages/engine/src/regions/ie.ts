@@ -369,6 +369,8 @@ export const IE: RegionDefinition = {
   name: "Ireland",
   coverage: "full",
   languages: ["en"],
+  // Ordinary words as well as agency names — matched only in caps.
+  caseSensitiveAuthorities: [],
 
   urgency: {
     foreignAuthority: URGENCY_FOREIGN_AUTHORITY,

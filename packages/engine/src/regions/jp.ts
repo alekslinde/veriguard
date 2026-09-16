@@ -40,12 +40,19 @@ const AUTHORITY_MENTIONS = [
   "npa cybercrime",
   "national police agency",
   "japan post",
-  // "yubin" is NOT listed: romanised 郵便 is the everyday word for "mail", not
-  // a name that identifies the operator. "The yubin has not arrived today"
-  // plus urgency reached 35/suspicious with a false government-agency flag.
-  // "japan post" above carries the operator, and this is the same class as
-  // ZA's "saps" — a bare entry that is also an ordinary word has no safe form,
-  // whichever language the word belongs to.
+  // "yubin" is matched CASE-SENSITIVELY (caseSensitiveAuthorities below):
+  // romanised 郵便 is the everyday word for "mail", so the lower-case form is
+  // ordinary Japanese ("the yubin arrived"), while the capitalised form heads
+  // an impersonation.
+  //
+  // Both accepted forms are enumerated rather than inferred: the lower-case
+  // entry means "the all-caps form", and "Yubin" adds the title case a
+  // romanised name actually takes. A general title-case rule cannot be
+  // expressed as a property of the string — "Police", "Revenue" and "Sheriff"
+  // all begin ordinary sentences and are longer than "Yubin" — so it stays a
+  // per-entry judgement, made here.
+  "yubin",
+  "Yubin",
   "nhk",
   "mynumber",
   "my number card",
@@ -64,6 +71,8 @@ export const JP: RegionDefinition = {
   name: "Japan",
   coverage: "minimal",
   languages: ["ja"],
+  // Ordinary words as well as agency names — matched only in caps.
+  caseSensitiveAuthorities: ["yubin", "Yubin"],
 
   // No national campaign keywords, for the script and language reason in the
   // header. Base contributes generic urgency and the voice-clone script.

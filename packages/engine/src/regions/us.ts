@@ -197,13 +197,11 @@ const AUTHORITY_MENTIONS = [
   "irs", "internal revenue service",
   "ssa", "social security administration", "social security",
   "medicare", "medicaid", "cms", "centers for medicare",
-  // "ice" is NOT listed, though ICE is heavily impersonated: it is an ordinary
-  // English word, and mentions() anchors on word boundaries, so it matches
-  // "grab some ice" exactly as it matches the agency. "immigration and
-  // customs" carries the agency, and a real lure names it in full or alongside
-  // DHS. Same rule as ZA's "saps" — an agency list has no substring/word
-  // split, so a bare entry that is also a dictionary word has no safe form.
-  "uscis", "immigration and customs", "dhs", "homeland security",
+  // "ice" is listed but matched CASE-SENSITIVELY (caseSensitiveAuthorities
+  // below): ICE is heavily impersonated and "ICE:" is the common SMS form, but
+  // the lower-case word is frozen water. Dropping it lost the acronym-only
+  // lure; keeping it case-insensitive flagged "grab some ice for the party".
+  "uscis", "immigration and customs", "ice", "dhs", "homeland security",
   // FEMA impersonation (D1 / #307 / FTC National Preparedness Month alert Sep
   // 2026; FEMA "Beware of Disaster Fraud" advisory 17 Jul 2026). FEMA is the
   // DHS component behind disaster assistance, and the relief-payment lure is
@@ -221,10 +219,9 @@ const AUTHORITY_MENTIONS = [
   "ftc", "federal trade commission",
   // Financial regulators and the deposit insurer. The SEC and FDIC never
   // cold-call consumers, and "FDIC insured" is a common false-legitimacy claim.
-  // "sec" is NOT listed: it is the ordinary abbreviation for "second" ("hang
-  // on a sec"), which a pasted message is far more likely to contain than a
-  // reference to the regulator. The expanded name carries the SEC.
-  "securities and exchange commission", "fdic", "cfpb", "finra",
+  // "sec" is matched case-sensitively — see "ice" above. Lower-case "sec" is
+  // the ordinary abbreviation for "second"; "SEC NOTICE:" is the lure.
+  "sec", "securities and exchange commission", "fdic", "cfpb", "finra",
   // E-ZPass and the state toll authorities function as the toll-lure authority
   // exactly as Linkt does for AU.
   "e-zpass", "ezpass", "sunpass", "fastrak", "txtag",
@@ -404,6 +401,8 @@ export const US: RegionDefinition = {
   name: "United States",
   coverage: "full",
   languages: ["en"],
+  // Ordinary words as well as agency names — matched only in caps.
+  caseSensitiveAuthorities: ["ice", "sec"],
 
   urgency: {
     foreignAuthority: URGENCY_FOREIGN_AUTHORITY,

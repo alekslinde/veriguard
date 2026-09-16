@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { resolveRegionPack, supportedRegions } from "@veriguard/engine/regions";
 import type { LanguageCode } from "@veriguard/engine/regions/types";
-import { checkSms } from "@veriguard/engine/scamDetector";
+import { checkSms, mentions } from "@veriguard/engine/scamDetector";
 
 // Guards the failure mode where an agency's own bare acronym is also an
 // ordinary English word.
@@ -219,6 +219,12 @@ const COMMON_WORDS_BY_LANGUAGE: Partial<Record<LanguageCode, string[]>> = {
   "yes",
   "yet",
   "zoo",
+  // Words that are also agency names in their own right. Kept in the list so
+  // the guard reports them rather than hiding them behind a length cap; each
+  // is resolved in KNOWN_COLLISIONS, because case cannot separate these.
+  "police",
+  "revenue",
+  "sheriff",
   ],
 
   // Everyday nouns and verbs. "dia" (day) and "ano" (year) are the ones that
@@ -334,7 +340,44 @@ const AUTHORITY_LISTS = ["authorityMentions", "foreignAuthorityMentions"] as con
  * common English, so COMMON_WORDS excludes them by design. That exclusion is
  * the check's conservatism, not an oversight.
  */
-const KNOWN_COLLISIONS = new Set<string>([]);
+const KNOWN_COLLISIONS = new Set<string>([
+  // ── Resolved by case: the entry stays, matched only in caps ──────────────
+  //
+  // These are acronyms, so the capitalised form is the agency and the
+  // lower-case form is the word. caseSensitiveAuthorities carries them, and the
+  // "matched only in caps" regression tests below are the cover.
+  //
+  // FR "ants", ZA "sars" and NL "duo" are resolved the same way but do not
+  // appear here: the guard reads authorityMentions, and a collision only needs
+  // reviewing while the bare form is still matched case-insensitively.
+  "US ice (ice, en)",
+  "US sec (sec, en)",
+  "NG firs (fir, en)",
+  "JP yubin (yubin, ja)",
+
+  // ── Not resolvable by case: the word IS the agency's ordinary name ───────
+  //
+  // "police", "revenue" and "sheriff" are not acronyms — they are the English
+  // words a real lure uses, in whatever case it likes. Requiring caps measured
+  // as a live regression in both directions: "don't call the police" is a real
+  // bail-scam signal in lower case, and "Revenue: your PPS number has been
+  // suspended" is a real IE lure in title case. Both stop scoring under a caps
+  // rule, which is a worse trade than the false positive.
+  //
+  // So they stay case-insensitive and keep their false-positive risk. That risk
+  // is real but bounded: a bare authority mention scores 0 and reaches
+  // suspicious only with corroboration, and the corroborating signals (urgency,
+  // a link, a credential ask) are absent from "the police came by about the
+  // noise". The honest summary is that this class is unresolved, not safe.
+  "AU police (police, en)",
+  "CA police (police, en)",
+  "GB police (police, en)",
+  "IE police (police, en)",
+  "NZ police (police, en)",
+  "US police (police, en)",
+  "IE revenue (revenue, en)",
+  "US sheriff (sheriff, en)",
+]);
 
 const shortAlphaEntries = (region: string) => {
   const pack = resolveRegionPack(region) as unknown as Record<string, unknown>;
@@ -346,8 +389,10 @@ const shortAlphaEntries = (region: string) => {
       if (typeof entry !== "string") continue;
       const word = entry.toLowerCase();
       // Multi-word entries are safe: an expanded name is not a single word.
+      // No length cap — a cutoff of 5 hid "police", "revenue" and "sheriff",
+      // the most common collisions in the repo, and let the guard report a
+      // clean sweep it had never performed.
       if (!/^[a-z]+$/.test(word)) continue;
-      if (word.length > 5) continue;
       out.push(word);
     }
   }
@@ -363,14 +408,23 @@ const collidesWith = (
   entry: string,
   languages: readonly LanguageCode[],
 ): { word: string; language: LanguageCode } | null => {
-  const singular = entry.replace(/s$/, "");
   for (const language of languages) {
     const words = COMMON_WORDS_BY_LANGUAGE[language];
     if (!words) continue;
-    if (words.includes(entry)) return { word: entry, language };
-    if (singular !== entry && words.includes(singular)) {
-      return { word: singular, language };
-    }
+    // The question is not "is the word inside the entry" but "does this ENTRY
+    // fire on ordinary prose containing the word" — that is the false positive
+    // users actually see. So ask the engine's own matcher, against the word and
+    // its plural, rather than modelling inflection by hand.
+    //
+    // The direction matters. mentions("ants", "ant") is false, because
+    // mentions() anchors entries of 4 characters or fewer hard — but the pack
+    // entry "ants" fires on "There are ants all over the floor" perfectly well.
+    // A hand-written /s$/ strip happened to catch that case and got others
+    // wrong ("mas" reaching "ma"), which is the drift this avoids.
+    const word = words.find(
+      (w) => mentions(w, entry) || mentions(`${w}s`, entry),
+    );
+    if (word) return { word, language };
   }
   return null;
 };
@@ -473,6 +527,49 @@ describe("innocent messages containing agency-acronym words", () => {
     ["ZA", "Urgent, please confirm: both sars outbreaks are on the exam today!"],
     ["JP", "Urgent: please confirm, the yubin has not arrived today!"],
   ];
+
+  // The other half of the trade, and the reason the entries were restored
+  // rather than deleted: the capitalised form is the impersonation script, and
+  // deleting the acronym to silence the false positive silently lost it.
+  const ACRONYM_LURES: [string, string][] = [
+    ["US", "SEC NOTICE: your brokerage account is under investigation. http://sec-gov.top/verify"],
+    ["US", "ICE: your immigration status requires verification. http://uscis-check.top/verify"],
+    ["ZA", "SARS NOTICE: you have an outstanding tax debt. http://sars-efiling.top/pay"],
+    ["NG", "FIRS NOTICE: your TIN is suspended. http://firs-ng.top/verify"],
+    ["JP", "Yubin: your parcel is held, pay the fee at http://jp-yubin.top/pay"],
+  ];
+
+  it.each(ACRONYM_LURES)("%s: still reads a capitalised acronym as an agency — %s", (region, text) => {
+    const result = checkSms(text, undefined, region);
+    expect(result.flags.filter((f) => /government agency/i.test(f))).not.toEqual([]);
+    expect(result.verdict).toBe("likely_scam");
+  });
+
+  // A message shouted in full caps must not turn every ordinary word into an
+  // agency — the condition that keeps the caps rule from being a new false
+  // positive of its own.
+  const SHOUTED: [string, string][] = [
+    ["US", "GRAB SOME ICE ON THE WAY HOME!!"],
+    ["US", "HANG ON A SEC, I WILL CALL YOU BACK"],
+  ];
+
+  it.each(SHOUTED)("%s: an all-caps innocent message is not an agency — %s", (region, text) => {
+    const result = checkSms(text, undefined, region);
+    expect(result.flags.filter((f) => /government agency/i.test(f))).toEqual([]);
+  });
+
+  // Accented pack entries must match the unaccented spelling a message is
+  // actually pasted in — SMS gateways transliterate and keyboards omit, so an
+  // accent-exact rule made these agency names unreachable in practice.
+  const UNACCENTED: [string, string][] = [
+    ["FR", "Agence nationale des titres securises: votre dossier est bloque. http://ants-titres.top/verifier"],
+    ["FR", "Pole emploi: votre dossier requiert une verification. http://pole-emploi-fr.top/verifier"],
+  ];
+
+  it.each(UNACCENTED)("%s: matches an agency written without accents — %s", (region, text) => {
+    const result = checkSms(text, undefined, region);
+    expect(result.flags.filter((f) => /government agency/i.test(f))).not.toEqual([]);
+  });
 
   it.each(URGENT)("%s: urgency plus a collision word stays below suspicious — %s", (region, text) => {
     const result = checkSms(text, undefined, region);

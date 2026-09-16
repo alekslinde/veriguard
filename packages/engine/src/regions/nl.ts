@@ -43,6 +43,8 @@ export const NL: RegionDefinition = {
   name: "Netherlands",
   coverage: "minimal",
   languages: ["nl"],
+  // Ordinary words as well as agency names — matched only in caps.
+  caseSensitiveAuthorities: ["duo"],
 
   urgency: {
     foreignAuthority: [],

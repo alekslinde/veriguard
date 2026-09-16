@@ -43,6 +43,8 @@ export const MX: RegionDefinition = {
   name: "Mexico",
   coverage: "minimal",
   languages: ["es"],
+  // Ordinary words as well as agency names — matched only in caps.
+  caseSensitiveAuthorities: ["sat", "ine"],
 
   urgency: {
     foreignAuthority: [],

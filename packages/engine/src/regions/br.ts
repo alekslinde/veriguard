@@ -30,13 +30,15 @@ const AUTHORITY_MENTIONS = [
   "instituto nacional do seguro social",
   "serasa",
   "spc brasil",
-  "caixa economica federal",
+  // Accented spellings only. mentions() folds diacritics, so these already
+  // match the unaccented form a message is usually pasted in — the separate
+  // unaccented copies that used to sit alongside each of these were exact
+  // duplicates once folding landed, and packShadowing flagged them as such.
   "caixa econômica federal",
   "banco central do brasil",
   "bacen",
   "procon",
   "anatel",
-  "policia federal",
   "polícia federal",
   "correios",
   // "gov.br" is deliberately NOT listed, though it is the real citizen portal
@@ -53,9 +55,7 @@ const AUTHORITY_MENTIONS = [
   // user that the verdicts are noise — which is the direction the project
   // treats as the costlier one.
   "cpf regularizacao",
-  "tribunal de justica",
   "tribunal de justiça",
-  "justica eleitoral",
   "justiça eleitoral",
 ];
 
