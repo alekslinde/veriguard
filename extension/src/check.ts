@@ -16,6 +16,7 @@ import type { AnalyzedIdentifier } from "@veriguard/engine/scamDetector";
 import { worstBy } from "@veriguard/engine/verdictRank";
 import type { Verdict } from "@veriguard/engine/verdictRank";
 import type { RegionCoverage } from "@veriguard/engine/regions";
+import type { HostLookup } from "@veriguard/engine/engineTypes";
 
 export interface ExtensionCheck {
   verdict: Verdict;
@@ -30,6 +31,14 @@ export interface ExtensionCheck {
    * and a reader who is not told will read the score as complete.
    */
   unexpandedShortener: boolean;
+  /**
+   * Whether the malicious-host blocklist was available for this check.
+   *
+   * False means the list could not be fetched or has never been fetched — not
+   * that it was consulted and found nothing. The popup says so on a clean
+   * verdict, where the distinction changes what the result is worth.
+   */
+  blocklistConsulted: boolean;
 }
 
 /**
@@ -70,17 +79,16 @@ function hasUnexpandedShortener(results: AnalyzedIdentifier[]): boolean {
 /**
  * Check `content` against the bundled engine.
  *
- * `blocklist` is accepted but optional and currently never supplied — the
- * URLhaus list is fetched app-side, and the seam is left open rather than
- * closed so that wiring it later is a change at the call site, not here. Passing
- * nothing means the engine scores without it, which can only ever produce a
- * *lower* score than the server would: a client verdict is never more alarming
- * than the site's.
+ * `blocklist` is optional and the check is complete without it — omitting it can
+ * only ever produce a *lower* score, never a higher one, so a client with no
+ * list misses a blocklisted host rather than inventing one. The result records
+ * which way it went, because "no blocklist entry matched" and "the blocklist was
+ * not consulted" are different statements and only one of them is reassuring.
  */
 export async function runCheck(
   content: string,
   region: string | undefined,
-  blocklist?: Set<string>,
+  blocklist?: HostLookup,
 ): Promise<ExtensionCheck | null> {
   const results = await analyzeContent(content, blocklist, region);
   const worst = worstBy(results, (r) => r.result.verdict);
@@ -92,5 +100,6 @@ export async function runCheck(
     results,
     coverage: worstCoverage(results),
     unexpandedShortener: hasUnexpandedShortener(results),
+    blocklistConsulted: blocklist !== undefined,
   };
 }

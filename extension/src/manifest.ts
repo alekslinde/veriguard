@@ -43,9 +43,19 @@ interface ManifestOptions {
   version: string;
   /** Firefox add-on id. Required for signing; ignored on Chrome. */
   geckoId: string;
+  /**
+   * Origin the blocklist is fetched from, and the only origin the popup may
+   * contact. Named in the CSP below rather than left to the default so the one
+   * network call this extension makes is declared, reviewable, and bounded to a
+   * single host.
+   */
+  apiBase: string;
 }
 
-export function buildManifest(target: Target, { version, geckoId }: ManifestOptions): object {
+export function buildManifest(
+  target: Target,
+  { version, geckoId, apiBase }: ManifestOptions,
+): object {
   const base = {
     manifest_version: 3,
     name: "Veriguard — scam check",
@@ -68,8 +78,13 @@ export function buildManifest(target: Target, { version, geckoId }: ManifestOpti
     // The popup is the only page, and it loads one local script. Spelling the
     // policy out rather than relying on the MV3 default means a later change
     // that would loosen it shows up as an edit to this line.
+    //
+    // `connect-src` names exactly one origin. The extension makes one network
+    // call — fetching the blocklist — and this is what stops any other code
+    // path, present or added later, from reaching anywhere else. The browser
+    // enforces it, so it is a real bound rather than a convention.
     content_security_policy: {
-      extension_pages: "script-src 'self'; object-src 'none'",
+      extension_pages: `script-src 'self'; object-src 'none'; connect-src ${apiBase}`,
     },
   };
 

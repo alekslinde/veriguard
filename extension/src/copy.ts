@@ -58,4 +58,14 @@ export const NOTICE = {
   /** A shortened link this client will not resolve. */
   shortener:
     "This message hides a link behind a shortener. Checking it here would tell the shortener your IP address, so we did not follow it — the destination is unchecked. Paste it on veriguard.app to have it resolved safely.",
+  /**
+   * The known-malicious-host list was unavailable.
+   *
+   * Shown only on an otherwise-clean verdict, and the wording is careful about
+   * why: on a verdict that already found something the list would not have
+   * changed the advice, but on a quiet one it is the difference between "we
+   * checked and found nothing" and "we could not run one of the checks".
+   */
+  noBlocklist:
+    "We could not reach the list of known malicious sites, so that check did not run. Everything else was checked normally. This result is less complete than usual — if anything about the message feels wrong, treat it as suspicious.",
 };

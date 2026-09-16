@@ -11,6 +11,7 @@ import { VERDICT_COPY, SOURCE_LABEL, NOTICE } from "./copy";
 import { REGION_OPTIONS, DEFAULT_REGION } from "@veriguard/engine/regions";
 import { defangText } from "@veriguard/engine/urlSanitizer";
 import { hasExtensionApi, storageGet, storageSet } from "./browser";
+import { getBlocklist } from "./blocklist";
 
 const REGION_KEY = "region";
 /** Where the background script leaves text from a right-click check. */
@@ -114,6 +115,17 @@ function renderVerdict(check: ExtensionCheck) {
     note.append(el("strong", undefined, "Link not followed. "), document.createTextNode(NOTICE.shortener));
     card.append(note);
   }
+  // Only where it changes what the result is worth. On a verdict that already
+  // found something, the missing list would not have altered the advice, and a
+  // third caveat under a scam warning dilutes the warning itself.
+  if (!check.blocklistConsulted && (check.verdict === "safe" || check.verdict === "unknown")) {
+    const note = el("div", "notice");
+    note.append(
+      el("strong", undefined, "One check did not run. "),
+      document.createTextNode(NOTICE.noBlocklist),
+    );
+    card.append(note);
+  }
 
   out.replaceChildren(card);
 }
@@ -131,7 +143,10 @@ async function check() {
   try {
     const region = regionSel.value || undefined;
     if (hasExtensionApi()) await storageSet(REGION_KEY, region);
-    const result = await runCheck(content, region);
+    // Returns whatever is cached without waiting on the network — a cold start
+    // checks without the list rather than making the user wait for it.
+    const blocklist = await getBlocklist(__API_BASE__);
+    const result = await runCheck(content, region, blocklist);
     if (result) renderVerdict(result);
     else renderError("Nothing to check in that — paste a message, link or number.");
   } catch {

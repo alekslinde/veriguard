@@ -24,7 +24,12 @@ const CHROME = path.join(DIST, "chrome");
 const built = existsSync(path.join(CHROME, "popup.js"));
 
 /**
- * Primitives that reach the network, and sinks that execute markup as code.
+ * Network primitives that must not appear at all.
+ *
+ * `fetch` is deliberately absent from this list and asserted separately below:
+ * the extension makes exactly one network call, to fetch the blocklist, so the
+ * claim worth enforcing is not "no fetch" but "one fetch, to one place".
+ * Everything here has no legitimate use in this bundle.
  *
  * Matched as substrings against the unminified bundle — which is exactly why
  * the build does not minify. A mangler would rename nothing here (these are all
@@ -32,7 +37,6 @@ const built = existsSync(path.join(CHROME, "popup.js"));
  * point of this test is that it is simple enough to trust.
  */
 const NETWORK_PRIMITIVES = [
-  "fetch(",
   "XMLHttpRequest",
   "sendBeacon",
   "new WebSocket",
@@ -46,11 +50,39 @@ describe.skipIf(!built)("built extension bundle", () => {
   const popup = () => readFileSync(path.join(CHROME, "popup.js"), "utf8");
   const background = () => readFileSync(path.join(CHROME, "background.js"), "utf8");
 
-  it("contains no network primitive", () => {
+  it("contains no network primitive besides the one fetch", () => {
     const bundle = popup() + background();
     for (const primitive of NETWORK_PRIMITIVES) {
       expect(bundle, `${primitive} reached the extension bundle`).not.toContain(primitive);
     }
+  });
+
+  it("calls fetch exactly once, and only to the configured API base", () => {
+    // The whole network surface, asserted rather than described. A second fetch
+    // — or one built from a computed URL — is the change this catches, and it is
+    // the change that would quietly break the privacy claim.
+    const bundle = popup() + background();
+    const calls = bundle.match(/\bfetch\(/g) ?? [];
+    expect(calls, "expected exactly one fetch call site").toHaveLength(1);
+
+    // The URL is a template over the build-time constant, so the literal origin
+    // appears in the bundle. A fetch to anything else would not match this.
+    expect(bundle).toMatch(/fetch\(`\$\{[A-Za-z_$][\w$]*\}\/api\/blocklist`/);
+
+    // The request must not carry credentials: the endpoint is unauthenticated,
+    // and a cookie would tie a client's refresh to a browsing session.
+    expect(bundle).toContain('credentials: "omit"');
+  });
+
+  it("sends nothing to the server — the blocklist request has no body or query", () => {
+    // The one call must stay a plain GET of a static path. A body or a query
+    // parameter is how "fetch a list" quietly becomes "ask about this host",
+    // which would disclose exactly what running the engine locally avoids.
+    const bundle = popup() + background();
+    expect(bundle).not.toMatch(/fetch\(`\$\{[A-Za-z_$][\w$]*\}\/api\/blocklist\?/);
+    const fetchCall = bundle.slice(bundle.indexOf("fetch(`"), bundle.indexOf("fetch(`") + 400);
+    expect(fetchCall).not.toContain("method:");
+    expect(fetchCall).not.toContain("body:");
   });
 
   it("contains no markup-execution sink", () => {
@@ -73,7 +105,11 @@ describe.skipIf(!built)("built extension bundle", () => {
 });
 
 describe("extension manifest", () => {
-  const opts = { version: "9.9.9", geckoId: "test@example.invalid" };
+  const opts = {
+    version: "9.9.9",
+    geckoId: "test@example.invalid",
+    apiBase: "https://api.example.invalid",
+  };
 
   it("asks for no host permissions on either target", () => {
     // Host permissions are the difference between "checks text you give it" and
@@ -114,6 +150,22 @@ describe("extension manifest", () => {
       expect(m.content_security_policy.extension_pages).toContain("script-src 'self'");
       expect(m.content_security_policy.extension_pages).not.toContain("unsafe-eval");
       expect(m.content_security_policy.extension_pages).not.toContain("unsafe-inline");
+    }
+  });
+
+  it("bounds connect-src to the one origin it fetches from", () => {
+    // This is the browser-enforced bound on the extension's single network
+    // call. A wildcard here would let any code path — including one added
+    // later — reach anywhere, which is precisely what the offline claim rules
+    // out. The CSP is the enforcement; the comment in blocklist.ts is not.
+    for (const target of ["chrome", "firefox"] as const) {
+      const m = buildManifest(target, opts) as {
+        content_security_policy: { extension_pages: string };
+      };
+      const csp = m.content_security_policy.extension_pages;
+      expect(csp).toContain(`connect-src ${opts.apiBase}`);
+      expect(csp).not.toContain("connect-src *");
+      expect(csp).not.toMatch(/connect-src[^;]*\shttps:(\s|;|$)/);
     }
   });
 });

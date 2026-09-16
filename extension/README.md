@@ -7,10 +7,17 @@ one source.
 
 ## What it does, and what it deliberately does not
 
-The engine is **bundled**, so a text check runs on the user's machine and makes
-no network request at all. That is not a promise in a privacy policy — it is a
-property of the artifact, asserted by `__tests__/extensionBundle.test.ts`, which
-greps the built bundle for every network primitive and fails if one appears.
+The engine is **bundled**, so scoring happens on the user's machine. The
+extension makes exactly **one** network request, and it is not about the
+message: it fetches the malicious-host blocklist, on a timer, with an empty body
+and no query parameters. Nothing you paste, and nothing derived from it, is ever
+sent anywhere.
+
+That is not a promise in a privacy policy — it is a property of the artifact.
+`__tests__/extensionBundle.test.ts` greps the built bundle and fails if a second
+`fetch` appears, if the one call gains a query string or a body, or if any other
+network primitive turns up at all. The manifest's `connect-src` names a single
+origin, so the browser enforces the same bound.
 
 Consequences worth understanding before changing anything here:
 
@@ -20,13 +27,29 @@ Consequences worth understanding before changing anything here:
   the destination is unchecked. Following the link from the user's browser
   would disclose their IP to the scammer's shortener — the reason expansion is
   server-side everywhere else.
-- **The URLhaus blocklist is not consulted.** It is fetched app-side and the
-  bundled engine has no way to reach it. A client verdict can therefore be
-  *lower* than the site's for the same input, never higher. Closing this gap is
-  the next piece of work — a hashed, CORS-allowlisted read endpoint.
+- **The blocklist is fetched as a whole list, never queried per host.**
+  `/api/blocklist` has no `?host=` parameter by design: answering "is this host
+  malicious" would turn a cached static payload into an oracle that records
+  which hosts a user is checking, which is exactly what running the engine
+  locally avoids producing.
+- **A check never waits on that fetch.** Whatever is cached is used
+  immediately; a refresh runs in the background for the *next* check. A cold
+  start, or an offline client, scores without the list — which can only lower a
+  score, never invent one. The popup says so on an otherwise-clean verdict.
 - **No host permissions, no content scripts.** Nothing reads the page. The
   context menu hands over the text the user selected, and that is the entire
   input path.
+
+### About the hashing
+
+The blocklist is served as truncated SHA-256 rather than hostnames. **This is
+obfuscation, not confidentiality, and nothing in the system may assume
+otherwise.** Hostnames are low-entropy and enumerable: anyone with a domain
+wordlist can hash candidates offline and recover most of the list, and abuse.ch
+publishes the same data openly anyway. What it buys is narrower — the response
+is not a turnkey list of live malware hosts served under our name — and both
+`hostHash.ts` and the route carry the same note so neither reads as a stronger
+claim than it is.
 
 ## Build
 
@@ -46,6 +69,7 @@ gitignored.
 |---|---|---|
 | `TARGET` | `chrome` | `chrome` or `firefox` — selects the manifest variant |
 | `GECKO_ID` | `veriguard@veriguard.app` | Firefox add-on id; must stay stable across uploads or the add-on becomes a different add-on |
+| `API_BASE` | `https://veriguard.app` | Origin the blocklist is fetched from. Inlined into the bundle *and* into the manifest's `connect-src`, so the two cannot disagree |
 
 ## Layout
 
@@ -56,6 +80,7 @@ gitignored.
 | `src/background.ts` | Context-menu registration; stashes the selection |
 | `src/popup.ts` | Popup controller and rendering |
 | `src/check.ts` | Engine bridge — verdict collapse, coverage, shortener honesty |
+| `src/blocklist.ts` | The one network call: fetch, cache, back off, degrade |
 | `src/copy.ts` | Reader-facing strings, kept in sync with `messages/` by test |
 
 ## Things to know before editing
@@ -75,6 +100,10 @@ gitignored.
 
 ## Not built yet
 
-OCR (client-side WASM), the blocklist endpoint, toolbar badging after a
-right-click, and icons — the manifest references `icons/icon-{16,48,128}.png`
-and the build warns when they are absent.
+OCR (client-side WASM), toolbar badging after a right-click, and icons — the
+manifest references `icons/icon-{16,48,128}.png` and the build warns when they
+are absent.
+
+Before publishing, the packaged extension's origin has to go in
+`CORS_ALLOWED_ORIGINS` (empty by default, no wildcards) — the id is not knowable
+until the extension is signed.

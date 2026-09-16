@@ -40,6 +40,18 @@ const { version } = JSON.parse(readFileSync(here("../package.json"), "utf8")) as
  */
 const GECKO_ID = process.env.GECKO_ID ?? "veriguard@veriguard.app";
 
+/**
+ * Origin the blocklist is fetched from.
+ *
+ * Baked in at build time and named in the manifest's `connect-src`, so the
+ * bundle and the policy cannot disagree about where it may connect. Overridable
+ * for a local build against a dev server; the default is production.
+ *
+ * Trailing slash stripped, because it is concatenated with a path and
+ * `https://host//api/blocklist` is a different URL to some caches and proxies.
+ */
+const API_BASE = (process.env.API_BASE ?? "https://veriguard.app").replace(/\/+$/, "");
+
 /** Emits the manifest and the static popup assets into the build output. */
 function emitStaticAssets() {
   return {
@@ -49,7 +61,11 @@ function emitStaticAssets() {
 
       writeFileSync(
         path.join(outDir, "manifest.json"),
-        JSON.stringify(buildManifest(TARGET, { version, geckoId: GECKO_ID }), null, 2) + "\n",
+        JSON.stringify(
+          buildManifest(TARGET, { version, geckoId: GECKO_ID, apiBase: API_BASE }),
+          null,
+          2,
+        ) + "\n",
       );
 
       for (const file of ["popup.html", "popup.css"]) {
@@ -78,6 +94,12 @@ function emitStaticAssets() {
 export default defineConfig({
   root: here("."),
   plugins: [emitStaticAssets()],
+  // Inlined rather than read from storage or a config file: the value must match
+  // the manifest's `connect-src`, and a build-time constant is what makes the
+  // two impossible to desynchronise.
+  define: {
+    __API_BASE__: JSON.stringify(API_BASE),
+  },
   build: {
     outDir,
     emptyOutDir: true,
