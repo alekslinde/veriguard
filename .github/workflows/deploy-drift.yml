@@ -1,0 +1,70 @@
+name: Deploy drift
+
+# Flags when `production` has fallen too far behind `main`.
+#
+# Promotion is manual by design (docs/releases.md): merges to `main` do not
+# deploy, and production moves only when a maintainer merges a promotion PR.
+# That is what decouples merge frequency from deploy frequency, and its
+# one failure mode is silence — "I'll cut a release later" decays into a month
+# of unshipped detection work with nothing prompting.
+#
+# So the cron lives HERE, not on the promotion train. The train opens a PR only
+# when asked (workflow_dispatch); this job just notices the gap and says so, by
+# refreshing a single "🚢 Production is behind main" issue. Clean runs close it
+# — an open digest issue means something is outstanding.
+#
+# It FLAGS, it does not promote. When to ship is a judgement about what is on
+# main, which a cron job has no way to make.
+
+on:
+  schedule:
+    # Mondays 21:00 UTC ≈ 07:00 Tuesday Australia/Sydney, an hour ahead of the
+    # radar/calendar freshness check, so the week's maintenance flags arrive
+    # together rather than trickling in.
+    - cron: "0 21 * * 1"
+  push:
+    # Right after a promotion lands, so the issue closes immediately rather
+    # than staying open until the next Monday.
+    branches: [production]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: deploy-drift
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Drift is measured as origin/production..origin/main, so the clone
+          # needs full history and both branches.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Check deploy drift and refresh flag issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          git fetch origin main production --quiet 2>/dev/null || true
+          set +e
+          npx tsx scripts/check-deploy-drift.ts --issue --markdown >> "$GITHUB_STEP_SUMMARY"
+          code=$?
+          set -e
+          if [ "$code" -eq 0 ]; then
+            echo "Production is current, or inside both thresholds."
+          elif [ "$code" -eq 1 ]; then
+            echo "::warning::Production is behind main — see the flag issue."
+          else
+            echo "::error::check-deploy-drift failed (exit $code) — flag issue may not have been published."
+            exit "$code"
+          fi

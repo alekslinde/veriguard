@@ -1,0 +1,90 @@
+name: Promotion train
+
+# Opens the main → production promotion PR, on request. Merges to main do not
+# deploy (the deployed branch is `production`), so this PR is the only
+# path to prod. It FLAGS, it does not merge — a maintainer still reviews the
+# "what shipped since the last tag" diff and merges by hand.
+#
+# Run it when you have decided to cut a release. If you would rather be told
+# when one is overdue, that is deploy-drift.yml's job.
+#
+# The job is idempotent: it no-ops when the production branch doesn't exist
+# yet, when main has nothing new, or when the promotion PR is already open.
+# Same-repo main → production only, so forks can neither trigger nor land a
+# promotion; the token never leaves this repo's own run.
+#
+# Rules for what rides and what goes same-day live in docs/releases.md.
+
+on:
+  # Deliberately dispatch-only: there is no release cadence to keep, and a
+  # weekly PR that is usually closed unmerged trains you to ignore it. The
+  # prompt to promote comes from deploy-drift.yml, which watches the gap and
+  # flags an issue once it is actually large or old. This job runs when a
+  # maintainer has decided to cut a release.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: promotion-train
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Changelog is built from origin/production..origin/main, so the
+          # clone needs full history and both branches.
+          fetch-depth: 0
+
+      - name: Open promotion PR if main is ahead
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -e
+          git fetch origin main production 2>/dev/null || true
+
+          if ! git ls-remote --exit-code --heads origin production >/dev/null 2>&1; then
+            echo "::notice::production branch does not exist yet — see docs/releases.md one-time setup."
+            exit 0
+          fi
+
+          AHEAD=$(git rev-list --count origin/production..origin/main)
+          if [ "$AHEAD" -eq 0 ]; then
+            echo "main has nothing new — no promotion PR needed."
+            exit 0
+          fi
+
+          if [ "$(gh pr list --base production --head main --json number --jq 'length')" -gt 0 ]; then
+            echo "Promotion PR already open — leaving it alone."
+            exit 0
+          fi
+
+          PROD_VER=$(git show origin/production:package.json | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version")
+          MAIN_VER=$(git show origin/main:package.json | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version")
+          DATE=$(date -u +%F)
+          git log --format='- %h %s (%an)' origin/production..origin/main > /tmp/changelog.txt
+
+          {
+            echo "Promotion: \`main\` ($MAIN_VER) → \`production\` ($PROD_VER). Merging deploys to prod."
+            echo ""
+            echo "Rules: docs/releases.md. Out-of-band only for broken prod, wrong verdicts in the wild, or security fixes."
+            echo ""
+            echo "## Checklist"
+            echo "- [ ] CI green on \`main\` head"
+            echo "- [ ] Diff since last tag reviewed (line review already happened on \`main\`)"
+            echo "- [ ] After merge: tag \`production\` HEAD and cut a GitHub Release"
+            echo ""
+            echo "## Changes ($AHEAD commits)"
+            cat /tmp/changelog.txt
+          } > /tmp/body.md
+
+          gh pr create --base production --head main \
+            --title "Promote main → production ($DATE)" \
+            --body-file /tmp/body.md
+          echo "Promotion PR opened ($AHEAD commits, $PROD_VER → $MAIN_VER)."
