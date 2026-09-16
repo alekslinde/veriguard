@@ -28,7 +28,7 @@
     "ocr-assets": "node scripts/copy-ocr-assets.mjs",
     "eval": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/eval.ts",
     "eval:metamorphic": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/eval-metamorphic.ts",
-    "check-deploy-drift": "tsx scripts/check-deploy-drift.ts"
+    "check-deploy-drift": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/check-deploy-drift.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
