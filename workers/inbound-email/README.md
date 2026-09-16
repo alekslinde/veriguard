@@ -25,12 +25,12 @@ Two **independent** deploy targets — neither deploys the other:
 
 | | Next app (`/`) | This Worker (`workers/inbound-email/`) |
 | --- | --- | --- |
-| Host | **Vercel** (git push → build) | **Cloudflare** (`wrangler deploy`) |
+| Host | the app host (git push → build) | **Cloudflare** (`wrangler deploy`) |
 | `/api/inbound` lives here | ✅ | — |
-| `INBOUND_SECRET` set as | Vercel env var | GitHub repo secret → pushed on deploy |
+| `INBOUND_SECRET` set as | app-host env var | GitHub repo secret → pushed on deploy |
 
-The two share one value: **`INBOUND_SECRET` must be identical** on Vercel and on
-the Worker, or the webhook 401s every call.
+The two share one value: **`INBOUND_SECRET` must be identical** on the app and
+on the Worker, or the webhook 401s every call.
 
 ## Go-live runbook (one-time)
 
@@ -43,8 +43,8 @@ committed values that name a particular one are `name` and
 
 0. **Domain DNS must be on Cloudflare.** Cloudflare Email Routing can only add MX
    records if Cloudflare is the domain's DNS provider. If `<your-domain>`
-   currently resolves through Vercel/your registrar, move the domain's
-   nameservers to Cloudflare first (Vercel still serves the site via its records;
+   currently resolves through your registrar or app host, move the domain's
+   nameservers to Cloudflare first (the app is still served via its records;
    only DNS hosting moves). **Nothing below works until this is done.**
 
 1. **Enable Email Routing.** Cloudflare dashboard → **Compute → Email Service →
@@ -61,10 +61,10 @@ committed values that name a particular one are `name` and
 2. **Pick the shared secret.** Generate one (`openssl rand -hex 32`). You'll set
    the same value in two places (steps 3 and 5).
 
-3. **Set it on Vercel.** Project → Settings → Environment Variables →
-   `INBOUND_SECRET` = the value from step 2. Also confirm the app is deployed
-   with `/api/inbound` live (this branch merged to `main`). Vercel bakes env vars
-   at build time, so **redeploy** after adding it.
+3. **Set it on the app host.** Add `INBOUND_SECRET` = the value from step 2 to
+   the app's environment. Also confirm the app is deployed with `/api/inbound`
+   live. If your host bakes env vars at build time, **redeploy** after adding
+   it.
 
 4. **Point the webhook at the app.** `wrangler.toml` → `INBOUND_WEBHOOK_URL`
    should be your deployed app's `/api/inbound`
@@ -100,20 +100,22 @@ committed values that name a particular one are `name` and
    Routing summary even when they arrive.
 
 8. **Flip the UI flag.** Only once step 7 passes: set
-   `NEXT_PUBLIC_INBOUND_ENABLED=true` on Vercel and redeploy, so the
-   "forward it to us" address is shown to users. Never advertise a dead inbox.
+   `NEXT_PUBLIC_INBOUND_ENABLED=true` in the app's environment and redeploy, so
+   the "forward it to us" address is shown to users. Never advertise a dead
+   inbox.
 
-   > **Vercel will refuse to save this one until you classify it as Config.**
-   > Any `NEXT_PUBLIC_`-prefixed variable is inlined into the client bundle, so
-   > Vercel blocks saving it as a (secret) Environment Variable and the dialog
-   > does not make the fix obvious. Set its type to **Config** — sensitive values
-   > like `INBOUND_SECRET` in step 3 stay as normal env vars.
+   > **A host may refuse to store this one as a secret.** Any
+   > `NEXT_PUBLIC_`-prefixed variable is inlined into the client bundle, so it
+   > is not secret by construction, and some hosts reject it as a secret
+   > environment variable without saying why. Store it as plain/public
+   > configuration — genuinely sensitive values like `INBOUND_SECRET` in step 3
+   > stay secret.
 
 ### Rotating the secret later
 
 Change it in **both** GitHub repo secrets (re-run the workflow) **and** the
-Vercel env var (redeploy). If only one side changes, inbound mail 401s until both
-match — so do them close together.
+app's env var (redeploy). If only one side changes, inbound mail 401s until
+both match — so do them close together.
 
 ## Deliverability — keeping the reply out of spam
 

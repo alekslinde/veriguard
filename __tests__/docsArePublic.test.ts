@@ -69,6 +69,50 @@ describe("docs/threat-intel holds public sweeps only", () => {
     expect(leaks).toEqual([]);
   });
 
+  it("keeps deployment prose free of dashboard walkthroughs", () => {
+    // Runbooks are where hosting disclosure accumulates, because a click-path
+    // is the easiest way to write a setup step. What a reader needs is the
+    // MECHANISM — "point the deployed branch at `production`" — which survives
+    // a host change and tells an attacker nothing about where this runs or
+    // what it is scaled for.
+    //
+    // Matched as a SHAPE, not as a list of vendor names: a list would make this
+    // file the one place every name appears, which is the failure it exists to
+    // prevent. A dashboard walkthrough has a recognisable form — a chain of
+    // UI nouns joined by arrows — so that is what this looks for.
+    //
+    // Scoped to prose that describes deploying. Code that reads a vendor's own
+    // header or env var (`x-vercel-ip-country`, `CLOUDFLARE_API_TOKEN`) is
+    // exempt by construction: the name is part of an API it must call, and
+    // renaming it there would break the call rather than hide anything. The
+    // threat-intel archive is exempt too — hosts named there are the
+    // ATTACKER's infrastructure, which is public research and the point.
+    const prose = execSync("git ls-files -- '*.md' '*.yml' '*.yaml'", {
+      cwd: ROOT,
+      encoding: "utf8",
+    })
+      .split("\n")
+      .filter(Boolean)
+      .filter((f) => !f.startsWith("docs/threat-intel/"));
+
+    // Three or more UI nouns chained by → or >, e.g.
+    // "Dashboard → Settings → Git → Production Branch".
+    const WALKTHROUGH = /(?:[A-Z][A-Za-z ]{1,24}(?:→|->|»)\s*){2,}[A-Z][A-Za-z ]{1,24}/;
+    const walkthroughs: string[] = [];
+    for (const file of prose) {
+      const text = readFileSync(resolve(ROOT, file), "utf8");
+      text.split("\n").forEach((line, i) => {
+        if (WALKTHROUGH.test(line)) walkthroughs.push(`${file}:${i + 1}`);
+      });
+    }
+    expect(
+      walkthroughs,
+      "Dashboard click-path in deployment prose. Describe what to change " +
+        "(the deployed branch, the env var) rather than which menu to click — " +
+        "the mechanism outlives the host and discloses less.",
+    ).toEqual([]);
+  });
+
   it("carries no working-notes marker", () => {
     // The roadmap and the probe logs open with a "do not commit" banner. If one
     // is ever pasted in here, catch it by its own warning rather than by name.

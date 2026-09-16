@@ -1,7 +1,7 @@
 name: Deploy inbound email worker
 
 # Deploys the Cloudflare Email Worker in workers/inbound-email/. The Next app is
-# deployed separately by Vercel — this only handles the Worker, and only runs
+# deployed separately by the app host — this only handles the Worker, and only runs
 # when the Worker's own files change, so app-only commits don't redeploy it.
 on:
   push:
@@ -54,7 +54,7 @@ jobs:
       # runs `wrangler secret put` for each name; `command: whoami` is a no-op
       # so this step ONLY sets the secret and doesn't redeploy. The value lives
       # only in GitHub repo secrets and the Worker — never in the repo. Must
-      # match INBOUND_SECRET set on the Next app (Vercel env var).
+      # match INBOUND_SECRET set on the Next app (its host's env var).
       - name: Set INBOUND_SECRET
         uses: cloudflare/wrangler-action@v4
         with:
