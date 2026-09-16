@@ -40,7 +40,12 @@ const AUTHORITY_MENTIONS = [
   "npa cybercrime",
   "national police agency",
   "japan post",
-  "yubin",
+  // "yubin" is NOT listed: romanised 郵便 is the everyday word for "mail", not
+  // a name that identifies the operator. "The yubin has not arrived today"
+  // plus urgency reached 35/suspicious with a false government-agency flag.
+  // "japan post" above carries the operator, and this is the same class as
+  // ZA's "saps" — a bare entry that is also an ordinary word has no safe form,
+  // whichever language the word belongs to.
   "nhk",
   "mynumber",
   "my number card",
@@ -58,6 +63,7 @@ export const JP: RegionDefinition = {
   code: "JP",
   name: "Japan",
   coverage: "minimal",
+  languages: ["ja"],
 
   // No national campaign keywords, for the script and language reason in the
   // header. Base contributes generic urgency and the voice-clone script.
