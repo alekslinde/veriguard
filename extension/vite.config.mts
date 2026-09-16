@@ -26,6 +26,19 @@ if (TARGET !== "chrome" && TARGET !== "firefox") {
 
 const outDir = here(`dist/${TARGET}`);
 
+/**
+ * Which entry this pass builds — see the note on `rollupOptions` below for why
+ * they are built separately rather than as two inputs to one build.
+ *
+ * `popup` goes first and owns clearing the output directory and emitting the
+ * static assets; `background` follows and must not wipe it.
+ */
+const ENTRY = (process.env.ENTRY ?? "popup") as "popup" | "background";
+if (ENTRY !== "popup" && ENTRY !== "background") {
+  throw new Error(`ENTRY must be "popup" or "background", got "${ENTRY}"`);
+}
+const IS_FIRST_PASS = ENTRY === "popup";
+
 // Version tracks the app's, so a bug report naming a version identifies one
 // build of everything rather than one build of the extension.
 const { version } = JSON.parse(readFileSync(here("../package.json"), "utf8")) as { version: string };
@@ -57,6 +70,10 @@ function emitStaticAssets() {
   return {
     name: "veriguard-extension-assets",
     closeBundle() {
+      // Written once, on the pass that also clears the directory. Emitting from
+      // both passes would rewrite identical files for no reason and make the
+      // warning below appear twice.
+      if (!IS_FIRST_PASS) return;
       mkdirSync(outDir, { recursive: true });
 
       writeFileSync(
@@ -75,7 +92,7 @@ function emitStaticAssets() {
       // Icons are referenced by the manifest, so a build without them installs
       // with a broken toolbar entry. Warn rather than fail: the bundle is still
       // loadable unpacked for development, and failing the build would block
-      // work on the popup on a missing PNG.
+      // work on the popup on a missing PNG. `npm run icons` generates them.
       const iconsSrc = here("icons");
       if (existsSync(iconsSrc)) {
         const iconsOut = path.join(outDir, "icons");
@@ -84,8 +101,18 @@ function emitStaticAssets() {
           const from = path.join(iconsSrc, `icon-${size}.png`);
           if (existsSync(from)) copyFileSync(from, path.join(iconsOut, `icon-${size}.png`));
         }
+        // The Safari wrapper's app icon, at the extension root where the
+        // converter looks for it. Unlike the three above it is not referenced by
+        // the manifest — Chrome and Firefox ignore it, and Safari's generated
+        // Xcode project fails to BUILD without it rather than merely rendering a
+        // placeholder.
+        const appIcon = path.join(iconsSrc, "Icon.png");
+        if (existsSync(appIcon)) copyFileSync(appIcon, path.join(outDir, "Icon.png"));
       } else {
-        console.warn(`[extension] no icons/ directory — manifest references icons that will 404`);
+        console.warn(
+          "[extension] no icons/ directory — run `npm run icons`. " +
+            "The manifest references icons that will 404, and the Safari build will fail.",
+        );
       }
     },
   };
@@ -102,15 +129,28 @@ export default defineConfig({
   },
   build: {
     outDir,
-    emptyOutDir: true,
+    // Only the first pass clears the directory — the second would otherwise
+    // delete the first pass's output.
+    emptyOutDir: IS_FIRST_PASS,
     minify: false,
     target: "es2022",
     modulePreload: false,
+    // One entry per build. `ENTRY` selects which; `npm run ext:*` runs both in
+    // turn, the second with `emptyOutDir` off so it does not delete the first.
+    //
+    // Two builds rather than one with two inputs, because Rollup hoists code
+    // shared between entries into a chunk each then imports — and a background
+    // script carrying a bare `import` is an ES module, which needs
+    // `"type": "module"` in the manifest. Safari does not support that key on a
+    // background service worker: it drops it with a warning, the worker fails to
+    // load its import, and the context menu never registers. Nothing errors
+    // visibly, the entry point just is not there.
+    //
+    // `manualChunks: undefined` does not prevent this — it controls how chunks
+    // are grouped, not whether shared code is extracted at all. Building each
+    // entry alone is what makes each output self-contained.
     rollupOptions: {
-      input: {
-        popup: here("src/popup.ts"),
-        background: here("src/background.ts"),
-      },
+      input: { [ENTRY]: here(`src/${ENTRY}.ts`) },
       output: {
         // Flat, predictable names: the manifest references `background.js` by
         // path, and a hashed filename would have to be read back out of the
@@ -118,6 +158,8 @@ export default defineConfig({
         entryFileNames: "[name].js",
         chunkFileNames: "[name].js",
         assetFileNames: "[name][extname]",
+        // Everything this entry needs, in this entry's file.
+        inlineDynamicImports: true,
       },
     },
   },

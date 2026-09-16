@@ -95,6 +95,40 @@ describe.skipIf(!built)("built extension bundle", () => {
     }
   });
 
+  it("emits self-contained entries, so neither needs a module manifest", () => {
+    // Safari does not support `"type": "module"` on a background service
+    // worker. It drops the key with a warning, the worker then fails on its
+    // first import, and the context menu is never registered — nothing errors
+    // visibly, the entry point just does not exist.
+    //
+    // The build therefore emits each entry alone rather than letting Rollup
+    // hoist shared code into a chunk the entries import. This asserts the
+    // output property that makes that true, because the failure it prevents is
+    // silent and only shows up in Safari.
+    for (const file of ["popup.js", "background.js"]) {
+      const source = readFileSync(path.join(CHROME, file), "utf8");
+      expect(source, `${file} carries a bare import`).not.toMatch(/^\s*import\s/m);
+      expect(source, `${file} carries a re-export`).not.toMatch(/^\s*export\s+\{/m);
+    }
+  });
+
+  it("declares no module type on the background script", () => {
+    // The other half of the same property: even with self-contained output, a
+    // stray `type: "module"` would break Safari for no benefit.
+    const manifest = JSON.parse(readFileSync(path.join(CHROME, "manifest.json"), "utf8")) as {
+      background: Record<string, unknown>;
+    };
+    expect(manifest.background.type).toBeUndefined();
+  });
+
+  it("ships the Safari wrapper's app icon", () => {
+    // The generated Xcode project references Resources/Icon.png and does not
+    // create it. Without it the Safari build FAILS, where Chrome and Firefox
+    // would merely render a placeholder — so its absence is a broken release,
+    // not a cosmetic gap.
+    expect(existsSync(path.join(CHROME, "Icon.png"))).toBe(true);
+  });
+
   it("bundles the engine rather than importing it at runtime", () => {
     // A bare import surviving into the bundle would mean the engine is expected
     // at load time from somewhere else, which in an extension resolves to
@@ -130,6 +164,20 @@ describe("extension manifest", () => {
     const firefox = buildManifest("firefox", opts) as { background: Record<string, unknown> };
     expect(firefox.background.scripts).toEqual(["background.js"]);
     expect(firefox.background.service_worker).toBeUndefined();
+  });
+
+  it("keeps the Chrome build installable in Edge", () => {
+    // Edge is Chromium, so it takes the Chrome build unmodified — there is no
+    // separate target, and this is what keeps that true rather than a thing
+    // someone remembers. What would break it is a Firefox-only manifest key
+    // reaching the Chrome variant: Edge rejects the manifest outright, and the
+    // extension simply fails to install.
+    const chrome = buildManifest("chrome", opts) as Record<string, unknown>;
+    for (const geckoOnly of ["browser_specific_settings", "applications"]) {
+      expect(chrome[geckoOnly], `${geckoOnly} would break the Edge install`).toBeUndefined();
+    }
+    // MV2 has been unsupported in Edge's store since 2024.
+    expect(chrome.manifest_version).toBe(3);
   });
 
   it("declares a gecko id on Firefox only", () => {

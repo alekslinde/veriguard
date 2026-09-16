@@ -88,10 +88,20 @@ export function buildManifest(
     },
   };
 
+  // No `type: "module"` on either variant, and that is deliberate.
+  //
+  // Safari does not support the key on a background service worker — it warns,
+  // drops it, and the worker then fails to load, so the context menu never
+  // registers and nothing errors visibly. Rather than carry a third manifest
+  // variant for that one difference, the build emits each entry as a
+  // self-contained classic script with no imports at all (see
+  // `rollupOptions` in vite.config.mts), which every browser loads the same way.
+  //
+  // This is what makes the Chrome build convert to Safari unmodified.
   if (target === "firefox") {
     return {
       ...base,
-      background: { scripts: ["background.js"], type: "module" },
+      background: { scripts: ["background.js"] },
       browser_specific_settings: {
         gecko: { id: geckoId, strict_min_version: "115.0" },
       },
@@ -100,6 +110,6 @@ export function buildManifest(
 
   return {
     ...base,
-    background: { service_worker: "background.js", type: "module" },
+    background: { service_worker: "background.js" },
   };
 }

@@ -1,7 +1,14 @@
 # Veriguard WebExtension
 
-Right-click a suspicious message → verdict popup. Chrome, Edge and Firefox from
-one source.
+Right-click a suspicious message → verdict popup. Chrome, Edge, Firefox and
+Safari from one source.
+
+| Browser | Build | Status |
+|---|---|---|
+| Chrome | `npm run ext:chrome` | Loads unpacked from `dist/chrome` |
+| Edge | `npm run ext:chrome` | **Same build as Chrome** — Chromium, MV3, no Chrome-only APIs and no Firefox-only manifest keys. A test asserts that stays true |
+| Firefox | `npm run ext:firefox` | `dist/firefox`; differs only in the background form and the gecko id |
+| Safari | `npm run ext:safari` | Wraps `dist/chrome` in an Xcode project. Builds; needs a signing identity to run |
 
 *Last reviewed: 2026-09-17.*
 
@@ -54,10 +61,17 @@ claim than it is.
 ## Build
 
 ```bash
-npm run ext          # both targets
+npm run icons        # generate the icon set (first time, and after the mark changes)
+npm run ext          # chrome + firefox
 npm run ext:chrome   # → extension/dist/chrome
 npm run ext:firefox  # → extension/dist/firefox
+npm run ext:safari   # → extension/safari (Xcode project; needs Xcode)
 ```
+
+Run `npm run icons` before the first build. The icons are generated from
+`app/icon.svg` rather than committed, so a fresh clone has none — Chrome and
+Firefox warn and render a placeholder, but **the Safari build fails outright**,
+because the generated Xcode project references an app icon it does not create.
 
 Output is unminified, deliberately: AMO reviews source, and the extension's
 claim is that you can read the bundle and confirm it makes no network call.
@@ -70,6 +84,35 @@ gitignored.
 | `TARGET` | `chrome` | `chrome` or `firefox` — selects the manifest variant |
 | `GECKO_ID` | `veriguard@veriguard.app` | Firefox add-on id; must stay stable across uploads or the add-on becomes a different add-on |
 | `API_BASE` | `https://veriguard.app` | Origin the blocklist is fetched from. Inlined into the bundle *and* into the manifest's `connect-src`, so the two cannot disagree |
+
+## Safari
+
+Safari runs the same source, but cannot load an unpacked directory: it needs a
+native app wrapper. `npm run ext:safari` builds the Chrome target and runs
+Xcode's `safari-web-extension-converter` over it, producing an Xcode project at
+`extension/safari` — generated output, regenerated on demand, gitignored.
+
+Running it locally needs three things: a signing team set on both targets, a
+build, and Safari configured to load unsigned extensions — the last is a
+developer setting that resets on restart, so it is re-enabled per session rather
+than once. Distribution goes through the App Store and needs a paid Apple
+Developer account.
+
+Two things about Safari shaped the build for **every** target, and both fail
+silently rather than loudly:
+
+- **No `"type": "module"` on a background service worker.** Safari drops the key
+  with a warning; the worker then fails to load its first import, so the context
+  menu never registers and nothing appears in any log. The build therefore emits
+  each entry as a self-contained classic script — two Rollup passes rather than
+  one with two inputs, since Rollup hoists code shared between entries into a
+  chunk they import. Tests assert both halves.
+- **The bundle identifier is the app's full id, ending in the app name.** The
+  converter derives the extension's id from it, and Xcode requires the
+  extension's to nest inside the app's. `app.veriguard` and
+  `app.veriguard.extension` both produce a non-nested pair and fail the build;
+  `app.veriguard.Veriguard` is correct. `scripts/build-safari.mjs` has the
+  table.
 
 ## Layout
 
