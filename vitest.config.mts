@@ -1,5 +1,4 @@
 import { defineConfig } from "vitest/config";
-import path from "path";
 
 export default defineConfig({
   test: {
@@ -17,6 +16,11 @@ export default defineConfig({
     // later stops exporting — would keep working in tests and under tsc while
     // failing for any real consumer. The map is only a boundary if the tooling
     // is made to honour it. __tests__/engineExports.test.ts asserts that it is.
-    alias: [{ find: /^@\/(.*)$/, replacement: path.resolve(__dirname, ".") + "/$1" }],
+    //
+    // `.mts` + `import.meta.dirname` rather than `.ts` + `__dirname`: Vite's
+    // native config loader, planned to become its default, loads this as real
+    // ESM, where a `.ts` file is treated as CommonJS and `__dirname` does not
+    // exist. Both forms warned before the switch and would have broken after.
+    alias: [{ find: /^@\/(.*)$/, replacement: import.meta.dirname + "/$1" }],
   },
 });
