@@ -6,12 +6,26 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   // Override default ignores of eslint-config-next.
+  //
+  // This REPLACES the defaults, so every generated directory has to be listed
+  // here by hand, and a missing one is invisible where it would be noticed:
+  // these are all gitignored, so lint stays clean on CI and on a fresh clone and
+  // goes noisy only for whoever ran the build. __tests__/lintIgnoresGenerated
+  // resolves this list through ESLint and fails when a gitignored directory
+  // holding JS/TS is not covered.
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Build output from a local deploy build. Gitignored, so it appears only on
+    // a machine that has run one — which is why it was missed here: lint is
+    // clean on CI and on a fresh clone, and noisy only for whoever built. It
+    // holds a minified copy of the whole app plus generated launchers, so
+    // linting it reports thousands of problems in code we did not write and
+    // buries any real finding under them.
+    ".vercel/**",
     // Tesseract browser runtime copied from node_modules by
     // scripts/copy-ocr-assets.mjs — vendor minified output, not our source.
     "public/tesseract/**",
