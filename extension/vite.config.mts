@@ -144,8 +144,8 @@ export default defineConfig({
     // One entry per build. `ENTRY` selects which; `npm run ext:*` runs both in
     // turn, the second with `emptyOutDir` off so it does not delete the first.
     //
-    // Two builds rather than one with two inputs, because Rollup hoists code
-    // shared between entries into a chunk each then imports — and a background
+    // Two builds rather than one with two inputs, because the bundler hoists
+    // code shared between entries into a chunk each then imports — and a background
     // script carrying a bare `import` is an ES module, which needs
     // `"type": "module"` in the manifest. Safari does not support that key on a
     // background service worker: it drops it with a warning, the worker fails to
@@ -154,7 +154,9 @@ export default defineConfig({
     //
     // `manualChunks: undefined` does not prevent this — it controls how chunks
     // are grouped, not whether shared code is extracted at all. Building each
-    // entry alone is what makes each output self-contained.
+    // entry alone, with splitting off, is what makes each output
+    // self-contained. `__tests__/extensionBundle.test.ts` asserts the result on
+    // the built files, because the failure it prevents is silent.
     rollupOptions: {
       input: { [ENTRY]: here(`src/${ENTRY}.ts`) },
       output: {
@@ -164,8 +166,13 @@ export default defineConfig({
         entryFileNames: "[name].js",
         chunkFileNames: "[name].js",
         assetFileNames: "[name][extname]",
-        // Everything this entry needs, in this entry's file.
-        inlineDynamicImports: true,
+        // Everything this entry needs, in this entry's file — no chunk is ever
+        // split out, so neither output carries an import for Safari to choke
+        // on. Replaces `inlineDynamicImports: true`, which Vite 8's bundler
+        // deprecated in favour of this spelling; same behaviour, and the name
+        // now says what the build actually depends on rather than naming one
+        // case of it.
+        codeSplitting: false,
       },
     },
   },

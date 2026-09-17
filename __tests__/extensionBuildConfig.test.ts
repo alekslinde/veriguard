@@ -51,6 +51,29 @@ describe("extension build config is native-loader safe", () => {
     );
   });
 
+  it("disables code splitting by its current name", () => {
+    // Self-contained entries are a Safari requirement, not a preference: a
+    // background script carrying a bare import is an ES module, which needs
+    // `"type": "module"` in the manifest, which Safari drops with a warning —
+    // after which the worker fails on its first import and the context menu
+    // never registers, silently.
+    //
+    // `inlineDynamicImports` still works and still produces byte-identical
+    // output, so this is not about behaviour today. It is deprecated, and the
+    // build that goes quiet when it is finally removed is one whose entries
+    // start importing a shared chunk — the exact silent Safari break above.
+    // extensionBundle.test.ts catches that on the built files; this catches the
+    // config change that causes it, without needing a build.
+    const config = read("extension/vite.config.mts");
+    expect(config).toMatch(/codeSplitting:\s*false/);
+    // Matched as a setting rather than as a word: the comment above that line
+    // names the deprecated option to explain what it replaced, and a bare
+    // substring search would flag the explanation as the thing it warns about.
+    expect(config, "inlineDynamicImports is deprecated — use codeSplitting: false").not.toMatch(
+      /^\s*inlineDynamicImports\s*:/m,
+    );
+  });
+
   it("allows the .ts extension in tsconfig, and can still do so", async () => {
     // The extension above is only accepted by tsc with this flag, and the flag
     // is only legal while the repo type-checks without emitting. If noEmit ever
