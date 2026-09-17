@@ -95,7 +95,26 @@ npm run ext          # chrome + firefox
 npm run ext:chrome   # → extension/dist/chrome
 npm run ext:firefox  # → extension/dist/firefox
 npm run ext:safari   # → extension/safari (Xcode project; needs Xcode)
+npm run ext:pack     # build both, then zip for submission
 ```
+
+## Packaging for the stores
+
+`npm run ext:pack` writes `dist/chrome.zip` and `dist/firefox.zip`. **Use it
+rather than zipping `dist/` yourself** — compressing the folder in Finder or
+with plain `zip -r` produces an archive both stores reject, for two reasons at
+once:
+
+- The archive nests everything under `chrome/` or `firefox/`, so `manifest.json`
+  is not at the root. AMO rejects this with *"No manifest.json was found at the
+  root of the extension."*
+- macOS writes AppleDouble sidecars (`__MACOSX/._*`) carrying extended
+  attributes from the machine that built it. AMO flags each one as a hidden file
+  that can disclose information about that machine.
+
+The script zips from inside the target directory, from an explicit file list
+that excludes dotfiles, then re-reads the finished archive and fails if a hidden
+entry or a misplaced manifest survived.
 
 Run `npm run icons` before the first build. The icons are generated from
 `app/icon.svg` rather than committed, so a fresh clone has none — Chrome and
