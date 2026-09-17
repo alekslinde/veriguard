@@ -13,6 +13,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
     "test": "NODE_OPTIONS=--disable-warning=DEP0205 vitest run",
     "test:watch": "NODE_OPTIONS=--disable-warning=DEP0205 vitest",
     "seed": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/seed-db.ts",
