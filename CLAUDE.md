@@ -43,12 +43,20 @@ lib/            ← App-side logic — everything that is NOT scoring.
                   submissionGuard.ts. Region/i18n: regionResolver.ts, geo.ts,
                   i18n.ts, lang.tsx. Blocklist: urlhausBlocklist.ts.
 messages/       ← i18n string bundles (en.normal.json)
-__tests__/      ← Vitest tests (engine + lib)
-scripts/        ← seed-db.ts, generate-icons.mjs
+extension/      ← WebExtension for Chrome, Edge, Firefox and Safari, from one
+                  source. src/ holds the shared code (popup, background,
+                  manifest.ts, check.ts, blocklist.ts, browser.ts);
+                  safari/ is the Xcode wrapper around the Chrome build.
+                  STORE.md holds the store-listing copy. Bundles the engine —
+                  scoring is on-device. See extension/README.md
+__tests__/      ← Vitest tests (engine + lib + extension)
+scripts/        ← seed-db.ts, generate-icons.mjs, build-safari.mjs,
+                  the check-* freshness and coverage scripts, eval harnesses
 workers/        ← inbound-email worker
 docs/           ← threat-intel/ — PUBLIC sweep research only, one file per
-                  sweep as `YYYY-MM-DD-threat-roadmap.md`. Nothing else goes
-                  here — see *Where writing goes*
+                  sweep as `YYYY-MM-DD-threat-roadmap.md`, plus that archive's
+                  README.md and sources.yml. Also scam-calendar/README.md,
+                  releases.md and versioning.md — see *Where writing goes*
 ```
 
 **Import detection from the package, not `lib/`:**
@@ -71,6 +79,11 @@ per identifier found in the input.
 - Keep the engine framework-free: no React, no `next/*`, no network calls.
   A teaching layer over detection (like `lib/signalTactics.ts`) belongs in
   `lib/`, so the engine can reword a signal without a taxonomy following it.
+- The extension bundles the engine, so shared scoring logic belongs there.
+  It may import a **pure** module from `lib/` (it takes `reportPrefill.ts`
+  that way), but nothing that pulls in React, `next/*` or I/O — the bundle is
+  shipped to a browser store and every import is read by a reviewer. Anything
+  UI-shaped is duplicated deliberately, in `extension/src/`.
 
 ---
 
@@ -96,6 +109,7 @@ Use these scopes in commit messages:
 - `(ui)` — Components and screens
 - `(api)` — Route handlers under `app/api/`
 - `(email)` — Email parsing / inbound / distiller
+- `(ext)` — The WebExtension under `extension/`
 - `(db)` — Data layer and stores
 - `(i18n)` — Strings and language handling
 - `(config)` — Config and environment
@@ -106,6 +120,11 @@ Use these scopes in commit messages:
 
 - Don't weaken PII scrubbing or the submission guard (honeypot, rate limit,
   timing, dedupe) without explicit sign-off — they're abuse defences
+- **Don't add a second network call site to the extension**, or give the
+  existing one a query string or a body. The store listings and the extension
+  README both make this claim in public, and it is what lets the listing
+  disclose no data collection. Changing it means changing what four stores
+  have been told
 - Don't commit `local.db` or `.env.local`
 - **`docs/` takes dated sweep research and nothing else** — see *Where writing
   goes*, below
@@ -116,15 +135,19 @@ Use these scopes in commit messages:
 
 **This repo is public. Write for that audience.**
 
-`docs/` holds exactly one thing: `threat-intel/YYYY-MM-DD-threat-roadmap.md`,
-the dated sweep research. Sweeps are outward-looking, cite public sources, and
-exist as **provenance for shipped rules** — why `.bond` scores +30, why
-`"quantum ai"` scores +50. Showing that working is the point.
+`docs/threat-intel/` holds exactly one kind of file:
+`YYYY-MM-DD-threat-roadmap.md`, the dated sweep research (plus the archive's
+own `README.md` and `sources.yml`). Sweeps are outward-looking, cite public
+sources, and exist as **provenance for shipped rules** — why `.bond` scores
++30, why `"quantum ai"` scores +50. Showing that working is the point.
 
-**Nothing else belongs in `docs/`.** Not notes, not analysis, not findings —
-if it is not a dated sweep, it does not go there. Other documentation has its
-place (this file, `README.md`, `AGENTS.md`); when something fits none of them,
-ask rather than inventing a home for it.
+**Nothing else belongs in `threat-intel/`.** Not notes, not analysis, not
+findings — if it is not a dated sweep, it does not go there. The rest of
+`docs/` is narrow and already spoken for: `scam-calendar/` documents the
+calendar data, `releases.md` and `versioning.md` document the release process.
+Other documentation has its place (this file, `README.md`, `AGENTS.md`,
+`extension/README.md`); when something fits none of them, ask rather than
+inventing a home for it.
 
 The naming is load-bearing: `threatRadar.test.ts` and `sweepCoverage.test.ts`
 resolve sweeps by filename, and `docsArePublic.test.ts` enforces this section.
@@ -155,7 +178,17 @@ npm run build         ← Production build
 npm run check-readme  ← Which READMEs are behind the code they document
 npm run check-sources ← Threat-intel source registry (--validate | --stale)
 npm run check-calendar ← Scam-calendar citation reachability
+npm run ext           ← Build the extension for Chrome and Firefox
+npm run ext:chrome    ← Chrome/Edge build → extension/dist/chrome
+npm run ext:firefox   ← Firefox build → extension/dist/firefox
+npm run ext:safari    ← Chrome build wrapped in the Xcode project
+npm run typecheck     ← tsc --noEmit
 ```
+
+**`extensionBundle.test.ts` needs a build to check anything.** It greps the
+built bundle to enforce the one-network-call property, and skips (visibly)
+when `dist/` is absent — so run `npm run ext` before trusting a green run on
+any change under `extension/`.
 
 **READMEs carry a `*Last reviewed: YYYY-MM-DD.*` marker.** They make
 present-tense claims — paths, scripts, schedules, counts — that nothing fails
