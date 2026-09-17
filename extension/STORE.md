@@ -163,26 +163,3 @@ the sequence is the argument, so keep it:
    good" still carries a caveat about new scams.
 
 Do not screenshot a real person's message. Use the samples in the test suite.
-
----
-
-## Before the first submission
-
-- [ ] `npm run icons` — icons are generated, not committed
-- [ ] `npm test` — with `dist/` present, so the bundle tests actually run
-      rather than skipping
-- [ ] Bump `version` in `extension/package.json` (not the root one)
-- [ ] Confirm `GECKO_ID` is unchanged — a new id makes it a different add-on
-      and existing users stop getting updates
-
-## After the first submission
-
-Publishing assigns the extension its permanent ids. Until they are known the
-blocklist request is blocked by CORS, which is expected and degrades safely: a
-check runs without the list rather than failing.
-
-- [ ] Collect the Chrome id (`chrome-extension://<id>`) and the Firefox uuid
-      (`moz-extension://<uuid>`)
-- [ ] Add both to `CORS_ALLOWED_ORIGINS`, comma-separated, and redeploy
-- [ ] Re-test that a check picks up the blocklist — this is the one path that
-      cannot be tested before publishing
