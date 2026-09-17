@@ -65,6 +65,9 @@ If you find a security issue — especially anything that could expose user data
 turn the inbound flow into a relay, or bypass the abuse mitigations above —
 please report it privately rather than opening a public issue. Use GitHub's
 [private vulnerability reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability)
-on this repository (Security → Report a vulnerability), or contact the
-maintainer directly. We'll acknowledge and work with you on a fix before any
-public disclosure.
+on this repository (Security → Report a vulnerability). We'll acknowledge and
+work with you on a fix before any public disclosure.
+
+For anything that is **not** a security issue — a wrong verdict, a bug, a
+feature request — [open an issue](https://github.com/alekslinde/veriguard/issues)
+instead.
