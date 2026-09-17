@@ -12,10 +12,16 @@ import { defineConfig } from "vite";
 import { fileURLToPath } from "node:url";
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync } from "node:fs";
 import path from "node:path";
-// Extensionless, matching the rest of the repo's imports: `moduleResolution:
-// "bundler"` in tsconfig resolves it, and writing "./src/manifest.ts" instead
-// trades a Vite config-loader warning for a tsc error across the whole repo.
-import { buildManifest, type Target } from "./src/manifest";
+// Written with its extension, unlike the rest of the repo's imports. Vite's
+// coming native config loader reads this file as real ESM rather than bundling
+// it first, and Node's resolver does not guess extensions — so an extensionless
+// specifier here becomes a load failure once that default flips.
+//
+// `tsc` accepts the extension because `allowImportingTsExtensions` is set,
+// which is in turn only legal because the repo type-checks with `noEmit`. That
+// is the whole reason this can be spelled correctly for both tools at once; the
+// alternative was picking which one to leave warning.
+import { buildManifest, type Target } from "./src/manifest.ts";
 
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 

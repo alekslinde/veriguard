@@ -1,0 +1,5 @@
+{
+  "name": "@veriguard/extension",
+  "private": true,
+  "type": "module"
+}

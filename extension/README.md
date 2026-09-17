@@ -134,6 +134,7 @@ silently rather than loudly:
 
 | File | Role |
 |---|---|
+| `package.json` | Three keys, one of them load-bearing: `"type": "module"` marks this directory as ESM. Not a workspace member (`workspaces` is `packages/*`) and nothing installs from it — deleting it makes the build warn and, once Vite's native config loader becomes the default, fail |
 | `src/manifest.ts` | Both manifest variants from one definition |
 | `src/browser.ts` | The whole cross-browser compatibility layer — promisified `chrome.*`/`browser.*`, with a timeout so a runtime that never answers cannot hang startup |
 | `src/background.ts` | Context-menu registration; stashes the selection |
