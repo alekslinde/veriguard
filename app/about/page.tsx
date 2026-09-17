@@ -5,7 +5,7 @@ import PageHeader from "@/components/PageHeader";
 export const metadata: Metadata = {
   title: "About & Privacy — Veriguard",
   description:
-    "What Veriguard stores, what it never stores (your IP, your uploads), how the checker works, and which countries it covers. Step-by-step guides for blocking and reporting spam live on the Learn page.",
+    "What Veriguard stores, what it never stores (your IP, your uploads), how the checker works, which countries it covers, and the browser extension's privacy policy. Step-by-step guides for blocking and reporting spam live on the Learn page.",
 };
 
 // This page is the canonical record of the project's privacy behaviour, so it
@@ -216,6 +216,68 @@ export default function AboutPage() {
             Detection logic is intentionally open source. Transparency lets the community improve
             it, and obscuring keyword lists wouldn&apos;t stop sophisticated scammers — it would
             only stop you from checking our work.
+          </p>
+        </section>
+
+        {/*
+          The browser extension's privacy policy.
+
+          All three stores require a policy at a stable URL, and this is it —
+          `/about#extension`. It lives here rather than on a page of its own
+          because this page is already the canonical record of the project's
+          privacy behaviour, and a second policy is a second thing to keep true.
+
+          Every claim below is a property of the shipped artifact rather than a
+          promise about intent, and each one is enforced by a test over the
+          built bundle. Keep it that way: a sentence here that nothing checks is
+          a sentence that will eventually be wrong.
+        */}
+        <section className={SECTION} id="extension">
+          <h2 className={H2}>The browser extension</h2>
+          <p className={P}>
+            The extension carries the whole detection engine inside it, so{" "}
+            <strong className={STRONG}>
+              what you check never leaves your device
+            </strong>
+            . There is no server call to score a message — not to us, not to anyone. Paste
+            something with the browser offline and it still works.
+          </p>
+          <p className={P}>
+            It makes <strong className={STRONG}>one</strong> network request, and it is not about
+            you: it downloads a list of known malicious websites, on a timer, so it can recognise
+            them offline. That request carries no query and no body — every copy of the extension
+            asks for the same list in the same way, and the server learns only that someone asked.
+            There is deliberately no &ldquo;is this site dangerous?&rdquo; lookup, because that
+            would tell us exactly which sites you are checking.
+          </p>
+          <p className={P}>
+            It asks for <strong className={STRONG}>no access to the pages you visit</strong>. No
+            host permissions, no content scripts, nothing reading a tab. The only text it ever
+            sees is text you typed into it, or selected and sent to it with a right-click.
+          </p>
+          <p className={P}>
+            Reporting a scam <strong className={STRONG}>opens this website</strong> with the scam
+            link or number filled in — the extension never submits anything itself. You see the
+            form, edit it, and send it yourself. The message you pasted is not carried across;
+            that field is left for you to describe in your own words, because it is the one most
+            likely to contain your own details.
+          </p>
+          <p className={P}>
+            What it keeps on your device: the region you picked, and the downloaded site list. No
+            history of what you checked is stored anywhere, by us or by it — there is nothing to
+            request a copy of, because nothing is kept.
+          </p>
+          <p className={P}>
+            None of this is a promise you have to take on trust. The extension ships unminified
+            so it can be read, and the{" "}
+            <a
+              href="https://github.com/alekslinde/veriguard/blob/main/__tests__/extensionBundle.test.ts"
+              className={LINK}
+            >
+              tests that enforce these claims
+            </a>{" "}
+            run against the built file — they fail if a second network call, a request body, or a
+            way to inject markup ever appears in it.
           </p>
         </section>
 

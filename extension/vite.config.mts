@@ -45,9 +45,60 @@ if (ENTRY !== "popup" && ENTRY !== "background") {
 }
 const IS_FIRST_PASS = ENTRY === "popup";
 
-// Version tracks the app's, so a bug report naming a version identifies one
-// build of everything rather than one build of the extension.
-const { version } = JSON.parse(readFileSync(here("../package.json"), "utf8")) as { version: string };
+/**
+ * The extension's own version, from `extension/package.json`.
+ *
+ * **Deliberately not the app's.** A published extension's version is a
+ * store-visible, monotonic release counter: every submission needs a number
+ * higher than the last, and a number that shipped can never be reused or
+ * withdrawn. Tying that to the app's version meant the two constrained each
+ * other in both directions — a typo fix on the website would burn an extension
+ * version that reviewers might take days to approve, and an extension hotfix
+ * would require bumping the whole project to ship. Neither is a decision either
+ * release should be making for the other. The engine already versions itself
+ * separately for the same reason.
+ *
+ * `buildVersion` enforces the stores' format, which is narrower than semver —
+ * see the note there.
+ */
+const { version: rawVersion } = JSON.parse(
+  readFileSync(here("package.json"), "utf8"),
+) as { version: string };
+
+/**
+ * The version as the stores will accept it.
+ *
+ * All three want one to four dot-separated integers and nothing else. Semver
+ * pre-release and build metadata (`-beta.1`, `+sha`) are rejected outright by
+ * Chrome and AMO rather than tolerated, and the failure arrives at upload time
+ * — after a build, at the end of a release, which is the worst moment to
+ * discover it. So it is checked here, where the build fails immediately and
+ * says what to fix.
+ *
+ * A pre-release suffix is stripped rather than rejected: `0.2.0-rc.1` is a
+ * reasonable thing to have in the file while testing, and it means the same
+ * shipped artifact as `0.2.0`. Anything else is an error, because silently
+ * reinterpreting a version is how a wrong number reaches a store listing that
+ * cannot be taken back.
+ */
+function buildVersion(raw: string): string {
+  const core = raw.split("-")[0].trim();
+  if (!/^\d+(\.\d+){0,3}$/.test(core)) {
+    throw new Error(
+      `extension/package.json version "${raw}" is not a store-acceptable version. ` +
+        `Chrome, AMO and Safari all require one to four dot-separated integers ` +
+        `(e.g. "0.2.0"); a pre-release suffix is allowed in the file and dropped here.`,
+    );
+  }
+  // Leading zeros are legal semver but Chrome rejects them ("01" is not 1).
+  const normalised = core
+    .split(".")
+    .map((part) => String(Number(part)))
+    .join(".");
+  return normalised;
+}
+
+const version = buildVersion(rawVersion);
 
 /**
  * Firefox add-on id.

@@ -1,0 +1,188 @@
+# Store listing copy
+
+Text to paste into the Chrome Web Store, Firefox AMO and App Store Connect
+dashboards. Kept here because a listing is the one piece of user-facing writing
+with no home in the codebase, and rewriting it from memory each submission is
+how two stores end up describing the same extension differently.
+
+**Every factual claim below is enforced by a test.** If one of these sentences
+stops being true, `__tests__/extensionBundle.test.ts` fails before the listing
+does. Do not add a claim here that nothing checks.
+
+Privacy policy URL, required by all three stores:
+`https://veriguard.app/about#extension`
+
+---
+
+## Name
+
+```
+Veriguard — scam check
+```
+
+Chrome allows 75 characters, AMO 50. This fits both.
+
+---
+
+## Summary / short description
+
+Chrome calls this the "short description" (132 char limit). AMO calls it the
+"summary" (250). One sentence works for both:
+
+```
+Right-click any suspicious message to check it for scam signals. Runs entirely on your device — nothing is sent anywhere.
+```
+
+121 characters. Identical to the manifest's `description`, deliberately: the
+browser shows that string in the extensions list, and a listing that describes
+the extension differently from the extension itself is a discrepancy a reviewer
+will notice.
+
+---
+
+## Full description
+
+For Chrome's "Detailed description" and AMO's "About this extension".
+
+```
+Paste a suspicious text, link, email or phone number — or select it on any page and right-click — and get an instant verdict explaining what's wrong with it.
+
+HOW IT'S DIFFERENT
+
+The detection engine is built into the extension. Your message is scored on your own machine, by rules you can read, and it never travels anywhere. Turn off your internet connection and it still works.
+
+That's unusual enough to be worth stating precisely: the extension makes exactly one network request, and it isn't about you. It downloads a list of known malicious websites on a timer so it can recognise them offline. The request carries no query and no body — every copy asks for the same list the same way. There is deliberately no "is this site dangerous?" lookup, because answering that would mean telling us which sites you're checking.
+
+WHAT IT CHECKS
+
+· Links — lookalike domains, suspicious top-level domains, tracking parameters, known malicious hosts
+· Messages — urgency and threat patterns, payment demands, impersonation of banks and government services
+· Senders — mismatched reply-to addresses, failed authentication
+· Phone numbers — number ranges and formats used by scam operations
+
+Every verdict shows its working: the rules that fired, what each one contributed, and a score that adds up to the number shown. You can check our arithmetic.
+
+WHAT IT WON'T DO
+
+It won't follow shortened links. Resolving one would tell the scammer's link shortener your IP address, so it says the destination is unchecked instead of quietly guessing.
+
+It won't pretend a quiet result is a clean one. If detection for your region is limited, or a check couldn't run, the verdict says so.
+
+It won't ask to read the pages you visit. No host permissions, no content scripts. The only text it sees is text you give it.
+
+PERMISSIONS
+
+Two, both minimal:
+· contextMenus — adds the right-click entry
+· storage — remembers your region and caches the malicious-site list
+
+REPORTING
+
+On a suspicious verdict you can report the scam to the public database. The extension opens the report form on veriguard.app with the link or number filled in — it never submits anything itself. You review it and send it.
+
+OPEN SOURCE
+
+The detection rules are public, because obscuring a keyword list wouldn't stop a sophisticated scammer — it would only stop you checking our work. The extension ships unminified so you can read what you installed.
+
+github.com/alekslinde/veriguard
+
+Australian-focused, with rule packs for the UK, US, Canada, Ireland and New Zealand.
+```
+
+---
+
+## Category
+
+- **Chrome:** Productivity (no security/privacy category; Productivity is where
+  comparable tools sit)
+- **AMO:** Privacy & Security
+- **Safari:** Utilities
+
+---
+
+## Chrome Web Store: permission justifications
+
+Chrome requires a written justification per permission, and rejects vague ones.
+These are the answers to give.
+
+**contextMenus**
+```
+Adds a single right-click menu item, "Check this with Veriguard", shown only when text is selected. It is the extension's primary entry point: it passes the selected text to the popup to be checked.
+```
+
+**storage**
+```
+Stores two things locally: the user's chosen region, so it persists between sessions, and a cached copy of a public malicious-host list so checks work offline. Neither is transmitted. No checked content, and no history of what was checked, is ever stored.
+```
+
+**Remote code**
+```
+No. All code is contained in the package. The single network request retrieves a JSON list of hostname hashes, which is data, never executed.
+```
+
+**Data usage disclosures** — tick nothing. The extension collects no personally
+identifiable information, health, financial, authentication, personal
+communications, location, web history or user activity. The single request
+carries no query and no body, so nothing about the user is transmitted.
+
+---
+
+## AMO: notes for reviewers
+
+AMO reviews source, so tell them how to verify the central claim quickly.
+
+```
+The extension is unminified by design so it can be read directly.
+
+Build: `npm run ext:firefox` (Node 22+, `npm ci` first) → extension/dist/firefox
+
+The privacy claim is that the extension makes exactly one network request — a GET of /api/blocklist with no query string and no body — and that no checked content is ever transmitted. It is enforced by tests that grep the built bundle: see __tests__/extensionBundle.test.ts, which fails if a second fetch appears, if the one call gains a query or body, or if any other network primitive (XMLHttpRequest, sendBeacon, WebSocket, EventSource) reaches the bundle.
+
+The manifest's content_security_policy restricts connect-src to one origin, so the browser enforces the same bound independently.
+
+Rendering uses textContent and createElement throughout, never innerHTML. A test fails if a markup-execution sink reaches the bundle — the content rendered is a scam message the user pasted, so this is treated as hostile input.
+
+Source: github.com/alekslinde/veriguard
+```
+
+---
+
+## Screenshots
+
+Chrome wants 1280×800 or 640×400; AMO accepts any size. Four, in this order —
+the sequence is the argument, so keep it:
+
+1. **A scam SMS, verdict likely_scam, evidence rows visible.** The core value,
+   and the rows showing their weights are what distinguishes this from a
+   black-box checker.
+2. **The right-click menu on selected text.** The primary entry point; not
+   obvious from the popup alone.
+3. **A limited-coverage or unchecked-shortener notice.** Shows the extension
+   admitting a gap. This is the honesty the listing claims, made visible.
+4. **A clean verdict.** Demonstrates it is not a scaremonger, and that "looks
+   good" still carries a caveat about new scams.
+
+Do not screenshot a real person's message. Use the samples in the test suite.
+
+---
+
+## Before the first submission
+
+- [ ] `npm run icons` — icons are generated, not committed
+- [ ] `npm test` — with `dist/` present, so the bundle tests actually run
+      rather than skipping
+- [ ] Bump `version` in `extension/package.json` (not the root one)
+- [ ] Confirm `GECKO_ID` is unchanged — a new id makes it a different add-on
+      and existing users stop getting updates
+
+## After the first submission
+
+Publishing assigns the extension its permanent ids. Until they are known the
+blocklist request is blocked by CORS, which is expected and degrades safely: a
+check runs without the list rather than failing.
+
+- [ ] Collect the Chrome id (`chrome-extension://<id>`) and the Firefox uuid
+      (`moz-extension://<uuid>`)
+- [ ] Add both to `CORS_ALLOWED_ORIGINS`, comma-separated, and redeploy
+- [ ] Re-test that a check picks up the blocklist — this is the one path that
+      cannot be tested before publishing

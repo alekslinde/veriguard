@@ -51,6 +51,59 @@ describe("extension build config is native-loader safe", () => {
     );
   });
 
+  it("versions the extension independently of the app", () => {
+    // A published extension's version is a monotonic, store-visible release
+    // counter: every submission needs a higher number than the last, and a
+    // number that shipped can never be reused. Sharing the app's meant a typo
+    // fix on the website burned an extension version, and an extension hotfix
+    // required bumping the whole project.
+    const ext = JSON.parse(read("extension/package.json")) as { version?: string };
+    expect(ext.version, "extension/package.json must carry its own version").toBeTypeOf("string");
+
+    const config = read("extension/vite.config.mts");
+    expect(config, "the manifest version must come from extension/package.json").toMatch(
+      /readFileSync\(\s*here\("package\.json"\)/,
+    );
+  });
+
+  it("keeps the extension version in the format every store accepts", () => {
+    // Narrower than semver: one to four dot-separated integers, no pre-release
+    // or build metadata, no leading zeros. Chrome and AMO reject the rest at
+    // upload time — after a build, at the end of a release.
+    const { version } = JSON.parse(read("extension/package.json")) as { version: string };
+    expect(version.split("-")[0]).toMatch(/^\d+(\.\d+){0,3}$/);
+    for (const part of version.split("-")[0].split(".")) {
+      expect(part, `leading zero in "${version}" — Chrome rejects it`).toBe(String(Number(part)));
+    }
+  });
+
+  it("keeps the store summary identical to the shipped description", () => {
+    // The browser shows the manifest's description in its own extensions list.
+    // A listing that describes the extension differently from the extension is
+    // a discrepancy a reviewer notices, and the copy lives in two files that
+    // nothing otherwise keeps together.
+    const listing = read("extension/STORE.md");
+    const manifest = read("extension/src/manifest.ts");
+
+    const described = /description:\s*\n?\s*"([^"]+)"/.exec(manifest)?.[1];
+    expect(described, "could not find the manifest description").toBeTypeOf("string");
+    expect(listing, "STORE.md summary has drifted from the manifest description").toContain(
+      described!,
+    );
+    // Chrome's short-description limit, checked here rather than discovered on
+    // upload.
+    expect(described!.length).toBeLessThanOrEqual(132);
+  });
+
+  it("points the stores at a privacy policy that exists", () => {
+    // All three stores require a policy URL. The page is the site's own
+    // about page, anchored — so the anchor has to be there.
+    expect(read("extension/STORE.md")).toContain("/about#extension");
+    expect(read("app/about/page.tsx"), "the #extension anchor is missing").toMatch(
+      /id="extension"/,
+    );
+  });
+
   it("disables code splitting by its current name", () => {
     // Self-contained entries are a Safari requirement, not a preference: a
     // background script carrying a bare import is an ES module, which needs
