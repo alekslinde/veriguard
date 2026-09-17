@@ -80,21 +80,35 @@ function generatedCodeDirectories(): string[] {
 
 describe("eslint ignores generated output", () => {
   it("ignores every gitignored build directory that exists", async () => {
-    // Only directories actually present are checked: which ones exist depends
-    // on what has been built on this machine, and a test that demanded all of
-    // them would fail on a fresh clone for the wrong reason.
+    // Only directories actually PRESENT are checked, and there may be none:
+    // which ones exist depends on what has been built here, and CI runs the
+    // suite without building the extension or a deploy bundle. An earlier
+    // version asserted the list was non-empty, to stop the loop passing
+    // vacuously — which made the test fail on exactly the machines that had
+    // nothing to check. The vacuous-pass worry is answered by the
+    // known-patterns test below instead, which needs no build at all.
     const eslint = new ESLint();
-    const candidates = generatedCodeDirectories();
 
-    expect(candidates.length, "no generated directories present to check").toBeGreaterThan(0);
-
-    for (const dir of candidates) {
+    for (const dir of generatedCodeDirectories()) {
       // A path ESLint would lint if the directory were not ignored. The probe
       // file is never written — isPathIgnored is a pure path question.
       const probe = path.join(ROOT, dir, "__lint_probe__.js");
       expect(await eslint.isPathIgnored(probe), `${dir}/ is linted but is generated output`).toBe(
         true,
       );
+    }
+  });
+
+  it("ignores the known generated directories whether or not they were built", async () => {
+    // The half that runs everywhere. The directories above appear only once
+    // something has produced them, so on CI that loop is empty and proves
+    // nothing; these paths are asserted directly, so a missing ignore entry
+    // fails on a fresh clone rather than waiting for someone to build locally
+    // and wonder why lint got noisy.
+    const eslint = new ESLint();
+    for (const dir of [".next", ".vercel", "extension/dist", "extension/safari", "public/tesseract"]) {
+      const probe = path.join(ROOT, dir, "__lint_probe__.js");
+      expect(await eslint.isPathIgnored(probe), `${dir}/ must be ignored`).toBe(true);
     }
   });
 
