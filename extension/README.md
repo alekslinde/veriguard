@@ -62,6 +62,19 @@ Consequences worth understanding before changing anything here:
 - **No host permissions, no content scripts.** Nothing reads the page. The
   context menu hands over the text the user selected, and that is the entire
   input path.
+- **Reporting is a hand-off, not a submission.** On a `suspicious` or
+  `likely_scam` verdict the popup offers a report button, and it opens
+  `/report` on the site with the identifiers prefilled — it never POSTs. A
+  submission from here would be a second network call carrying the user's
+  content, which is the one thing this surface promises not to do, so the user
+  reviews and sends from a page they can see, on our origin, where the honeypot,
+  form token and rate limit already are. The link carries only identifiers (the
+  scam link, number or address); the pasted message never travels in it, because
+  that is the field most likely to hold the reporter's own details. The query is
+  built with `lib/reportPrefill.ts` — the same module the form parses it with,
+  imported rather than copied, so the two cannot disagree about a parameter.
+  Opening a tab needs no permission; `tabs` would only be required to *read*
+  tab URLs, which nothing here does.
 
 ### About the hashing
 
@@ -141,6 +154,7 @@ silently rather than loudly:
 | `src/popup.ts` | Popup controller and rendering |
 | `src/check.ts` | Engine bridge — verdict collapse, coverage, shortener honesty |
 | `src/blocklist.ts` | The one network call: fetch, cache, back off, degrade |
+| `src/report.ts` | Report hand-off — which verdicts offer it, what the link carries, what it deliberately does not |
 | `src/copy.ts` | Reader-facing strings, kept in sync with `messages/` by test |
 
 ## Things to know before editing

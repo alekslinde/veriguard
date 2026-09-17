@@ -85,6 +85,21 @@ describe.skipIf(!built)("built extension bundle", () => {
     expect(fetchCall).not.toContain("body:");
   });
 
+  it("hands the report to the site rather than submitting one", () => {
+    // The report button opens the site's form with the identifiers prefilled.
+    // It must never POST: that would be a second network call carrying the
+    // user's pasted content, which is the exact claim this extension makes
+    // about itself. The one-fetch assertion above already bounds the call
+    // count; this names the path that would most plausibly add one, so the
+    // failure message points at the reason rather than just the count.
+    const bundle = popup() + background();
+    expect(bundle).toContain("/report?");
+    expect(bundle, "the report path must not POST").not.toMatch(/method:\s*"POST"/i);
+    expect(bundle, "a report must not be submitted from the extension").not.toContain(
+      "/api/report",
+    );
+  });
+
   it("contains no markup-execution sink", () => {
     // The popup renders attacker-controlled text — the scam message itself, and
     // engine signal strings that quote it. innerHTML here would be a script

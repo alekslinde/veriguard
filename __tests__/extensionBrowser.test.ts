@@ -116,6 +116,61 @@ describe("storage calls settle on every runtime shape", () => {
   });
 });
 
+describe("openTab", () => {
+  it("opens through the tabs API when the runtime has one", async () => {
+    const create = vi.fn();
+    install(baseApi({ tabs: { create } }));
+    const { openTab } = await import("../extension/src/browser");
+
+    openTab("https://veriguard.app/report?type=url");
+    expect(create).toHaveBeenCalledWith({ url: "https://veriguard.app/report?type=url" });
+  });
+
+  it("needs no permission to do it", async () => {
+    // `tabs.create` with a plain URL is available to every extension. What the
+    // `tabs` permission buys is READING tab URLs and titles, which nothing here
+    // does — so the report link costs the user nothing at the install prompt.
+    const { buildManifest } = await import("../extension/src/manifest");
+    for (const target of ["chrome", "firefox"] as const) {
+      const m = buildManifest(target, {
+        version: "9.9.9",
+        geckoId: "t@example.invalid",
+        apiBase: "https://api.example.invalid",
+      }) as { permissions: string[] };
+      expect(m.permissions, "opening a tab must not have added a permission").not.toContain("tabs");
+    }
+  });
+
+  it("falls back to window.open when the runtime exposes no tabs API", async () => {
+    const open = vi.fn();
+    vi.stubGlobal("open", open);
+    install(baseApi());
+    const { openTab } = await import("../extension/src/browser");
+
+    openTab("https://veriguard.app/report");
+    expect(open).toHaveBeenCalledWith("https://veriguard.app/report", "_blank");
+  });
+
+  it("does not throw when both paths fail", async () => {
+    // The caller is a button whose whole job is opening a page. A popup that
+    // throws while trying is worse than one where the click did nothing.
+    vi.stubGlobal("open", () => {
+      throw new Error("blocked");
+    });
+    install(
+      baseApi({
+        tabs: {
+          create: () => {
+            throw new Error("no");
+          },
+        },
+      }),
+    );
+    const { openTab } = await import("../extension/src/browser");
+    expect(() => openTab("https://veriguard.app/report")).not.toThrow();
+  });
+});
+
 describe("createContextMenu is idempotent", () => {
   // A background worker is torn down when idle and re-evaluated on the next
   // event, so this runs many times over a session with the same id.

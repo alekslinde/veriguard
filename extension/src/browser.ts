@@ -36,10 +36,15 @@ interface Runtime {
   openOptionsPage?: () => void;
 }
 
+interface Tabs {
+  create(props: { url: string }): unknown;
+}
+
 interface ExtensionApi {
   storage: { local: StorageArea };
   contextMenus: ContextMenus;
   runtime: Runtime;
+  tabs?: Tabs;
   action?: { openPopup?: () => Promise<void> };
 }
 
@@ -188,6 +193,36 @@ export function createContextMenu(id: string, title: string): void {
     if (returned && typeof returned.then === "function") returned.then(create, create);
   } catch {
     create();
+  }
+}
+
+/**
+ * Open a URL in a new tab.
+ *
+ * **Needs no permission, and that is the point.** `tabs.create` with a plain
+ * URL is available to every extension; what the `tabs` permission buys is
+ * *reading* tab URLs and titles, which this never does. So the report link
+ * costs the user nothing in the install prompt.
+ *
+ * Falls back to `window.open` when the API is absent — under test, and in any
+ * runtime that does not expose it. Failure is swallowed: the caller is a button
+ * whose whole job is opening a page, and a popup that throws while trying is
+ * worse than one where the click did nothing visible.
+ */
+export function openTab(url: string): void {
+  try {
+    const tabs = api().tabs;
+    if (tabs) {
+      tabs.create({ url });
+      return;
+    }
+  } catch {
+    // Fall through to window.open.
+  }
+  try {
+    globalThis.open?.(url, "_blank");
+  } catch {
+    // Nothing further to try.
   }
 }
 

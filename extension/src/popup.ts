@@ -7,11 +7,12 @@
 // sink fed by exactly the input most likely to carry one.
 
 import { runCheck, type ExtensionCheck } from "./check";
-import { VERDICT_COPY, SOURCE_LABEL, NOTICE } from "./copy";
+import { VERDICT_COPY, SOURCE_LABEL, NOTICE, REPORT } from "./copy";
 import { REGION_OPTIONS, DEFAULT_REGION } from "@veriguard/engine/regions";
 import { defangText } from "@veriguard/engine/urlSanitizer";
-import { hasExtensionApi, storageGet, storageSet } from "./browser";
+import { hasExtensionApi, storageGet, storageSet, openTab } from "./browser";
 import { getBlocklist } from "./blocklist";
+import { isReportable, prefillFor, reportUrl } from "./report";
 
 const REGION_KEY = "region";
 /** Where the background script leaves text from a right-click check. */
@@ -41,7 +42,7 @@ function renderError(message: string) {
   out.replaceChildren(el("div", "err", message));
 }
 
-function renderVerdict(check: ExtensionCheck) {
+function renderVerdict(check: ExtensionCheck, content: string) {
   const copy = VERDICT_COPY[check.verdict];
   const card = el("div", "card");
 
@@ -129,6 +130,25 @@ function renderVerdict(check: ExtensionCheck) {
     card.append(note);
   }
 
+  // Report — last, after the verdict and everything qualifying it. The user
+  // should know what was found, and what could not be, before being asked to
+  // act on it.
+  //
+  // A button rather than a link: an <a href> would put the prefilled URL in the
+  // DOM, where "copy link address" hands someone a URL with the scam
+  // identifiers in it and no indication that it is about to become a public
+  // report. The click builds it and goes.
+  if (isReportable(check.verdict)) {
+    const block = el("div", "report");
+    const button = el("button", "report-go", REPORT.label);
+    button.type = "button";
+    button.addEventListener("click", () => {
+      openTab(reportUrl(__API_BASE__, prefillFor(check.results, content)));
+    });
+    block.append(button, el("p", "report-note", REPORT.note));
+    card.append(block);
+  }
+
   out.replaceChildren(card);
 }
 
@@ -153,7 +173,7 @@ async function check() {
     // current rather than merely present.
     const blocklist = await getBlocklist(__API_BASE__);
     const result = await runCheck(content, region, blocklist);
-    if (result) renderVerdict(result);
+    if (result) renderVerdict(result, content);
     else renderError("Nothing to check in that — paste a message, link or number.");
   } catch {
     // The engine is local, so a throw here is a defect rather than a network

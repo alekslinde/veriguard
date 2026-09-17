@@ -69,3 +69,18 @@ export const NOTICE = {
   noBlocklist:
     "We could not reach the list of known malicious sites, so that check did not run. Everything else was checked normally. This result is less complete than usual — if anything about the message feels wrong, treat it as suspicious.",
 };
+
+/**
+ * The report hand-off.
+ *
+ * Says where the user is going and what travels with them, because the button
+ * leaves the extension — and an offer to "report this" that quietly posted the
+ * message would contradict the one thing this surface promises. The message
+ * itself is deliberately not carried; the form asks for it in the user's own
+ * words, in a box they can see.
+ */
+export const REPORT = {
+  label: "Report this scam",
+  /** Sits under the button, in the same register as the notices above it. */
+  note: "Opens the report form on veriguard.app with the link, number or address filled in. Nothing is sent until you review it there and submit.",
+};

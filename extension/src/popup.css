@@ -300,6 +300,41 @@ button:focus-visible {
   color: var(--text-dim);
 }
 
+/* ── Report hand-off ────────────────────────────────────────────────────── */
+
+.report {
+  border-top: 1px solid var(--rule);
+  padding: 11px 13px 12px;
+}
+
+/* Outlined rather than filled: the primary action on this panel is checking,
+   and a second solid button competes with it. This reads as available without
+   claiming to be the next thing you should do. */
+.report-go {
+  width: 100%;
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  /* Matches .go — past the 24px minimum target, near the 44px recommendation. */
+  height: 38px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.report-go:hover {
+  border-color: var(--caution);
+  color: var(--caution);
+}
+
+.report-note {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--faint);
+}
+
 .foot {
   font-size: 11.5px;
   color: var(--faint);
