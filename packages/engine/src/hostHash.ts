@@ -152,8 +152,28 @@ export function sha256Hex(text: string): string {
  * never produces.
  */
 export function hashHost(hostname: string): string {
-  const normalised = hostname.toLowerCase().replace(/\.+$/, "");
-  return sha256Hex(normalised).slice(0, HOST_HASH_HEX_LENGTH);
+  return sha256Hex(normaliseHost(hostname)).slice(0, HOST_HASH_HEX_LENGTH);
+}
+
+/**
+ * Lowercase, and strip trailing dots.
+ *
+ * **Written as a scan rather than `/\.+$/`, deliberately.** That regex
+ * backtracks quadratically: anchoring `+` to `$` makes the engine retry from
+ * every position in a run of dots that does not end in one, so a hostname of
+ * many dots costs time proportional to its length squared. It reaches here from
+ * pasted content — a hostname parsed out of a submitted message is handed
+ * straight to the blocklist lookup — which makes it a denial-of-service vector
+ * rather than a curiosity. Measured before the change: 80k dots took ~2.5s,
+ * and doubling the input roughly quadrupled it.
+ *
+ * A trailing-dot strip needs no backtracking at all. This walks back from the
+ * end once, so the cost is linear and the worst case is one pass.
+ */
+function normaliseHost(hostname: string): string {
+  let end = hostname.length;
+  while (end > 0 && hostname.charCodeAt(end - 1) === 46 /* "." */) end--;
+  return hostname.slice(0, end).toLowerCase();
 }
 
 /**
