@@ -100,6 +100,18 @@ Australian-focused, with rule packs for the UK, US, Canada, Ireland and New Zeal
 
 ---
 
+## Chrome Web Store: single purpose
+
+Chrome requires one narrow purpose, and rejects a description that reads as a
+bundle of features. The dashboard field sits above the permission
+justifications below.
+
+```
+Veriguard checks text the user gives it — a message, link, email address or phone number — against a built-in set of scam-detection rules, and shows a verdict with the rules that matched and what each contributed to the score. That is the extension's only function. Text reaches it two ways, both user-initiated: pasted into the popup, or selected on a page and sent via the right-click menu. Scoring happens on the user's device.
+```
+
+---
+
 ## Chrome Web Store: permission justifications
 
 Chrome requires a written justification per permission, and rejects vague ones.
