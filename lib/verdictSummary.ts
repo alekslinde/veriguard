@@ -9,7 +9,7 @@
 // Pure module: no React, no I/O. Safe to unit test and to import from a route.
 
 import { AnalyzedIdentifier } from "@veriguard/engine/scamDetector";
-import { isWorse, worstBy } from "@veriguard/engine/verdictRank";
+import { isWorse, worstBy, evidenceFor } from "@veriguard/engine/verdictRank";
 import type { Verdict } from "@veriguard/engine/verdictRank";
 import type { RegionCoverage } from "@veriguard/engine/regions";
 import type { Signal } from "@veriguard/engine/engineTypes";
@@ -538,34 +538,23 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
 // most concrete evidence on the page. The overall score is composed from all of
 // them, so the evidence under it has to be too, or the arithmetic doesn't add
 // up in front of a reader we explicitly invite to check it.
-//
-// Ordering: findings first in identifier order, then the clamp row last if any
-// identifier hit its ceiling — it is arithmetic about the total, so it belongs
-// at the bottom of the column it explains, not interleaved with observations.
-//
-// Duplicate texts are collapsed. The same URL appearing in both the message
-// scan and its own scan produces the same sentence twice, and one observation
-// listed twice reads as two independent findings.
 /**
  * The overall verdict AND the evidence behind it, composed together.
  *
  * These have to be produced in one place. composeVerdict returns the WORST
- * identifier's score while pooledSignals returns EVERY identifier's rows, and
- * pairing them put a headline of 75 above six rows adding to 120 — in a panel
- * whose own copy invites the reader to check our arithmetic. Worse, the score
- * panel reasons over the rows it is handed (how many rules tripped, which one
- * was heaviest, what the clamp row means), so cross-identifier rows let it
- * assert things about a score a different identifier produced.
+ * identifier's score while pooled evidence covers EVERY identifier, and pairing
+ * them put a headline of 75 above six rows adding to 120 — in a panel whose own
+ * copy invites the reader to check our arithmetic. Worse, the score panel
+ * reasons over the rows it is handed (how many rules tripped, which one was
+ * heaviest, what the clamp row means), so cross-identifier rows let it assert
+ * things about a score a different identifier produced.
  *
- * So the headline here is the sum of the evidence shown, capped at 100 like
- * every per-identifier score, with a clamp row when the cap bites. That keeps
- * the invariant the engine already holds itself to: the rows on screen add up
- * to the number above them.
- *
- * The verdict still comes from composeVerdict — worst-identifier-wins is the
- * severity rule, and it is shared with the email reply. Only the arithmetic
- * shown to the reader is recomputed. A pooled sum can only ever be >= the worst
- * identifier's score, so this never softens a verdict.
+ * The pooling, the cap and the clamp row now live in
+ * `@veriguard/engine/verdictRank` alongside the rank table, because the
+ * WebExtension shows the same evidence list and cannot reach `lib/`. It had a
+ * second copy of this pairing and got it wrong in exactly the way described
+ * above. This function is what remains app-side: the verdict, and the tracking
+ * pixel that no identifier scores.
  */
 export function composeVerdictWithEvidence(
   results: AnalyzedIdentifier[],
@@ -574,46 +563,20 @@ export function composeVerdictWithEvidence(
   const composed = composeVerdict(results, pixelReport);
   if (!composed) return null;
 
-  const findings = pooledSignals(results).filter((x) => x.source !== "score");
-  let signals = findings;
-  let score = Math.min(findings.reduce((n, x) => n + x.points, 0), 100);
-
   // The tracking pixel nudges the verdict without any identifier scoring it, so
   // it has to enter the evidence as its own row — otherwise the panel shows a
-  // 40/100 meter above rows totalling 5 and never names the reason.
-  if (pixelReport && score < composed.score) {
-    signals = [
-      ...findings,
-      {
+  // 40/100 meter above rows totalling 5 and never names the reason. That is the
+  // one app-side addition; the arithmetic around it is the engine's.
+  const floor = pixelReport
+    ? {
+        score: composed.score,
         text: `Contains ${pixelReport.pixels.length === 1 ? "a tracking pixel" : `${pixelReport.pixels.length} tracking pixels`} — an invisible image that tells the sender you opened this, and when. Legitimate senders use them too, but it confirms your address is live and being watched.`,
-        points: composed.score - score,
-        source: "message",
-      },
-    ];
-    score = composed.score;
-  }
+        source: "message" as const,
+      }
+    : undefined;
 
-  const raw = signals.reduce((n, x) => n + x.points, 0);
-  if (raw > score) {
-    signals = [
-      ...signals,
-      { text: `Signals total ${raw} — the score is capped at ${score}`, points: score - raw, source: "score" },
-    ];
-  }
-
+  const { score, signals } = evidenceFor(results, floor);
   return { verdict: composed.verdict, score, signals };
 }
 
-export function pooledSignals(results: AnalyzedIdentifier[]): Signal[] {
-  const seen = new Set<string>();
-  const findings: Signal[] = [];
-  const clamps: Signal[] = [];
-  for (const r of results) {
-    for (const s of r.result.signals ?? []) {
-      if (seen.has(s.text)) continue;
-      seen.add(s.text);
-      (s.source === "score" ? clamps : findings).push(s);
-    }
-  }
-  return [...findings, ...clamps];
-}
+export { pooledSignals } from "@veriguard/engine/verdictRank";

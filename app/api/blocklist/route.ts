@@ -32,6 +32,16 @@ import { corsHeaders, corsPreflightHeaders } from "@/lib/cors";
  * offline client exists to avoid producing.
  */
 
+/**
+ * How long a shared cache may hold this response, as a fraction of the client's
+ * own lifetime.
+ *
+ * A quarter, so that a client refetching at its `ttl` cannot receive a copy
+ * already that old and end up carrying entries for twice the window the payload
+ * states. See the note at the `Cache-Control` header below.
+ */
+const EDGE_TTL_SECONDS = Math.floor(BLOCKLIST_TTL_SECONDS / 4);
+
 /** CORS preflight. Same allowlist as /api/check; empty by default. */
 export async function OPTIONS(req: NextRequest) {
   return new NextResponse(null, {
@@ -90,10 +100,18 @@ export async function GET(req: NextRequest) {
   // for six hours would pin the failure in place long after it recovered. Serve
   // it — a client passing an empty list scores exactly as it does today — but
   // let it expire quickly.
+  //
+  // The edge window is a fraction of the client's, because the two are
+  // sequential and not alternatives: a client refetches after `ttl`, and an
+  // edge copy `ttl` old at that moment hands it entries already twice that age.
+  // Equal windows therefore promise six hours of staleness and deliver up to
+  // twelve. Dividing keeps the client's `ttl` the honest bound on the whole
+  // chain, and costs only a more frequent origin fetch of a payload the origin
+  // already has cached for the same six hours.
   const cache =
     hashes.length === 0
       ? "public, s-maxage=60, stale-while-revalidate=60"
-      : `public, s-maxage=${BLOCKLIST_TTL_SECONDS}, stale-while-revalidate=${BLOCKLIST_TTL_SECONDS}`;
+      : `public, s-maxage=${EDGE_TTL_SECONDS}, stale-while-revalidate=${EDGE_TTL_SECONDS}`;
 
   return new NextResponse(body, {
     headers: {

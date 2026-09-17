@@ -71,9 +71,20 @@ describe("GET /api/blocklist", () => {
     expect(body.ttl).toBe(21600);
   });
 
-  it("caches a populated response for the full window", async () => {
+  it("keeps the edge window under the client's, so the two do not compound", async () => {
+    // The windows are sequential, not alternatives: a client refetches after
+    // `ttl`, and an edge copy already `ttl` old at that moment hands it entries
+    // twice that age. Equal windows therefore promise six hours of staleness and
+    // deliver up to twelve, so the edge gets a fraction of the client's.
     const res = await GET(req());
-    expect(res.headers.get("Cache-Control")).toContain("s-maxage=21600");
+    const cache = res.headers.get("Cache-Control")!;
+    const edge = Number(/s-maxage=(\d+)/.exec(cache)![1]);
+    const { ttl } = await (await GET(req())).json();
+
+    expect(edge).toBeGreaterThan(0);
+    expect(edge).toBeLessThan(ttl);
+    // The client's stated ttl is the honest bound on the whole chain.
+    expect(edge + ttl).toBeLessThanOrEqual(ttl * 1.5);
   });
 
   it("caches an empty response only briefly", async () => {

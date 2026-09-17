@@ -102,6 +102,36 @@ async function readCache(): Promise<CachedBlocklist | null> {
 }
 
 /**
+ * Record that a refresh failed, so the retry backs off.
+ *
+ * Every failure path goes through here, not just the thrown ones. A refused or
+ * throttled response is the failure most in need of a backoff: a client that
+ * trips the route's rate limit and retries on every popup open keeps itself
+ * locked out for the whole window, which is the abuse pattern
+ * `RETRY_AFTER_FAILURE_MS` exists to prevent. An exception and a 429 differ in
+ * cause and in nothing else that matters here.
+ *
+ * A previous copy is preserved rather than replaced: it is still usable (see
+ * getBlocklist), and losing it because a later refresh failed would turn a
+ * temporary outage into a permanent downgrade. With no previous copy the stored
+ * entry carries an empty list, so the shape is always complete and
+ * `hashes.length` alone decides whether there is anything to look up.
+ */
+async function recordFailure(now: number): Promise<null> {
+  if (!hasExtensionApi()) return null;
+  const previous = await readCache();
+  const record: CachedBlocklist = {
+    algorithm: previous?.algorithm ?? HOST_HASH_ALGORITHM,
+    hashes: previous?.hashes ?? [],
+    ttl: previous?.ttl ?? DEFAULT_TTL_SECONDS,
+    fetchedAt: previous?.fetchedAt ?? 0,
+    failedAt: now,
+  };
+  await storageSet(CACHE_KEY, record).catch(() => {});
+  return null;
+}
+
+/**
  * Fetch a fresh copy and store it. Resolves to null on any failure.
  *
  * `apiBase` is passed in rather than read from a global so the caller decides
@@ -115,37 +145,36 @@ async function refresh(apiBase: string, now: number): Promise<CachedBlocklist | 
       credentials: "omit",
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
-    if (!res.ok) return null;
+    // Refused, throttled, or serving something this client will not store: a
+    // failure like any other, and backed off like one.
+    if (!res.ok) return await recordFailure(now);
     const parsed = parse((await res.json()) as BlocklistResponse, now);
-    if (!parsed) return null;
+    if (!parsed) return await recordFailure(now);
     if (hasExtensionApi()) await storageSet(CACHE_KEY, parsed);
     return parsed;
   } catch {
-    // Offline, blocked, timed out, malformed — all the same from here. Record
-    // the failure so the retry backs off rather than firing on every popup.
-    //
-    // A previous copy is preserved rather than replaced: it is still usable (see
-    // getBlocklist), and losing it because a later refresh failed would turn a
-    // temporary outage into a permanent downgrade. With no previous copy the
-    // stored entry carries an empty list, so the shape is always complete and
-    // `hashes.length` alone decides whether there is anything to look up.
-    if (hasExtensionApi()) {
-      const previous = await readCache();
-      const record: CachedBlocklist = {
-        algorithm: previous?.algorithm ?? HOST_HASH_ALGORITHM,
-        hashes: previous?.hashes ?? [],
-        ttl: previous?.ttl ?? DEFAULT_TTL_SECONDS,
-        fetchedAt: previous?.fetchedAt ?? 0,
-        failedAt: now,
-      };
-      await storageSet(CACHE_KEY, record).catch(() => {});
-    }
-    return null;
+    // Offline, blocked, timed out, malformed — all the same from here.
+    return await recordFailure(now);
   }
 }
 
 /**
- * The blocklist lookup to hand the engine, or undefined when none is available.
+ * What a check got, and how good it was.
+ *
+ * `fresh` is reported separately from `lookup` because "a list was consulted"
+ * and "a current list was consulted" are different claims, and the popup makes
+ * the honest one. A caller cannot derive freshness from `lookup` alone — a copy
+ * days old still produces a usable lookup, which is the point of serving it.
+ */
+export interface BlocklistState {
+  /** The lookup to hand the engine, or undefined when no copy is available. */
+  lookup: HostLookup | undefined;
+  /** Whether that copy is within the lifetime the server stated for it. */
+  fresh: boolean;
+}
+
+/**
+ * The blocklist lookup to hand the engine, with its freshness.
  *
  * **Never waits on the network.** Whatever is cached is returned immediately,
  * and a refresh is started in the background when that copy has expired — its
@@ -158,10 +187,11 @@ async function refresh(apiBase: string, now: number): Promise<CachedBlocklist | 
  * The background refresh is deliberately not awaited, so a caller cannot
  * accidentally reintroduce the wait by awaiting this function's result harder.
  */
-export async function getBlocklist(apiBase: string): Promise<HostLookup | undefined> {
+export async function getBlocklist(apiBase: string): Promise<BlocklistState> {
   const now = Date.now();
   const cache = await readCache();
-  const fresh = cache?.hashes?.length ? isFresh(cache, now) : false;
+  const usable = Boolean(cache?.hashes?.length);
+  const fresh = usable ? isFresh(cache!, now) : false;
 
   if (!fresh) {
     // Expired, absent, or previously failed. Back off after a failure so a
@@ -176,8 +206,7 @@ export async function getBlocklist(apiBase: string): Promise<HostLookup | undefi
   // A stale copy still beats nothing: these are hostnames reported as malicious,
   // and one reported six hours ago is overwhelmingly likely to still be. Using
   // it can only raise a score, and the direction that costs a user is the one
-  // where a real scam scores low.
-  if (cache?.hashes?.length) return hashedHostLookup(cache.hashes);
-
-  return undefined;
+  // where a real scam scores low. It is still reported as stale, so the popup
+  // can qualify a clean verdict that a current list might have contradicted.
+  return { lookup: usable ? hashedHostLookup(cache!.hashes) : undefined, fresh };
 }

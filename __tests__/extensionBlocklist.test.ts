@@ -55,7 +55,7 @@ describe("getBlocklist", () => {
     let resolveFetch: (v: unknown) => void = () => {};
     vi.mocked(fetch).mockReturnValue(new Promise((r) => (resolveFetch = r)) as never);
 
-    const lookup = await getBlocklist(API);
+    const { lookup } = await getBlocklist(API);
     expect(lookup).toBeUndefined();
 
     // The refresh was still started — it lands in storage for the next check.
@@ -66,11 +66,12 @@ describe("getBlocklist", () => {
   it("stores a fetched list and uses it on the next call", async () => {
     vi.mocked(fetch).mockResolvedValue(okResponse(HOSTS.map(hashHost)) as never);
 
-    expect(await getBlocklist(API)).toBeUndefined(); // cold
+    expect((await getBlocklist(API)).lookup).toBeUndefined(); // cold
     await settle();
 
-    const lookup = await getBlocklist(API);
+    const { lookup, fresh } = await getBlocklist(API);
     expect(lookup).toBeDefined();
+    expect(fresh).toBe(true);
     for (const host of HOSTS) expect(lookup!.has(host), host).toBe(true);
     expect(lookup!.has("innocent.example")).toBe(false);
   });
@@ -96,14 +97,17 @@ describe("getBlocklist", () => {
     };
     vi.mocked(fetch).mockResolvedValue(okResponse([hashHost("newer.example")]) as never);
 
-    const lookup = await getBlocklist(API);
+    const { lookup, fresh } = await getBlocklist(API);
     expect(lookup!.has("evil.example")).toBe(true);
+    // Used, but not counted as consulted: hosts added since this copy was taken
+    // could not have been caught, and the popup says so on a clean verdict.
+    expect(fresh).toBe(false);
     expect(fetch).toHaveBeenCalledOnce();
   });
 
   it("degrades to no blocklist when the fetch fails", async () => {
     vi.mocked(fetch).mockRejectedValue(new Error("offline"));
-    expect(await getBlocklist(API)).toBeUndefined();
+    expect((await getBlocklist(API)).lookup).toBeUndefined();
     await settle();
     // The failure is recorded rather than thrown.
     expect((store.blocklist as { failedAt?: number })?.failedAt).toBeTypeOf("number");
@@ -134,7 +138,7 @@ describe("getBlocklist", () => {
     };
     vi.mocked(fetch).mockRejectedValue(new Error("offline"));
 
-    const lookup = await getBlocklist(API);
+    const { lookup } = await getBlocklist(API);
     expect(lookup!.has("evil.example")).toBe(true);
     await settle();
 
@@ -158,7 +162,7 @@ describe("response validation", () => {
       // everything, which is indistinguishable from a clean feed.
       vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => body } as never);
 
-      expect(await getBlocklist(API)).toBeUndefined();
+      expect((await getBlocklist(API)).lookup).toBeUndefined();
       await settle();
       expect((store.blocklist as { hashes?: string[] })?.hashes ?? []).toHaveLength(0);
     });
@@ -177,6 +181,50 @@ describe("response validation", () => {
 
   it("ignores a non-ok response", async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false, status: 503 } as never);
-    expect(await getBlocklist(API)).toBeUndefined();
+    expect((await getBlocklist(API)).lookup).toBeUndefined();
+  });
+});
+
+describe("backoff covers server-side failures too", () => {
+  // The backoff existed only for thrown errors, so a refused response retried on
+  // every popup open. That is the case it is most needed for: a client that
+  // trips the route's rate limit and immediately retries keeps itself locked out
+  // for the whole window — the precise abuse pattern the backoff prevents.
+  const refusals: [string, unknown][] = [
+    ["a 429", { ok: false, status: 429, json: async () => ({ code: "rate_limited" }) }],
+    ["a 503", { ok: false, status: 503, json: async () => ({}) }],
+    ["a body it will not store", { ok: true, json: async () => ({ algorithm: "md5-32", hashes: [] }) }],
+  ];
+
+  for (const [label, response] of refusals) {
+    it(`records ${label} as a failure and backs off`, async () => {
+      vi.mocked(fetch).mockResolvedValue(response as never);
+
+      await getBlocklist(API);
+      await settle();
+      expect((store.blocklist as { failedAt?: number })?.failedAt).toBeTypeOf("number");
+
+      // The second open must not produce a second request.
+      vi.mocked(fetch).mockClear();
+      await getBlocklist(API);
+      await settle();
+      expect(fetch).not.toHaveBeenCalled();
+    });
+  }
+
+  it("keeps serving a usable copy through a refusal", async () => {
+    store.blocklist = {
+      algorithm: HOST_HASH_ALGORITHM,
+      hashes: [hashHost("evil.example")],
+      ttl: 1,
+      fetchedAt: Date.now() - 86_400_000,
+    };
+    vi.mocked(fetch).mockResolvedValue({ ok: false, status: 429, json: async () => ({}) } as never);
+
+    await getBlocklist(API);
+    await settle();
+
+    const { lookup } = await getBlocklist(API);
+    expect(lookup!.has("evil.example")).toBe(true);
   });
 });

@@ -53,9 +53,11 @@ function renderVerdict(check: ExtensionCheck) {
   head.append(headText);
   card.append(head);
 
-  // Evidence. The clamp row is arithmetic about the total rather than an
-  // observation, so it is shown but never counted as a finding.
-  const signals = check.results.flatMap((r) => r.result.signals ?? []);
+  // Evidence, already pooled across identifiers with duplicates collapsed and
+  // any clamp row last — see `evidenceFor`. Taken as composed rather than
+  // re-derived here: these rows sum to `check.score`, and recomputing either
+  // half separately is what breaks that.
+  const signals = check.signals;
   if (signals.length) {
     const list = el("ul", "ev");
     for (const s of signals) {
@@ -142,9 +144,13 @@ async function check() {
   checkBtn.disabled = true;
   try {
     const region = regionSel.value || undefined;
-    if (hasExtensionApi()) await storageSet(REGION_KEY, region);
+    // Remembering the region is a convenience; failing to remember it must not
+    // cost the user the check they asked for.
+    if (hasExtensionApi()) await storageSet(REGION_KEY, region).catch(() => {});
     // Returns whatever is cached without waiting on the network — a cold start
-    // checks without the list rather than making the user wait for it.
+    // checks without the list rather than making the user wait for it. Carries
+    // its own freshness, so the verdict can say whether the list it used was
+    // current rather than merely present.
     const blocklist = await getBlocklist(__API_BASE__);
     const result = await runCheck(content, region, blocklist);
     if (result) renderVerdict(result);
@@ -173,16 +179,25 @@ async function init() {
   let pending: string | null = null;
 
   if (hasExtensionApi()) {
-    // A stored region that the engine no longer knows would select nothing and
-    // silently fall back, so it is validated against the live list rather than
-    // trusted. Packs come and go; storage outlives them.
-    const stored = await storageGet<string>(REGION_KEY);
-    if (stored && REGION_OPTIONS.some((r) => r.code === stored)) region = stored;
+    // Storage is a convenience here — a remembered region and a handed-over
+    // selection — and neither is worth a popup that fails to open. A rejected
+    // or timed-out read falls through to the defaults, so the worst case is a
+    // usable popup with an empty box rather than a blank panel.
+    try {
+      // A stored region that the engine no longer knows would select nothing and
+      // silently fall back, so it is validated against the live list rather than
+      // trusted. Packs come and go; storage outlives them.
+      const stored = await storageGet<string>(REGION_KEY);
+      if (stored && REGION_OPTIONS.some((r) => r.code === stored)) region = stored;
 
-    pending = await storageGet<string>(PENDING_KEY);
-    // Cleared on read: the selection is a one-shot handoff, and leaving it in
-    // storage means the next popup opens showing text the user did not paste.
-    if (pending) await storageSet(PENDING_KEY, null);
+      pending = await storageGet<string>(PENDING_KEY);
+      // Cleared on read: the selection is a one-shot handoff, and leaving it in
+      // storage means the next popup opens showing text the user did not paste.
+      if (pending) await storageSet(PENDING_KEY, null);
+    } catch {
+      // Defaults already hold. Nothing to tell the user: they asked for a
+      // popup, and they are getting one.
+    }
   }
 
   populateRegions(region);

@@ -33,8 +33,13 @@ const PENDING_KEY = "pendingSelection";
  */
 const MAX_SELECTION = 20_000;
 
-createContextMenu(MENU_ID, "Check this with Veriguard");
-
+// The listener goes first, and the ordering is load-bearing rather than
+// stylistic. A background worker is revived and re-evaluated repeatedly across
+// its life, so everything at this level runs many times; registering the
+// listener before anything that can fail means a menu item can never exist
+// without something listening to it. `createContextMenu` also completes
+// asynchronously on the runtime that returns a promise, so a listener
+// registered after it would be registered after the item is already clickable.
 onContextMenuClicked((info) => {
   if (info.menuItemId !== MENU_ID) return;
   const text = (info.selectionText ?? "").slice(0, MAX_SELECTION);
@@ -44,3 +49,7 @@ onContextMenuClicked((info) => {
   // beyond not crashing the worker.
   void storageSet(PENDING_KEY, text).catch(() => {});
 });
+
+// Idempotent — see createContextMenu. A re-evaluated worker must not stack a
+// duplicate id, which on one runtime throws and on the other logs.
+createContextMenu(MENU_ID, "Check this with Veriguard");
