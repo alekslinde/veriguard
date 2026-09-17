@@ -12,7 +12,8 @@
 //
 // Run: npm run icons
 import sharp from "sharp";
-import { readFileSync } from "fs";
+import { readFileSync, mkdirSync } from "fs";
+import { dirname } from "path";
 
 const SVG = readFileSync(new URL("../app/icon.svg", import.meta.url));
 const BG = { r: 3, g: 7, b: 18, alpha: 1 };      // gray-950 #030712
@@ -34,12 +35,17 @@ async function makeIcon(size, glyphRatio, out) {
     .png()
     .toBuffer();
 
+  const outPath = new URL(`../${out}`, import.meta.url).pathname;
+  // The extension icons land in a directory that is not committed (it holds only
+  // generated files), so it may not exist on a fresh clone.
+  mkdirSync(dirname(outPath), { recursive: true });
+
   await sharp({
     create: { width: size, height: size, channels: 4, background: BG },
   })
     .composite([{ input: tinted, gravity: "centre" }])
     .png()
-    .toFile(new URL(`../${out}`, import.meta.url).pathname);
+    .toFile(outPath);
 
   console.log(`✓ ${out} (${size}px)`);
 }
@@ -49,3 +55,25 @@ await makeIcon(512, 0.78, "public/icon-512.png");
 // Maskable: keep the glyph inside the 80% safe zone so circular masks don't clip it.
 await makeIcon(512, 0.6, "public/icon-maskable-512.png");
 await makeIcon(180, 0.72, "app/apple-icon.png");
+
+// WebExtension toolbar and store icons.
+//
+// Same mark, same recipe — a separate source would be a second thing to keep in
+// step with the brand for no gain. The sizes are the three the manifest
+// declares; Chrome, Firefox and Edge all pick from them, and the Safari wrapper
+// takes the 128 as its app icon (see below).
+//
+// A larger glyph ratio at 16px: the mark is rendered into very few pixels there,
+// and the padding that reads as breathing room at 128px reads as a shrunken
+// smudge in a toolbar.
+await makeIcon(16, 0.86, "extension/icons/icon-16.png");
+await makeIcon(48, 0.8, "extension/icons/icon-48.png");
+await makeIcon(128, 0.78, "extension/icons/icon-128.png");
+
+// The Safari wrapper app's icon.
+//
+// `safari-web-extension-converter` generates an Xcode project that references
+// `Resources/Icon.png` but never creates it — the build fails outright without
+// one, where Chrome and Firefox merely render a placeholder. Written into the
+// extension build so the converter picks it up as an ordinary resource.
+await makeIcon(512, 0.78, "extension/icons/Icon.png");

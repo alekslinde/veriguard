@@ -14,7 +14,16 @@
 import { unstable_cache } from "next/cache";
 
 const URLHAUS_CSV = "https://urlhaus.abuse.ch/downloads/csv_recent/";
-const TTL_SECONDS = 6 * 60 * 60; // 6 hours
+/**
+ * How long a fetched copy of the feed is reused, in seconds.
+ *
+ * Exported so the blocklist endpoint caches for the same window rather than
+ * picking its own: a client cache longer than this serves entries we have
+ * already refreshed, and a shorter one asks us to re-serve a list that has not
+ * changed. One constant, so the two cannot drift apart.
+ */
+export const BLOCKLIST_TTL_SECONDS = 6 * 60 * 60; // 6 hours
+const TTL_SECONDS = BLOCKLIST_TTL_SECONDS;
 const MAX_ENTRIES = 5000;         // cap to bound memory and parse time
 
 function parseHostnames(csv: string): Set<string> {

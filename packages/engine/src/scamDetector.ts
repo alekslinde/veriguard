@@ -8,7 +8,7 @@ import { analysePhone, PhoneIntel } from "./phoneIntel";
 import { isShortened, expandUrl, type ExpandFetch } from "./urlExpander";
 import { resolveRegionPack, supportedRegions, DEFAULT_REGION, type RegionInput, type RegionCoverage, type RegionPack } from "./regions";
 import { KEYS_BY_POST_PHRASES, FAMILY_RELATION_TERMS, NEW_NUMBER_PRETEXT_PHRASES } from "./regions/base";
-import type { CheckResult, Signal, SignalSource } from "./engineTypes";
+import type { CheckResult, HostLookup, Signal, SignalSource } from "./engineTypes";
 
 // ScamType and CheckResult live in engineTypes.ts to break the import cycle
 // with detectType (see the note there). Re-exported here so every existing
@@ -495,7 +495,7 @@ const GLOBAL_BRANDS: ReadonlySet<string> = new Set(BASE_SIGNALS.typosquatBrands)
 
 export function checkUrl(
   raw: string,
-  blocklist?: Set<string>,
+  blocklist?: HostLookup,
   region?: RegionInput,
   /**
    * The URL as the user actually wrote it, before normaliseForAnalysis.
@@ -1445,7 +1445,7 @@ function addSplicedWordingSignal(sig: Signals, text: string, pack: RegionPack): 
 
 export function checkSms(
   text: string,
-  blocklist?: Set<string>,
+  blocklist?: HostLookup,
   region?: RegionInput,
   options?: MessageCheckOptions,
 ): CheckResult {
@@ -2337,7 +2337,7 @@ const UNDISCOUNTED_COMPOSITES: string[] = [
 // Email checker
 // ────────────────────────────────────────────────────────────────────────────
 
-export function checkEmail(text: string, blocklist?: Set<string>, region?: RegionInput): CheckResult {
+export function checkEmail(text: string, blocklist?: HostLookup, region?: RegionInput): CheckResult {
   const PACK = resolveRegionPack(region);
   const {
     suspiciousTlds: SUSPICIOUS_TLDS,
@@ -2639,7 +2639,7 @@ export function checkPhone(number: string, region?: RegionInput): CheckResult {
 // Custom / free-text checker
 // ────────────────────────────────────────────────────────────────────────────
 
-export function checkCustom(text: string, blocklist?: Set<string>, region?: RegionInput): CheckResult {
+export function checkCustom(text: string, blocklist?: HostLookup, region?: RegionInput): CheckResult {
   const PACK = resolveRegionPack(region);
   const {
     urgencyWords: URGENCY_WORDS,
@@ -3031,9 +3031,20 @@ function bareHostFlaggedTlds(suspiciousTlds: string[]): ReadonlySet<string> {
   return new Set(suspiciousTlds.map((t) => t.replace(/^\./, "").toLowerCase()));
 }
 
+/**
+ * Emitted when a shortened link was found but its destination was not resolved.
+ *
+ * Exported because a client has to be able to *recognise* this case, not merely
+ * display it: a bundled engine with no transport hits it for every shortener,
+ * and a surface that cannot tell this note apart from an ordinary finding will
+ * present an incomplete verdict as a complete one. Consumers match on this
+ * constant rather than on the wording, so the sentence stays free to change.
+ */
+export const UNEXPANDED_SHORTENER_NOTE = "Shortened URL — destination could not be checked";
+
 // Expands a shortened URL and merges the destination analysis into the base result.
 // If expansion fails or times out, the base result is returned unchanged.
-async function applyExpansion(url: string, base: CheckResult, blocklist?: Set<string>, region?: RegionInput, fetcher?: ExpandFetch): Promise<CheckResult> {
+async function applyExpansion(url: string, base: CheckResult, blocklist?: HostLookup, region?: RegionInput, fetcher?: ExpandFetch): Promise<CheckResult> {
   if (!isShortened(url)) return base;
 
   const { expandedUrl, rawExpandedUrl, hops } = await expandUrl(url, fetcher);
@@ -3043,7 +3054,7 @@ async function applyExpansion(url: string, base: CheckResult, blocklist?: Set<st
     // no transport ("unavailable") and a timeout, missing Location or
     // exhausted hop budget ("failed"). The shortener is all we ever saw, and a
     // silent base result would present that as a complete answer.
-    const note = "Shortened URL — destination could not be checked";
+    const note = UNEXPANDED_SHORTENER_NOTE;
     return {
       ...base,
       flags: [...base.flags, note],
@@ -3099,7 +3110,7 @@ export interface AnalyzeOptions {
   fetcher?: ExpandFetch;
 }
 
-export async function analyzeContent(content: string, blocklist?: Set<string>, region?: RegionInput, options?: AnalyzeOptions): Promise<AnalyzedIdentifier[]> {
+export async function analyzeContent(content: string, blocklist?: HostLookup, region?: RegionInput, options?: AnalyzeOptions): Promise<AnalyzedIdentifier[]> {
   const raw = content.trim();
   if (!raw) return [];
 

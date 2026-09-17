@@ -1,6 +1,6 @@
 {
   "name": "@veriguard/engine",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": true,
   "description": "Rule-based scam detection engine. No framework, no ambient network access.",
   "type": "module",
@@ -9,6 +9,7 @@
     "./detectType": "./src/detectType.ts",
     "./emailHeaders": "./src/emailHeaders.ts",
     "./engineTypes": "./src/engineTypes.ts",
+    "./hostHash": "./src/hostHash.ts",
     "./keyboardAdjacency": "./src/keyboardAdjacency.ts",
     "./phoneIntel": "./src/phoneIntel.ts",
     "./publicSuffix": "./src/publicSuffix.ts",
@@ -16,7 +17,8 @@
     "./regions/*": "./src/regions/*.ts",
     "./scamDetector": "./src/scamDetector.ts",
     "./urlExpander": "./src/urlExpander.ts",
-    "./urlSanitizer": "./src/urlSanitizer.ts"
+    "./urlSanitizer": "./src/urlSanitizer.ts",
+    "./verdictRank": "./src/verdictRank.ts"
   },
   "dependencies": {
     "libphonenumber-js": "^1.13.13"

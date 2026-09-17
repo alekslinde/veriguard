@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Veriguard</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="head">
+        <span class="mark" aria-hidden="true"></span>
+        <h1>Veriguard</h1>
+        <span class="offline" title="Checks run on your device">on-device</span>
+      </header>
+
+      <label class="field">
+        <span class="label">Paste a message, link or number</span>
+        <textarea
+          id="input"
+          rows="5"
+          placeholder="Paste the suspicious message here…"
+          spellcheck="false"
+        ></textarea>
+      </label>
+
+      <div class="row">
+        <label class="region">
+          <span class="label">Region</span>
+          <select id="region"></select>
+        </label>
+        <button id="check" type="button" class="go">Check</button>
+      </div>
+
+      <!-- Verdict output. aria-live so a screen reader announces the result:
+           the check completes without any focus change, so a silent region
+           would leave a non-visual user with no indication anything happened. -->
+      <section id="out" class="out" aria-live="polite" aria-atomic="true"></section>
+
+      <footer class="foot">
+        <span>Rule-based. Nothing you paste leaves this device.</span>
+      </footer>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

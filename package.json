@@ -1,6 +1,6 @@
 {
   "name": "veriguard",
-  "version": "0.25.0",
+  "version": "0.26.0",
   "private": true,
   "workspaces": [
     "packages/*"
@@ -28,7 +28,11 @@
     "ocr-assets": "node scripts/copy-ocr-assets.mjs",
     "eval": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/eval.ts",
     "eval:metamorphic": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/eval-metamorphic.ts",
-    "check-deploy-drift": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/check-deploy-drift.ts"
+    "check-deploy-drift": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/check-deploy-drift.ts",
+    "ext:chrome": "TARGET=chrome ENTRY=popup vite build --config extension/vite.config.mts && TARGET=chrome ENTRY=background vite build --config extension/vite.config.mts",
+    "ext:firefox": "TARGET=firefox ENTRY=popup vite build --config extension/vite.config.mts && TARGET=firefox ENTRY=background vite build --config extension/vite.config.mts",
+    "ext": "npm run ext:chrome && npm run ext:firefox",
+    "ext:safari": "npm run ext:chrome && node scripts/build-safari.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

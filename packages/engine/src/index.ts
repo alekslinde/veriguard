@@ -25,6 +25,9 @@ export type {
 
 export type { ScamType, CheckResult } from "./engineTypes";
 
+export { VERDICT_RANK, isWorse, worstBy } from "./verdictRank";
+export type { Verdict } from "./verdictRank";
+
 export { detectType } from "./detectType";
 
 export {
