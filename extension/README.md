@@ -116,6 +116,17 @@ The script zips from inside the target directory, from an explicit file list
 that excludes dotfiles, then re-reads the finished archive and fails if a hidden
 entry or a misplaced manifest survived.
 
+The root `Icon.png` is left out of both zips — it belongs to the Safari wrapper,
+which reads it from `dist/chrome/` as a directory, and no manifest references
+it. **`icons/icon-{16,48,128}.png` are not in that category**: `manifest.json`
+names all three, so dropping them fails upload validation. The script re-reads
+the packaged manifest and fails on any path it references that the archive does
+not contain.
+
+The store-listing icon, screenshots and promo tiles are a third thing again.
+They live in each store's dashboard, are never read from the package, and are
+always uploaded by hand — a build change cannot affect them.
+
 Run `npm run icons` before the first build. The icons are generated from
 `app/icon.svg` rather than committed, so a fresh clone has none — Chrome and
 Firefox warn and render a placeholder, but **the Safari build fails outright**,

@@ -33,6 +33,22 @@ const EXCLUDED = [
 ];
 
 /**
+ * Files present in the build but not part of a store package, by exact path.
+ *
+ * `Icon.png` is the Safari wrapper's app icon. No manifest references it —
+ * `build-safari.mjs` reads it out of `dist/chrome/` as a directory, never from
+ * an archive — so in a Chrome or AMO upload it is an unexplained image a
+ * reviewer has to account for and a user never sees.
+ *
+ * Note this is NOT true of `icons/icon-{16,48,128}.png`, which look similar and
+ * are not: `manifest.json` names all three, so omitting them fails upload
+ * validation against a manifest pointing at files the package does not contain.
+ * The store-listing icon and screenshots are a third thing again, entered in
+ * each dashboard by hand and never read from the package at all.
+ */
+const NOT_SHIPPED = new Set(["Icon.png"]);
+
+/**
  * Every file under `dir`, as paths relative to it, depth first.
  *
  * Built explicitly rather than handed to `zip -r` so that the exclusions are a
@@ -46,7 +62,7 @@ function collect(dir, prefix = "") {
     const abs = path.join(dir, name);
     const rel = prefix ? `${prefix}/${name}` : name;
     if (statSync(abs).isDirectory()) out.push(...collect(abs, rel));
-    else out.push(rel);
+    else if (!NOT_SHIPPED.has(rel)) out.push(rel);
   }
   return out;
 }
@@ -112,6 +128,34 @@ function verify(zipPath, target, expected) {
   if (missing.length > 0) {
     throw new Error(
       `${target}.zip is missing built files:\n` + missing.map((f) => `  ${f}`).join("\n"),
+    );
+  }
+
+  // Every path the manifest names must exist in the archive. A manifest
+  // referencing a file the package does not contain fails upload validation, and
+  // the store's error names the missing file rather than the reason it went
+  // missing — so the check belongs here, next to the exclusion lists that are
+  // the only way it can happen.
+  const manifest = JSON.parse(
+    execFileSync("unzip", ["-p", zipPath, "manifest.json"], { encoding: "utf8" }),
+  );
+  const referenced = [
+    ...Object.values(manifest.icons ?? {}),
+    ...Object.values(manifest.action?.default_icon ?? {}),
+    manifest.action?.default_popup,
+    manifest.background?.service_worker,
+    manifest.background?.scripts,
+  ]
+    .flat()
+    .filter((v) => typeof v === "string");
+
+  const dangling = referenced.filter((f) => !entries.includes(f));
+  if (dangling.length > 0) {
+    throw new Error(
+      `${target}.zip: manifest.json references files the package does not contain:\n` +
+        dangling.map((f) => `  ${f}`).join("\n") +
+        `\nEither the build did not emit them, or they are being excluded by ` +
+        `NOT_SHIPPED / EXCLUDED in this script.`,
     );
   }
 
