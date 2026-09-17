@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
 import path from "path";
 import { createRequire } from "module";
 
@@ -22,7 +22,15 @@ const pkg = JSON.parse(readFileSync(path.join(PKG_DIR, "package.json"), "utf8"))
 describe("engine package exports map", () => {
   it("is the only way in — no alias resolves around it", () => {
     // A path-based alias would defeat every other assertion here.
-    const vitestConfig = readFileSync(path.join(process.cwd(), "vitest.config.ts"), "utf8");
+    //
+    // Resolve the config by extension rather than naming one file: reading a
+    // fixed name would throw if it were renamed, and "the file we read is the
+    // config vitest loads" is the premise this assertion rests on. Finding
+    // none, or more than one, means that premise no longer holds.
+    const configs = readdirSync(process.cwd()).filter((f) => /^vitest\.config\.[cm]?[jt]s$/.test(f));
+    expect(configs, "expected exactly one vitest config at the repo root").toHaveLength(1);
+
+    const vitestConfig = readFileSync(path.join(process.cwd(), configs[0]), "utf8");
     expect(vitestConfig).not.toContain("packages/engine/src");
 
     const tsconfig = readFileSync(path.join(process.cwd(), "tsconfig.json"), "utf8");

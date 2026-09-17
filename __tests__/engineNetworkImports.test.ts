@@ -44,10 +44,9 @@ let project: ESLint;
 
 beforeAll(() => {
   const block = projectConfig.find(
-    (c): c is { rules: Record<string, unknown> } =>
-      Boolean(c && typeof c === "object" && "rules" in c && c.rules && "no-restricted-syntax" in c.rules),
+    (c) => Boolean(c && typeof c === "object" && "rules" in c && c.rules && "no-restricted-syntax" in c.rules),
   );
-  if (!block) throw new Error("eslint.config.mjs no longer carries a no-restricted-syntax block");
+  if (!block?.rules) throw new Error("eslint.config.mjs no longer carries a no-restricted-syntax block");
 
   rules = new ESLint({
     cwd: process.cwd(),
