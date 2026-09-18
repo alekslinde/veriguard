@@ -63,8 +63,14 @@ export function buildManifest(
     // Reads as the sentence a user sees in the store listing, not as a feature
     // list. The offline claim is the differentiator and is literally true for
     // the text check this ships with.
+    // Names no entry point on purpose. The right-click menu is the desktop way
+    // in, but no mobile surface has one — Firefox for Android implements no
+    // `menus` API, and the Safari build stays macOS-only for the same reason —
+    // so copy built on "right-click" is wrong the moment a mobile target ships.
+    // The popup works everywhere, so the sentence describes what the extension
+    // does rather than how you reach it.
     description:
-      "Right-click any suspicious message to check it for scam signals. Runs entirely on your device — nothing is sent anywhere.",
+      "Check a suspicious message, link, email or number for scam signals. Runs entirely on your device — nothing is sent anywhere.",
     version,
     permissions: [...PERMISSIONS],
     action: {

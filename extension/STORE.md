@@ -30,13 +30,21 @@ Chrome calls this the "short description" (132 char limit). AMO calls it the
 "summary" (250). One sentence works for both:
 
 ```
-Right-click any suspicious message to check it for scam signals. Runs entirely on your device — nothing is sent anywhere.
+Check a suspicious message, link, email or number for scam signals. Runs entirely on your device — nothing is sent anywhere.
 ```
 
-121 characters. Identical to the manifest's `description`, deliberately: the
+124 characters. Identical to the manifest's `description`, deliberately: the
 browser shows that string in the extensions list, and a listing that describes
 the extension differently from the extension itself is a discrepancy a reviewer
-will notice.
+will notice. A test pins the two together, so changing one means changing both.
+
+It names no entry point, which is also deliberate. The right-click menu is the
+desktop way in and the obvious thing to lead with, but no mobile surface has
+one — Firefox for Android implements no `menus` API, and the Safari build is
+macOS-only for the same reason. Copy built on "right-click" would be wrong the
+moment a mobile target ships, and this string is the hardest one to change,
+since it appears in the manifest, in three dashboards, and in the browser's own
+extensions list.
 
 ---
 
@@ -45,7 +53,7 @@ will notice.
 For Chrome's "Detailed description" and AMO's "About this extension".
 
 ```
-Paste a suspicious text, link, email or phone number — or select it on any page and right-click — and get an instant verdict explaining what's wrong with it.
+Paste a suspicious text, link, email or phone number — or, on desktop, select it on any page and right-click — and get an instant verdict explaining what's wrong with it.
 
 HOW IT'S DIFFERENT
 
@@ -73,7 +81,7 @@ It won't ask to read the pages you visit. No host permissions, no content script
 PERMISSIONS
 
 Two, both minimal:
-· contextMenus — adds the right-click entry
+· contextMenus — adds the right-click entry (desktop; Firefox for Android has no extension context menu, so there the toolbar button is the way in)
 · storage — remembers your region and caches the malicious-site list
 
 REPORTING
@@ -98,6 +106,16 @@ Australian-focused, with rule packs for the UK, US, Canada, Ireland and New Zeal
 - **AMO:** Privacy & Security
 - **Safari:** Utilities
 
+Platforms, since two of these differ from what a store's default assumes:
+
+- **Chrome, Edge, Firefox desktop, Safari** — the full experience, both entry
+  points.
+- **Firefox for Android** (142+) — popup only; that runtime implements no
+  `menus` API. Declared by `gecko_android` in the manifest.
+- **iOS Safari** — not shipped. The Safari build is `--macos-only`, because the
+  interaction model differs and it cannot be tested from this repo. Turning it
+  on is a product decision, not a build flag.
+
 ---
 
 ## Chrome Web Store: single purpose
@@ -109,6 +127,10 @@ justifications below.
 ```
 Veriguard checks text the user gives it — a message, link, email address or phone number — against a built-in set of scam-detection rules, and shows a verdict with the rules that matched and what each contributed to the score. That is the extension's only function. Text reaches it two ways, both user-initiated: pasted into the popup, or selected on a page and sent via the right-click menu. Scoring happens on the user's device.
 ```
+
+Chrome is a desktop target, so the right-click sentence is accurate there and
+worth keeping — it is the second entry point, and omitting it would make the
+`contextMenus` justification below read as unexplained.
 
 ---
 
@@ -188,6 +210,8 @@ The extension is unminified by design so it can be read directly.
 
 Build: `npm run ext:firefox` (Node 22+, `npm ci` first) → extension/dist/firefox
 
+The submitted archive is produced by `npm run ext:pack`, which zips that directory from inside it, so manifest.json is at the archive root and no editor or filesystem metadata is included. The extension is desktop-first: on Firefox for Android there is no menus API, so the toolbar popup is the only entry point and the context-menu code is skipped rather than failing.
+
 The privacy claim is that the extension makes exactly one network request — a GET of /api/blocklist with no query string and no body — and that no checked content is ever transmitted. It is enforced by tests that grep the built bundle: see __tests__/extensionBundle.test.ts, which fails if a second fetch appears, if the one call gains a query or body, or if any other network primitive (XMLHttpRequest, sendBeacon, WebSocket, EventSource) reaches the bundle.
 
 The manifest's content_security_policy restricts connect-src to one origin, so the browser enforces the same bound independently.
@@ -207,8 +231,10 @@ the sequence is the argument, so keep it:
 1. **A scam SMS, verdict likely_scam, evidence rows visible.** The core value,
    and the rows showing their weights are what distinguishes this from a
    black-box checker.
-2. **The right-click menu on selected text.** The primary entry point; not
-   obvious from the popup alone.
+2. **The right-click menu on selected text.** The desktop entry point; not
+   obvious from the popup alone. Shoot it on a desktop build — it does not
+   exist on Firefox for Android, and a screenshot of a menu the viewer's
+   browser cannot produce is worse than one fewer screenshot.
 3. **A limited-coverage or unchecked-shortener notice.** Shows the extension
    admitting a gap. This is the honesty the listing claims, made visible.
 4. **A clean verdict.** Demonstrates it is not a scaremonger, and that "looks
