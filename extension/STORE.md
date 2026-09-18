@@ -174,8 +174,7 @@ Verify a build against AMO's own linter before submitting, which catches this
 class of thing without spending a review cycle:
 
 ```bash
-npm run ext:firefox
-npx web-ext lint --source-dir extension/dist/firefox
+npm run ext:lint
 ```
 
 ---

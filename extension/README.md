@@ -7,7 +7,7 @@ Safari from one source.
 |---|---|---|
 | Chrome | `npm run ext:chrome` | Loads unpacked from `dist/chrome` |
 | Edge | `npm run ext:chrome` | **Same build as Chrome** — Chromium, MV3, no Chrome-only APIs and no Firefox-only manifest keys. A test asserts that stays true |
-| Firefox | `npm run ext:firefox` | `dist/firefox`; differs only in the background form and the `browser_specific_settings` block (gecko id, data declaration, version floors). Desktop 140+, Android 142+ |
+| Firefox | `npm run ext:firefox` | `dist/firefox`; differs only in the background form and the `browser_specific_settings` block (gecko id, data declaration, version floors). Desktop 140+, Android 142+ — on Android the toolbar popup is the only entry point, as that runtime has no `menus` API |
 | Safari | `npm run ext:safari` | Wraps `dist/chrome` in an Xcode project. Builds; needs a signing identity to run |
 
 *Last reviewed: 2026-09-18.*

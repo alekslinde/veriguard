@@ -144,10 +144,18 @@ export function buildManifest(
         // `data_collection_permissions` in 142 rather than 140.
         //
         // The floor is the only thing this key asserts. It does not claim the UI
-        // is adapted: the popup is a fixed 380px panel, and the entry point on
-        // desktop is a right-click menu that Android Firefox does not offer, so
-        // the toolbar button is the whole way in there. That is a real gap, and
-        // it is worth checking on a device before the listing leans on Android.
+        // is adapted: the popup is a fixed 380px panel, and the toolbar button
+        // is the whole way in on Android, because that runtime implements no
+        // `menus` API at all — not a degraded context menu, none.
+        //
+        // That absence is handled rather than assumed away. `browser.ts` guards
+        // both menu helpers, since they run at the top of the background script
+        // where a throw aborts module evaluation and takes every listener below
+        // it with it. `extensionBrowser.test.ts` pins that by importing the real
+        // background module against a runtime with no `contextMenus`.
+        //
+        // Still worth exercising on a device before the listing leans on
+        // Android: no crash is not the same as a good small-screen experience.
         gecko_android: { strict_min_version: "142.0" },
       },
     };
