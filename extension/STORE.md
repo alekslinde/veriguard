@@ -205,6 +205,40 @@ npm run ext:lint
 
 ---
 
+## AMO: source code submission
+
+AMO asks whether the extension is built with a generator, bundler, template
+engine or similar. **The answer is yes** — Vite bundles the popup and background
+entries — so every Firefox upload must be accompanied by source.
+
+What to upload: an archive of the repository at the tag or commit being
+submitted, **excluding `node_modules` and `dist/`**. `package-lock.json` must be
+in it; that is what lets a reviewer install the exact tool versions.
+
+The build instructions live in `extension/README.md` under *Reproducing the
+submitted bundle*, which is written for a reviewer rather than a contributor.
+Nothing needs to be written fresh at submission time.
+
+```bash
+git archive --format=zip -o veriguard-source.zip HEAD
+```
+
+`git archive` is the reliable way to produce this: it takes only tracked files,
+so `node_modules`, `dist/`, `local.db` and `.env.local` cannot be swept in by a
+stray glob, and it adds no macOS metadata.
+
+Two properties this submission depends on, both worth re-checking before upload
+rather than assuming:
+
+- **The build is reproducible.** A clean clone, `npm ci`, `npm run ext:firefox`
+  reproduces the uploaded bundle byte for byte. A reviewer diffs the two; if
+  they differ, the submission is rejected.
+- **The default env vars are the shipped ones.** `GECKO_ID` and `API_BASE` fall
+  back to production values, so a reviewer who sets nothing gets exactly the
+  submitted manifest.
+
+---
+
 ## AMO: notes for reviewers
 
 AMO reviews source, so tell them how to verify the central claim quickly.

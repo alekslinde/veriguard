@@ -156,6 +156,37 @@ gitignored.
 | `GECKO_ID` | `veriguard@veriguard.app` | Firefox add-on id; must stay stable across uploads or the add-on becomes a different add-on |
 | `API_BASE` | `https://veriguard.app` | Origin the blocklist is fetched from. Inlined into the bundle *and* into the manifest's `connect-src`, so the two cannot disagree |
 
+## Reproducing the submitted bundle
+
+AMO requires source whenever a build step generates what ships, which Vite does
+here. These are the instructions that accompany a source submission — written
+for a reviewer with the repository and nothing else.
+
+**Environment.** Node 22 or newer and the bundled npm; no other tooling, no
+global installs, no network access beyond the registry. Every build tool is an
+open-source dev dependency in `package-lock.json`. Any OS — nothing here is
+platform-specific, though `npm run ext:safari` additionally needs macOS and
+Xcode and is not part of a Firefox submission.
+
+```bash
+npm ci                  # exact versions from package-lock.json
+npm run ext:firefox     # → extension/dist/firefox
+```
+
+`dist/firefox` is then byte-for-byte what was uploaded. No environment variables
+need setting: the defaults in the table above are the shipped values, and they
+are baked in at build time rather than read at runtime.
+
+**The build is reproducible, and that is worth verifying rather than trusting.**
+Two builds from a clean clone produce identical output:
+
+```bash
+shasum -a 256 extension/dist/firefox/*.js extension/dist/firefox/manifest.json
+```
+
+Output is deliberately unminified, so the shipped files can be read directly
+and diffed against these sources without a source map.
+
 ## Safari
 
 Safari runs the same source, but cannot load an unpacked directory: it needs a
