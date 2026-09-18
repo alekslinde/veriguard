@@ -1,6 +1,6 @@
 {
   "name": "veriguard",
-  "version": "0.26.1",
+  "version": "0.26.2",
   "private": true,
   "workspaces": [
     "packages/*"
@@ -33,7 +33,8 @@
     "ext:chrome": "TARGET=chrome ENTRY=popup vite build --config extension/vite.config.mts && TARGET=chrome ENTRY=background vite build --config extension/vite.config.mts",
     "ext:firefox": "TARGET=firefox ENTRY=popup vite build --config extension/vite.config.mts && TARGET=firefox ENTRY=background vite build --config extension/vite.config.mts",
     "ext": "npm run ext:chrome && npm run ext:firefox",
-    "ext:safari": "npm run ext:chrome && node scripts/build-safari.mjs"
+    "ext:safari": "npm run ext:chrome && node scripts/build-safari.mjs",
+    "ext:pack": "npm run ext && node scripts/pack-extension.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
