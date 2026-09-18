@@ -205,6 +205,27 @@ describe("extension manifest", () => {
     expect(buildManifest("chrome", opts)).not.toHaveProperty("browser_specific_settings");
   });
 
+  it("declares to Firefox that it collects no data", () => {
+    // AMO requires this key on new add-ons and rejects a submission without it.
+    // More than a formality: `none` is the manifest saying the same thing as the
+    // description, the CSP and the store listings — nothing derived from what a
+    // user pastes leaves the device.
+    //
+    // `none` is exclusive by specification: it cannot appear alongside any other
+    // data type. So a change that started collecting something could not just
+    // add to this list, it would have to remove `none` — and Firefox would then
+    // prompt every existing user for data consent on update. That is why this is
+    // pinned exactly rather than merely checked for presence.
+    const firefox = buildManifest("firefox", opts) as {
+      browser_specific_settings: {
+        gecko: { data_collection_permissions: { required: string[] } };
+      };
+    };
+    const declared = firefox.browser_specific_settings.gecko.data_collection_permissions;
+    expect(declared).toEqual({ required: ["none"] });
+    expect(declared).not.toHaveProperty("optional");
+  });
+
   it("locks extension pages to their own scripts", () => {
     for (const target of ["chrome", "firefox"] as const) {
       const m = buildManifest(target, opts) as {

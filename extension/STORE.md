@@ -139,6 +139,32 @@ carries no query and no body, so nothing about the user is transmitted.
 
 ---
 
+## AMO: data collection declaration
+
+Firefox takes this disclosure in the **manifest** rather than a dashboard form,
+and AMO rejects a new add-on that omits it:
+
+> The "/browser_specific_settings/gecko/data_collection_permissions" property is
+> required for all new Firefox extensions.
+
+The build emits it, so there is nothing to fill in at submission time:
+
+```json
+"data_collection_permissions": { "required": ["none"] }
+```
+
+`none` means the add-on collects and transmits no data. It is exclusive by
+specification — it cannot be listed alongside any other data type — so it is the
+whole declaration, and it matches what the Chrome form above says by ticking
+nothing.
+
+Two consequences worth knowing before changing it. An add-on that has used these
+keys must keep using them in every later version. And because `none` is
+exclusive, starting to collect anything means *removing* `none`, which makes
+Firefox prompt every existing user for data consent on update.
+
+---
+
 ## AMO: notes for reviewers
 
 AMO reviews source, so tell them how to verify the central claim quickly.

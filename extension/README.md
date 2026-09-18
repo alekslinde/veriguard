@@ -7,10 +7,10 @@ Safari from one source.
 |---|---|---|
 | Chrome | `npm run ext:chrome` | Loads unpacked from `dist/chrome` |
 | Edge | `npm run ext:chrome` | **Same build as Chrome** — Chromium, MV3, no Chrome-only APIs and no Firefox-only manifest keys. A test asserts that stays true |
-| Firefox | `npm run ext:firefox` | `dist/firefox`; differs only in the background form and the gecko id |
+| Firefox | `npm run ext:firefox` | `dist/firefox`; differs only in the background form and the `browser_specific_settings` block (gecko id, data declaration) |
 | Safari | `npm run ext:safari` | Wraps `dist/chrome` in an Xcode project. Builds; needs a signing identity to run |
 
-*Last reviewed: 2026-09-17.*
+*Last reviewed: 2026-09-18.*
 
 ## What it does, and what it deliberately does not
 
@@ -33,6 +33,12 @@ network primitive turns up at all. The manifest's `connect-src` names a single
 origin, so the browser enforces the same bound. The test needs a build to check
 anything — it skips, visibly, when `dist/` is absent, so run `npm run ext`
 before trusting a green run.
+
+The Firefox manifest states the same thing in the form AMO reads:
+`data_collection_permissions: { required: ["none"] }` — no data collected or
+transmitted. That value is exclusive, so it cannot quietly gain an exception:
+collecting anything would mean removing it, and Firefox would prompt every
+existing user for consent on update.
 
 Consequences worth understanding before changing anything here:
 

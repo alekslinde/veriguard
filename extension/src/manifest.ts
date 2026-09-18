@@ -11,7 +11,8 @@
 //     pages remain the compatible choice, and this extension's background work
 //     is a context-menu listener, which an event page serves fine.
 //   · `browser_specific_settings` — Firefox requires an explicit add-on id to
-//     sign and to keep storage stable across updates. Chrome rejects the key
+//     sign and to keep storage stable across updates, and, for new add-ons, a
+//     `data_collection_permissions` declaration. Chrome rejects the key
 //     outright, so it cannot simply be left in both.
 //
 // Not varied, deliberately: permissions. Both browsers get the same, minimal
@@ -103,7 +104,30 @@ export function buildManifest(
       ...base,
       background: { scripts: ["background.js"] },
       browser_specific_settings: {
-        gecko: { id: geckoId, strict_min_version: "115.0" },
+        gecko: {
+          id: geckoId,
+          strict_min_version: "115.0",
+          // Required by AMO for new extensions since 2025-11-03; a submission
+          // without it is rejected outright.
+          //
+          // `none` is the declaration that the add-on collects and transmits no
+          // personal data. It is a special value: it cannot be combined with any
+          // other type, required or optional, which is precisely the claim here
+          // and the reason no other key is listed.
+          //
+          // This says the same thing as the description above, the CSP below and
+          // the store listings — the engine is bundled, so nothing derived from
+          // what a user pastes is sent anywhere. The single network call fetches
+          // the blocklist with an empty body and no query string, so it carries
+          // no user content. **A change that made that untrue would have to
+          // change this key**, and Firefox would then show the user a data
+          // consent prompt on update. That is the point of declaring it.
+          //
+          // Left off the Chrome variant: Chrome rejects unknown
+          // `browser_specific_settings` keys, and the equivalent disclosure
+          // there is the dashboard's data-use form, not the manifest.
+          data_collection_permissions: { required: ["none"] },
+        },
       },
     };
   }
