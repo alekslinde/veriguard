@@ -7,7 +7,7 @@ Safari from one source.
 |---|---|---|
 | Chrome | `npm run ext:chrome` | Loads unpacked from `dist/chrome` |
 | Edge | `npm run ext:chrome` | **Same build as Chrome** — Chromium, MV3, no Chrome-only APIs and no Firefox-only manifest keys. A test asserts that stays true |
-| Firefox | `npm run ext:firefox` | `dist/firefox`; differs only in the background form and the `browser_specific_settings` block (gecko id, data declaration) |
+| Firefox | `npm run ext:firefox` | `dist/firefox`; differs only in the background form and the `browser_specific_settings` block (gecko id, data declaration, version floors). Desktop 140+, Android 142+ — on Android the toolbar popup is the only entry point, as that runtime has no `menus` API |
 | Safari | `npm run ext:safari` | Wraps `dist/chrome` in an Xcode project. Builds; needs a signing identity to run |
 
 *Last reviewed: 2026-09-18.*
@@ -102,7 +102,13 @@ npm run ext:chrome   # → extension/dist/chrome
 npm run ext:firefox  # → extension/dist/firefox
 npm run ext:safari   # → extension/safari (Xcode project; needs Xcode)
 npm run ext:pack     # build both, then zip for submission
+npm run ext:lint     # check the Firefox build against AMO's own validator
 ```
+
+`ext:lint` runs `web-ext lint`, the same validator AMO runs on upload, so a
+manifest problem surfaces in seconds rather than after a submission is rejected.
+It is kept out of `ext:pack` on purpose: it fetches `web-ext` on demand, and the
+build otherwise needs no network at all.
 
 ## Packaging for the stores
 

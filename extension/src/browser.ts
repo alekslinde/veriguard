@@ -42,7 +42,12 @@ interface Tabs {
 
 interface ExtensionApi {
   storage: { local: StorageArea };
-  contextMenus: ContextMenus;
+  /**
+   * Optional because Firefox for Android does not implement `menus` at all —
+   * the type says so, so that a new call site has to decide what to do about it
+   * rather than inheriting a crash on a runtime the author never had in mind.
+   */
+  contextMenus?: ContextMenus;
   runtime: Runtime;
   tabs?: Tabs;
   action?: { openPopup?: () => Promise<void> };
@@ -168,7 +173,13 @@ export async function storageSet(key: string, value: unknown): Promise<void> {
  * (nothing to remove, on a first run) does not stop the create.
  */
 export function createContextMenu(id: string, title: string): void {
+  // Absent on Firefox for Android, which has no `menus` API. Returning here
+  // rather than letting the calls below throw into their own catches: they
+  // would survive it, but by accident, and a reader cannot tell a handled case
+  // from an unhandled one when the difference is which catch happens to fire.
   const menus = api().contextMenus;
+  if (!menus) return;
+
   const create = () => {
     try {
       menus.create({ id, title, contexts: ["selection"] }, () => {
@@ -226,9 +237,27 @@ export function openTab(url: string): void {
   }
 }
 
-/** Listen for clicks on our context-menu item. */
+/**
+ * Listen for clicks on our context-menu item.
+ *
+ * Guarded because the API is not everywhere. Firefox for Android has no `menus`
+ * at all, and this is the background script's **first statement** — an
+ * unguarded dereference there throws during module evaluation, which aborts the
+ * rest of the module, so everything registered below it silently never happens.
+ * That is the same failure `createContextMenu` above is written to avoid, and
+ * the reason both are defensive rather than only the one that is known to throw.
+ *
+ * Absent API is a no-op, not an error: on a runtime with no context menu there
+ * is no click to hear about, and the toolbar popup is unaffected. Returning
+ * quietly is what keeps the popup working on a surface where the menu cannot.
+ */
 export function onContextMenuClicked(
   cb: (info: { menuItemId: string; selectionText?: string }) => void,
 ): void {
-  api().contextMenus.onClicked.addListener(cb);
+  try {
+    api().contextMenus?.onClicked?.addListener(cb);
+  } catch {
+    // No context-menu API on this runtime. Nothing to listen to, and nothing
+    // the caller can do about it.
+  }
 }

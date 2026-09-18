@@ -268,3 +268,40 @@ describe("createContextMenu is idempotent", () => {
     expect(reads.length).toBeGreaterThan(0);
   });
 });
+
+describe("a runtime with no context-menu API", () => {
+  // Firefox for Android implements no `menus` API at all, and the manifest now
+  // opts the add-on into that surface. Both helpers run at the top of the
+  // background script, where a throw does not merely fail — it aborts module
+  // evaluation, so every listener registered below never binds and the failure
+  // is silence rather than an error.
+  //
+  // The popup is the entire UI there, so "no menu" has to mean "no menu",
+  // not "no extension".
+  const androidApi = () => {
+    const api = baseApi();
+    delete api.contextMenus;
+    return api;
+  };
+
+  it("registers no click listener rather than throwing", async () => {
+    install(androidApi());
+    const { onContextMenuClicked } = await import("../extension/src/browser");
+    expect(() => onContextMenuClicked(() => {})).not.toThrow();
+  });
+
+  it("skips menu creation rather than throwing", async () => {
+    install(androidApi());
+    const { createContextMenu } = await import("../extension/src/browser");
+    expect(() => createContextMenu("id", "Title")).not.toThrow();
+  });
+
+  it("lets the background script finish evaluating", async () => {
+    // The regression that matters: not that either call throws, but that a
+    // throw from one stops everything after it. Importing the real background
+    // module on an Android-shaped runtime is the only way to assert that the
+    // module completes, since what would break is code this test never names.
+    install(androidApi());
+    await expect(import("../extension/src/background")).resolves.toBeDefined();
+  });
+});
