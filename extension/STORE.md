@@ -94,7 +94,11 @@ The detection rules are public, because obscuring a keyword list wouldn't stop a
 
 github.com/alekslinde/veriguard
 
-Australian-focused, with rule packs for the UK, US, Canada, Ireland and New Zealand.
+REGIONS
+
+Scam patterns are local — the brands impersonated, the number formats, the agencies named. Veriguard ships rule packs for 27 countries across Europe, Asia, Africa, the Americas and Oceania, with the deepest coverage for Australia.
+
+Anywhere else still works: the universal checks — lookalike domains, shorteners, tracking parameters, known malicious hosts, requests for personal details — run everywhere, and the verdict tells you when regional rules for your country aren't there yet rather than quietly scoring you as safe.
 ```
 
 ---

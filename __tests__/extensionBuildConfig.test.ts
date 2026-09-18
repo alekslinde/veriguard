@@ -13,6 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { supportedRegions, FALLBACK_REGION } from "@veriguard/engine/regions";
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(path.join(ROOT, p), "utf8");
@@ -93,6 +94,26 @@ describe("extension build config is native-loader safe", () => {
     // Chrome's short-description limit, checked here rather than discovered on
     // upload.
     expect(described!.length).toBeLessThanOrEqual(132);
+  });
+
+  it("counts the regions the listing claims", () => {
+    // The listing names a number of rule packs, and a store description is
+    // read far more often than it is edited — so the number is the claim most
+    // likely to rot, and the least likely to be noticed rotting. Adding a
+    // region pack should fail here, which is the reminder to update the copy.
+    //
+    // `ZZ` is excluded on both sides: it is the base-only fallback for
+    // countries with no national layer, not a country, and the listing counts
+    // it separately by saying everywhere else still works.
+    const named = supportedRegions().filter((code) => code !== FALLBACK_REGION);
+    const listing = read("extension/STORE.md");
+
+    const claimed = /rule packs for (\d+) countries/.exec(listing)?.[1];
+    expect(claimed, "STORE.md no longer states a region count").toBeTypeOf("string");
+    expect(
+      Number(claimed),
+      `STORE.md claims ${claimed} regions, the engine ships ${named.length}`,
+    ).toBe(named.length);
   });
 
   it("points the stores at a privacy policy that exists", () => {
