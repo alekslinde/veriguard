@@ -106,7 +106,18 @@ export function buildManifest(
       browser_specific_settings: {
         gecko: {
           id: geckoId,
-          strict_min_version: "115.0",
+          // 140 because that is where `data_collection_permissions` below was
+          // introduced. Declaring an older floor is not a runtime problem —
+          // Firefox ignores manifest keys it does not know — but AMO's linter
+          // cross-checks the floor against each key's introduction version and
+          // warns on every submission, and a warning nobody can action is one
+          // that trains people to skim the list that also carries real errors.
+          //
+          // The floor costs nothing real: it was 115, whose ESR reached
+          // end-of-life in March 2026. Every Firefox still receiving security
+          // updates is 140 or newer, so this excludes no one who is not already
+          // running an unpatched browser.
+          strict_min_version: "140.0",
           // Required by AMO for new extensions since 2025-11-03; a submission
           // without it is rejected outright.
           //
@@ -128,6 +139,16 @@ export function buildManifest(
           // there is the dashboard's data-use form, not the manifest.
           data_collection_permissions: { required: ["none"] },
         },
+        // Opts the add-on into Firefox for Android — without this key it is not
+        // offered there at all — with its own floor, because Android gained
+        // `data_collection_permissions` in 142 rather than 140.
+        //
+        // The floor is the only thing this key asserts. It does not claim the UI
+        // is adapted: the popup is a fixed 380px panel, and the entry point on
+        // desktop is a right-click menu that Android Firefox does not offer, so
+        // the toolbar button is the whole way in there. That is a real gap, and
+        // it is worth checking on a device before the listing leans on Android.
+        gecko_android: { strict_min_version: "142.0" },
       },
     };
   }

@@ -163,6 +163,21 @@ keys must keep using them in every later version. And because `none` is
 exclusive, starting to collect anything means *removing* `none`, which makes
 Firefox prompt every existing user for data consent on update.
 
+The key also sets the minimum versions: it arrived in Firefox 140 on desktop and
+142 on Android, and AMO warns per key when `strict_min_version` predates the keys
+declared alongside it. Hence `gecko.strict_min_version: "140.0"` and
+`gecko_android.strict_min_version: "142.0"`. This costs no real users — ESR 115
+went end-of-life in March 2026, so everything still receiving security updates is
+past both floors.
+
+Verify a build against AMO's own linter before submitting, which catches this
+class of thing without spending a review cycle:
+
+```bash
+npm run ext:firefox
+npx web-ext lint --source-dir extension/dist/firefox
+```
+
 ---
 
 ## AMO: notes for reviewers

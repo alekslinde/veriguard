@@ -226,6 +226,26 @@ describe("extension manifest", () => {
     expect(declared).not.toHaveProperty("optional");
   });
 
+  it("sets a minimum version that actually supports the keys it declares", () => {
+    // AMO's linter compares `strict_min_version` against the version each
+    // manifest key was introduced in, and warns per key when the floor is older.
+    // `data_collection_permissions` landed in Firefox 140 on desktop and 142 on
+    // Android, which is the only reason these particular numbers are here — so
+    // they are asserted next to the key that forces them.
+    //
+    // Nothing is lost by the floor: Firefox ESR 115 went end-of-life in March
+    // 2026, so every version still receiving security updates is well past both.
+    const firefox = buildManifest("firefox", opts) as {
+      browser_specific_settings: {
+        gecko: { strict_min_version: string };
+        gecko_android: { strict_min_version: string };
+      };
+    };
+    const { gecko, gecko_android } = firefox.browser_specific_settings;
+    expect(Number.parseFloat(gecko.strict_min_version)).toBeGreaterThanOrEqual(140);
+    expect(Number.parseFloat(gecko_android.strict_min_version)).toBeGreaterThanOrEqual(142);
+  });
+
   it("locks extension pages to their own scripts", () => {
     for (const target of ["chrome", "firefox"] as const) {
       const m = buildManifest(target, opts) as {
