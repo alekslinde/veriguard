@@ -60,19 +60,25 @@ const nextConfig: NextConfig = {
   // Next.js file tracing can detect statically, so both must be declared here
   // or Vercel omits them from the function bundle:
   //   1. eng.traineddata.gz  — language data (process.cwd()/public/tessdata)
-  //   2. tesseract-core-lstm.wasm — the WASM core, readFileSync'd by the JS
-  //      shim at runtime (the .js shim IS traced, the .wasm binary is not).
+  //   2. the LSTM WASM cores — readFileSync'd by their JS shim at runtime (the
+  //      .js shim IS traced, the .wasm binary is not).
   // Without the .wasm file the worker fails to initialise; the failure is
   // otherwise silent and the request hangs until the client aborts.
   //
-  // Only the one core variant app/api/ocr/route.ts pins via corePath is
-  // listed — the glob this used to be (./node_modules/tesseract.js-core/*.wasm)
-  // bundled all six variants tesseract.js ships (~18 MB) into every
-  // deployment of this function, when only one is ever loaded at runtime.
+  // All three LSTM builds ship because the runtime picks one by feature
+  // detection — relaxed SIMD, then SIMD, then neither — and that choice belongs
+  // to the machine the function lands on, not to us. Listing a single build was
+  // what broke this route in production: it resolved a relaxed-SIMD core that
+  // the deployment had never included. The non-LSTM halves stay out because the
+  // route creates its worker with OEM 1 (LSTM-only), which is what makes this a
+  // safe narrowing rather than another guess — change that argument and these
+  // three stop being the reachable set. ~8.8 MB, against ~18 MB for all six.
   outputFileTracingIncludes: {
     "/api/ocr": [
       "./public/tessdata/**/*",
       "./node_modules/tesseract.js-core/tesseract-core-lstm.wasm",
+      "./node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm",
+      "./node_modules/tesseract.js-core/tesseract-core-relaxedsimd-lstm.wasm",
       // Added back after the blanket exclude above strips it from every route.
       "./node_modules/sharp/**",
       "./node_modules/@img/**",
