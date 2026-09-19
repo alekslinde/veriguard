@@ -170,7 +170,12 @@ test("a reply rejected by Cloudflare is reported and not counted", async () => {
 
   await handler.email(fakeMessage({ replyThrows: true }) as never, ENV);
 
-  assert.match(logs.find((l) => l.level === "warn")!.text, /reply rejected/i);
+  const warned = logs.find((l) => l.level === "warn")!.text;
+  assert.match(warned, /reply refused/i);
+  // The platform's own wording has to survive: it distinguishes a DMARC
+  // failure from "not repliable" from a spent reply limit, and naming one of
+  // those ourselves sent an earlier investigation after the wrong cause.
+  assert.match(warned, /DMARC failure/);
   assert.equal(confirmed, false, "a rejected reply must not be counted as delivered");
 });
 
