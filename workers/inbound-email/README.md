@@ -195,6 +195,27 @@ costs nothing.
 > up: replies show as **"dropped"** in the Email Routing summary even when
 > delivered — that's expected, not a failure.)
 
+### Two authentications, two jobs
+
+A forward carries two things that authenticate separately, and conflating them
+is the mistake this section exists to prevent.
+
+| | What it answers | What it gates |
+| --- | --- | --- |
+| **The forward** (outer) | Did this person really send us this? | Whether a reply is possible |
+| **The forwarded mail** (inner) | Did the mail they are asking about authenticate? | **Nothing.** It is a scam signal |
+
+The inner result is *evidence*, and it is scored as evidence — a message
+claiming to be from a bank that fails DMARC is exactly what this product exists
+to catch. It is parsed in the engine (`emailHeaders.ts`) and contributes to the
+verdict there.
+
+**It must never gate anything in this Worker.** Every forward is analysed and
+answered on its merits, whatever the mail inside it authenticates as. A rule
+that withheld verdicts from unauthenticated mail would withhold them precisely
+from the mail most worth checking, and the user would get silence — which reads
+as "probably fine", the worst answer this product can give.
+
 ### When NO reply is sent
 
 `message.reply()` is allowed only when every one of the platform's documented
@@ -203,18 +224,19 @@ the sending domain matches the receiving domain, and one reply per event — and
 the Worker satisfies those identically for every message, so they never explain
 a refusal in production. Two are properties of the forward itself:
 
-- **The incoming forward must have a valid DMARC result** — and a forward
-  carries more than one identity to judge. The forwarder's own send is
-  typically fine; the message they forwarded is not, because scam mail comes
-  from domains that publish no DMARC policy. That arrives as a second set of
-  verdicts reading `dmarc=none spf=none`, and `none` is the absence of a
-  policy, not a pass. Observed: a forward logging
-  `[dkim=pass spf=pass dmarc=pass] [spf=none dmarc=none]` was refused, while
-  forwards from the same provider carrying one all-pass set were answered.
-  **This is a property of the mail being forwarded, not of the person
-  forwarding it** — which is why the same sender can succeed and fail on
-  different messages, and why it cannot be fixed by anything in this
-  directory.
+- **The incoming forward must have a valid DMARC result.** This is about the
+  forward itself — whether the person forwarding really sent it — and nothing
+  else. It is **not** a judgement on the mail they forwarded.
+
+  > An earlier version of this section claimed the opposite: that a forward of
+  > unauthenticated mail was refused because the forwarded message carried
+  > `dmarc=none`. That was wrong and is recorded here because it was wrong in a
+  > costly direction. It was disproved twice over — forwards that were
+  > **answered** carried the same `dmarc=none spf=none` tokens as forwards that
+  > were refused, and forwarding an airline notice and a bank notice (both from
+  > domains publishing DMARC) produced verdicts byte-identical to forwarding a
+  > scam email. Those tokens describe how the forwarding provider relays; they
+  > say nothing about the mail being checked.
 - **The incoming forward must carry no more than 100 `References` entries.**
   Each hop adds one, so mail that has been passed around a group before reaching
   us accumulates them — which is exactly the mail this flow is built for. The
