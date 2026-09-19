@@ -29,7 +29,9 @@ const ENV = {
 };
 
 /** A forward the Worker can read: a real stream, a sender, a Message-ID. */
-function fakeMessage(overrides: { replyThrows?: boolean; references?: string } = {}) {
+function fakeMessage(
+  overrides: { replyThrows?: boolean; references?: string; authResults?: string } = {},
+) {
   const replies: unknown[] = [];
   return {
     from: "forwarder@gmail.com",
@@ -37,6 +39,7 @@ function fakeMessage(overrides: { replyThrows?: boolean; references?: string } =
     headers: new Headers({
       "Message-ID": "<orig@gmail.com>",
       ...(overrides.references ? { References: overrides.references } : {}),
+      ...(overrides.authResults ? { "Authentication-Results": overrides.authResults } : {}),
     }),
     raw: new ReadableStream({
       start(c) {
@@ -265,60 +268,70 @@ test("an oversized forward is reported rather than dropped in silence", async ()
   assert.match(logs.find((l) => l.level === "warn")!.text, /unreadable or over/i);
 });
 
-// TEMPORARY — covers the minimal-reply probe's wiring. Remove with the probe.
+// A reply is refused unless the incoming forward has a valid DMARC result, and
+// the refusal names no cause. The verdict the receiving MTA recorded is the one
+// thing a log can say about that condition — but the header it comes from also
+// names the sending host and envelope addresses, which belong to whoever the
+// forward passed through and answer nothing a verdict does not.
 
-test("the probe is off unless MINIMAL_REPLY_PROBE is exactly \"1\"", async () => {
-  // A diagnostic that switches on loosely would quietly change production
-  // behaviour for anyone who set it to "true" or "0" meaning to disable it.
-  stubFetch((_url, init) => {
-    if (JSON.parse(String(init.body)).delivered) return new Response("{}", { status: 200 });
-    return new Response(
-      JSON.stringify({ ok: true, reply: { subject: "s", text: "t", html: "<p>h</p>" } }),
-      { status: 200 },
-    );
-  });
+const okReply = (_url: string, init: RequestInit) => {
+  if (JSON.parse(String(init.body)).delivered) return new Response("{}", { status: 200 });
+  return new Response(
+    JSON.stringify({ ok: true, reply: { subject: "s", text: "t", html: "<p>h</p>" } }),
+    { status: 200 },
+  );
+};
 
-  for (const value of [undefined, "", "0", "true", "yes"]) {
-    infoLogs = [];
-    await handler.email(fakeMessage() as never, { ...ENV, MINIMAL_REPLY_PROBE: value } as never);
-    assert.ok(
-      !infoLogs.some((l) => /MINIMAL_REPLY_PROBE active/.test(l)),
-      `probe must stay off for ${JSON.stringify(value)}`,
-    );
-  }
+test("records the authentication verdicts on every forward", async () => {
+  stubFetch(okReply);
+  await handler.email(
+    fakeMessage({ authResults: "mx.veriguard.app; dmarc=pass header.from=gmail.com; spf=pass" }) as never,
+    ENV,
+  );
+  assert.ok(infoLogs.some((l) => /auth: .*dmarc=pass/.test(l)));
 });
 
-test("the probe announces itself when active, so a log is never misread", async () => {
-  stubFetch((_url, init) => {
-    if (JSON.parse(String(init.body)).delivered) return new Response("{}", { status: 200 });
-    return new Response(
-      JSON.stringify({ ok: true, reply: { subject: "s", text: "t", html: "<p>h</p>" } }),
-      { status: 200 },
-    );
-  });
-
-  const msg = fakeMessage();
-  await handler.email(msg as never, { ...ENV, MINIMAL_REPLY_PROBE: "1" } as never);
-
-  assert.ok(infoLogs.some((l) => /MINIMAL_REPLY_PROBE active/.test(l)));
-  assert.equal(msg.replies.length, 1, "the probe still sends a reply");
+test("records a failing verdict, which is what a refusal is read against", async () => {
+  stubFetch(okReply);
+  await handler.email(fakeMessage({ authResults: "mx.veriguard.app; dmarc=fail; spf=softfail" }) as never, ENV);
+  const line = infoLogs.find((l) => /auth:/.test(l))!;
+  assert.match(line, /dmarc=fail/);
+  assert.match(line, /spf=softfail/);
 });
 
-test("a refusal records which reply shape was refused", async () => {
-  // The probe's whole purpose is comparing a refusal under it against one
-  // without, so the log has to say which is which.
-  stubFetch((_url, init) => {
-    if (JSON.parse(String(init.body)).delivered) return new Response("{}", { status: 200 });
-    return new Response(
-      JSON.stringify({ ok: true, reply: { subject: "s", text: "t", html: "<p>h</p>" } }),
-      { status: 200 },
-    );
-  });
+test("says so plainly when no verdict was recorded", async () => {
+  // Distinguishable from "recorded, and it passed" — the absence is itself a
+  // finding when a forward is refused.
+  stubFetch(okReply);
+  await handler.email(fakeMessage() as never, ENV);
+  assert.ok(infoLogs.some((l) => /auth: none recorded/.test(l)));
+});
 
-  await handler.email(fakeMessage({ replyThrows: true }) as never, { ...ENV, MINIMAL_REPLY_PROBE: "1" } as never);
-  assert.match(logs.find((l) => l.level === "warn")!.text, /reply: minimal probe/);
+test("keeps the correspondent's host and addresses out of the log", async () => {
+  stubFetch(okReply);
+  await handler.email(
+    fakeMessage({
+      authResults:
+        "mx.veriguard.app; dmarc=pass header.from=example.test; " +
+        "spf=pass smtp.mailfrom=someone@private.test; dkim=pass header.d=private.test",
+    }) as never,
+    ENV,
+  );
+  const everything = [...infoLogs, ...logs.map((l) => l.text)].join(" ");
+  assert.ok(!everything.includes("private.test"), "signature and envelope domains must not be logged");
+  assert.ok(!everything.includes("someone@"), "envelope addresses must not be logged");
+  assert.match(everything, /dmarc=pass/);
+});
 
-  logs = [];
-  await handler.email(fakeMessage({ replyThrows: true }) as never, ENV);
-  assert.match(logs.find((l) => l.level === "warn")!.text, /reply: full/);
+test("a refusal carries both measured conditions", async () => {
+  // The refusal is only readable against the same figures from forwards that
+  // succeeded, so it has to carry them itself.
+  stubFetch(okReply);
+  await handler.email(
+    fakeMessage({ replyThrows: true, authResults: "mx.veriguard.app; dmarc=fail" }) as never,
+    ENV,
+  );
+  const warned = logs.find((l) => l.level === "warn")!.text;
+  assert.match(warned, /References entries: \d+/);
+  assert.match(warned, /auth: .*dmarc=fail/);
 });
