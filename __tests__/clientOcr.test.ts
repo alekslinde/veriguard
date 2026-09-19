@@ -93,12 +93,31 @@ describe("OCR asset wiring — the paths clientOcr requests must exist", () => {
     expect(existsSync(path.join(process.cwd(), "public", workerPath))).toBe(true);
   });
 
-  it("serves the WASM core from our own origin", () => {
+  it("serves every core variant the browser can ask for", () => {
+    // Not a fixed list of names. The browser worker chooses a core by probing
+    // relaxed SIMD, then SIMD, then neither, each with an LSTM and a non-LSTM
+    // build, and loads that name with no fallback — so the set it may request
+    // is what has to be on disk. Reading the names out of tesseract.js's own
+    // resolver keeps this honest: an earlier version of this test asserted two
+    // names by hand, they went stale when the core package was upgraded, and
+    // the test kept passing because those files still existed for other
+    // reasons while the ones browsers actually fetch were never copied.
+    const resolver = readFileSync(
+      path.join(process.cwd(), "node_modules/tesseract.js/src/worker-script/browser/getCore.js"),
+      "utf8",
+    );
+    const wanted = [...resolver.matchAll(/\/(tesseract-core[a-z-]*\.wasm\.js)`/g)].map((m) => m[1]);
+
+    // Guard the extraction itself — a resolver rewrite that matches nothing
+    // would otherwise make this assert against an empty list and pass.
+    expect(wanted.length).toBe(6);
+
     const corePath = constant("CORE_PATH");
     expect(corePath.startsWith("/")).toBe(true);
     const dir = path.join(process.cwd(), "public", corePath);
-    expect(existsSync(path.join(dir, "tesseract-core-simd.wasm"))).toBe(true);
-    expect(existsSync(path.join(dir, "tesseract-core.wasm"))).toBe(true);
+    for (const name of wanted) {
+      expect(existsSync(path.join(dir, name)), `${name} missing from public${corePath}`).toBe(true);
+    }
   });
 
   it("points at the committed gzipped language data", () => {
