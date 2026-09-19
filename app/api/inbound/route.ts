@@ -158,7 +158,12 @@ export async function POST(req: NextRequest) {
     // lower-fidelity inline quote. The raw email is now out of scope and
     // discarded with this request.
     return NextResponse.json({ ok: true, source, reply });
-  } catch {
+  } catch (err) {
+    // Still a 200 — never bounce mail back to a possibly-spoofed sender — but
+    // not silent. Analysis throwing means this forward produced no verdict for
+    // someone who asked for one, and the `analysed` counter above has already
+    // counted it, so without this line the failure leaves no trace at all.
+    console.error("inbound analysis failed:", err);
     // Never bounce — acknowledge and send nothing.
     return NextResponse.json({ ok: true, skip: "analysis-error" });
   }

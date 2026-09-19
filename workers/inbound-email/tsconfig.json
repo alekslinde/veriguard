@@ -7,7 +7,12 @@
     "types": ["@cloudflare/workers-types"],
     "strict": true,
     "noEmit": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    // src/ imports with explicit .ts extensions so bare Node can resolve them
+    // in the tests; nothing here emits, and wrangler rewrites them at build.
+    "allowImportingTsExtensions": true
   },
+  // src only. The tests run on node:test and would pull in @types/node, a dep
+  // this Worker otherwise does not need; `npm test` is what checks them.
   "include": ["src/**/*.ts"]
 }
