@@ -30,7 +30,12 @@ const ENV = {
 
 /** A forward the Worker can read: a real stream, a sender, a Message-ID. */
 function fakeMessage(
-  overrides: { replyThrows?: boolean; references?: string; authResults?: string[] } = {},
+  overrides: {
+    replyThrows?: boolean;
+    references?: string;
+    authResults?: string[];
+    envelope?: Record<string, string>;
+  } = {},
 ) {
   const replies: unknown[] = [];
   return {
@@ -47,6 +52,7 @@ function fakeMessage(
       for (const value of overrides.authResults ?? []) {
         h.append("Authentication-Results", value);
       }
+      for (const [k, v] of Object.entries(overrides.envelope ?? {})) h.set(k, v);
       return h;
     })(),
     raw: new ReadableStream({
@@ -383,4 +389,87 @@ test("a refusal carries both measured conditions", async () => {
   const warned = logs.find((l) => l.level === "warn")!.text;
   assert.match(warned, /References entries: \d+/);
   assert.match(warned, /auth: .*dmarc=fail/);
+});
+
+// Two accounts are answered on every forward and two are refused on every
+// forward, whatever they send — and content, size, chain length and
+// authentication have each been ruled out by coming back identical on both
+// sides. The envelope is where a difference between two plain accounts can
+// still hide, so its shape is recorded. Shape only: the addresses themselves
+// would put the forwarder's correspondents in a log to answer a question about
+// our own configuration.
+
+test("records the envelope's shape on every forward", async () => {
+  stubFetch(okReply);
+  await handler.email(
+    fakeMessage({
+      envelope: { From: "Anna <forwarder@gmail.com>", "Return-Path": "<forwarder@gmail.com>" },
+    }) as never,
+    ENV,
+  );
+  const line = infoLogs.find((l) => /envelope:/.test(l))!;
+  assert.match(line, /from=name\+addr/);
+  assert.match(line, /envelope=matches-from/);
+  assert.match(line, /replyto=absent/);
+});
+
+test("distinguishes the shapes that could differ between two accounts", async () => {
+  stubFetch(okReply);
+  await handler.email(
+    fakeMessage({
+      envelope: {
+        From: "forwarder@gmail.com",
+        "Reply-To": "somewhere@else.test",
+        "Return-Path": "<bounce@relay.test>",
+        Sender: "list@group.test",
+      },
+    }) as never,
+    ENV,
+  );
+  const line = infoLogs.find((l) => /envelope:/.test(l))!;
+  assert.match(line, /from=addr-only/);
+  assert.match(line, /replyto=differs/);
+  assert.match(line, /envelope=differs-from/);
+  assert.match(line, /sender-hdr=present/);
+});
+
+test("the envelope shape carries no addresses", async () => {
+  stubFetch(okReply);
+  await handler.email(
+    fakeMessage({
+      envelope: {
+        From: "Someone <private@correspondent.test>",
+        "Reply-To": "secret@elsewhere.test",
+        "Return-Path": "<bounce@relay.test>",
+        Sender: "list@group.test",
+      },
+    }) as never,
+    ENV,
+  );
+  const everything = [...infoLogs, ...logs.map((l) => l.text)].join(" ");
+  for (const leak of ["correspondent.test", "elsewhere.test", "relay.test", "group.test", "private@", "secret@"]) {
+    assert.ok(!everything.includes(leak), `${leak} must not appear in any log line`);
+  }
+  assert.match(everything, /envelope: from=/);
+});
+
+test("a refusal carries the envelope shape too", async () => {
+  stubFetch(okReply);
+  await handler.email(
+    fakeMessage({ replyThrows: true, envelope: { From: "forwarder@gmail.com" } }) as never,
+    ENV,
+  );
+  const warned = logs.find((l) => l.level === "warn")!.text;
+  assert.match(warned, /envelope: from=addr-only/);
+});
+
+test("a forward with no envelope headers reports them absent, not missing", async () => {
+  // Distinguishable from "present and matching" — an absence is itself a
+  // difference when two accounts are being compared.
+  stubFetch(okReply);
+  await handler.email(fakeMessage() as never, ENV);
+  const line = infoLogs.find((l) => /envelope:/.test(l))!;
+  assert.match(line, /from=absent/);
+  assert.match(line, /envelope=absent/);
+  assert.match(line, /sender-hdr=absent/);
 });
