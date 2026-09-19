@@ -14,17 +14,35 @@
 import { EmailMessage } from "cloudflare:email";
 // Extension-ful: wrangler resolves either, but bare Node (which runs this
 // Worker's tests) only resolves the explicit form.
-import { buildReplyMime, buildMinimalReplyMime } from "./reply.ts";
+import { buildReplyMime } from "./reply.ts";
 
 export interface Env {
   // Set via `wrangler secret put` — must match the Next app's INBOUND_SECRET.
   INBOUND_SECRET: string;
   // Full URL of the Next webhook, e.g. https://veriguard.app/api/inbound
   INBOUND_WEBHOOK_URL: string;
-  // TEMPORARY diagnostic. "1" replies with the barest MIME the platform will
-  // take, to tell a fault in what we build from a fault in configuration. See
-  // buildMinimalReplyMime. Unset in normal operation; remove with the probe.
-  MINIMAL_REPLY_PROBE?: string;
+}
+
+/**
+ * The authentication verdicts the receiving MTA recorded on the forward, as
+ * bare tokens: "dmarc=pass spf=pass".
+ *
+ * A reply is refused unless the incoming message has a valid DMARC result, and
+ * the refusal names no cause, so this is the one condition a log can speak to
+ * that the error will not. It is read from the header the receiving MTA wrote,
+ * not computed here.
+ *
+ * Only the mechanism=result pairs are kept. The full header also carries the
+ * sending host, envelope addresses and signature domains — a correspondent's
+ * details, which answer nothing a verdict does not and do not belong in a log.
+ */
+function authSummary(headers: Headers): string {
+  const raw = headers.get("Authentication-Results");
+  if (!raw) return "none recorded";
+  const verdicts = raw
+    .toLowerCase()
+    .match(/\b(?:dmarc|spf|dkim|compauth)=(?:pass|fail|none|neutral|softfail|temperror|permerror|bestguesspass)\b/g);
+  return verdicts?.length ? [...new Set(verdicts)].join(" ") : "none recorded";
 }
 
 const MAX_RAW_BYTES = 1_000_000; // drop anything larger before calling the API
@@ -114,38 +132,29 @@ const handler = {
     const inboundReferences = message.headers.get("References");
 
     // The platform refuses a reply for several distinct reasons behind one error
-    // string, and the refusal itself names none of them. Of those reasons, all
-    // but two are structural — they hold identically for every message this
-    // handler builds — so the two that vary per message are what a refusal is
-    // actually reporting: the forward's own authentication result, and the
-    // length of its References chain (bounded to guard against reply loops).
-    // The chain length is knowable here and the authentication result is not,
-    // so log it on every message: a refusal is only diagnosable against a count
-    // from a forward that succeeded, which means recording it before knowing
-    // which this is. Counting entries rather than logging the header keeps
-    // correspondents' message IDs out of the log.
+    // string, and the refusal names none of them. Of those reasons, all but two
+    // are structural — they hold identically for every message this handler
+    // builds — so the two that vary per forward are what a refusal is actually
+    // reporting: the forward's own authentication result, and the length of its
+    // References chain. Both are recorded on every forward, refused or not: a
+    // refusal is only readable against the same two numbers from forwards that
+    // succeeded, which means recording them before knowing which this is.
+    //
+    // Entries are counted and verdicts reduced to bare tokens, so neither line
+    // carries a correspondent's message IDs or sending host.
     const referenceCount = inboundReferences ? inboundReferences.trim().split(/\s+/).length : 0;
-    console.log(`inbound References entries: ${referenceCount}`);
-
-    // TEMPORARY diagnostic — see buildMinimalReplyMime. Logged on the way past
-    // so a run under the probe is never mistaken for ordinary behaviour when
-    // the log is read back later.
-    const probing = env.MINIMAL_REPLY_PROBE === "1";
-    if (probing) {
-      console.log("MINIMAL_REPLY_PROBE active — replying with the barest MIME, threading omitted");
-    }
+    const auth = authSummary(message.headers);
+    console.log(`inbound References entries: ${referenceCount}, auth: ${auth}`);
 
     // Build a reply addressed back to the forwarder. message.reply() restricts
     // the recipient to the original sender, so this can't be redirected; the
     // From is the receiving address so Cloudflare DKIM-signs it for that domain.
-    const mime = probing
-      ? buildMinimalReplyMime(data.reply, { from: message.to, to: message.from })
-      : buildReplyMime(data.reply, {
-          from: message.to,
-          to: message.from,
-          messageId: message.headers.get("Message-ID"),
-          references: inboundReferences,
-        });
+    const mime = buildReplyMime(data.reply, {
+      from: message.to,
+      to: message.from,
+      messageId: message.headers.get("Message-ID"),
+      references: inboundReferences,
+    });
 
     try {
       await message.reply(new EmailMessage(message.to, message.from, mime));
@@ -154,15 +163,19 @@ const handler = {
       // through one error — the forward failed DMARC, the message is "not
       // repliable", or a per-message reply limit is spent — so pass its own
       // wording through rather than naming a cause. An earlier version of this
-      // line asserted DMARC, and when a Gmail forward was refused (Gmail
-      // publishes p=none and passes its own DMARC, so that reading was almost
-      // certainly wrong) the log actively pointed away from the real fault.
+      // line asserted DMARC, and when a Gmail forward was refused the log
+      // actively pointed away from the real fault: a duplicated entry in the
+      // References header we built, which had nothing to do with DMARC and
+      // refused every forward until it was fixed.
+      //
+      // The two measured conditions ride along, because the refusal is only
+      // readable against the same figures from forwards that succeeded.
       //
       // Nothing to retry on the inbound transaction. No delivery confirmation
       // is sent, so this forward is correctly never counted as a check.
       console.warn(
         `reply refused by the mail platform (inbound References entries: ${referenceCount}, ` +
-          `reply: ${probing ? "minimal probe" : "full"}):`,
+          `auth: ${auth}):`,
         err,
       );
       return;

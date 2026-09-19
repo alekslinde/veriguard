@@ -1,6 +1,6 @@
 # Inbound Email Worker
 
-*Last reviewed: 2026-09-19.*
+*Last reviewed: 2026-09-20.*
 
 Receives forwarded suspicious emails at `check@<domain>`, sends the raw message
 to the Next app's `/api/inbound` for analysis, and replies to the forwarder with
@@ -139,8 +139,8 @@ value silently reverts at the next merge to `main`.
 
 Every way a forward can die now says so in the Worker's logs
 (`npx wrangler tail`, or the dashboard's live logs). A healthy forward logs only
-its `inbound References entries:` count, so any *warning or error* here is the
-diagnosis:
+its `inbound References entries: N, auth: …` line, so any *warning or error*
+here is the diagnosis:
 
 | Log line | Means |
 | --- | --- |
@@ -148,7 +148,7 @@ diagnosis:
 | `inbound webhook rejected: HTTP 5xx` | The app is up but erroring — check the app's own logs for `inbound analysis failed`. |
 | `inbound webhook unreachable` | Wrong `INBOUND_WEBHOOK_URL`, or the app is down. |
 | `inbound skipped by API: rate-limited` | Working as intended — the per-sender budget. |
-| `reply refused by the mail platform (inbound References entries: N)` | The platform declined the reply and reports several distinct causes through one error, so it passes that wording through rather than naming one. Every other condition is structural and holds for every message the Worker builds, so a refusal is the forward itself: either its own authentication result, or an over-long `References` chain (the reply is refused above 100 entries). `N` is that chain's length — compare it against the counts logged by forwards that succeeded. See *When NO reply is sent*. |
+| `reply refused by the mail platform (inbound References entries: N, auth: …)` | The platform declined the reply and reports several distinct causes through one error, so it passes that wording through rather than naming one. Both measured conditions ride along: the inbound chain length, and the authentication verdicts the receiving MTA recorded. Compare them against the same figures from forwards that succeeded — a refusal is only readable that way. See *When NO reply is sent*. |
 | `inbound dropped: raw unreadable or over …` | The forward exceeded `MAX_RAW_BYTES`. |
 
 Silence in the Worker's log while mail still goes unanswered means the message
@@ -212,9 +212,18 @@ a refusal in production. Two are properties of the forward itself:
   *reply* we build is bounded (see *Deliverability*), but the limit is checked
   against the incoming message, so a chain that long is refused regardless.
 
-All of these throw, and the Worker logs the refusal with the inbound chain
-length rather than failing silently. The error names no cause, so that count is
-the one measurable discriminator between the two.
+All of these throw, and the Worker logs the refusal with both measured
+conditions rather than failing silently. The error names no cause, so those two
+figures are what discriminate between them.
+
+**A malformed reply is refused the same way, with the same wording.** A reply
+built with a `References` entry repeated — which happened when the inbound chain
+was a single Message-ID and that ID was appended to a chain already ending with
+it — was refused on every forward, with an error naming none of the conditions
+above. Two diagnoses were talked out of the evidence before the header itself
+was read. When refusals are universal rather than occasional, suspect what the
+Worker builds before suspecting the forward: print the generated MIME and look
+at it.
 
 **Decision (current):** accept this — no paid outbound sender. If it becomes a
 real problem, the upgrade is a fallback that sends a fresh message via a
