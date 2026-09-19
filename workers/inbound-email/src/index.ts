@@ -14,13 +14,17 @@
 import { EmailMessage } from "cloudflare:email";
 // Extension-ful: wrangler resolves either, but bare Node (which runs this
 // Worker's tests) only resolves the explicit form.
-import { buildReplyMime } from "./reply.ts";
+import { buildReplyMime, buildMinimalReplyMime } from "./reply.ts";
 
 export interface Env {
   // Set via `wrangler secret put` — must match the Next app's INBOUND_SECRET.
   INBOUND_SECRET: string;
   // Full URL of the Next webhook, e.g. https://veriguard.app/api/inbound
   INBOUND_WEBHOOK_URL: string;
+  // TEMPORARY diagnostic. "1" replies with the barest MIME the platform will
+  // take, to tell a fault in what we build from a fault in configuration. See
+  // buildMinimalReplyMime. Unset in normal operation; remove with the probe.
+  MINIMAL_REPLY_PROBE?: string;
 }
 
 const MAX_RAW_BYTES = 1_000_000; // drop anything larger before calling the API
@@ -123,15 +127,25 @@ const handler = {
     const referenceCount = inboundReferences ? inboundReferences.trim().split(/\s+/).length : 0;
     console.log(`inbound References entries: ${referenceCount}`);
 
+    // TEMPORARY diagnostic — see buildMinimalReplyMime. Logged on the way past
+    // so a run under the probe is never mistaken for ordinary behaviour when
+    // the log is read back later.
+    const probing = env.MINIMAL_REPLY_PROBE === "1";
+    if (probing) {
+      console.log("MINIMAL_REPLY_PROBE active — replying with the barest MIME, threading omitted");
+    }
+
     // Build a reply addressed back to the forwarder. message.reply() restricts
     // the recipient to the original sender, so this can't be redirected; the
     // From is the receiving address so Cloudflare DKIM-signs it for that domain.
-    const mime = buildReplyMime(data.reply, {
-      from: message.to,
-      to: message.from,
-      messageId: message.headers.get("Message-ID"),
-      references: inboundReferences,
-    });
+    const mime = probing
+      ? buildMinimalReplyMime(data.reply, { from: message.to, to: message.from })
+      : buildReplyMime(data.reply, {
+          from: message.to,
+          to: message.from,
+          messageId: message.headers.get("Message-ID"),
+          references: inboundReferences,
+        });
 
     try {
       await message.reply(new EmailMessage(message.to, message.from, mime));
@@ -147,7 +161,8 @@ const handler = {
       // Nothing to retry on the inbound transaction. No delivery confirmation
       // is sent, so this forward is correctly never counted as a check.
       console.warn(
-        `reply refused by the mail platform (inbound References entries: ${referenceCount}):`,
+        `reply refused by the mail platform (inbound References entries: ${referenceCount}, ` +
+          `reply: ${probing ? "minimal probe" : "full"}):`,
         err,
       );
       return;

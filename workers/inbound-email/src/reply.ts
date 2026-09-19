@@ -24,7 +24,11 @@ const REFERENCES_KEEP_ROOT = 1;
 const REFERENCES_KEEP_RECENT = 20;
 
 export function truncateReferences(references: string): string {
-  const ids = references.split(/\s+/).filter(Boolean);
+  // De-duplicated, keeping first occurrence. A forward whose References is just
+  // the message's own Message-ID — the common case, and what every observed
+  // failure carries — produced that ID twice once the message being replied to
+  // was appended to the chain it already ended with.
+  const ids = [...new Set(references.split(/\s+/).filter(Boolean))];
   if (ids.length <= REFERENCES_KEEP_ROOT + REFERENCES_KEEP_RECENT) return ids.join(" ");
   return [...ids.slice(0, REFERENCES_KEEP_ROOT), ...ids.slice(-REFERENCES_KEEP_RECENT)].join(" ");
 }
@@ -58,5 +62,35 @@ export function buildReplyMime(
   msg.setHeader("Auto-Submitted", "auto-replied");
   msg.addMessage({ contentType: "text/plain", data: reply.text });
   msg.addMessage({ contentType: "text/html", data: reply.html });
+  return msg.asRaw();
+}
+
+/**
+ * TEMPORARY — a diagnostic probe, not a feature. Remove once the refusal below
+ * is understood.
+ *
+ * Every forward is currently refused, across unrelated senders and with a
+ * References chain of 1, so the cause is neither the message nor the sender.
+ * Two possibilities remain: something in the MIME we build, or the account's
+ * own mail configuration. They are told apart by replying with the least
+ * message the platform will accept.
+ *
+ * So this drops everything the full builder adds — threading headers, the HTML
+ * alternative, the automated-reply marker, the display name — and keeps only
+ * what a reply cannot omit. If a reply built here is accepted, the fault is in
+ * what we construct and this narrows it to the headers dropped. If it is
+ * refused identically, the MIME is exonerated and the fault is configuration,
+ * which no code change here will fix.
+ */
+export function buildMinimalReplyMime(
+  reply: ReplyContent,
+  opts: { from: string; to: string },
+  createMime: typeof createMimeMessage = createMimeMessage,
+): string {
+  const msg = createMime();
+  msg.setSender(opts.from);
+  msg.setRecipient(opts.to);
+  msg.setSubject(reply.subject);
+  msg.addMessage({ contentType: "text/plain", data: reply.text });
   return msg.asRaw();
 }

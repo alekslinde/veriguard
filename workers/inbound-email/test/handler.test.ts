@@ -264,3 +264,61 @@ test("an oversized forward is reported rather than dropped in silence", async ()
   await handler.email(msg as never, ENV);
   assert.match(logs.find((l) => l.level === "warn")!.text, /unreadable or over/i);
 });
+
+// TEMPORARY — covers the minimal-reply probe's wiring. Remove with the probe.
+
+test("the probe is off unless MINIMAL_REPLY_PROBE is exactly \"1\"", async () => {
+  // A diagnostic that switches on loosely would quietly change production
+  // behaviour for anyone who set it to "true" or "0" meaning to disable it.
+  stubFetch((_url, init) => {
+    if (JSON.parse(String(init.body)).delivered) return new Response("{}", { status: 200 });
+    return new Response(
+      JSON.stringify({ ok: true, reply: { subject: "s", text: "t", html: "<p>h</p>" } }),
+      { status: 200 },
+    );
+  });
+
+  for (const value of [undefined, "", "0", "true", "yes"]) {
+    infoLogs = [];
+    await handler.email(fakeMessage() as never, { ...ENV, MINIMAL_REPLY_PROBE: value } as never);
+    assert.ok(
+      !infoLogs.some((l) => /MINIMAL_REPLY_PROBE active/.test(l)),
+      `probe must stay off for ${JSON.stringify(value)}`,
+    );
+  }
+});
+
+test("the probe announces itself when active, so a log is never misread", async () => {
+  stubFetch((_url, init) => {
+    if (JSON.parse(String(init.body)).delivered) return new Response("{}", { status: 200 });
+    return new Response(
+      JSON.stringify({ ok: true, reply: { subject: "s", text: "t", html: "<p>h</p>" } }),
+      { status: 200 },
+    );
+  });
+
+  const msg = fakeMessage();
+  await handler.email(msg as never, { ...ENV, MINIMAL_REPLY_PROBE: "1" } as never);
+
+  assert.ok(infoLogs.some((l) => /MINIMAL_REPLY_PROBE active/.test(l)));
+  assert.equal(msg.replies.length, 1, "the probe still sends a reply");
+});
+
+test("a refusal records which reply shape was refused", async () => {
+  // The probe's whole purpose is comparing a refusal under it against one
+  // without, so the log has to say which is which.
+  stubFetch((_url, init) => {
+    if (JSON.parse(String(init.body)).delivered) return new Response("{}", { status: 200 });
+    return new Response(
+      JSON.stringify({ ok: true, reply: { subject: "s", text: "t", html: "<p>h</p>" } }),
+      { status: 200 },
+    );
+  });
+
+  await handler.email(fakeMessage({ replyThrows: true }) as never, { ...ENV, MINIMAL_REPLY_PROBE: "1" } as never);
+  assert.match(logs.find((l) => l.level === "warn")!.text, /reply: minimal probe/);
+
+  logs = [];
+  await handler.email(fakeMessage({ replyThrows: true }) as never, ENV);
+  assert.match(logs.find((l) => l.level === "warn")!.text, /reply: full/);
+});

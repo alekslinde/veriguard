@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildReplyMime, truncateReferences } from "../src/reply.ts";
+import { buildReplyMime, buildMinimalReplyMime, truncateReferences } from "../src/reply.ts";
 
 const REPLY = {
   subject: "Scam alert: the email you forwarded",
@@ -72,6 +72,23 @@ test("a short References chain is passed through unchanged", () => {
   assert.equal(truncateReferences(chain), chain);
 });
 
+test("a repeated Message-ID appears once", () => {
+  // The common shape: a forward whose References is just its own Message-ID.
+  // Appending the message being replied to duplicated the entry it already
+  // ended with, and every observed refusal carried exactly this.
+  assert.equal(truncateReferences("<a@x.test> <a@x.test>"), "<a@x.test>");
+  assert.equal(
+    truncateReferences("<a@x.test> <b@x.test> <a@x.test>"),
+    "<a@x.test> <b@x.test>",
+  );
+});
+
+test("a reply to a single-entry chain carries that ID exactly once", () => {
+  const mime = buildReplyMime(REPLY, { ...OPTS, references: OPTS.messageId });
+  const header = mime.match(/^References: (.*)$/m)?.[1] ?? "";
+  assert.equal(header.trim(), OPTS.messageId);
+});
+
 test("a chain at the keep-everything boundary is not truncated", () => {
   // 21 entries = root + 20 recent, the most that survives intact.
   const ids = Array.from({ length: 21 }, (_, i) => `<id-${i}@x.test>`);
@@ -101,4 +118,31 @@ test("a reply to a deeply forwarded message carries a bounded References header"
   assert.match(header, /<hop-0@x\.test>/);
   // The message being replied to is still the last entry after truncation.
   assert.match(header, /<orig-123@gmail\.com>$/);
+});
+
+// TEMPORARY — covers the minimal-reply probe. Remove with the probe itself.
+//
+// The probe's value is entirely in what it OMITS: if a reply built this way is
+// accepted while the full one is refused, the difference is the diagnosis. A
+// header creeping back in would silently make the two builders equivalent and
+// the experiment would prove nothing, so the omissions are what is asserted.
+
+test("the minimal probe omits every header the full reply adds", () => {
+  const mime = buildMinimalReplyMime(REPLY, { from: OPTS.from, to: OPTS.to });
+  assert.doesNotMatch(mime, /^In-Reply-To:/m);
+  assert.doesNotMatch(mime, /^References:/m);
+  assert.doesNotMatch(mime, /^Auto-Submitted:/m);
+  assert.doesNotMatch(mime, /multipart\/alternative/);
+  assert.doesNotMatch(mime, /text\/html/);
+});
+
+test("the minimal probe still addresses and identifies itself correctly", () => {
+  // Recipient and sender domain are platform requirements, not decoration —
+  // dropping either would make a refusal uninformative.
+  const mime = buildMinimalReplyMime(REPLY, { from: OPTS.from, to: OPTS.to });
+  assert.match(mime, /^From:.*check@veriguard\.app/m);
+  assert.match(mime, /^To:.*<victim@gmail\.com>/m);
+  assert.match(mime, /^Subject: /m);
+  assert.match(mime, /Content-Type: text\/plain/);
+  assert.match(mime, /This looks like a scam/);
 });
