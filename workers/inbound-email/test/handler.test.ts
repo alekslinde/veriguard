@@ -30,17 +30,25 @@ const ENV = {
 
 /** A forward the Worker can read: a real stream, a sender, a Message-ID. */
 function fakeMessage(
-  overrides: { replyThrows?: boolean; references?: string; authResults?: string } = {},
+  overrides: { replyThrows?: boolean; references?: string; authResults?: string[] } = {},
 ) {
   const replies: unknown[] = [];
   return {
     from: "forwarder@gmail.com",
     to: "check@veriguard.app",
-    headers: new Headers({
-      "Message-ID": "<orig@gmail.com>",
-      ...(overrides.references ? { References: overrides.references } : {}),
-      ...(overrides.authResults ? { "Authentication-Results": overrides.authResults } : {}),
-    }),
+    headers: (() => {
+      const h = new Headers({
+        "Message-ID": "<orig@gmail.com>",
+        ...(overrides.references ? { References: overrides.references } : {}),
+      });
+      // Each MTA the mail passed through adds its own header; several of one
+      // name join into a comma-separated value, which is the shape the handler
+      // has to read back apart.
+      for (const value of overrides.authResults ?? []) {
+        h.append("Authentication-Results", value);
+      }
+      return h;
+    })(),
     raw: new ReadableStream({
       start(c) {
         c.enqueue(new TextEncoder().encode("From: scammer@evil.test\r\n\r\nClick here"));
@@ -282,21 +290,61 @@ const okReply = (_url: string, init: RequestInit) => {
   );
 };
 
-test("records the authentication verdicts on every forward", async () => {
+test("groups each MTA's verdicts separately", async () => {
+  // The live shape: a forwarded scam email. The forwarder's own send passes,
+  // and the original it quotes has no policy at all. Flattened into one list
+  // these read as a contradiction ("dmarc=pass dmarc=none"); grouped, they say
+  // which identity each belongs to, which is the whole diagnostic value.
   stubFetch(okReply);
   await handler.email(
-    fakeMessage({ authResults: "mx.veriguard.app; dmarc=pass header.from=gmail.com; spf=pass" }) as never,
+    fakeMessage({
+      authResults: [
+        "mx.veriguard.app; dkim=pass header.d=gmail.com; spf=pass; dmarc=pass header.from=gmail.com",
+        "mx.google.com; spf=none; dmarc=none header.from=scammer.test",
+      ],
+    }) as never,
     ENV,
   );
-  assert.ok(infoLogs.some((l) => /auth: .*dmarc=pass/.test(l)));
+  const line = infoLogs.find((l) => /auth:/.test(l))!;
+  assert.match(line, /\[[^\]]*dmarc=pass[^\]]*\]/, "the forwarder's own send is one set");
+  assert.match(line, /\[[^\]]*dmarc=none[^\]]*\]/, "the forwarded original is another");
 });
 
-test("records a failing verdict, which is what a refusal is read against", async () => {
+test("records a single set for an ordinary direct send", async () => {
   stubFetch(okReply);
-  await handler.email(fakeMessage({ authResults: "mx.veriguard.app; dmarc=fail; spf=softfail" }) as never, ENV);
+  await handler.email(
+    fakeMessage({ authResults: ["mx.veriguard.app; dmarc=pass header.from=gmail.com; spf=pass"] }) as never,
+    ENV,
+  );
+  const line = infoLogs.find((l) => /auth:/.test(l))!;
+  assert.match(line, /\[dmarc=pass spf=pass\]|\[spf=pass dmarc=pass\]/);
+  assert.equal((line.match(/\[/g) ?? []).length, 1, "one identity, one set");
+});
+
+test("records failing verdicts, which is what a refusal is read against", async () => {
+  stubFetch(okReply);
+  await handler.email(
+    fakeMessage({ authResults: ["mx.veriguard.app; dmarc=fail; spf=softfail"] }) as never,
+    ENV,
+  );
   const line = infoLogs.find((l) => /auth:/.test(l))!;
   assert.match(line, /dmarc=fail/);
   assert.match(line, /spf=softfail/);
+});
+
+test("a comma inside a quoted value does not invent a second identity", async () => {
+  // A DKIM signature value may contain a comma. Splitting on it naively would
+  // report two identities where the message carries one — and the count of
+  // identities is exactly what is being read here.
+  stubFetch(okReply);
+  await handler.email(
+    fakeMessage({
+      authResults: ['mx.veriguard.app; dkim=pass header.d=gmail.com header.b="ab,cd"; dmarc=pass'],
+    }) as never,
+    ENV,
+  );
+  const line = infoLogs.find((l) => /auth:/.test(l))!;
+  assert.equal((line.match(/\[/g) ?? []).length, 1, "one header is one set, commas and all");
 });
 
 test("says so plainly when no verdict was recorded", async () => {
@@ -311,9 +359,10 @@ test("keeps the correspondent's host and addresses out of the log", async () => 
   stubFetch(okReply);
   await handler.email(
     fakeMessage({
-      authResults:
+      authResults: [
         "mx.veriguard.app; dmarc=pass header.from=example.test; " +
-        "spf=pass smtp.mailfrom=someone@private.test; dkim=pass header.d=private.test",
+          "spf=pass smtp.mailfrom=someone@private.test; dkim=pass header.d=private.test",
+      ],
     }) as never,
     ENV,
   );
@@ -328,7 +377,7 @@ test("a refusal carries both measured conditions", async () => {
   // succeeded, so it has to carry them itself.
   stubFetch(okReply);
   await handler.email(
-    fakeMessage({ replyThrows: true, authResults: "mx.veriguard.app; dmarc=fail" }) as never,
+    fakeMessage({ replyThrows: true, authResults: ["mx.veriguard.app; dmarc=fail"] }) as never,
     ENV,
   );
   const warned = logs.find((l) => l.level === "warn")!.text;
