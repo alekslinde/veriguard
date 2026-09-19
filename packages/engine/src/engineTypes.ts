@@ -16,6 +16,29 @@ import type { RegionCoverage } from "./regions";
 export type ScamType = "url" | "sms" | "email" | "phone" | "qr" | "custom";
 
 /**
+ * The blocklist, as the engine actually uses it: one membership test.
+ *
+ * Every checker took a `Set<string>`, but the scorer only ever asks
+ * `blocklist.has(hostname)` — one call site, one method. The wider type was a
+ * claim the engine did not rely on, and it ruled out a caller that answers the
+ * same question differently.
+ *
+ * That caller now exists. The WebExtension receives the list as truncated
+ * hashes, so its lookup hashes the hostname before testing membership; it
+ * satisfies this interface and cannot satisfy `Set<string>`. `Set` still
+ * satisfies it structurally, so every existing call site is unchanged.
+ *
+ * The contract for an implementor: `has` is synchronous, total, and answers for
+ * a lowercased hostname with trailing dots already stripped — the form the
+ * scorer derives before calling. It must not throw; a lookup that cannot answer
+ * returns false, because the failure mode of a wrong `true` is a false
+ * accusation against a real domain.
+ */
+export interface HostLookup {
+  has(hostname: string): boolean;
+}
+
+/**
  * Where a signal came from. The UI groups evidence rows by this, so it names
  * the surface the reader can look at themselves — the link, the wording, the
  * headers — not the internal checker that produced it.

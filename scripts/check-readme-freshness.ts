@@ -59,6 +59,9 @@ export const SUBJECTS: ReadmeSubject[] = [
   { readme: "eval/README.md", subject: ["eval", "scripts/eval.ts", "scripts/eval-metamorphic.ts"] },
   { readme: "packages/engine/README.md", subject: ["packages/engine/src"] },
   { readme: "workers/inbound-email/README.md", subject: ["workers/inbound-email"] },
+  // The manifest and build config carry as many present-tense claims as the
+  // source does — permissions, output paths, env vars — so both are subjects.
+  { readme: "extension/README.md", subject: ["extension/src", "extension/vite.config.mts"] },
 ];
 
 const REVIEWED = /^\*Last reviewed:\s*(\d{4}-\d{2}-\d{2})\.?\*/m;

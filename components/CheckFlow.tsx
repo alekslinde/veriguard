@@ -7,7 +7,8 @@ import { extractIdentifiers, defangEmail } from "@veriguard/engine/urlSanitizer"
 import { parseEmailHeaders, summariseAuth } from "@veriguard/engine/emailHeaders";
 import { analyseEmailSource, EmailSourceAnalysis } from "@/lib/emailSource";
 import { distillEmailContent } from "@/lib/emailDistiller";
-import { VERDICT_RANK, defangValue, defangFlag, composeVerdictWithEvidence, isClean, overallCoverage, pooledSignals } from "@/lib/verdictSummary";
+import { defangValue, defangFlag, composeVerdictWithEvidence, isClean, overallCoverage, pooledSignals } from "@/lib/verdictSummary";
+import { worstBy } from "@veriguard/engine/verdictRank";
 import { useLang, MessageKey } from "@/lib/lang";
 // Capability probe only — the OCR engine itself is imported dynamically so the
 // WASM core is never downloaded by someone who does not upload an image.
@@ -1165,9 +1166,7 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
             // up to the headline above them. Composing them separately put a 75
             // over rows totalling 120 — see composeVerdictWithEvidence.
             const composed = composeVerdictWithEvidence(results, pixelReport)!;
-            const worst = results.reduce((acc, r) =>
-              VERDICT_RANK[r.result.verdict] > VERDICT_RANK[acc.result.verdict] ? r : acc,
-            );
+            const worst = worstBy(results, (r) => r.result.verdict)!;
             const overall = { ...worst.result, ...composed };
 
             return (

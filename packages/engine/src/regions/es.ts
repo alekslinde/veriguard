@@ -38,6 +38,7 @@ export const ES: RegionDefinition = {
   code: "ES",
   name: "Spain",
   coverage: "minimal",
+  languages: ["es"],
 
   urgency: {
     foreignAuthority: [],

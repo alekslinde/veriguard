@@ -39,6 +39,7 @@ export const IT: RegionDefinition = {
   code: "IT",
   name: "Italy",
   coverage: "minimal",
+  languages: ["it"],
 
   urgency: {
     foreignAuthority: [],

@@ -41,6 +41,7 @@ export const AE: RegionDefinition = {
   code: "AE",
   name: "United Arab Emirates",
   coverage: "minimal",
+  languages: ["ar", "en"],
 
   urgency: {
     foreignAuthority: [],

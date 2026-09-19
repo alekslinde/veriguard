@@ -89,6 +89,7 @@ export const SG: RegionDefinition = {
   // carries no brand knowledge at all, where CA's `partial` carries brands, a
   // number plan and agencies and lacks only French keywords.
   coverage: "minimal",
+  languages: ["en", "zh", "ms", "ta"],
 
   // No national campaign keywords, for the multilingual reason in the header.
   // Base contributes generic urgency and the voice-clone script, which are

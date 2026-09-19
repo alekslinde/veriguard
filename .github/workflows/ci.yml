@@ -1,11 +1,18 @@
 name: CI
 
-# Lint + test gate on every PR and on pushes to main. This is the green light
-# every merge relies on — a PR (Dependabot's or a human's) isn't safe to merge
-# until this passes. The production dependency audit lives in its own workflow
-# (dependency-audit.yml), triggered only when the dependency tree can actually
-# change, since its result is identical to main on any PR that doesn't touch
-# package files.
+# Typecheck + lint + test gate on every PR and on pushes to main. This is the
+# green light every merge relies on — a PR (Dependabot's or a human's) isn't
+# safe to merge until this passes. The production dependency audit lives in its
+# own workflow (dependency-audit.yml), triggered only when the dependency tree
+# can actually change, since its result is identical to main on any PR that
+# doesn't touch package files.
+#
+# The typecheck step is separate because neither of the other two performs one:
+# eslint's TS rules are syntactic and vitest strips types without checking them,
+# so a type error passes both and reaches main. That is not hypothetical — a
+# predicate narrowing to a type not assignable to its parameter's shipped green
+# through lint and 3,256 passing tests, and was caught only by running tsc by
+# hand. Nothing builds in CI either, so this is the only step that would see it.
 
 on:
   pull_request:
@@ -30,6 +37,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Before lint and tests: a type error is usually the cause of whatever
+      # they would report, so failing here first names it directly.
+      - name: Typecheck
+        run: npm run typecheck
       - name: Lint
         run: npm run lint
       - name: Unit tests

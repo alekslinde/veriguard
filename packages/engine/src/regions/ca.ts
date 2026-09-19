@@ -297,6 +297,7 @@ export const CA: RegionDefinition = {
   // officially bilingual population is a real gap, and the coverage gate is
   // what stops it becoming a confident-looking wrong answer.
   coverage: "partial",
+  languages: ["en", "fr"],
 
   urgency: {
     foreignAuthority: URGENCY_FOREIGN_AUTHORITY,

@@ -31,6 +31,9 @@ const AUTHORITY_MENTIONS = [
   "cnav",
   "police nationale",
   "gendarmerie nationale",
+  // "ants" is matched CASE-SENSITIVELY (caseSensitiveAuthorities below): the
+  // lower-case form is the plural of the English insect, which a message
+  // pasted here is scored against; "ANTS" is the agency.
   "ants",
   "agence nationale des titres sécurisés",
   "franceconnect",
@@ -52,6 +55,9 @@ export const FR: RegionDefinition = {
   code: "FR",
   name: "France",
   coverage: "minimal",
+  languages: ["fr"],
+  // Ordinary words as well as agency names — matched only in caps.
+  caseSensitiveAuthorities: ["ants"],
 
   // No national campaign keywords — French lures are written in French, and an
   // English list would assert coverage this tier has not earned.

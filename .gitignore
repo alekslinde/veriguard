@@ -64,6 +64,21 @@ yarn-error.log*
 # vercel
 .vercel
 
+# built WebExtension bundles — reproducible from source via `npm run ext`.
+# The unpacked build is what you load in the browser; the store uploads are
+# zipped from it. Neither is source.
+/extension/dist/
+
+# extension icons — generated from app/icon.svg by `npm run icons`, same as the
+# PWA set. Committing them would be a second copy of the mark to keep in step.
+/extension/icons/
+
+# the Safari wrapper — an Xcode project generated from extension/dist/chrome by
+# `npm run ext:safari`. Regenerated on demand; committing it would mean
+# maintaining a second copy of the extension plus a project file that conflicts
+# on every merge.
+/extension/safari/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

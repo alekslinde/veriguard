@@ -36,6 +36,7 @@ export const TH: RegionDefinition = {
   code: "TH",
   name: "Thailand",
   coverage: "minimal",
+  languages: ["th"],
 
   urgency: {
     foreignAuthority: [],

@@ -53,6 +53,9 @@ export const KE: RegionDefinition = {
   code: "KE",
   name: "Kenya",
   coverage: "minimal",
+  languages: ["sw", "en"],
+  // Ordinary words as well as agency names — matched only in caps.
+  caseSensitiveAuthorities: ["sha"],
 
   urgency: {
     foreignAuthority: [],

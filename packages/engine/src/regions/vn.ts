@@ -43,6 +43,7 @@ export const VN: RegionDefinition = {
   code: "VN",
   name: "Vietnam",
   coverage: "minimal",
+  languages: ["vi"],
 
   urgency: {
     foreignAuthority: [],
