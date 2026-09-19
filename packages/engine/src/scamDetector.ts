@@ -34,8 +34,30 @@ export type { PhoneIntel };
 /** A signal row plus, while scanning, its unresolved corroborated alternative. */
 type PendingSignal = Signal & { deferred?: { corroborated: string; points: number } };
 
+/**
+ * Deferred rows a sub-result was still holding when it was scored, keyed by the
+ * text the row carries while alone.
+ *
+ * The email path analyses the body by running the SMS checker over it and
+ * merging the result. That inner pass settles its own deferred rows against its
+ * own evidence, which is a narrower question than the one the rule is asking:
+ * the sender and link rules have not run yet, so nothing they find can
+ * corroborate anything the body deferred. An agency mention paired with a
+ * mismatched sender domain — the single strongest corroboration available, and
+ * the textbook shape of the scam — settled as "nothing else unusual" because
+ * the only evidence contradicting that lived in a different collection.
+ *
+ * So an unsettled row rides out with the sub-result and is re-deferred into the
+ * outer collection, which settles once, at the end, against all of the evidence.
+ * Carried beside CheckResult rather than inside Signal because it is scanning
+ * state, not a reader-facing row: it is meaningless by the time anything renders.
+ */
+const PENDING = new WeakMap<object, Map<string, { corroborated: string; points: number }>>();
+
 class Signals {
   private readonly list: PendingSignal[] = [];
+  /** Filled by resolveDeferred; see unsettled(). */
+  private readonly leftUnsettled = new Map<string, { corroborated: string; points: number }>();
 
   /** Record one reason and the points it contributes. Returns the points so a
    *  caller can still branch on what it just added. */
@@ -53,6 +75,9 @@ class Signals {
    */
   merge(source: SignalSource, sub: { flags: string[]; signals?: Signal[] }, weighted: number): number {
     const inner = sub.signals?.filter((x) => x.source !== "score") ?? [];
+    // Rows the sub-result settled as uncorroborated only because its own pass
+    // had nothing else to offer. Re-deferred here so the outer list decides.
+    const carried = PENDING.get(sub as object);
     const rawTotal = inner.reduce((n, x) => n + x.points, 0);
     if (inner.length && rawTotal > 0) {
       let handed = 0;
@@ -64,7 +89,14 @@ class Signals {
       });
       return weighted;
     }
-    for (const text of sub.flags) this.list.push({ text, points: 0, source });
+    for (const text of sub.flags) {
+      const pending = carried?.get(text);
+      // A carried row keeps its deferred shape, so evidence found later in the
+      // outer pass can still settle it. Its weight rides at the sub-result's
+      // own scale; the channel discount is applied by the caller that knows it.
+      if (pending) this.list.push({ text, points: 0, source, deferred: pending });
+      else this.list.push({ text, points: 0, source });
+    }
     if (weighted !== 0) {
       this.list.push({ text: sub.flags[0] ?? "Sub-check contribution", points: weighted, source });
     }
@@ -115,9 +147,27 @@ class Signals {
       if (scoredElsewhere) {
         row.text = row.deferred.corroborated;
         row.points = row.deferred.points;
+      } else {
+        // Settled uncorroborated. Remember it against the text it settled
+        // under, so a caller still gathering evidence can re-defer it into a
+        // wider list — resolveDeferred runs from total(), which every checker
+        // calls before its result is built, so this is the last point at which
+        // the row's deferred shape still exists.
+        this.leftUnsettled.set(row.text, row.deferred);
       }
       delete row.deferred;
     }
+  }
+
+  /**
+   * Deferred rows that settled with nothing corroborating them in THIS pass.
+   *
+   * Populated by resolveDeferred and readable afterwards, because the score is
+   * computed before the result is assembled and settling is what makes the
+   * answer knowable. Empty whenever something else here scored.
+   */
+  unsettled(): Map<string, { corroborated: string; points: number }> {
+    return this.leftUnsettled;
   }
 
   /**
@@ -455,6 +505,116 @@ function isMacClickFix(text: string): boolean {
 /** Entries matched, for the compounds that score on how many distinct hits. */
 function mentionsCount(text: string, entries: string[]): number {
   return entries.filter((entry) => mentions(text, entry)).length;
+}
+
+/**
+ * Is `token` `name` with letters dropped — and close enough that no other
+ * reading is plausible?
+ *
+ * The shape being caught is "austalsn" for "australian" and "rghts" for
+ * "rights": the letters that remain are in their original order, and enough of
+ * them remain that the word is still readable. Both halves are load-bearing.
+ *
+ * Order alone is far too weak. Short ordinary words are subsequences of longer
+ * unrelated ones by sheer chance — "sent" of "statement", "post" of "auspost",
+ * "count" of "account" — so an order-only test flags plain English and, worse,
+ * flags the genuine mail whose vocabulary this is. Requiring most of the word to
+ * survive is what makes a hit mean something: a corrupted name keeps its length
+ * (mangling is meant to stay readable), while a coincidental subsequence is
+ * almost always much shorter than the word it matched.
+ *
+ * Deliberately NOT anchored to a first-letter match: real kits corrupt the first
+ * letter as readily as any other.
+ *
+ * Deletion only — a token that also SUBSTITUTES a letter is not matched, so
+ * "austalsn" for "australian" (an l moved, not just dropped) is missed. That is
+ * a known and accepted gap. Edit distance would catch it, but measured against
+ * both classes it does not separate them: "austalsn" scores 0.70 similarity to
+ * "australian" while "count" scores 0.71 to "account", so any threshold loose
+ * enough for the first admits the second, and plurals ("payments" vs "payment",
+ * 0.88) score higher than either. A rule that flags "count" and "payments" in
+ * ordinary mail costs more than the corruptions it would catch, so this stays
+ * the narrower test and the message is caught by its other signals.
+ */
+// 0.75 is where the two classes actually separate, measured against both: at
+// 0.7 "count" still reads as corrupted "account" and at 0.8 "tis" stops reading
+// as "this". Real corruptions drop one or two letters from a word; coincidental
+// subsequences are shorter relative to what they match.
+const CORRUPTION_MIN_RETAINED = 0.75;
+
+function isLetterDeletionOf(token: string, name: string): boolean {
+  if (token.length >= name.length || token.length === 0) return false;
+  // Enough of the word must survive that the corruption is still that word.
+  if (token.length / name.length < CORRUPTION_MIN_RETAINED) return false;
+  let at = 0;
+  for (const ch of name) {
+    if (at < token.length && token[at] === ch) at += 1;
+  }
+  return at === token.length;
+}
+
+/**
+ * Words mangled by dropping letters, of the specific kind that survives a human
+ * skim while defeating a keyword match: "Austalsn Taxation Office", "Al rghts
+ * reserved", "unsubscribe from tis fst".
+ *
+ * This is not a spellchecker and must not become one. Genuine mail contains
+ * genuine typos, and flagging those would score real organisations for clumsy
+ * proofreading. What is scored here is narrower and is a deliberate act: a word
+ * from a KNOWN vocabulary — the region's agency and brand names, plus the
+ * boilerplate that scam templates copy wholesale — reproduced with letters
+ * removed. A sender with any relationship to the agency it names can spell it,
+ * and legitimate boilerplate is pasted, not retyped from memory.
+ *
+ * Deletion specifically, not general edit distance: an edit-distance threshold
+ * loose enough to catch "austalsn" also catches unrelated short words, and
+ * every extra letter it permits is another ordinary word pulled in. Deletion is
+ * both what these kits actually do and the cheapest to bound, since a token can
+ * only lose letters from one source word.
+ *
+ * Tokens shorter than MIN are ignored: at three or four letters the space is
+ * dense enough that ordinary words are subsequences of unrelated names by
+ * accident ("as" of "asd", "at" of "ato"), which would flag plain English.
+ */
+const CORRUPTION_MIN_TOKEN = 5;
+
+/**
+ * The footer and administrative wording that scam templates copy from the mail
+ * they imitate, and therefore the words their manglers corrupt. Region-neutral:
+ * this is the furniture of bulk mail everywhere, not any agency's vocabulary.
+ *
+ * Every entry has to be a word whose CORRECT spelling is unremarkable in
+ * ordinary mail, so that only the corrupted form is evidence.
+ */
+const BOILERPLATE_VOCABULARY = [
+  "rights", "reserved", "copyright", "unsubscribe", "preferences",
+  "subscription", "notification", "department", "government", "official",
+  "security", "account", "statement", "assessment", "payment", "reference",
+];
+
+function corruptedNames(text: string, vocabulary: string[]): string[] {
+  // Single words only. A multi-word entry is checked by its parts, so a name
+  // split across a line break is still seen.
+  const words = new Set(
+    vocabulary
+      .flatMap((entry) => entry.toLowerCase().split(/[^a-z]+/))
+      .filter((w) => w.length >= CORRUPTION_MIN_TOKEN),
+  );
+  if (words.size === 0) return [];
+
+  const seen = new Set<string>();
+  for (const raw of text.toLowerCase().split(/[^a-z]+/)) {
+    if (raw.length < CORRUPTION_MIN_TOKEN - 1) continue;
+    // A token that IS a vocabulary word is spelled correctly — not evidence.
+    if (words.has(raw)) continue;
+    for (const name of words) {
+      if (isLetterDeletionOf(raw, name)) {
+        seen.add(name);
+        break;
+      }
+    }
+  }
+  return [...seen];
 }
 
 /**
@@ -2284,6 +2444,34 @@ export function checkSms(
     sig.add("message", "Spelling/grammar patterns common in scam messages", 10);
   }
 
+  // Names and boilerplate reproduced with letters missing — filter evasion, not
+  // sloppiness. See corruptedNames: the vocabulary is deliberately closed, so
+  // this scores a mangled agency name or a mangled copyright footer and stays
+  // silent on ordinary misspelling.
+  //
+  // Two hits rather than one before it scores on its own account: a single
+  // corrupted word is within reach of a genuine typo, whereas a message that
+  // mangles several at once is running a template through a mangler. One hit
+  // still emits at zero weight, because the reader should see what was noticed.
+  const corrupted = corruptedNames(text, [
+    ...PACK.authorityMentions,
+    ...PACK.officialSenderNames,
+    ...BOILERPLATE_VOCABULARY,
+  ]);
+  if (corrupted.length >= 2) {
+    sig.add(
+      "message",
+      `Words are misspelled by dropping letters (${corrupted.slice(0, 3).sort().join(", ")}) — a trick to slip past filters that scan for the correctly spelled words while still reading normally to you`,
+      20,
+    );
+  } else if (corrupted.length === 1) {
+    sig.add(
+      "message",
+      `A word here is spelled with letters missing (${corrupted[0]}) — on its own that can be an ordinary typo, but it is also how a scam message slips past filters looking for the real word`,
+      0,
+    );
+  }
+
   // Named fraudulent investment platforms (D4 / #104). ASIC/Scamwatch have
   // explicitly warned against these exact names — a single match is a
   // high-confidence scam signal with essentially no legitimate use case.
@@ -2771,13 +2959,20 @@ function scoreToResult(
     details = `This is almost certainly a scam. Delete it, block the sender, and report it to ${reportingBody}.`;
   }
 
+  // Read before finalise(), which settles these rows against this pass's
+  // evidence alone. A caller still gathering evidence (the email path, mid-way
+  // through its body analysis) re-defers them into its own list instead.
+  const unsettled = sig.unsettled();
+
   // finalise() appends the clamp row when the raw total overshot, so signals and
   // flags are produced from the same list and cannot drift apart.
   const signals = sig.finalise(score);
-  return downgradeForCoverage(
+  const result = downgradeForCoverage(
     { verdict, score, flags: signals.map((x) => x.text), details, category, coverage, signals },
     coverage,
   );
+  if (unsettled.size) PENDING.set(result as object, unsettled);
+  return result;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
