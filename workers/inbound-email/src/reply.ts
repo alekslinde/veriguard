@@ -13,6 +13,22 @@ export interface ReplyContent {
   html: string;
 }
 
+// A mail platform may refuse to reply to a message carrying more than 100
+// References entries, as a reply-loop and abuse guard. Each forwarding hop adds
+// one, and the forward-to-check flow is fed by exactly the kind of mail that has
+// been passed around a group before it reaches us, so an unbounded chain walks a
+// real thread into that ceiling. RFC 5322 §3.6.4 lets an implementation drop
+// entries it cannot keep, so keep the root (what clients group the thread by)
+// and the most recent few (what they use to nest the reply) and drop the middle.
+const REFERENCES_KEEP_ROOT = 1;
+const REFERENCES_KEEP_RECENT = 20;
+
+export function truncateReferences(references: string): string {
+  const ids = references.split(/\s+/).filter(Boolean);
+  if (ids.length <= REFERENCES_KEEP_ROOT + REFERENCES_KEEP_RECENT) return ids.join(" ");
+  return [...ids.slice(0, REFERENCES_KEEP_ROOT), ...ids.slice(-REFERENCES_KEEP_RECENT)].join(" ");
+}
+
 // Build the raw MIME for the verdict reply. Deliverability/threading notes:
 //   • From = the address that RECEIVED the mail (the inbound `to`). Cloudflare
 //     requires the reply's sender domain to match the receiving domain, and
@@ -34,8 +50,10 @@ export function buildReplyMime(
   msg.setSubject(reply.subject);
   if (opts.messageId) msg.setHeader("In-Reply-To", opts.messageId);
   // Preserve any existing References chain and append the message we're replying
-  // to, so the thread stays intact across clients.
-  const references = [opts.references, opts.messageId].filter(Boolean).join(" ").trim();
+  // to, so the thread stays intact across clients, bounded by truncateReferences.
+  const references = truncateReferences(
+    [opts.references, opts.messageId].filter(Boolean).join(" ").trim(),
+  );
   if (references) msg.setHeader("References", references);
   msg.setHeader("Auto-Submitted", "auto-replied");
   msg.addMessage({ contentType: "text/plain", data: reply.text });

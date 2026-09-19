@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildReplyMime } from "../src/reply.ts";
+import { buildReplyMime, truncateReferences } from "../src/reply.ts";
 
 const REPLY = {
   subject: "Scam alert: the email you forwarded",
@@ -60,4 +60,45 @@ test("still produces a valid message body when given empty threading refs", () =
   const mime = buildReplyMime(REPLY, { from: OPTS.from, to: OPTS.to, messageId: null, references: null });
   assert.match(mime, /^From:.*check@veriguard\.app/m);
   assert.doesNotMatch(mime, /^References:/m);
+});
+
+// Each forwarding hop appends one References entry, and a mail platform may
+// refuse to reply to a message carrying more than 100 of them. A reply that
+// appended without bound would hand the next hop a chain one longer than the
+// one it received.
+
+test("a short References chain is passed through unchanged", () => {
+  const chain = "<a@x.test> <b@x.test> <c@x.test>";
+  assert.equal(truncateReferences(chain), chain);
+});
+
+test("a chain at the keep-everything boundary is not truncated", () => {
+  // 21 entries = root + 20 recent, the most that survives intact.
+  const ids = Array.from({ length: 21 }, (_, i) => `<id-${i}@x.test>`);
+  assert.equal(truncateReferences(ids.join(" ")).split(" ").length, 21);
+});
+
+test("a long chain is bounded, keeping the thread root and the recent entries", () => {
+  const ids = Array.from({ length: 150 }, (_, i) => `<id-${i}@x.test>`);
+  const out = truncateReferences(ids.join(" ")).split(" ");
+
+  assert.equal(out.length, 21, "a bounded chain cannot grow into the refusal");
+  // Clients group a thread by its root and nest the reply by the latest entry,
+  // so those are the two ends that have to survive; the middle is droppable
+  // under RFC 5322 §3.6.4.
+  assert.equal(out[0], "<id-0@x.test>", "the thread root must survive");
+  assert.equal(out.at(-1), "<id-149@x.test>", "the most recent entry must survive");
+});
+
+test("a reply to a deeply forwarded message carries a bounded References header", () => {
+  // The end-to-end property: the failing case from production, through the
+  // builder rather than the helper alone.
+  const longChain = Array.from({ length: 120 }, (_, i) => `<hop-${i}@x.test>`).join(" ");
+  const mime = buildReplyMime(REPLY, { ...OPTS, references: longChain });
+
+  const header = mime.match(/^References: (.*)$/m)?.[1] ?? "";
+  assert.ok(header.split(/\s+/).length <= 21, "the built reply must stay bounded");
+  assert.match(header, /<hop-0@x\.test>/);
+  // The message being replied to is still the last entry after truncation.
+  assert.match(header, /<orig-123@gmail\.com>$/);
 });
