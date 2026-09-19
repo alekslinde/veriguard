@@ -120,12 +120,17 @@ const handler = {
     try {
       await message.reply(new EmailMessage(message.to, message.from, mime));
     } catch (err) {
-      // Cloudflare rejects the reply when the incoming forward itself failed
-      // DMARC (a documented constraint) — we can't reply on that transaction.
-      // Log it so this isn't a silent black hole; there's nothing else to do
-      // on the inbound transaction. No delivery confirmation is sent, so this
-      // forward is (correctly) never counted as a check.
-      console.warn("reply rejected (likely incoming DMARC failure):", err);
+      // Cloudflare refused the reply. It reports several distinct causes
+      // through one error — the forward failed DMARC, the message is "not
+      // repliable", or a per-message reply limit is spent — so pass its own
+      // wording through rather than naming a cause. An earlier version of this
+      // line asserted DMARC, and when a Gmail forward was refused (Gmail
+      // publishes p=none and passes its own DMARC, so that reading was almost
+      // certainly wrong) the log actively pointed away from the real fault.
+      //
+      // Nothing to retry on the inbound transaction. No delivery confirmation
+      // is sent, so this forward is correctly never counted as a check.
+      console.warn("reply refused by the mail platform:", err);
       return;
     }
 
