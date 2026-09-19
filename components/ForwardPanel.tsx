@@ -77,7 +77,11 @@ export default function ForwardPanel() {
   }
 
   return (
-    <aside className="rounded-2xl border border-[var(--rule)] bg-[var(--ink-2)] p-5 space-y-3 h-fit">
+    // Fills its grid track rather than sizing to content, so the two cards end
+    // level whatever this one is currently saying. The trailing note is pushed
+    // to the bottom (mt-auto) so the slack lands there rather than as a gap
+    // under the last box.
+    <aside className="rounded-2xl border border-[var(--rule)] bg-[var(--ink-2)] p-5 flex flex-col gap-3 h-full">
       <p className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
         <span className="shrink-0 text-[var(--faint)]">
           <ForwardIcon />
@@ -89,11 +93,19 @@ export default function ForwardPanel() {
       {/* Above the address, not below it: the point is to be read BEFORE
           someone forwards and starts waiting. role="status" rather than
           "alert" — it is a caveat on a working feature, not an error, and
-          should not interrupt a screen reader mid-sentence. */}
+          should not interrupt a screen reader mid-sentence.
+
+          Deliberately NOT styled like the tracking-pixel warning below, though
+          both are advisories. That one is permanent safety guidance; this is
+          transient service status that gets deleted in days. Giving them the
+          same amber treatment taught the eye to skim both, and the safety one
+          is the one that must never be skimmed. Muted surface, no colour, and
+          a rule down the side marks it as an aside on the feature rather than
+          a hazard in the message. */}
       {REPLIES_DELAYED && (
         <p
           role="status"
-          className="text-xs text-[var(--caution)] bg-[var(--caution)]/10 border border-[var(--caution)]/35 rounded-lg px-3 py-2"
+          className="text-xs leading-relaxed text-[var(--text-dim)] bg-[var(--ink)] border-l-2 border-[var(--faint)] rounded-r-md pl-3 pr-3 py-2"
         >
           {bold(t("check.forward.delay"))}
         </p>
@@ -123,7 +135,7 @@ export default function ForwardPanel() {
         {bold(t("check.forward.noopen"))}
       </p>
 
-      <p className="text-[11px] text-[var(--faint)]">{t("check.forward.note")}</p>
+      <p className="text-[11px] text-[var(--faint)] mt-auto">{t("check.forward.note")}</p>
     </aside>
   );
 }

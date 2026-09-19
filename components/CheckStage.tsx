@@ -119,7 +119,16 @@ export default function CheckStage({
           done
             ? "grid gap-5"
             : forward
-              ? "grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-start"
+              // 1fr/1fr rather than 1.15/0.85, and stretched rather than
+              // top-aligned. The panel beside the box grows and shrinks with
+              // what it has to say — a service notice appears, the
+              // tracking-pixel warning wraps differently at each width — so a
+              // split tuned against one of those states comes apart in the
+              // others, and top-alignment left one card floating against the
+              // other's lower edge. Equal columns that stretch stay square
+              // across every combination, and the box is still a comfortable
+              // measure to paste into at half the container.
+              ? "grid gap-5 lg:grid-cols-2 lg:items-stretch"
               // Without a forwarding panel beside it the box would otherwise
               // stretch the full container, and a textarea spanning 1180px is
               // worse to paste into than one at a readable width.
