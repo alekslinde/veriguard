@@ -473,3 +473,39 @@ test("a forward with no envelope headers reports them absent, not missing", asyn
   assert.match(line, /envelope=absent/);
   assert.match(line, /sender-hdr=absent/);
 });
+
+test("a header packed with angle brackets is parsed without degrading", async () => {
+  // These headers are attacker-controlled — anyone can send mail with a 100KB
+  // From line. The first version of this parser used `.replace(/^.*</, "")`,
+  // which CodeQL flagged as a polynomial ReDoS before it ever shipped.
+  //
+  // This test does NOT reproduce the exploit: the engine optimises that pattern
+  // well enough that the old code passes too, and a timing assertion tuned
+  // finely enough to catch it would be flaky on shared CI. It guards the
+  // property that matters — hostile input is handled in bounded time — and the
+  // reason the regex is gone is the static finding, not this measurement.
+  stubFetch(okReply);
+  const evil = "<".repeat(50_000) + ">".repeat(50_000);
+
+  const started = Date.now();
+  await handler.email(
+    fakeMessage({ envelope: { From: evil, "Reply-To": evil, "Return-Path": evil } }) as never,
+    ENV,
+  );
+  const elapsed = Date.now() - started;
+
+  assert.ok(elapsed < 1000, `parsing must not degrade on hostile input (took ${elapsed}ms)`);
+  assert.ok(infoLogs.some((l) => /envelope: from=/.test(l)), "and must still produce a shape");
+});
+
+test("an address with no closing bracket is still read", async () => {
+  // Malformed input must not silently become the whole header, which would put
+  // the raw value into a comparison and defeat the point of reporting a shape.
+  stubFetch(okReply);
+  await handler.email(
+    fakeMessage({ envelope: { From: "Name <forwarder@gmail.com", "Return-Path": "<forwarder@gmail.com>" } }) as never,
+    ENV,
+  );
+  const line = infoLogs.find((l) => /envelope:/.test(l))!;
+  assert.match(line, /envelope=matches-from/, "an unterminated bracket still yields the address");
+});

@@ -93,8 +93,18 @@ function authSummary(headers: Headers): string {
  * Diagnostic. Remove once the refusals are explained.
  */
 function envelopeShape(headers: Headers, from: string, to: string): string {
-  const addrOf = (v: string | null) => (v ?? "").match(/<([^>]+)>/)?.[1] ?? (v ?? "").trim();
-  const bare = (v: string) => v.toLowerCase().replace(/^.*</, "").replace(/>.*$/, "").trim();
+  // Angle-bracket extraction without a regex. `.replace(/^.*</, "")` reads
+  // naturally but is quadratic on a header full of brackets, and these headers
+  // are attacker-controlled: anyone can send mail with a 100KB From line. Index
+  // arithmetic does the same job in one pass and cannot backtrack.
+  const addrOf = (v: string | null): string => {
+    const s = v ?? "";
+    const open = s.indexOf("<");
+    if (open === -1) return s.trim();
+    const close = s.indexOf(">", open + 1);
+    return close === -1 ? s.slice(open + 1).trim() : s.slice(open + 1, close).trim();
+  };
+  const bare = (v: string) => addrOf(v).toLowerCase();
 
   const fromHeader = headers.get("From");
   const replyTo = headers.get("Reply-To");
@@ -107,13 +117,13 @@ function envelopeShape(headers: Headers, from: string, to: string): string {
     // A Reply-To pointing somewhere other than the sender changes who a reply
     // would reach, which is the one thing message.reply() is strict about.
     `replyto=${
-      replyTo ? (bare(addrOf(replyTo)) === bare(from) ? "same-as-from" : "differs") : "absent"
+      replyTo ? (bare(replyTo) === bare(from) ? "same-as-from" : "differs") : "absent"
     }`,
     // The envelope sender is what SPF is checked against, and a mismatch with
     // the header From is the ordinary signature of a relayed or forwarded send.
     `envelope=${
       returnPath
-        ? bare(addrOf(returnPath)) === bare(from)
+        ? bare(returnPath) === bare(from)
           ? "matches-from"
           : "differs-from"
         : "absent"
