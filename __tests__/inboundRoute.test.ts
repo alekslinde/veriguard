@@ -154,10 +154,18 @@ describe("POST /api/inbound — check counter", () => {
       .spyOn(blocklist, "getUrlhausBlocklist")
       .mockRejectedValueOnce(new Error("boom") as never);
 
+    // Silence the expected error while still asserting it was reported: this
+    // forward produced no verdict for someone who asked for one, and a bare
+    // `catch {}` here left that with no trace anywhere. The route still answers
+    // 200 — bouncing mail to a possibly-spoofed sender is the worse failure.
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
     const res = await POST(inbound({ raw: SCAM_FORWARD, from: "crash-probe@gmail.com" }));
     expect(await res.json()).toMatchObject({ skip: "analysis-error" });
     expect(recordCheckEvent).toHaveBeenCalledWith("email", "analysed");
+    expect(logged).toHaveBeenCalledWith("inbound analysis failed:", expect.any(Error));
 
+    logged.mockRestore();
     spy.mockRestore();
   });
 

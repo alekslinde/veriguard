@@ -45,3 +45,15 @@ jobs:
         run: npm run lint
       - name: Unit tests
         run: npm test
+
+      # The Worker is outside the npm workspaces and vitest excludes workers/**,
+      # so the root `npm test` above does not reach it — its suite would only
+      # ever run if someone remembered to by hand. That is how the email()
+      # handler's failure handling went untested while a stale secret took the
+      # whole forward-to-check path down.
+      - name: Install inbound worker deps
+        working-directory: workers/inbound-email
+        run: npm ci
+      - name: Inbound worker tests
+        working-directory: workers/inbound-email
+        run: npm test
