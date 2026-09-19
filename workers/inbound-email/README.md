@@ -139,7 +139,7 @@ value silently reverts at the next merge to `main`.
 
 Every way a forward can die now says so in the Worker's logs
 (`npx wrangler tail`, or the dashboard's live logs). A healthy forward logs only
-its `inbound References entries: N, auth: …` line, so any *warning or error*
+its `inbound References entries: N, auth: [...] [...]` line, so any *warning or error*
 here is the diagnosis:
 
 | Log line | Means |
@@ -148,7 +148,7 @@ here is the diagnosis:
 | `inbound webhook rejected: HTTP 5xx` | The app is up but erroring — check the app's own logs for `inbound analysis failed`. |
 | `inbound webhook unreachable` | Wrong `INBOUND_WEBHOOK_URL`, or the app is down. |
 | `inbound skipped by API: rate-limited` | Working as intended — the per-sender budget. |
-| `reply refused by the mail platform (inbound References entries: N, auth: …)` | The platform declined the reply and reports several distinct causes through one error, so it passes that wording through rather than naming one. Both measured conditions ride along: the inbound chain length, and the authentication verdicts the receiving MTA recorded. Compare them against the same figures from forwards that succeeded — a refusal is only readable that way. See *When NO reply is sent*. |
+| `reply refused by the mail platform (inbound References entries: N, auth: [...])` | The platform declined the reply and reports several distinct causes through one error, so it passes that wording through rather than naming one. Both measured conditions ride along: the inbound chain length, and the authentication verdicts, grouped one bracket per identity. A forward carries more than one — the forwarder's own send, and the original it quotes. `[dmarc=pass …] [dmarc=none …]` is a forward of unauthenticated mail, which is refused although the forwarder themselves authenticated fine. See *When NO reply is sent*. |
 | `inbound dropped: raw unreadable or over …` | The forward exceeded `MAX_RAW_BYTES`. |
 
 Silence in the Worker's log while mail still goes unanswered means the message
@@ -203,9 +203,18 @@ the sending domain matches the receiving domain, and one reply per event — and
 the Worker satisfies those identically for every message, so they never explain
 a refusal in production. Two are properties of the forward itself:
 
-- **The incoming forward must have a valid DMARC result.** A forward from a
-  provider or path that fails DMARC is refused. Most consumer providers
-  (Gmail/Outlook/iCloud) pass on forwards, so this is an edge case.
+- **The incoming forward must have a valid DMARC result** — and a forward
+  carries more than one identity to judge. The forwarder's own send is
+  typically fine; the message they forwarded is not, because scam mail comes
+  from domains that publish no DMARC policy. That arrives as a second set of
+  verdicts reading `dmarc=none spf=none`, and `none` is the absence of a
+  policy, not a pass. Observed: a forward logging
+  `[dkim=pass spf=pass dmarc=pass] [spf=none dmarc=none]` was refused, while
+  forwards from the same provider carrying one all-pass set were answered.
+  **This is a property of the mail being forwarded, not of the person
+  forwarding it** — which is why the same sender can succeed and fail on
+  different messages, and why it cannot be fixed by anything in this
+  directory.
 - **The incoming forward must carry no more than 100 `References` entries.**
   Each hop adds one, so mail that has been passed around a group before reaching
   us accumulates them — which is exactly the mail this flow is built for. The

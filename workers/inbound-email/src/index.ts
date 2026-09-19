@@ -24,25 +24,55 @@ export interface Env {
 }
 
 /**
- * The authentication verdicts the receiving MTA recorded on the forward, as
- * bare tokens: "dmarc=pass spf=pass".
+ * The authentication verdicts recorded on the forward, grouped as they were
+ * written: "[dkim=pass dmarc=pass spf=pass] [dmarc=none spf=none]".
  *
  * A reply is refused unless the incoming message has a valid DMARC result, and
  * the refusal names no cause, so this is the one condition a log can speak to
- * that the error will not. It is read from the header the receiving MTA wrote,
- * not computed here.
+ * that the error will not. Read from the headers the MTAs wrote, not computed
+ * here.
  *
- * Only the mechanism=result pairs are kept. The full header also carries the
- * sending host, envelope addresses and signature domains — a correspondent's
- * details, which answer nothing a verdict does not and do not belong in a log.
+ * A FORWARD CARRIES MORE THAN ONE SET. Each MTA the mail passed through adds
+ * its own header, and a forwarded scam email therefore arrives with a verdict
+ * on the forwarder's send (typically all pass) and another on the original it
+ * quotes (typically dmarc=none, since scam domains publish no policy). Several
+ * headers of one name join into a comma-separated value, so the sets are split
+ * back apart here.
+ *
+ * The grouping is what makes the reading possible: flattened into one list, a
+ * "dmarc=pass dmarc=none" tells you two verdicts exist but not which identity
+ * each belongs to — and it is precisely a forward of unauthenticated mail that
+ * gets refused, so that distinction is the whole diagnostic value.
+ *
+ * Only the mechanism=result pairs are kept, in the order written and
+ * de-duplicated within a set but never across sets. The full header also
+ * carries the sending host, envelope addresses and signature domains — a
+ * correspondent's details, which answer nothing a verdict does not and do not
+ * belong in a log.
  */
 function authSummary(headers: Headers): string {
   const raw = headers.get("Authentication-Results");
   if (!raw) return "none recorded";
-  const verdicts = raw
+  const groups = raw
     .toLowerCase()
-    .match(/\b(?:dmarc|spf|dkim|compauth)=(?:pass|fail|none|neutral|softfail|temperror|permerror|bestguesspass)\b/g);
-  return verdicts?.length ? [...new Set(verdicts)].join(" ") : "none recorded";
+    // Quoted strings are dropped before splitting: a DKIM signature value may
+    // contain a comma, which would otherwise split one MTA's verdicts into two
+    // and invent a second identity that was never there.
+    .replace(/"[^"]*"/g, "")
+    .split(",")
+    .map(
+      (part) =>
+        part.match(
+          /\b(?:dmarc|spf|dkim|compauth|arc)=(?:pass|fail|none|neutral|softfail|hardfail|temperror|permerror|bestguesspass)\b/g,
+        ) ?? [],
+    )
+    .filter((found) => found.length > 0)
+    .map((found) => [...new Set(found)].join(" "));
+
+  if (groups.length === 0) return "none recorded";
+  // De-duplicated across sets too: an identical set repeated says nothing extra,
+  // while two DIFFERENT sets are the finding.
+  return [...new Set(groups)].map((g) => `[${g}]`).join(" ");
 }
 
 const MAX_RAW_BYTES = 1_000_000; // drop anything larger before calling the API
