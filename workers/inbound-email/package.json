@@ -6,7 +6,7 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
-    "test": "node --test"
+    "test": "node --import ./test/register.mjs --test 'test/*.test.ts'"
   },
   "dependencies": {
     "mimetext": "^3.0.24"

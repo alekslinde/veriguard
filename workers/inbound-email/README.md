@@ -1,5 +1,7 @@
 # Inbound Email Worker
 
+*Last reviewed: 2026-09-19.*
+
 Receives forwarded suspicious emails at `check@<domain>`, sends the raw message
 to the Next app's `/api/inbound` for analysis, and replies to the forwarder with
 a plain-English verdict.
@@ -113,9 +115,44 @@ committed values that name a particular one are `name` and
 
 ### Rotating the secret later
 
-Change it in **both** GitHub repo secrets (re-run the workflow) **and** the
-app's env var (redeploy). If only one side changes, inbound mail 401s until
-both match — so do them close together.
+There are **three** places the value lives, and all three must match:
+
+| Where | How it gets the new value |
+| --- | --- |
+| GitHub repo secret | edit it directly |
+| **The Worker (Cloudflare)** | **re-run the deploy workflow** — editing the GitHub secret does not deploy anything |
+| The app's env var | edit it on the host, then redeploy |
+
+The middle row is the one that gets missed: rotating the GitHub secret changes
+what the *next* deploy would push, and nothing more. Until that workflow runs,
+the Worker keeps presenting the old value and every call to `/api/inbound`
+401s. Inbound mail is dead for as long as the three disagree, so rotate them
+close together and finish with the workflow run.
+
+Set the Worker's value as a **secret**, never a `[vars]` entry — a plaintext
+variable of the same name both exposes it in the dashboard and collides with
+the secret binding. Avoid editing it by hand in the dashboard at all: the
+deploy workflow re-pushes it from the GitHub secret on every run, so a manual
+value silently reverts at the next merge to `main`.
+
+## When a forward gets no reply
+
+Every way a forward can die now says so in the Worker's logs
+(`npx wrangler tail`, or the dashboard's live logs). A healthy forward logs
+nothing, so anything here is the diagnosis:
+
+| Log line | Means |
+| --- | --- |
+| `inbound webhook rejected: HTTP 401 … INBOUND_SECRET likely does not match` | The three copies of the secret have drifted. See above. |
+| `inbound webhook rejected: HTTP 5xx` | The app is up but erroring — check the app's own logs for `inbound analysis failed`. |
+| `inbound webhook unreachable` | Wrong `INBOUND_WEBHOOK_URL`, or the app is down. |
+| `inbound skipped by API: rate-limited` | Working as intended — the per-sender budget. |
+| `reply rejected (likely incoming DMARC failure)` | Cloudflare refused the reply because the *incoming forward* failed DMARC. Nothing to fix here; see *The one case where NO reply is sent*. |
+| `inbound dropped: raw unreadable or over …` | The forward exceeded `MAX_RAW_BYTES`. |
+
+Silence in the Worker's log while mail still goes unanswered means the message
+never reached the Worker — check the Email Routing rule binding
+(step 6) rather than anything in this directory.
 
 ## Deliverability — keeping the reply out of spam
 
@@ -202,15 +239,26 @@ See: <https://developers.cloudflare.com/email-service/configuration/mta-sts/>
 
 ```sh
 npm install
-npm test          # node:test — unit-tests the reply MIME builder (src/reply.ts)
+npm test          # node:test — the email() handler and the reply MIME builder
 npm run dev       # wrangler dev — replay a fixture against the email() handler
 npm run typecheck
 ```
 
-`npm test` covers the only non-Cloudflare logic in the Worker (building the reply
-MIME: From alignment, threading headers, multipart body). The `message.raw` read
-and `message.reply()` send only run inside Cloudflare's email runtime — exercise
-those with `wrangler dev` (it can simulate an inbound message) pointing
+`npm test` covers the reply MIME builder (`src/reply.ts`: From alignment,
+threading headers, multipart body) and the `email()` handler's control flow —
+which of the webhook's answers produce a reply, and that each way a forward can
+die is reported rather than dropped in silence.
+
+Reaching the handler at all needs `test/loader.mjs`, a resolver hook mapping
+`cloudflare:email` to a local stub: that module exists only in the Workers
+runtime and the default ESM loader rejects its scheme outright. `npm test`
+registers the hook; a bare `node --test` fails on the import. Because of it,
+`src/` imports carry explicit `.ts` extensions — wrangler accepts either form,
+bare Node does not.
+
+What the stub cannot cover is the real `message.raw` stream and the actual
+`message.reply()` send, which only exist inside Cloudflare's email runtime —
+exercise those with `wrangler dev` (it can simulate an inbound message) pointing
 `INBOUND_WEBHOOK_URL` at a local tunnel or a staging deploy of the Next app.
 
 ## Notes

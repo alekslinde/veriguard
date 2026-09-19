@@ -12,7 +12,9 @@
 // one else. (We still rate-limit per sender on the API side as defence depth.)
 
 import { EmailMessage } from "cloudflare:email";
-import { buildReplyMime } from "./reply";
+// Extension-ful: wrangler resolves either, but bare Node (which runs this
+// Worker's tests) only resolves the explicit form.
+import { buildReplyMime } from "./reply.ts";
 
 export interface Env {
   // Set via `wrangler secret put` — must match the Next app's INBOUND_SECRET.
@@ -53,7 +55,12 @@ async function streamToString(stream: ReadableStream, maxBytes: number): Promise
 const handler = {
   async email(message: ForwardableEmailMessage, env: Env): Promise<void> {
     const raw = await streamToString(message.raw, MAX_RAW_BYTES);
-    if (!raw) return; // oversized or unreadable — silently drop
+    if (!raw) {
+      // Over MAX_RAW_BYTES or unreadable. Still a forward someone is waiting on,
+      // so say so rather than dropping in silence.
+      console.warn(`inbound dropped: raw unreadable or over ${MAX_RAW_BYTES} bytes`);
+      return;
+    }
 
     let data: VerdictReply;
     try {
@@ -65,13 +72,40 @@ const handler = {
         },
         body: JSON.stringify({ raw, from: message.from, to: message.to }),
       });
+
+      // A non-2xx RESOLVES — it does not throw — so without this check the
+      // error body falls through to the `!data.reply` return below and a hard
+      // failure becomes indistinguishable from the API deciding not to reply.
+      // That is not hypothetical: a stale INBOUND_SECRET 401s every call, and
+      // the whole forward-to-check path went down with nothing logged anywhere
+      // until someone noticed replies had stopped arriving. 401 and 403 are
+      // called out by name because they mean the shared secret has drifted
+      // between the Worker and the app — a configuration fault that no amount
+      // of retrying fixes, and the first thing to check when mail goes quiet.
+      if (!res.ok) {
+        const hint =
+          res.status === 401 || res.status === 403
+            ? " — INBOUND_SECRET likely does not match the app's; re-run the worker deploy after rotating it"
+            : "";
+        console.error(`inbound webhook rejected: HTTP ${res.status}${hint}`);
+        return;
+      }
+
       data = (await res.json()) as VerdictReply;
-    } catch {
-      return; // webhook unreachable — drop rather than bounce
+    } catch (err) {
+      console.error("inbound webhook unreachable:", err);
+      return; // drop rather than bounce
     }
 
-    // No reply means the API skipped (rate-limited, empty, error) — send nothing.
-    if (!data.reply) return;
+    // No reply means the API deliberately skipped — rate-limited, empty, or an
+    // analysis error it already accounted for. `skip` carries which, so log it
+    // rather than inferring; this is the one quiet path that is working as
+    // intended, and naming the reason keeps it distinguishable from the
+    // failures above.
+    if (!data.reply) {
+      console.warn(`inbound skipped by API: ${data.skip ?? "no reason given"}`);
+      return;
+    }
 
     // Build a reply addressed back to the forwarder. message.reply() restricts
     // the recipient to the original sender, so this can't be redirected; the
