@@ -29,12 +29,15 @@ const ENV = {
 };
 
 /** A forward the Worker can read: a real stream, a sender, a Message-ID. */
-function fakeMessage(overrides: { replyThrows?: boolean } = {}) {
+function fakeMessage(overrides: { replyThrows?: boolean; references?: string } = {}) {
   const replies: unknown[] = [];
   return {
     from: "forwarder@gmail.com",
     to: "check@veriguard.app",
-    headers: new Headers({ "Message-ID": "<orig@gmail.com>" }),
+    headers: new Headers({
+      "Message-ID": "<orig@gmail.com>",
+      ...(overrides.references ? { References: overrides.references } : {}),
+    }),
     raw: new ReadableStream({
       start(c) {
         c.enqueue(new TextEncoder().encode("From: scammer@evil.test\r\n\r\nClick here"));
@@ -53,12 +56,21 @@ function fakeMessage(overrides: { replyThrows?: boolean } = {}) {
 let logs: { level: string; text: string }[] = [];
 let restore: (() => void) | undefined;
 
+// `logs` holds only the levels that report a fault, so the assertions below can
+// keep saying "a healthy forward logs nothing" about warnings and errors. Plain
+// console.log is routine diagnostic output that every forward emits, so it is
+// captured apart from them rather than counted as noise.
+let infoLogs: string[] = [];
+
 before(() => {
+  const log = console.log;
   const warn = console.warn;
   const error = console.error;
+  console.log = (...a: unknown[]) => infoLogs.push(a.join(" "));
   console.warn = (...a: unknown[]) => logs.push({ level: "warn", text: a.join(" ") });
   console.error = (...a: unknown[]) => logs.push({ level: "error", text: a.join(" ") });
   restore = () => {
+    console.log = log;
     console.warn = warn;
     console.error = error;
   };
@@ -67,6 +79,7 @@ before(() => {
 after(() => restore?.());
 beforeEach(() => {
   logs = [];
+  infoLogs = [];
 });
 
 function stubFetch(responder: (url: string, init: RequestInit) => Response) {
@@ -176,7 +189,64 @@ test("a reply rejected by Cloudflare is reported and not counted", async () => {
   // failure from "not repliable" from a spent reply limit, and naming one of
   // those ourselves sent an earlier investigation after the wrong cause.
   assert.match(warned, /DMARC failure/);
+  // Of the conditions behind a refusal, the chain length is the one this side
+  // can measure, so the refusal carries it: a count here is only meaningful
+  // against counts from forwards that succeeded, and both come from this line.
+  assert.match(warned, /References entries: \d+/);
   assert.equal(confirmed, false, "a rejected reply must not be counted as delivered");
+});
+
+test("every forward logs its inbound References count, refused or not", async () => {
+  // A refusal names no cause, so the count is diagnosable only by comparison
+  // with forwards that worked — which means logging it before knowing which
+  // this one is.
+  stubFetch((_url, init) => {
+    if (JSON.parse(String(init.body)).delivered) return new Response("{}", { status: 200 });
+    return new Response(
+      JSON.stringify({ ok: true, reply: { subject: "s", text: "t", html: "<p>h</p>" } }),
+      { status: 200 },
+    );
+  });
+
+  await handler.email(fakeMessage({ references: "<a@x.test> <b@x.test> <c@x.test>" }) as never, ENV);
+
+  assert.ok(
+    infoLogs.some((l) => /References entries: 3/.test(l)),
+    "a successful forward should still record its chain length",
+  );
+});
+
+test("the References count does not put correspondents' message IDs in the log", async () => {
+  // The chain names who a thread passed through. A count answers the question
+  // the log exists for; the IDs themselves would be someone else's mail.
+  stubFetch((_url, init) => {
+    if (JSON.parse(String(init.body)).delivered) return new Response("{}", { status: 200 });
+    return new Response(
+      JSON.stringify({ ok: true, reply: { subject: "s", text: "t", html: "<p>h</p>" } }),
+      { status: 200 },
+    );
+  });
+
+  await handler.email(fakeMessage({ references: "<private@correspondent.test>" }) as never, ENV);
+
+  assert.ok(
+    [...infoLogs, ...logs.map((l) => l.text)].every((l) => !l.includes("correspondent.test")),
+    "message IDs must not be logged",
+  );
+});
+
+test("a forward with no References header counts zero rather than failing", async () => {
+  stubFetch((_url, init) => {
+    if (JSON.parse(String(init.body)).delivered) return new Response("{}", { status: 200 });
+    return new Response(
+      JSON.stringify({ ok: true, reply: { subject: "s", text: "t", html: "<p>h</p>" } }),
+      { status: 200 },
+    );
+  });
+
+  await handler.email(fakeMessage() as never, ENV);
+
+  assert.ok(infoLogs.some((l) => /References entries: 0/.test(l)));
 });
 
 test("an oversized forward is reported rather than dropped in silence", async () => {

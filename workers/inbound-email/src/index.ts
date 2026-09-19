@@ -107,6 +107,22 @@ const handler = {
       return;
     }
 
+    const inboundReferences = message.headers.get("References");
+
+    // The platform refuses a reply for several distinct reasons behind one error
+    // string, and the refusal itself names none of them. Of those reasons, all
+    // but two are structural — they hold identically for every message this
+    // handler builds — so the two that vary per message are what a refusal is
+    // actually reporting: the forward's own authentication result, and the
+    // length of its References chain (bounded to guard against reply loops).
+    // The chain length is knowable here and the authentication result is not,
+    // so log it on every message: a refusal is only diagnosable against a count
+    // from a forward that succeeded, which means recording it before knowing
+    // which this is. Counting entries rather than logging the header keeps
+    // correspondents' message IDs out of the log.
+    const referenceCount = inboundReferences ? inboundReferences.trim().split(/\s+/).length : 0;
+    console.log(`inbound References entries: ${referenceCount}`);
+
     // Build a reply addressed back to the forwarder. message.reply() restricts
     // the recipient to the original sender, so this can't be redirected; the
     // From is the receiving address so Cloudflare DKIM-signs it for that domain.
@@ -114,7 +130,7 @@ const handler = {
       from: message.to,
       to: message.from,
       messageId: message.headers.get("Message-ID"),
-      references: message.headers.get("References"),
+      references: inboundReferences,
     });
 
     try {
@@ -130,7 +146,10 @@ const handler = {
       //
       // Nothing to retry on the inbound transaction. No delivery confirmation
       // is sent, so this forward is correctly never counted as a check.
-      console.warn("reply refused by the mail platform:", err);
+      console.warn(
+        `reply refused by the mail platform (inbound References entries: ${referenceCount}):`,
+        err,
+      );
       return;
     }
 
