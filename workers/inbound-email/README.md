@@ -138,8 +138,9 @@ value silently reverts at the next merge to `main`.
 ## When a forward gets no reply
 
 Every way a forward can die now says so in the Worker's logs
-(`npx wrangler tail`, or the dashboard's live logs). A healthy forward logs
-nothing, so anything here is the diagnosis:
+(`npx wrangler tail`, or the dashboard's live logs). A healthy forward logs only
+its `inbound References entries:` count, so any *warning or error* here is the
+diagnosis:
 
 | Log line | Means |
 | --- | --- |
@@ -147,7 +148,7 @@ nothing, so anything here is the diagnosis:
 | `inbound webhook rejected: HTTP 5xx` | The app is up but erroring — check the app's own logs for `inbound analysis failed`. |
 | `inbound webhook unreachable` | Wrong `INBOUND_WEBHOOK_URL`, or the app is down. |
 | `inbound skipped by API: rate-limited` | Working as intended — the per-sender budget. |
-| `reply rejected (likely incoming DMARC failure)` | Cloudflare refused the reply because the *incoming forward* failed DMARC. Nothing to fix here; see *The one case where NO reply is sent*. |
+| `reply refused by the mail platform (inbound References entries: N)` | The platform declined the reply and reports several distinct causes through one error, so it passes that wording through rather than naming one. Every other condition is structural and holds for every message the Worker builds, so a refusal is the forward itself: either its own authentication result, or an over-long `References` chain (the reply is refused above 100 entries). `N` is that chain's length — compare it against the counts logged by forwards that succeeded. See *When NO reply is sent*. |
 | `inbound dropped: raw unreadable or over …` | The forward exceeded `MAX_RAW_BYTES`. |
 
 Silence in the Worker's log while mail still goes unanswered means the message
@@ -169,9 +170,14 @@ mailbox providers still judge it on authentication. To land in the inbox:
    received the mail (`check@<domain>`), because Cloudflare requires the reply's
    sender domain to match the receiving domain. `buildReplyMime` sets this.
 3. **Threading + automated-reply hints** also help: the reply carries
-   `In-Reply-To`, a preserved `References` chain, and `Auto-Submitted:
-   auto-replied`, so it reads as a genuine threaded reply, not an unsolicited
-   send, and won't bounce-loop with other auto-responders.
+   `In-Reply-To`, a `References` chain, and `Auto-Submitted: auto-replied`, so it
+   reads as a genuine threaded reply, not an unsolicited send, and won't
+   bounce-loop with other auto-responders. The chain is preserved but **bounded**
+   — a reply is refused outright when the message it answers carries more than
+   100 `References` entries, and each forwarding hop adds one, so the builder
+   keeps the thread root and the most recent entries and drops the middle
+   (permitted by RFC 5322 §3.6.4). Clients still group and nest the reply
+   correctly, and a long-lived thread cannot grow itself into that refusal.
 
 ### Cost: why this uses reply() and not outbound sending
 
@@ -189,14 +195,26 @@ costs nothing.
 > up: replies show as **"dropped"** in the Email Routing summary even when
 > delivered — that's expected, not a failure.)
 
-### The one case where NO reply is sent
+### When NO reply is sent
 
-Cloudflare's documented constraint: **the incoming forward must itself have a
-valid DMARC result for `message.reply()` to be allowed.** If a user forwards from
-a provider/path that fails DMARC, Cloudflare refuses the reply and `reply()`
-throws — the Worker logs this (`console.warn`) rather than failing silently.
-Most consumer providers (Gmail/Outlook/iCloud) pass DMARC on forwards, so this is
-an edge case, but a small fraction of forwards will get no reply.
+`message.reply()` is allowed only when every one of the platform's documented
+conditions holds. Three are structural — the reply goes to the incoming sender,
+the sending domain matches the receiving domain, and one reply per event — and
+the Worker satisfies those identically for every message, so they never explain
+a refusal in production. Two are properties of the forward itself:
+
+- **The incoming forward must have a valid DMARC result.** A forward from a
+  provider or path that fails DMARC is refused. Most consumer providers
+  (Gmail/Outlook/iCloud) pass on forwards, so this is an edge case.
+- **The incoming forward must carry no more than 100 `References` entries.**
+  Each hop adds one, so mail that has been passed around a group before reaching
+  us accumulates them — which is exactly the mail this flow is built for. The
+  *reply* we build is bounded (see *Deliverability*), but the limit is checked
+  against the incoming message, so a chain that long is refused regardless.
+
+All of these throw, and the Worker logs the refusal with the inbound chain
+length rather than failing silently. The error names no cause, so that count is
+the one measurable discriminator between the two.
 
 **Decision (current):** accept this — no paid outbound sender. If it becomes a
 real problem, the upgrade is a fallback that sends a fresh message via a
