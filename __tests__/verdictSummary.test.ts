@@ -547,3 +547,116 @@ describe("composeVerdictWithEvidence — the rows add up to the score", () => {
     expect(composeVerdictWithEvidence([], null)).toBeNull();
   });
 });
+
+// The emailed verdict and the results sheet are two renderings of one check.
+// Someone who pasted a message on the site and someone who forwarded it should
+// be told the same things in the same order — otherwise the email reads as a
+// lesser product, and the transparency claim ("we publish our weights") holds
+// on one surface and not the other.
+describe("verdict email parity with the results sheet", () => {
+  const scored = (points: number[], texts: string[]) =>
+    ident("message", "likely_scam", "", 70, texts, {
+      signals: texts.map((text, i) => ({ text, points: points[i], source: "message" as const })),
+    });
+
+  const sample = () =>
+    formatVerdictEmail({
+      results: [
+        scored(
+          [30, 25, 0],
+          [
+            "Urgency language detected: \"within 24 hours\"",
+            "Claims to be from a government agency — verify directly via official channels",
+            "A context row worth nothing",
+          ],
+        ),
+      ],
+      emailFlags: [],
+      pixelReport: null,
+    });
+
+  it("publishes each signal's weight", () => {
+    // The claim the product rests on. A list of assertions with a score and no
+    // arithmetic asks to be taken on faith, which is what the sheet exists not
+    // to do.
+    const { text, html } = sample();
+    expect(text).toContain("+30");
+    expect(text).toContain("+25");
+    expect(html).toContain("+30");
+    expect(html).toContain("+25");
+  });
+
+  it("marks a context row as contributing nothing rather than as zero", () => {
+    // "0" reads as a measured value; the em dash reads as "not a contribution",
+    // which is what a context row is. Matches the sheet.
+    expect(sample().text).toContain("—  A context row worth nothing");
+  });
+
+  it("states the risk score and what that band means", () => {
+    const { text, html } = sample();
+    expect(text).toMatch(/RISK SCORE: \d+\/100/);
+    expect(text).toMatch(/Past where honest messages land/);
+    expect(html).toContain("Risk score");
+  });
+
+  it("names the tactics using the Learn page's own words", () => {
+    // Continuity is the whole point of the tactics layer: someone who has read
+    // how scammers operate should meet the same six names on their result.
+    const { text, html } = sample();
+    expect(text).toContain("TACTICS USED");
+    expect(text).toContain("Urgency & fear");
+    expect(html).toContain("Tactics used");
+  });
+
+  it("leads with the score and evidence, then advice", () => {
+    // The sheet's order. Advice used to come first; the redesign puts the
+    // reasoning above it so the verdict is read as a conclusion rather than an
+    // instruction.
+    const { text } = sample();
+    expect(text.indexOf("RISK SCORE")).toBeLessThan(text.indexOf("WHAT WE FOUND"));
+    expect(text.indexOf("WHAT WE FOUND")).toBeLessThan(text.indexOf("WHAT YOU SHOULD DO"));
+  });
+
+  it("still renders when an identifier carries no weighted signals", () => {
+    // Results predating the signals field, and the header-only forward, must
+    // not lose their reasons — the email falls back to the plain flag list.
+    const { text } = formatVerdictEmail({
+      results: [ident("url", "likely_scam", "http://evil.test", 70, ["Dodgy top-level domain"])],
+      emailFlags: [],
+      pixelReport: null,
+    });
+    expect(text).toContain("Dodgy top-level domain");
+  });
+
+  it("still scores a header-only forward, which has a real score of its own", () => {
+    // overallVerdict gives sender-spoofing flags 40 even with no scored
+    // identifier, so the number is genuine and belongs in the reply.
+    const { text } = formatVerdictEmail({
+      results: [],
+      emailFlags: ["Sender name claims to be \"myGov\" but the real address is elsewhere"],
+      pixelReport: null,
+    });
+    expect(text).toContain("RISK SCORE: 40/100");
+  });
+
+  it("omits the score when there is genuinely nothing to report", () => {
+    // Nothing scored and nothing flagged: "Risk score: 0/100" would present a
+    // number we never worked out as though it were a finding.
+    const { text } = formatVerdictEmail({ results: [], emailFlags: [], pixelReport: null });
+    expect(text).not.toContain("RISK SCORE");
+  });
+
+  it("defangs signal text, so no evidence row carries a live link", () => {
+    const { text, html } = formatVerdictEmail({
+      results: [
+        ident("message", "likely_scam", "", 70, [], {
+          signals: [{ text: "Contains link: http://evil.test/pay", points: 20, source: "message" }],
+        }),
+      ],
+      emailFlags: [],
+      pixelReport: null,
+    });
+    expect(text).not.toContain("http://evil.test");
+    expect(html).not.toContain("http://evil.test");
+  });
+});

@@ -17,6 +17,7 @@ import { TrackingPixelReport } from "@/lib/trackingPixel";
 import { TrackingFinding } from "@/lib/emailTracking";
 import { defang, defangEmail, defangPhone, defangText } from "@veriguard/engine/urlSanitizer";
 import { buildReportQuery, ReportPrefill } from "@/lib/reportPrefill";
+import { matchedTactics, TACTIC_IDS, TACTIC_TITLES } from "@/lib/signalTactics";
 
 // Severity ordering lives in the engine now: the WebExtension bundles the
 // engine and cannot reach `lib/`, and two rank tables that must agree is the
@@ -248,6 +249,43 @@ const MAX_REASONS_PER_ITEM = 4;
 interface BreakdownItem {
   heading: string;
   reasons: string[];
+  /** Weighted evidence for this identifier — the same rows the sheet shows. */
+  signals: Signal[];
+}
+
+/**
+ * Format one signal's contribution the way the results sheet does: a signed
+ * weight, or an em dash when a row is context rather than a contribution.
+ *
+ * Publishing the weights is the claim the whole product rests on — detection is
+ * open source so people can check our reasoning, and a score with no breakdown
+ * asks to be taken on faith. The emailed verdict was asking for exactly that.
+ */
+function formatPoints(points: number): string {
+  if (points > 0) return `+${points}`;
+  if (points < 0) return `${points}`;
+  return "—";
+}
+
+/**
+ * The score's meaning in words, matching the bands the sheet names.
+ *
+ * Bounds are scoreToResult's, and the wording is the sheet's own — someone who
+ * checked on the site and someone who forwarded should read the same sentence
+ * about the same number. Kept as literals here because this module is pure and
+ * has no translator; that is the existing convention for every other string in
+ * the reply.
+ */
+function scoreBand(score: number, findings: Signal[]): string {
+  if (score >= 45) {
+    return findings.length >= 4
+      ? "Past where honest messages land. Anyone can trip one of these rules; tripping this many isn't bad luck."
+      : "Past where honest messages land. A real sender trips a rule now and then, but not this hard.";
+  }
+  if (score >= 20) {
+    return "Enough to distrust, not enough to call. A careful scam scores here — so does a real message having a bad day.";
+  }
+  return "A low score is the absence of evidence, not evidence of safety. We can only score the tricks we already know.";
 }
 
 function escapeHtml(s: string): string {
@@ -263,7 +301,7 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
 
   // One shared severity decision — same rule the Check UI uses — so a header-
   // only forward still gets a meaningful headline and the two never disagree.
-  const { verdict } = overallVerdict(results, pixelReport, emailFlags, trackingFindings.length > 0);
+  const { verdict, score } = overallVerdict(results, pixelReport, emailFlags, trackingFindings.length > 0);
   const head = VERDICT_HEADLINE[verdict];
 
   // Breakdown — each identifier, its status, and WHY. The reasons are the point:
@@ -284,7 +322,12 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
       reasons.unshift(`Real destination: ${r.result.expandedUrl}`);
     }
 
-    return { heading: `${label}${value} — ${VERDICT_STATUS[r.result.verdict]}`, reasons };
+    // The weighted rows behind that verdict. Context rows (source "score") are
+    // the clamp's own arithmetic, not an observation about the message, so they
+    // are excluded here exactly as the sheet excludes them.
+    const signals = (r.result.signals ?? []).filter((x) => x.source !== "score");
+
+    return { heading: `${label}${value} — ${VERDICT_STATUS[r.result.verdict]}`, reasons, signals };
   });
   const flagLines = emailFlags.map((f) => defangFlag(f));
   // Tracking: prefer the broader findings when present; otherwise fall back to
@@ -366,6 +409,19 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
     "We've already filled in what we found — you just add anything you want to " +
     "say and hit submit.";
 
+  // Every weighted row across all identifiers, for the score band and the
+  // tactics. Gathered once so the two sections cannot disagree about what the
+  // evidence was.
+  const allSignals = breakdown.flatMap((b) => b.signals);
+  const tactics = matchedTactics(allSignals);
+  const tacticNames = TACTIC_IDS.filter((id) => tactics.has(id)).map((id) => TACTIC_TITLES[id]);
+
+  // The score and what it means — the sheet's own framing. Only when something
+  // was actually scored: "Risk score: 0/100" on a header-only forward reports a
+  // number we never computed.
+  const showScore = allSignals.length > 0 || score > 0;
+  const bandLine = showScore ? scoreBand(score, allSignals) : "";
+
   // ── Plain text ──
   const textParts = [
     "VERIGUARD — Scam check result",
@@ -373,19 +429,34 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
     `${head.emoji} ${head.line}`,
     head.meaning,
     "",
-    "WHAT YOU SHOULD DO",
-    `  ${advice}`,
-    "",
+    ...(showScore ? [`RISK SCORE: ${score}/100`, `  ${bandLine}`, ""] : []),
     ...(breakdown.length
       ? [
           "WHAT WE FOUND",
           ...breakdown.flatMap((b) => [
             `  • ${b.heading}`,
-            ...b.reasons.map((r) => `      - ${r}`),
+            // The weighted rows when we have them, the plain reasons otherwise.
+            // A row's contribution is the thing being published; dropping it
+            // leaves a list of assertions and a number that cannot be checked
+            // against them.
+            ...(b.signals.length
+              ? b.signals.map((x) => `      ${formatPoints(x.points).padStart(4)}  ${defangText(x.text)}`)
+              : b.reasons.map((r) => `      - ${r}`)),
           ]),
           "",
         ]
       : []),
+    ...(tacticNames.length
+      ? [
+          "TACTICS USED",
+          `  ${tacticNames.join(" · ")}`,
+          "  These are among the six tactics we explain on the Learn page.",
+          "",
+        ]
+      : []),
+    "WHAT YOU SHOULD DO",
+    `  ${advice}`,
+    "",
     ...(nothingFound ? [nothingFound, ""] : []),
     ...(flagLines.length ? ["WHO SENT IT", ...flagLines.map((f) => `  • ${f}`), ""] : []),
     ...(coverageNote ? [coverageNote, ""] : []),
@@ -407,12 +478,38 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
   // what makes the verdict readable at a glance on a phone.
   const li = (items: string[]) => items.map((i) => `<li>${escapeHtml(i)}</li>`).join("");
 
+  // Evidence rows carry their weight, as the results sheet does. A two-column
+  // table rather than a list: the weights must line up as a column to be
+  // scannable, and table layout is the one thing every mail client agrees on.
+  // Colour follows the sheet — amber for a contribution, green for a credit,
+  // grey for a context row worth no points.
+  const weightedRows = (signals: Signal[]) =>
+    `<table role="presentation" cellpadding="0" cellspacing="0" ` +
+    `style="width:100%;margin:6px 0 0;border-collapse:collapse">` +
+    signals
+      .map((x) => {
+        const colour = x.points > 0 ? "#9a6b12" : x.points < 0 ? "#1c7a55" : "#7c879a";
+        return (
+          `<tr>` +
+          `<td style="padding:4px 10px 4px 0;color:#444;font-size:14px;line-height:1.5;` +
+          `vertical-align:top">${escapeHtml(defangText(x.text))}</td>` +
+          `<td style="padding:4px 0;color:${colour};font-size:13px;font-weight:bold;` +
+          `white-space:nowrap;text-align:right;vertical-align:top">` +
+          `${escapeHtml(formatPoints(x.points))}</td>` +
+          `</tr>`
+        );
+      })
+      .join("") +
+    `</table>`;
+
   const breakdownHtml = breakdown
     .map((b) => {
-      const reasons = b.reasons.length
-        ? `<ul style="margin:4px 0 0;padding-left:20px;color:#444;font-size:14px">${li(b.reasons)}</ul>`
-        : "";
-      return `<li style="margin-bottom:10px"><strong>${escapeHtml(b.heading)}</strong>${reasons}</li>`;
+      const detail = b.signals.length
+        ? weightedRows(b.signals)
+        : b.reasons.length
+          ? `<ul style="margin:4px 0 0;padding-left:20px;color:#444;font-size:14px">${li(b.reasons)}</ul>`
+          : "";
+      return `<li style="margin-bottom:10px"><strong>${escapeHtml(b.heading)}</strong>${detail}</li>`;
     })
     .join("");
 
@@ -463,17 +560,74 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
     `<div style="font-size:14px;line-height:1.55;color:#2b3648">${escapeHtml(advice)}</div>` +
     `</div>`;
 
+  // The score, with the bar the sheet draws. Built from a table rather than a
+  // div with a percentage width: Outlook ignores percentage widths on divs, and
+  // a bar that renders full-width in one client and empty in another is worse
+  // than no bar. The filled cell is the score, the rest is the track.
+  const scoreBox = showScore
+    ? `<div style="border:1px solid #dfe3e8;background:#ffffff;border-radius:10px;` +
+      `padding:14px 16px;margin:0 0 18px">` +
+      `<div style="font-size:13px;font-weight:bold;text-transform:uppercase;` +
+      `letter-spacing:0.04em;color:#3a4658;margin-bottom:8px">Risk score</div>` +
+      `<div style="font-size:26px;font-weight:bold;color:${head.accent};line-height:1.1">` +
+      `${score}<span style="font-size:15px;color:#7c879a;font-weight:normal">/100</span></div>` +
+      `<table role="presentation" cellpadding="0" cellspacing="0" ` +
+      `style="width:100%;margin:10px 0 0;border-collapse:collapse;height:6px">` +
+      `<tr>` +
+      (score > 0
+        ? `<td style="width:${Math.max(2, Math.min(100, score))}%;` +
+          // The accent as a border rather than a fill. A solid-accent block is
+          // one step from a solid-accent block WITH text on it, which is the
+          // contrast failure the banner above is deliberately built to avoid;
+          // keeping the accent out of `background` entirely means the rule
+          // cannot be broken here by someone later dropping a label inside.
+          `border-top:6px solid ${head.accent};` +
+          `border-radius:3px 0 0 3px;font-size:0;line-height:0">&nbsp;</td>`
+        : "") +
+      (score < 100
+        ? `<td style="border-top:6px solid #e8ecf1;` +
+          `border-radius:${score > 0 ? "0 3px 3px 0" : "3px"};` +
+          `font-size:0;line-height:0">&nbsp;</td>`
+        : "") +
+      `</tr></table>` +
+      `<div style="font-size:13px;line-height:1.55;color:#4a5567;margin-top:10px">` +
+      `${escapeHtml(bandLine)}</div>` +
+      `</div>`
+    : "";
+
+  // The tactics this message used, named as the Learn page names them. The
+  // continuity is the point: someone who has read "how scammers operate"
+  // should meet the same six words on their own result.
+  const tacticsBox = tacticNames.length
+    ? `<div style="margin:0 0 18px">` +
+      `<p style="margin:0 0 6px;font-size:13px;font-weight:bold;text-transform:uppercase;` +
+      `letter-spacing:0.04em;color:#3a4658">Tactics used</p>` +
+      tacticNames
+        .map(
+          (n) =>
+            `<span style="display:inline-block;margin:0 6px 6px 0;padding:4px 10px;` +
+            `background:#eef1f5;border-radius:999px;color:#3a4658;font-size:13px">` +
+            `${escapeHtml(n)}</span>`,
+        )
+        .join("") +
+      `<div style="font-size:13px;color:#7c879a;margin-top:2px">` +
+      `${escapeHtml("These are among the six tactics we explain on the Learn page.")}</div>` +
+      `</div>`
+    : "";
+
   const sectionHeading = (t: string) =>
     `<p style="margin:0 0 6px;font-size:13px;font-weight:bold;text-transform:uppercase;` +
     `letter-spacing:0.04em;color:#3a4658">${escapeHtml(t)}</p>`;
 
   const body = [
     banner,
-    actionBox,
+    scoreBox,
     breakdown.length
       ? sectionHeading("What we found") +
         `<ul style="margin:0 0 18px;padding-left:20px">${breakdownHtml}</ul>`
       : "",
+    tacticsBox,
+    actionBox,
     nothingFound ? `<p style="margin:0 0 18px;color:#444">${escapeHtml(nothingFound)}</p>` : "",
     flagLines.length
       ? sectionHeading("Who sent it") +
