@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { useLang } from "@/lib/lang";
 import { bold } from "@/lib/richText";
 import type { MessageKey } from "@/lib/i18n";
+import enNormal from "@/messages/en.normal.json";
 
 /**
  * Site-wide strip for the state of the service itself: maintenance, a degraded
@@ -24,25 +25,49 @@ import type { MessageKey } from "@/lib/i18n";
  * with a single small dot carrying the signal, and stays legible without
  * competing with anything that matters more.
  *
- * DISMISSAL is per-viewer and per-message. The key includes a hash of the body
- * text, so a NEW notice reappears for someone who dismissed the previous one —
- * a dismissal is "I have read this", not "never show me service notices". It
- * is stored in localStorage, which an artifact of this kind may not have
- * (private windows, blocked site data), so every access is guarded and a
- * failure simply means the strip shows.
+ * DISMISSAL is per-viewer and per-notice. The key carries a revision plus a
+ * hash of the body text, so a NEW notice — or a re-raised one, via the
+ * revision — reappears for someone who dismissed the previous one. A dismissal
+ * is "I have read this", not "never show me service notices". It is stored in
+ * localStorage, which a browser may not provide (private windows, blocked site
+ * data), so every access is guarded and a failure simply means the strip
+ * shows.
  */
 
 const ENABLED = process.env.NEXT_PUBLIC_SERVICE_NOTICE === "true";
+
+const DEFAULT_KEY = "service.inboundDelayed";
 
 /**
  * Which notice to show. A key into the message bundle rather than free text,
  * so the copy is translatable and reviewable like everything else the user
  * reads — and so an env var can never inject markup into the page.
+ *
+ * Checked against the bundle rather than cast. `translate` falls back to
+ * returning the key itself when it resolves to nothing, so a typo'd or renamed
+ * variable would print the literal "service.inboundDelyed" across every page —
+ * failing loudest at exactly the moment the notice matters. An unknown key
+ * falls back to the default notice instead, and a misconfiguration costs the
+ * right wording rather than the whole page.
  */
-const NOTICE_KEY = (process.env.NEXT_PUBLIC_SERVICE_NOTICE_KEY ??
-  "service.inboundDelayed") as MessageKey;
+export function resolveNoticeKey(configured: string | undefined): MessageKey {
+  const key = configured ?? DEFAULT_KEY;
+  return (key in (enNormal as Record<string, string>) ? key : DEFAULT_KEY) as MessageKey;
+}
+
+const NOTICE_KEY = resolveNoticeKey(process.env.NEXT_PUBLIC_SERVICE_NOTICE_KEY);
 
 const STORAGE_PREFIX = "veriguard:service-notice:";
+
+/**
+ * Bumped by hand to re-raise a notice whose wording has not changed.
+ *
+ * The dismissal key fingerprints the body, so re-enabling an incident that
+ * someone already dismissed would stay hidden for exactly the people it
+ * affected last time. Changing this makes the strip reappear for everyone
+ * without touching the copy.
+ */
+const NOTICE_REVISION = process.env.NEXT_PUBLIC_SERVICE_NOTICE_REVISION ?? "1";
 
 /** Nothing else in this tab writes the key, so there is nothing to subscribe to. */
 const subscribeNever = () => () => {};
@@ -59,7 +84,7 @@ function fingerprint(text: string): string {
 export default function ServiceNotice() {
   const { t } = useLang();
   const body = ENABLED ? t(NOTICE_KEY) : "";
-  const storageKey = `${STORAGE_PREFIX}${fingerprint(body)}`;
+  const storageKey = `${STORAGE_PREFIX}${NOTICE_REVISION}:${fingerprint(body)}`;
 
   // Read during render, via useSyncExternalStore, rather than in an effect.
   //
@@ -104,12 +129,19 @@ export default function ServiceNotice() {
   }
 
   return (
-    // role="status" and aria-live="polite": this is a standing condition, not
-    // an event needing interruption. A screen reader reaches it in document
-    // order rather than being pulled out of whatever it was reading.
-    <div
-      role="status"
-      aria-live="polite"
+    // Deliberately NOT a live region. This is a standing condition that is
+    // present from the moment the page renders, not something that happens
+    // while the reader is on it — and because the strip mounts after
+    // hydration, a role="status"/aria-live region here would be empty through
+    // the first paint and gain content immediately after. Assistive technology
+    // reads that as an update and announces it on every single page view,
+    // interrupting whatever was being read, which is the opposite of what a
+    // polite live region is for.
+    //
+    // As a plain landmark it is reached in document order, right after the
+    // header, and read once like any other content.
+    <aside
+      aria-label={t("service.label")}
       className="border-b border-[var(--rule)] bg-[var(--ink-2)]"
     >
       <div className="mx-auto max-w-[1180px] px-4 py-2.5 flex items-start gap-3">
@@ -132,6 +164,6 @@ export default function ServiceNotice() {
           <span aria-hidden="true">✕</span>
         </button>
       </div>
-    </div>
+    </aside>
   );
 }

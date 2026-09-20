@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import enNormal from "@/messages/en.normal.json";
+import { resolveNoticeKey } from "@/components/ServiceNotice";
 
 // The site-wide service notice says what is wrong with the service itself —
 // maintenance, a degraded feature, an incident being worked on. It is
@@ -49,15 +50,47 @@ describe("service notice copy", () => {
     });
   });
 
-  it("keeps notice copy in the bundle, not in environment variables", () => {
-    // The component takes a message KEY from the environment, never body text.
-    // A notice assembled from an env var would bypass translation and put
-    // unreviewed content — including markup — straight onto every page.
-    const noticeKeys = Object.keys(strings).filter((k) => k.startsWith("service."));
-    expect(noticeKeys.length).toBeGreaterThan(0);
-    for (const key of noticeKeys) {
-      expect(strings[key]).toBeTypeOf("string");
-    }
+  describe("the key the component resolves", () => {
+    // The component takes a message KEY from the environment, never body text:
+    // an env-assembled notice would bypass translation and put unreviewed
+    // content, markup included, on every page.
+    //
+    // But a key is only safe if it resolves. translate() falls back to
+    // returning the key itself, so a typo'd or renamed variable would print
+    // the literal "service.inboundDelyed" site-wide — failing loudest at
+    // exactly the moment the notice matters most. These exercise the
+    // resolution the component performs, against the real bundle.
+    const DEFAULT_KEY = "service.inboundDelayed";
+    // The component's own resolver, not a copy of it — a reimplementation here
+    // would pass while the shipped code did something else.
+    const resolve = resolveNoticeKey;
+
+    it("keeps a known key", () => {
+      expect(resolve("service.inboundDelayed")).toBe("service.inboundDelayed");
+    });
+
+    it("falls back to the default when the key is unknown", () => {
+      // A misconfiguration costs the right wording, not the whole page.
+      expect(resolve("service.inboundDelyed")).toBe(DEFAULT_KEY);
+      expect(resolve("totally.made.up")).toBe(DEFAULT_KEY);
+      expect(resolve("")).toBe(DEFAULT_KEY);
+      expect(resolve(undefined)).toBe(DEFAULT_KEY);
+    });
+
+    it("never resolves to a key absent from the bundle", () => {
+      for (const candidate of ["service.inboundDelyed", "", "nope", DEFAULT_KEY]) {
+        expect((resolve(candidate) as string) in strings).toBe(true);
+      }
+    });
+
+    it("has a default that exists, so the fallback itself cannot fail", () => {
+      expect(strings[DEFAULT_KEY]).toBeTypeOf("string");
+    });
+
+    it("gives the notice landmark an accessible name", () => {
+      expect(strings["service.label"]).toBeTypeOf("string");
+      expect(strings["service.label"].length).toBeGreaterThan(0);
+    });
   });
 
   it("no longer carries the superseded per-panel copy", () => {
