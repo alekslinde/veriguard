@@ -1,5 +1,7 @@
 {
   "a11y.newTab": "opens in a new tab",
+  "service.dismiss": "Dismiss this notice",
+  "service.inboundDelayed": "**Emailed replies are delayed.** We're fixing a problem with our mail provider. Everything you forward is still checked — but the reply may not arrive, so paste the message on the Check page for an instant answer.",
   "nav.learn": "Learn",
   "nav.reports": "Reports",
   "nav.about": "About",
@@ -47,7 +49,6 @@
   "check.dropHere": "Drop to analyse",
   "check.forward.heading": "Rather forward it from your email app?",
   "check.forward.body": "We'll email you back a verdict.",
-  "check.forward.delay": "**Replies are delayed right now.** We're still checking everything you forward, but the emailed verdict may not arrive while we fix a problem with our mail provider. Paste the message here instead for an instant answer.",
   "check.forward.noopen": "**Forward it without opening** — swipe or right-click it in your inbox list. Opening loads its tracking pixel, which tells the sender your address is live. Already opened it? Forward it anyway.",
   "check.forward.copy": "Copy",
   "check.forward.copied": "Copied",

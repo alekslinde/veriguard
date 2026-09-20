@@ -7,20 +7,6 @@ import { bold } from "@/lib/richText";
 const INBOUND_ENABLED = process.env.NEXT_PUBLIC_INBOUND_ENABLED === "true";
 const INBOUND_ADDRESS = process.env.NEXT_PUBLIC_INBOUND_ADDRESS ?? "check@veriguard.app";
 
-/**
- * Set while the emailed verdict is unreliable, to say so before someone waits
- * on one that may not arrive.
- *
- * Separate from INBOUND_ENABLED, and deliberately not the same lever. Disabling
- * would hide the address entirely and lose the forwards that DO get answered,
- * along with the analysis every forward still receives. Saying "this may be
- * slow, here is the instant route" keeps the feature honest without withdrawing
- * it — the failure mode to avoid is someone forwarding a scam, hearing nothing,
- * and reading the silence as "probably fine".
- *
- * A flag rather than a hardcoded banner so it clears without a deploy.
- */
-const REPLIES_DELAYED = process.env.NEXT_PUBLIC_INBOUND_DELAYED === "true";
 
 function ForwardIcon() {
   return (
@@ -89,27 +75,6 @@ export default function ForwardPanel() {
         <span>{t("check.forward.heading")}</span>
       </p>
       <p className="text-sm text-[var(--text-dim)]">{t("check.forward.body")}</p>
-
-      {/* Above the address, not below it: the point is to be read BEFORE
-          someone forwards and starts waiting. role="status" rather than
-          "alert" — it is a caveat on a working feature, not an error, and
-          should not interrupt a screen reader mid-sentence.
-
-          Deliberately NOT styled like the tracking-pixel warning below, though
-          both are advisories. That one is permanent safety guidance; this is
-          transient service status that gets deleted in days. Giving them the
-          same amber treatment taught the eye to skim both, and the safety one
-          is the one that must never be skimmed. Muted surface, no colour, and
-          a rule down the side marks it as an aside on the feature rather than
-          a hazard in the message. */}
-      {REPLIES_DELAYED && (
-        <p
-          role="status"
-          className="text-xs leading-relaxed text-[var(--text-dim)] bg-[var(--ink)] border-l-2 border-[var(--faint)] rounded-r-md pl-3 pr-3 py-2"
-        >
-          {bold(t("check.forward.delay"))}
-        </p>
-      )}
 
       <div className="flex items-center gap-2 rounded-lg border border-[var(--rule)] bg-[var(--ink)] px-3 py-2">
         {/* Selectable text, so the address is usable even when the clipboard
