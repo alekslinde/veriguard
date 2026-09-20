@@ -3,6 +3,7 @@ import { Fraunces, Inter, IBM_Plex_Mono } from "next/font/google";
 import { LangProvider } from "@/lib/lang";
 import { BugReportProvider } from "@/components/BugReportProvider";
 import SiteHeader from "@/components/SiteHeader";
+import ServiceNotice from "@/components/ServiceNotice";
 import SiteFooter from "@/components/SiteFooter";
 import { SITE_URL } from "@/lib/siteUrl";
 import "./globals.css";
@@ -89,6 +90,10 @@ export default function RootLayout({
         <LangProvider>
           <BugReportProvider>
             <SiteHeader />
+            {/* Under the nav rather than above it: the header is how someone
+                orients and navigates away from a degraded feature, so it stays
+                the first thing on the page. */}
+            <ServiceNotice />
             <div className="flex-1">{children}</div>
             <SiteFooter />
           </BugReportProvider>

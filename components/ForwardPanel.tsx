@@ -7,6 +7,7 @@ import { bold } from "@/lib/richText";
 const INBOUND_ENABLED = process.env.NEXT_PUBLIC_INBOUND_ENABLED === "true";
 const INBOUND_ADDRESS = process.env.NEXT_PUBLIC_INBOUND_ADDRESS ?? "check@veriguard.app";
 
+
 function ForwardIcon() {
   return (
     <svg
@@ -62,7 +63,11 @@ export default function ForwardPanel() {
   }
 
   return (
-    <aside className="rounded-2xl border border-[var(--rule)] bg-[var(--ink-2)] p-5 space-y-3 h-fit">
+    // Fills its grid track rather than sizing to content, so the two cards end
+    // level whatever this one is currently saying. The trailing note is pushed
+    // to the bottom (mt-auto) so the slack lands there rather than as a gap
+    // under the last box.
+    <aside className="rounded-2xl border border-[var(--rule)] bg-[var(--ink-2)] p-5 flex flex-col gap-3 h-full">
       <p className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
         <span className="shrink-0 text-[var(--faint)]">
           <ForwardIcon />
@@ -95,7 +100,7 @@ export default function ForwardPanel() {
         {bold(t("check.forward.noopen"))}
       </p>
 
-      <p className="text-[11px] text-[var(--faint)]">{t("check.forward.note")}</p>
+      <p className="text-[11px] text-[var(--faint)] mt-auto">{t("check.forward.note")}</p>
     </aside>
   );
 }

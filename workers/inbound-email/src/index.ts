@@ -23,6 +23,119 @@ export interface Env {
   INBOUND_WEBHOOK_URL: string;
 }
 
+/**
+ * The authentication verdicts recorded on the forward, grouped one bracket per
+ * set as written: "[dkim=pass dmarc=pass spf=pass] [dmarc=none spf=none]".
+ *
+ * MEASURED: these do NOT discriminate a refused forward from an answered one.
+ * Forwards that were answered carried the same "dmarc=none spf=none" tokens as
+ * forwards that were refused, and forwarding an airline notice and a bank
+ * notice — both from domains publishing DMARC — produced verdicts identical to
+ * forwarding a scam email. The tokens describe how the forwarding provider
+ * relays, not the mail being forwarded, and not whether a reply is possible.
+ *
+ * Kept because a per-message authentication fault would still show up here, and
+ * ruling it out on every forward is what let it be ruled out at all. Not
+ * because it explains the refusals seen so far — it does not.
+ *
+ * A forward's authentication has no bearing on whether its contents are
+ * analysed: every forward goes to the engine whatever these say. A failing
+ * verdict on the mail SOMEONE FORWARDED is a scam signal, scored there (see
+ * emailHeaders.ts), never a gate here.
+ *
+ * Only the mechanism=result pairs are kept, in the order written and
+ * de-duplicated within a set but never across sets. The full header also
+ * carries the sending host, envelope addresses and signature domains — a
+ * correspondent's details, which answer nothing a verdict does not and do not
+ * belong in a log.
+ */
+function authSummary(headers: Headers): string {
+  const raw = headers.get("Authentication-Results");
+  if (!raw) return "none recorded";
+  const groups = raw
+    .toLowerCase()
+    // Quoted strings are dropped before splitting: a DKIM signature value may
+    // contain a comma, which would otherwise split one MTA's verdicts into two
+    // and invent a second identity that was never there.
+    .replace(/"[^"]*"/g, "")
+    .split(",")
+    .map(
+      (part) =>
+        part.match(
+          /\b(?:dmarc|spf|dkim|compauth|arc)=(?:pass|fail|none|neutral|softfail|hardfail|temperror|permerror|bestguesspass)\b/g,
+        ) ?? [],
+    )
+    .filter((found) => found.length > 0)
+    .map((found) => [...new Set(found)].join(" "));
+
+  if (groups.length === 0) return "none recorded";
+  // De-duplicated across sets too: an identical set repeated says nothing extra,
+  // while two DIFFERENT sets are the finding.
+  return [...new Set(groups)].map((g) => `[${g}]`).join(" ");
+}
+
+/**
+ * The SHAPE of the forward's envelope: which headers are present, and how the
+ * addresses in them relate to each other — never the addresses themselves.
+ *
+ * Why this exists: two accounts are answered on every forward and two are
+ * refused on every forward, whatever they send. Content, size, chain length and
+ * authentication are all ruled out — measured identical across both outcomes —
+ * so whatever separates them is not yet visible in the log. The envelope is
+ * where a difference between two plain accounts can still hide: a display name,
+ * a Reply-To, a Return-Path that disagrees with From, a Sender header.
+ *
+ * Booleans and relations only. "from=addr-only replyto=absent envelope=matches"
+ * says everything a comparison needs; the addresses themselves would put the
+ * forwarder's correspondents in a log to answer a question about our own
+ * configuration.
+ *
+ * Diagnostic. Remove once the refusals are explained.
+ */
+function envelopeShape(headers: Headers, from: string, to: string): string {
+  // Angle-bracket extraction without a regex. `.replace(/^.*</, "")` reads
+  // naturally but is quadratic on a header full of brackets, and these headers
+  // are attacker-controlled: anyone can send mail with a 100KB From line. Index
+  // arithmetic does the same job in one pass and cannot backtrack.
+  const addrOf = (v: string | null): string => {
+    const s = v ?? "";
+    const open = s.indexOf("<");
+    if (open === -1) return s.trim();
+    const close = s.indexOf(">", open + 1);
+    return close === -1 ? s.slice(open + 1).trim() : s.slice(open + 1, close).trim();
+  };
+  const bare = (v: string) => addrOf(v).toLowerCase();
+
+  const fromHeader = headers.get("From");
+  const replyTo = headers.get("Reply-To");
+  const returnPath = headers.get("Return-Path");
+  const sender = headers.get("Sender");
+
+  const parts = [
+    // Did the From header carry a display name, or just an address?
+    `from=${fromHeader ? (/</.test(fromHeader) ? "name+addr" : "addr-only") : "absent"}`,
+    // A Reply-To pointing somewhere other than the sender changes who a reply
+    // would reach, which is the one thing message.reply() is strict about.
+    `replyto=${
+      replyTo ? (bare(replyTo) === bare(from) ? "same-as-from" : "differs") : "absent"
+    }`,
+    // The envelope sender is what SPF is checked against, and a mismatch with
+    // the header From is the ordinary signature of a relayed or forwarded send.
+    `envelope=${
+      returnPath
+        ? bare(returnPath) === bare(from)
+          ? "matches-from"
+          : "differs-from"
+        : "absent"
+    }`,
+    `sender-hdr=${sender ? "present" : "absent"}`,
+    // The address we received on decides the reply's From, and must be a domain
+    // the platform will sign for.
+    `rcpt=${to.includes("@") ? "ok" : "malformed"}`,
+  ];
+  return parts.join(" ");
+}
+
 const MAX_RAW_BYTES = 1_000_000; // drop anything larger before calling the API
 
 interface VerdictReply {
@@ -110,18 +223,20 @@ const handler = {
     const inboundReferences = message.headers.get("References");
 
     // The platform refuses a reply for several distinct reasons behind one error
-    // string, and the refusal itself names none of them. Of those reasons, all
-    // but two are structural — they hold identically for every message this
-    // handler builds — so the two that vary per message are what a refusal is
-    // actually reporting: the forward's own authentication result, and the
-    // length of its References chain (bounded to guard against reply loops).
-    // The chain length is knowable here and the authentication result is not,
-    // so log it on every message: a refusal is only diagnosable against a count
-    // from a forward that succeeded, which means recording it before knowing
-    // which this is. Counting entries rather than logging the header keeps
-    // correspondents' message IDs out of the log.
+    // string, and the refusal names none of them. Everything measurable here is
+    // therefore recorded on EVERY forward, refused or not: a refusal says
+    // nothing on its own, and only becomes readable against the same figures
+    // from forwards that were answered. Four candidate causes have been ruled
+    // out exactly that way, by coming back identical on both sides.
+    //
+    // Counts, bare verdict tokens and envelope shape — no message IDs, no
+    // correspondent addresses, no sending hosts.
     const referenceCount = inboundReferences ? inboundReferences.trim().split(/\s+/).length : 0;
-    console.log(`inbound References entries: ${referenceCount}`);
+    const auth = authSummary(message.headers);
+    const envelope = envelopeShape(message.headers, message.from, message.to);
+    console.log(
+      `inbound References entries: ${referenceCount}, auth: ${auth}, envelope: ${envelope}`,
+    );
 
     // Build a reply addressed back to the forwarder. message.reply() restricts
     // the recipient to the original sender, so this can't be redirected; the
@@ -137,17 +252,22 @@ const handler = {
       await message.reply(new EmailMessage(message.to, message.from, mime));
     } catch (err) {
       // Cloudflare refused the reply. It reports several distinct causes
-      // through one error — the forward failed DMARC, the message is "not
-      // repliable", or a per-message reply limit is spent — so pass its own
-      // wording through rather than naming a cause. An earlier version of this
-      // line asserted DMARC, and when a Gmail forward was refused (Gmail
-      // publishes p=none and passes its own DMARC, so that reading was almost
-      // certainly wrong) the log actively pointed away from the real fault.
+      // through one error, so pass its own wording through rather than naming
+      // one. Naming a cause here has been wrong every time it was tried: this
+      // line once asserted DMARC, which sent an investigation away from the
+      // real fault — a duplicated entry in the References header we built,
+      // which refused every forward until it was fixed. The authentication
+      // reading that replaced it was disproved the same way, by forwards that
+      // were answered carrying identical verdicts to forwards that were not.
+      //
+      // Everything measured rides along, because a refusal is only readable
+      // against the same figures from forwards that were answered.
       //
       // Nothing to retry on the inbound transaction. No delivery confirmation
       // is sent, so this forward is correctly never counted as a check.
       console.warn(
-        `reply refused by the mail platform (inbound References entries: ${referenceCount}):`,
+        `reply refused by the mail platform (inbound References entries: ${referenceCount}, ` +
+          `auth: ${auth}, envelope: ${envelope}):`,
         err,
       );
       return;

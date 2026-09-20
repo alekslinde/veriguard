@@ -72,6 +72,23 @@ test("a short References chain is passed through unchanged", () => {
   assert.equal(truncateReferences(chain), chain);
 });
 
+test("a repeated Message-ID appears once", () => {
+  // The common shape: a forward whose References is just its own Message-ID.
+  // Appending the message being replied to duplicated the entry it already
+  // ended with, and every observed refusal carried exactly this.
+  assert.equal(truncateReferences("<a@x.test> <a@x.test>"), "<a@x.test>");
+  assert.equal(
+    truncateReferences("<a@x.test> <b@x.test> <a@x.test>"),
+    "<a@x.test> <b@x.test>",
+  );
+});
+
+test("a reply to a single-entry chain carries that ID exactly once", () => {
+  const mime = buildReplyMime(REPLY, { ...OPTS, references: OPTS.messageId });
+  const header = mime.match(/^References: (.*)$/m)?.[1] ?? "";
+  assert.equal(header.trim(), OPTS.messageId);
+});
+
 test("a chain at the keep-everything boundary is not truncated", () => {
   // 21 entries = root + 20 recent, the most that survives intact.
   const ids = Array.from({ length: 21 }, (_, i) => `<id-${i}@x.test>`);

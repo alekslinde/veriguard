@@ -1,6 +1,6 @@
 # Inbound Email Worker
 
-*Last reviewed: 2026-09-19.*
+*Last reviewed: 2026-09-20.*
 
 Receives forwarded suspicious emails at `check@<domain>`, sends the raw message
 to the Next app's `/api/inbound` for analysis, and replies to the forwarder with
@@ -139,8 +139,8 @@ value silently reverts at the next merge to `main`.
 
 Every way a forward can die now says so in the Worker's logs
 (`npx wrangler tail`, or the dashboard's live logs). A healthy forward logs only
-its `inbound References entries:` count, so any *warning or error* here is the
-diagnosis:
+its `inbound References entries: N, auth: [...] [...]` line, so any *warning or error*
+here is the diagnosis:
 
 | Log line | Means |
 | --- | --- |
@@ -148,7 +148,7 @@ diagnosis:
 | `inbound webhook rejected: HTTP 5xx` | The app is up but erroring — check the app's own logs for `inbound analysis failed`. |
 | `inbound webhook unreachable` | Wrong `INBOUND_WEBHOOK_URL`, or the app is down. |
 | `inbound skipped by API: rate-limited` | Working as intended — the per-sender budget. |
-| `reply refused by the mail platform (inbound References entries: N)` | The platform declined the reply and reports several distinct causes through one error, so it passes that wording through rather than naming one. Every other condition is structural and holds for every message the Worker builds, so a refusal is the forward itself: either its own authentication result, or an over-long `References` chain (the reply is refused above 100 entries). `N` is that chain's length — compare it against the counts logged by forwards that succeeded. See *When NO reply is sent*. |
+| `reply refused by the mail platform (inbound References entries: N, auth: [...])` | The platform declined the reply and reports several distinct causes through one error, so it passes that wording through rather than naming one. Both measured conditions ride along: the inbound chain length, and the authentication verdicts, grouped one bracket per identity. A forward carries more than one — the forwarder's own send, and the original it quotes. `[dmarc=pass …] [dmarc=none …]` is a forward of unauthenticated mail, which is refused although the forwarder themselves authenticated fine. See *When NO reply is sent*. |
 | `inbound dropped: raw unreadable or over …` | The forward exceeded `MAX_RAW_BYTES`. |
 
 Silence in the Worker's log while mail still goes unanswered means the message
@@ -195,6 +195,27 @@ costs nothing.
 > up: replies show as **"dropped"** in the Email Routing summary even when
 > delivered — that's expected, not a failure.)
 
+### Two authentications, two jobs
+
+A forward carries two things that authenticate separately, and conflating them
+is the mistake this section exists to prevent.
+
+| | What it answers | What it gates |
+| --- | --- | --- |
+| **The forward** (outer) | Did this person really send us this? | Whether a reply is possible |
+| **The forwarded mail** (inner) | Did the mail they are asking about authenticate? | **Nothing.** It is a scam signal |
+
+The inner result is *evidence*, and it is scored as evidence — a message
+claiming to be from a bank that fails DMARC is exactly what this product exists
+to catch. It is parsed in the engine (`emailHeaders.ts`) and contributes to the
+verdict there.
+
+**It must never gate anything in this Worker.** Every forward is analysed and
+answered on its merits, whatever the mail inside it authenticates as. A rule
+that withheld verdicts from unauthenticated mail would withhold them precisely
+from the mail most worth checking, and the user would get silence — which reads
+as "probably fine", the worst answer this product can give.
+
 ### When NO reply is sent
 
 `message.reply()` is allowed only when every one of the platform's documented
@@ -203,18 +224,37 @@ the sending domain matches the receiving domain, and one reply per event — and
 the Worker satisfies those identically for every message, so they never explain
 a refusal in production. Two are properties of the forward itself:
 
-- **The incoming forward must have a valid DMARC result.** A forward from a
-  provider or path that fails DMARC is refused. Most consumer providers
-  (Gmail/Outlook/iCloud) pass on forwards, so this is an edge case.
+- **The incoming forward must have a valid DMARC result.** This is about the
+  forward itself — whether the person forwarding really sent it — and nothing
+  else. It is **not** a judgement on the mail they forwarded.
+
+  > An earlier version of this section claimed the opposite: that a forward of
+  > unauthenticated mail was refused because the forwarded message carried
+  > `dmarc=none`. That was wrong and is recorded here because it was wrong in a
+  > costly direction. It was disproved twice over — forwards that were
+  > **answered** carried the same `dmarc=none spf=none` tokens as forwards that
+  > were refused, and forwarding an airline notice and a bank notice (both from
+  > domains publishing DMARC) produced verdicts byte-identical to forwarding a
+  > scam email. Those tokens describe how the forwarding provider relays; they
+  > say nothing about the mail being checked.
 - **The incoming forward must carry no more than 100 `References` entries.**
   Each hop adds one, so mail that has been passed around a group before reaching
   us accumulates them — which is exactly the mail this flow is built for. The
   *reply* we build is bounded (see *Deliverability*), but the limit is checked
   against the incoming message, so a chain that long is refused regardless.
 
-All of these throw, and the Worker logs the refusal with the inbound chain
-length rather than failing silently. The error names no cause, so that count is
-the one measurable discriminator between the two.
+All of these throw, and the Worker logs the refusal with both measured
+conditions rather than failing silently. The error names no cause, so those two
+figures are what discriminate between them.
+
+**A malformed reply is refused the same way, with the same wording.** A reply
+built with a `References` entry repeated — which happened when the inbound chain
+was a single Message-ID and that ID was appended to a chain already ending with
+it — was refused on every forward, with an error naming none of the conditions
+above. Two diagnoses were talked out of the evidence before the header itself
+was read. When refusals are universal rather than occasional, suspect what the
+Worker builds before suspecting the forward: print the generated MIME and look
+at it.
 
 **Decision (current):** accept this — no paid outbound sender. If it becomes a
 real problem, the upgrade is a fallback that sends a fresh message via a

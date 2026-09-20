@@ -24,7 +24,15 @@ const REFERENCES_KEEP_ROOT = 1;
 const REFERENCES_KEEP_RECENT = 20;
 
 export function truncateReferences(references: string): string {
-  const ids = references.split(/\s+/).filter(Boolean);
+  // De-duplicated, keeping first occurrence. A forward whose References is just
+  // the message's own Message-ID — the ordinary case for a first forward —
+  // produced that ID twice once the message being replied to was appended to
+  // the chain it already ended with, and the platform refused every reply
+  // carrying it. Measured: with the duplicate present no forward was ever
+  // answered; with it removed, replies went out on the same senders and the
+  // same one-entry chains. A repeated entry is malformed under RFC 5322 §3.6.4
+  // regardless, so this stays whatever else changes.
+  const ids = [...new Set(references.split(/\s+/).filter(Boolean))];
   if (ids.length <= REFERENCES_KEEP_ROOT + REFERENCES_KEEP_RECENT) return ids.join(" ");
   return [...ids.slice(0, REFERENCES_KEEP_ROOT), ...ids.slice(-REFERENCES_KEEP_RECENT)].join(" ");
 }
