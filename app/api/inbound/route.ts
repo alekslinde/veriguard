@@ -3,6 +3,7 @@ import { timingSafeEqual } from "crypto";
 import { analyzeContent } from "@veriguard/engine/scamDetector";
 import { getUrlhausBlocklist } from "@/lib/urlhausBlocklist";
 import { analyseEmailSource } from "@/lib/emailSource";
+import { analysePressureTactics } from "@/lib/pressureTactics";
 import { formatVerdictEmail } from "@/lib/verdictSummary";
 import { checkAndRecordRateLimit, incrementCheckCount, recordCheckEvent, recordTargetRegion } from "@/lib/reportStore";
 import { inferTargetRegion } from "@/lib/targetRegion";
@@ -142,6 +143,11 @@ export async function POST(req: NextRequest) {
       emailFlags: identityFlags,
       pixelReport,
       trackingFindings: tracking.findings,
+      // Persuasion techniques, reported beside the verdict and never folded
+      // into it. Read from `original` — the extracted message — for the same
+      // reason the analysis is: a forwarding wrapper is not copy anyone wrote
+      // to persuade the reader.
+      pressure: analysePressureTactics(original),
       // Lets the reply end with a one-tap link to a prefilled report form. Only
       // the extracted identifiers travel in that link — the raw email is still
       // discarded with this request. See lib/reportPrefill.ts.
