@@ -18,6 +18,26 @@ export type TacticId = 1 | 2 | 3 | 4 | 5 | 6;
 
 export const TACTIC_IDS: readonly TacticId[] = [1, 2, 3, 4, 5, 6];
 
+/**
+ * The tactic names in English, for surfaces with no translator.
+ *
+ * The web reads these from the message bundle (`learn.tactics.N.title`) so they
+ * translate with everything else. The emailed verdict is a pure server-side
+ * artifact with no i18n context and is English-only for v1, and it must name
+ * the same six things as the Learn page or the continuity this layer exists for
+ * is lost. Kept beside the patterns so a renamed tactic is renamed once.
+ *
+ * A test asserts these match the bundle, so the two cannot drift.
+ */
+export const TACTIC_TITLES: Record<TacticId, string> = {
+  1: "Urgency & fear",
+  2: "Impersonation",
+  3: "Too good to be true",
+  4: "Borrowed authority",
+  5: "Unusual payment",
+  6: "Building rapport",
+};
+
 const PATTERNS: Record<TacticId, RegExp> = {
   // Urgency & fear — deadlines, suspension, threatened loss.
   1: /urgency|urgent|immediat|suspend|within \d+ hours?|expir|deadline|act now|final notice|overdue|held at customs|will be returned/i,

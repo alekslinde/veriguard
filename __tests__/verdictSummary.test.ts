@@ -12,6 +12,7 @@ import {
 } from "@/lib/verdictSummary";
 import { AnalyzedIdentifier, CheckResult } from "@veriguard/engine/scamDetector";
 import { TrackingPixelReport } from "@/lib/trackingPixel";
+import enNormal from "@/messages/en.normal.json";
 
 // Minimal builders — these mirror the shapes the real analysers emit, kept
 // local so the tests don't depend on the (heavier) full analysis pipeline.
@@ -545,5 +546,248 @@ describe("composeVerdictWithEvidence — the rows add up to the score", () => {
 
   it("returns null when there is nothing scored, like composeVerdict", () => {
     expect(composeVerdictWithEvidence([], null)).toBeNull();
+  });
+});
+
+// The emailed verdict and the results sheet are two renderings of one check.
+// Someone who pasted a message on the site and someone who forwarded it should
+// be told the same things in the same order — otherwise the email reads as a
+// lesser product, and the transparency claim ("we publish our weights") holds
+// on one surface and not the other.
+describe("verdict email parity with the results sheet", () => {
+  const scored = (points: number[], texts: string[]) =>
+    ident("message", "likely_scam", "", 70, texts, {
+      signals: texts.map((text, i) => ({ text, points: points[i], source: "message" as const })),
+    });
+
+  const sample = () =>
+    formatVerdictEmail({
+      results: [
+        scored(
+          [30, 25, 0],
+          [
+            "Urgency language detected: \"within 24 hours\"",
+            "Claims to be from a government agency — verify directly via official channels",
+            "A context row worth nothing",
+          ],
+        ),
+      ],
+      emailFlags: [],
+      pixelReport: null,
+    });
+
+  it("publishes each signal's weight", () => {
+    // The claim the product rests on. A list of assertions with a score and no
+    // arithmetic asks to be taken on faith, which is what the sheet exists not
+    // to do.
+    const { text, html } = sample();
+    expect(text).toContain("+30");
+    expect(text).toContain("+25");
+    expect(html).toContain("+30");
+    expect(html).toContain("+25");
+  });
+
+  it("marks a context row as contributing nothing rather than as zero", () => {
+    // "0" reads as a measured value; the em dash reads as "not a contribution",
+    // which is what a context row is. Matches the sheet.
+    expect(sample().text).toContain("—  A context row worth nothing");
+  });
+
+  it("states the risk score and what that band means", () => {
+    const { text, html } = sample();
+    expect(text).toMatch(/RISK SCORE: \d+\/100/);
+    expect(text).toMatch(/Past where honest messages land/);
+    expect(html).toContain("Risk score");
+  });
+
+  it("names the tactics using the Learn page's own words", () => {
+    // Continuity is the whole point of the tactics layer: someone who has read
+    // how scammers operate should meet the same six names on their result.
+    const { text, html } = sample();
+    expect(text).toContain("TACTICS USED");
+    expect(text).toContain("Urgency & fear");
+    expect(html).toContain("Tactics used");
+  });
+
+  it("leads with the score and evidence, then advice", () => {
+    // The sheet's order. Advice used to come first; the redesign puts the
+    // reasoning above it so the verdict is read as a conclusion rather than an
+    // instruction.
+    const { text } = sample();
+    expect(text.indexOf("RISK SCORE")).toBeLessThan(text.indexOf("WHAT WE FOUND"));
+    expect(text.indexOf("WHAT WE FOUND")).toBeLessThan(text.indexOf("WHAT YOU SHOULD DO"));
+  });
+
+  it("still renders when an identifier carries no weighted signals", () => {
+    // Results predating the signals field, and the header-only forward, must
+    // not lose their reasons — the email falls back to the plain flag list.
+    const { text } = formatVerdictEmail({
+      results: [ident("url", "likely_scam", "http://evil.test", 70, ["Dodgy top-level domain"])],
+      emailFlags: [],
+      pixelReport: null,
+    });
+    expect(text).toContain("Dodgy top-level domain");
+  });
+
+  it("still scores a header-only forward, which has a real score of its own", () => {
+    // overallVerdict gives sender-spoofing flags 40 even with no scored
+    // identifier, so the number is genuine and belongs in the reply.
+    const { text } = formatVerdictEmail({
+      results: [],
+      emailFlags: ["Sender name claims to be \"myGov\" but the real address is elsewhere"],
+      pixelReport: null,
+    });
+    expect(text).toContain("RISK SCORE: 40/100");
+  });
+
+  it("omits the score when there is genuinely nothing to report", () => {
+    // Nothing scored and nothing flagged: "Risk score: 0/100" would present a
+    // number we never worked out as though it were a finding.
+    const { text } = formatVerdictEmail({ results: [], emailFlags: [], pixelReport: null });
+    expect(text).not.toContain("RISK SCORE");
+  });
+
+  it("defangs signal text, so no evidence row carries a live link", () => {
+    const { text, html } = formatVerdictEmail({
+      results: [
+        ident("message", "likely_scam", "", 70, [], {
+          signals: [{ text: "Contains link: http://evil.test/pay", points: 20, source: "message" }],
+        }),
+      ],
+      emailFlags: [],
+      pixelReport: null,
+    });
+    expect(text).not.toContain("http://evil.test");
+    expect(html).not.toContain("http://evil.test");
+  });
+});
+
+// Every fixture above uses ONE identifier, which hides the defect this section
+// exists for: the score comes from the worst identifier while the evidence
+// covers all of them, so a hand-rolled pairing prints a headline that the rows
+// beneath it contradict. composeVerdictWithEvidence is what reconciles them,
+// and the email has to use it rather than re-deriving the pair.
+describe("verdict email with several identifiers", () => {
+  const withSignals = (
+    kind: AnalyzedIdentifier["kind"],
+    verdict: CheckResult["verdict"],
+    value: string,
+    score: number,
+    rows: Array<[string, number]>,
+  ) =>
+    ident(kind, verdict, value, score, rows.map(([t]) => t), {
+      signals: rows.map(([text, points]) => ({ text, points, source: "message" as const })),
+    });
+
+  const twoIdentifiers = () =>
+    formatVerdictEmail({
+      results: [
+        withSignals("message", "suspicious", "", 40, [
+          ["Urgency language detected", 20],
+          ["Asks for sensitive info", 20],
+        ]),
+        withSignals("url", "likely_scam", "http://evil.test", 70, [
+          ["Dodgy top-level domain", 30],
+          ["No HTTPS", 15],
+          ["Contains login/verify keywords", 10],
+        ]),
+      ],
+      emailFlags: [],
+      pixelReport: null,
+    });
+
+  it("prints a score the rows beneath it actually add up to", () => {
+    // The reader is explicitly invited to check our arithmetic, so it has to
+    // survive being checked.
+    const { text } = twoIdentifiers();
+    const score = Number(text.match(/RISK SCORE: (\d+)\/100/)?.[1]);
+    const rows = [...text.matchAll(/^\s+([+-]\d+)\s{2}/gm)].map((m) => Number(m[1]));
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.reduce((a, b) => a + b, 0)).toBe(score);
+  });
+
+  it("collapses a repeated observation instead of printing it twice", () => {
+    // Pooling is what composeVerdictWithEvidence does and a bare filter does
+    // not. A duplicate both double-counts and can push the band wording into
+    // claiming a pile-up that the evidence does not show.
+    const { text } = formatVerdictEmail({
+      results: [
+        withSignals("message", "suspicious", "", 20, [["Urgency language detected", 20]]),
+        withSignals("url", "suspicious", "http://a.test", 20, [["Urgency language detected", 20]]),
+      ],
+      emailFlags: [],
+      pixelReport: null,
+    });
+    expect(text.match(/Urgency language detected/g)?.length).toBe(1);
+  });
+
+  it("keeps the expanded destination of a shortened link", () => {
+    // Not a scored signal, so the weighted path drops it unless carried
+    // separately — and where a shortener actually goes is the most useful fact
+    // in the whole reply.
+    const { text, html } = formatVerdictEmail({
+      results: [
+        ident("url", "likely_scam", "http://bit.ly/x", 70, ["Dodgy domain"], {
+          expandedUrl: "http://evil.test/pay",
+          signals: [{ text: "Dodgy domain", points: 30, source: "link" }],
+        }),
+      ],
+      emailFlags: [],
+      pixelReport: null,
+    });
+    expect(text).toContain("Real destination:");
+    expect(html).toContain("Real destination:");
+  });
+
+  it("defangs domains and addresses inside signal text, not just URLs", () => {
+    // Signal rows carry bare domains and email addresses too. defangText only
+    // neutralises URLs, so a row naming a scam domain shipped it live.
+    const { text, html } = formatVerdictEmail({
+      results: [
+        ident("message", "likely_scam", "", 70, [], {
+          signals: [
+            { text: "Sender is refunds@evil-bank.test on domain evil-bank.test", points: 40, source: "sender" },
+          ],
+        }),
+      ],
+      emailFlags: [],
+      pixelReport: null,
+    });
+    for (const out of [text, html]) {
+      expect(out).not.toContain("refunds@evil-bank.test");
+      expect(out).not.toMatch(/(?<!\[\.\])evil-bank\.test/);
+    }
+  });
+
+  it("strips the scheme as well as the dots from a URL in signal text", () => {
+    // The two defangers cover different shapes: defangText neutralises a full
+    // URL including its scheme, defangFlag handles bare domains and email
+    // addresses. Signal rows carry all three, and applying only the second
+    // left "http://" live and clickable in clients that autolink.
+    const { text, html } = formatVerdictEmail({
+      results: [
+        ident("message", "likely_scam", "", 70, [], {
+          signals: [{ text: "Contains link: http://evil.test/pay", points: 20, source: "message" }],
+        }),
+      ],
+      emailFlags: [],
+      pixelReport: null,
+    });
+    for (const out of [text, html]) {
+      expect(out).not.toContain("http://evil.test");
+      expect(out).not.toMatch(/https?:\/\/evil/);
+    }
+  });
+
+  it("reads the score band from the same bundle the sheet renders", () => {
+    // Retyping these dropped a trailing sentence once already.
+    const { text } = formatVerdictEmail({
+      results: [withSignals("message", "suspicious", "", 25, [["Something odd", 25]])],
+      emailFlags: [],
+      pixelReport: null,
+    });
+    expect(text).toContain(
+      (enNormal as Record<string, string>)["verdict.score.band.suspicious"],
+    );
   });
 });

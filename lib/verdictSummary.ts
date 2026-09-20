@@ -17,6 +17,12 @@ import { TrackingPixelReport } from "@/lib/trackingPixel";
 import { TrackingFinding } from "@/lib/emailTracking";
 import { defang, defangEmail, defangPhone, defangText } from "@veriguard/engine/urlSanitizer";
 import { buildReportQuery, ReportPrefill } from "@/lib/reportPrefill";
+import { matchedTactics, TACTIC_IDS, TACTIC_TITLES } from "@/lib/signalTactics";
+// Read rather than retyped: the sheet renders these same four strings through
+// the translator, and a hand-copied version already drifted once (a trailing
+// sentence was dropped silently). The email is English-only, so reading the
+// base bundle directly is both correct and the only copy that can be wrong.
+import enNormal from "@/messages/en.normal.json";
 
 // Severity ordering lives in the engine now: the WebExtension bundles the
 // engine and cannot reach `lib/`, and two rank tables that must agree is the
@@ -38,7 +44,13 @@ export function defangValue(kind: AnalyzedIdentifier["kind"], value: string): st
 // plain text. Defang both so a flag can never surface a live, clickable address
 // — matching how every other value is shown.
 export function defangFlag(flag: string): string {
-  return flag
+  // defangText first, so a full URL loses its scheme (hxxp://) as well as its
+  // dots — the domain-level pass below neutralises the dots but leaves
+  // "http://" live and clickable in clients that autolink. Applying only one of
+  // the two leaves a hole: defangText alone misses bare domains and email
+  // addresses, defangFlag alone misses the scheme. Signal text carries all
+  // three shapes, so it needs both.
+  return defangText(flag)
     .replace(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g, (a) => defangEmail(a))
     .replace(/\b[a-zA-Z0-9\-]+(?:\.[a-zA-Z0-9\-]+)+\b/g, (d) => d.replace(/\./g, "[.]"));
 }
@@ -248,6 +260,45 @@ const MAX_REASONS_PER_ITEM = 4;
 interface BreakdownItem {
   heading: string;
   reasons: string[];
+  /** Weighted evidence for this identifier — the same rows the sheet shows. */
+  signals: Signal[];
+  /** Where a shortened link actually goes. Not a scored signal; shown first. */
+  expanded: string;
+}
+
+/**
+ * Format one signal's contribution the way the results sheet does: a signed
+ * weight, or an em dash when a row is context rather than a contribution.
+ *
+ * Publishing the weights is the claim the whole product rests on — detection is
+ * open source so people can check our reasoning, and a score with no breakdown
+ * asks to be taken on faith. The emailed verdict was asking for exactly that.
+ */
+function formatPoints(points: number): string {
+  if (points > 0) return `+${points}`;
+  if (points < 0) return `${points}`;
+  return "—";
+}
+
+/**
+ * The score's meaning in words, matching the bands the sheet names.
+ *
+ * Bounds are scoreToResult's, and the wording is read from the same bundle the
+ * sheet renders — someone who checked on the site and someone who forwarded
+ * must read the same sentence about the same number. Retyping them here dropped
+ * a trailing sentence without anything noticing, which is why this reads rather
+ * than copies.
+ */
+function scoreBand(score: number, findings: Signal[]): string {
+  const key =
+    score >= 45
+      ? findings.length >= 4
+        ? "verdict.score.band.scamMany"
+        : "verdict.score.band.scam"
+      : score >= 20
+        ? "verdict.score.band.suspicious"
+        : "verdict.score.band.safe";
+  return (enNormal as Record<string, string>)[key] ?? "";
 }
 
 function escapeHtml(s: string): string {
@@ -266,25 +317,80 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
   const { verdict } = overallVerdict(results, pixelReport, emailFlags, trackingFindings.length > 0);
   const head = VERDICT_HEADLINE[verdict];
 
+  // The score and the rows under it, composed together.
+  //
+  // These cannot be sourced separately. composeVerdict returns the WORST
+  // identifier's score while evidence covers EVERY identifier, so pairing them
+  // by hand puts a headline of 75 above rows adding to 120 — in a reply that
+  // invites the reader to check our arithmetic. The results sheet had that
+  // defect, and composeVerdictWithEvidence exists to prevent it; the email
+  // reimplemented the pairing and reintroduced it. It also does the pooling
+  // (duplicate observations collapse rather than printing twice) and adds the
+  // tracking-pixel row that no identifier scores.
+  const composed = composeVerdictWithEvidence(results, pixelReport);
+  // Fall back to the headline score for a header-only forward, where no
+  // identifier scored but sender flags still imply a severity.
+  const score = composed?.score ?? overallVerdict(results, pixelReport, emailFlags, trackingFindings.length > 0).score;
+  // Context rows (source "score") are the clamp's own arithmetic, not an
+  // observation about the message, so they are excluded from the count exactly
+  // as the sheet excludes them.
+  const pooled = (composed?.signals ?? []).filter((x) => x.source !== "score");
+
   // Breakdown — each identifier, its status, and WHY. The reasons are the point:
   // "Link evil[.]tk: likely scam" with nothing under it tells someone to be
   // afraid without teaching them what to look for next time. The detector
   // already writes lay-readable flags ("Dodgy top-level domain (.tk) — commonly
   // used by scammers"); this surfaces them instead of discarding them.
+  // Rows already printed under an earlier identifier. The breakdown groups
+  // evidence by identifier, which the sheet's flat list does not, so pooling
+  // has to happen across the groups: the same observation reached from two
+  // identifiers is one finding, and printing it twice both double-counts
+  // against the score above and inflates the "how many rules did this trip"
+  // wording. Ordered by identifier, so a duplicate stays under the first
+  // identifier that produced it.
+  const alreadyShown = new Set<string>();
+
   const breakdown: BreakdownItem[] = results.map((r) => {
     const label = KIND_LABEL[r.kind];
     const value = r.kind !== "message" && r.value ? ` ${defangValue(r.kind, r.value)}` : "";
-    const reasons = r.result.flags.slice(0, MAX_REASONS_PER_ITEM).map((f) => defangFlag(f));
-    const hidden = Math.max(0, r.result.flags.length - MAX_REASONS_PER_ITEM);
+    // The weighted rows behind this verdict, deduped across identifiers — see
+    // alreadyShown. Runs before the flag fallback below, which reads the same
+    // set.
+    const signals = (r.result.signals ?? []).filter((x) => {
+      if (x.source === "score") return false;
+      if (alreadyShown.has(x.text)) return false;
+      alreadyShown.add(x.text);
+      return true;
+    });
+
+    // Flags already shown under an earlier identifier are dropped for the same
+    // reason their weighted rows are: one observation, printed once. Without
+    // this an identifier whose rows all deduped away falls back to the flag
+    // list and reprints them unweighted.
+    const freshFlags = r.result.flags.filter((f) => !alreadyShown.has(f));
+    const reasons = freshFlags.slice(0, MAX_REASONS_PER_ITEM).map((f) => defangFlag(f));
+    const hidden = Math.max(0, freshFlags.length - MAX_REASONS_PER_ITEM);
     if (hidden > 0) reasons.push(`…and ${hidden} more signal${hidden === 1 ? "" : "s"}`);
 
     // The resolved destination of a shortened link is the single most useful
-    // fact we can give someone, so it leads rather than sitting among the flags.
-    if (r.result.expandedUrl) {
-      reasons.unshift(`Real destination: ${r.result.expandedUrl}`);
-    }
+    // fact we can give someone, so it leads rather than sitting among the
+    // flags. Held separately rather than pushed into `reasons`, because the
+    // weighted path does not render `reasons` at all and would otherwise drop
+    // it — it is an observation we made, not a signal that scored.
+    const expanded = r.result.expandedUrl
+      ? `Real destination: ${defangFlag(r.result.expandedUrl)}`
+      : "";
 
-    return { heading: `${label}${value} — ${VERDICT_STATUS[r.result.verdict]}`, reasons };
+    // The weighted rows behind that verdict. Context rows (source "score") are
+    // the clamp's own arithmetic, not an observation about the message, so they
+    // are excluded here exactly as the sheet excludes them.
+
+    return {
+      heading: `${label}${value} — ${VERDICT_STATUS[r.result.verdict]}`,
+      reasons,
+      signals,
+      expanded,
+    };
   });
   const flagLines = emailFlags.map((f) => defangFlag(f));
   // Tracking: prefer the broader findings when present; otherwise fall back to
@@ -366,6 +472,21 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
     "We've already filled in what we found — you just add anything you want to " +
     "say and hit submit.";
 
+  // The pooled rows drive both the band wording and the tactics, so the two
+  // sections cannot disagree about what the evidence was.
+  const tactics = matchedTactics(pooled);
+  const tacticNames = TACTIC_IDS.filter((id) => tactics.has(id)).map((id) => TACTIC_TITLES[id]);
+
+  // The score and what it means — the sheet's own framing.
+  //
+  // Shown whenever a check actually ran, including for a clean result: the
+  // sheet renders RiskScore unconditionally, and a low score is itself the
+  // finding there ("the absence of evidence, not evidence of safety"). What is
+  // suppressed is the case where nothing was examined at all, where "0/100"
+  // would present a number we never worked out as though it were a result.
+  const showScore = pooled.length > 0 || score > 0 || results.length > 0;
+  const bandLine = showScore ? scoreBand(score, pooled) : "";
+
   // ── Plain text ──
   const textParts = [
     "VERIGUARD — Scam check result",
@@ -373,19 +494,38 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
     `${head.emoji} ${head.line}`,
     head.meaning,
     "",
-    "WHAT YOU SHOULD DO",
-    `  ${advice}`,
-    "",
+    ...(showScore ? [`RISK SCORE: ${score}/100`, `  ${bandLine}`, ""] : []),
     ...(breakdown.length
       ? [
           "WHAT WE FOUND",
           ...breakdown.flatMap((b) => [
             `  • ${b.heading}`,
-            ...b.reasons.map((r) => `      - ${r}`),
+            // The weighted rows when we have them, the plain reasons otherwise.
+            // A row's contribution is the thing being published; dropping it
+            // leaves a list of assertions and a number that cannot be checked
+            // against them.
+            // The expanded destination of a shortened link leads whatever
+            // follows: it is the single most useful fact we can give someone,
+            // and it is not a scored signal, so the weighted rows would drop it.
+            ...(b.expanded ? [`      ${b.expanded}`] : []),
+            ...(b.signals.length
+              ? b.signals.map((x) => `      ${formatPoints(x.points).padStart(4)}  ${defangFlag(x.text)}`)
+              : b.reasons.map((r) => `      - ${r}`)),
           ]),
           "",
         ]
       : []),
+    ...(tacticNames.length
+      ? [
+          "TACTICS USED",
+          `  ${tacticNames.join(" · ")}`,
+          "  These are among the six tactics we explain on the Learn page.",
+          "",
+        ]
+      : []),
+    "WHAT YOU SHOULD DO",
+    `  ${advice}`,
+    "",
     ...(nothingFound ? [nothingFound, ""] : []),
     ...(flagLines.length ? ["WHO SENT IT", ...flagLines.map((f) => `  • ${f}`), ""] : []),
     ...(coverageNote ? [coverageNote, ""] : []),
@@ -407,12 +547,45 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
   // what makes the verdict readable at a glance on a phone.
   const li = (items: string[]) => items.map((i) => `<li>${escapeHtml(i)}</li>`).join("");
 
+  // Evidence rows carry their weight, as the results sheet does. A two-column
+  // table rather than a list: the weights must line up as a column to be
+  // scannable, and table layout is the one thing every mail client agrees on.
+  // Colour follows the sheet — amber for a contribution, green for a credit,
+  // grey for a context row worth no points.
+  const weightedRows = (signals: Signal[]) =>
+    `<table role="presentation" cellpadding="0" cellspacing="0" ` +
+    `style="width:100%;margin:6px 0 0;border-collapse:collapse">` +
+    signals
+      .map((x) => {
+        const colour = x.points > 0 ? "#9a6b12" : x.points < 0 ? "#1c7a55" : "#7c879a";
+        return (
+          `<tr>` +
+          `<td style="padding:4px 10px 4px 0;color:#444;font-size:14px;line-height:1.5;` +
+          `vertical-align:top">${escapeHtml(defangFlag(x.text))}</td>` +
+          `<td style="padding:4px 0;color:${colour};font-size:13px;font-weight:bold;` +
+          `white-space:nowrap;text-align:right;vertical-align:top">` +
+          `${escapeHtml(formatPoints(x.points))}</td>` +
+          `</tr>`
+        );
+      })
+      .join("") +
+    `</table>`;
+
   const breakdownHtml = breakdown
     .map((b) => {
-      const reasons = b.reasons.length
-        ? `<ul style="margin:4px 0 0;padding-left:20px;color:#444;font-size:14px">${li(b.reasons)}</ul>`
+      // The expanded destination leads, whichever path renders below it.
+      const expandedHtml = b.expanded
+        ? `<div style="margin:4px 0 0;color:#444;font-size:14px">${escapeHtml(b.expanded)}</div>`
         : "";
-      return `<li style="margin-bottom:10px"><strong>${escapeHtml(b.heading)}</strong>${reasons}</li>`;
+      const detail = b.signals.length
+        ? weightedRows(b.signals)
+        : b.reasons.length
+          ? `<ul style="margin:4px 0 0;padding-left:20px;color:#444;font-size:14px">${li(b.reasons)}</ul>`
+          : "";
+      return (
+        `<li style="margin-bottom:10px"><strong>${escapeHtml(b.heading)}</strong>` +
+        `${expandedHtml}${detail}</li>`
+      );
     })
     .join("");
 
@@ -463,17 +636,74 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
     `<div style="font-size:14px;line-height:1.55;color:#2b3648">${escapeHtml(advice)}</div>` +
     `</div>`;
 
+  // The score, with the bar the sheet draws. Built from a table rather than a
+  // div with a percentage width: Outlook ignores percentage widths on divs, and
+  // a bar that renders full-width in one client and empty in another is worse
+  // than no bar. The filled cell is the score, the rest is the track.
+  const scoreBox = showScore
+    ? `<div style="border:1px solid #dfe3e8;background:#ffffff;border-radius:10px;` +
+      `padding:14px 16px;margin:0 0 18px">` +
+      `<div style="font-size:13px;font-weight:bold;text-transform:uppercase;` +
+      `letter-spacing:0.04em;color:#3a4658;margin-bottom:8px">Risk score</div>` +
+      `<div style="font-size:26px;font-weight:bold;color:${head.accent};line-height:1.1">` +
+      `${score}<span style="font-size:15px;color:#7c879a;font-weight:normal">/100</span></div>` +
+      `<table role="presentation" cellpadding="0" cellspacing="0" ` +
+      `style="width:100%;margin:10px 0 0;border-collapse:collapse;height:6px">` +
+      `<tr>` +
+      (score > 0
+        ? `<td style="width:${Math.max(2, Math.min(100, score))}%;` +
+          // The accent as a border rather than a fill. A solid-accent block is
+          // one step from a solid-accent block WITH text on it, which is the
+          // contrast failure the banner above is deliberately built to avoid;
+          // keeping the accent out of `background` entirely means the rule
+          // cannot be broken here by someone later dropping a label inside.
+          `border-top:6px solid ${head.accent};` +
+          `border-radius:3px 0 0 3px;font-size:0;line-height:0">&nbsp;</td>`
+        : "") +
+      (score < 100
+        ? `<td style="border-top:6px solid #e8ecf1;` +
+          `border-radius:${score > 0 ? "0 3px 3px 0" : "3px"};` +
+          `font-size:0;line-height:0">&nbsp;</td>`
+        : "") +
+      `</tr></table>` +
+      `<div style="font-size:13px;line-height:1.55;color:#4a5567;margin-top:10px">` +
+      `${escapeHtml(bandLine)}</div>` +
+      `</div>`
+    : "";
+
+  // The tactics this message used, named as the Learn page names them. The
+  // continuity is the point: someone who has read "how scammers operate"
+  // should meet the same six words on their own result.
+  const tacticsBox = tacticNames.length
+    ? `<div style="margin:0 0 18px">` +
+      `<p style="margin:0 0 6px;font-size:13px;font-weight:bold;text-transform:uppercase;` +
+      `letter-spacing:0.04em;color:#3a4658">Tactics used</p>` +
+      tacticNames
+        .map(
+          (n) =>
+            `<span style="display:inline-block;margin:0 6px 6px 0;padding:4px 10px;` +
+            `background:#eef1f5;border-radius:999px;color:#3a4658;font-size:13px">` +
+            `${escapeHtml(n)}</span>`,
+        )
+        .join("") +
+      `<div style="font-size:13px;color:#7c879a;margin-top:2px">` +
+      `${escapeHtml("These are among the six tactics we explain on the Learn page.")}</div>` +
+      `</div>`
+    : "";
+
   const sectionHeading = (t: string) =>
     `<p style="margin:0 0 6px;font-size:13px;font-weight:bold;text-transform:uppercase;` +
     `letter-spacing:0.04em;color:#3a4658">${escapeHtml(t)}</p>`;
 
   const body = [
     banner,
-    actionBox,
+    scoreBox,
     breakdown.length
       ? sectionHeading("What we found") +
         `<ul style="margin:0 0 18px;padding-left:20px">${breakdownHtml}</ul>`
       : "",
+    tacticsBox,
+    actionBox,
     nothingFound ? `<p style="margin:0 0 18px;color:#444">${escapeHtml(nothingFound)}</p>` : "",
     flagLines.length
       ? sectionHeading("Who sent it") +

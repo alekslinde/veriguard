@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { matchedTactics, TACTIC_IDS } from "@/lib/signalTactics";
+import { matchedTactics, TACTIC_IDS , TACTIC_TITLES } from "@/lib/signalTactics";
+import enNormal from "@/messages/en.normal.json";
 import { checkSms, checkUrl } from "@veriguard/engine/scamDetector";
 import type { Signal } from "@veriguard/engine/engineTypes";
 
@@ -56,6 +57,26 @@ describe("matchedTactics", () => {
     const r = checkUrl("http://auspost-redelivery.tk/verify");
     for (const id of matchedTactics(r.signals)) {
       expect(TACTIC_IDS).toContain(id);
+    }
+  });
+});
+
+describe("TACTIC_TITLES", () => {
+  it("matches the Learn page's own wording", () => {
+    // The emailed verdict has no translator and carries these literals, while
+    // the web reads learn.tactics.N.title from the bundle. Two copies of the
+    // same six names will drift the moment one is reworded, and the continuity
+    // the tactics layer exists for is exactly what drift destroys.
+    for (const id of TACTIC_IDS) {
+      const fromBundle = (enNormal as Record<string, string>)[`learn.tactics.${id}.title`];
+      expect(TACTIC_TITLES[id]).toBe(fromBundle);
+    }
+  });
+
+  it("names every tactic", () => {
+    for (const id of TACTIC_IDS) {
+      expect(TACTIC_TITLES[id]).toBeTypeOf("string");
+      expect(TACTIC_TITLES[id].length).toBeGreaterThan(0);
     }
   });
 });
