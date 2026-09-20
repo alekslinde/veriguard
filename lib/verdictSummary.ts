@@ -18,6 +18,7 @@ import { TrackingFinding } from "@/lib/emailTracking";
 import { defang, defangEmail, defangPhone, defangText } from "@veriguard/engine/urlSanitizer";
 import { buildReportQuery, ReportPrefill } from "@/lib/reportPrefill";
 import { matchedTactics, TACTIC_IDS, TACTIC_TITLES } from "@/lib/signalTactics";
+import type { PressureReport } from "@/lib/pressureTactics";
 // Read rather than retyped: the sheet renders these same four strings through
 // the translator, and a hand-copied version already drifted once (a trailing
 // sentence was dropped silently). The email is English-only, so reading the
@@ -234,6 +235,12 @@ export interface VerdictEmailInput {
   // Used only to prefill the report link — never to address anything.
   senderAddress?: string;
   replyToAddress?: string;
+  /**
+   * Persuasion techniques the message uses. Reported beside the verdict, never
+   * folded into it — a legitimate sale and a scam pull the same levers, and the
+   * separation is what lets this be said without calling a shop a scam.
+   */
+  pressure?: PressureReport;
 }
 
 export interface VerdictEmail {
@@ -310,7 +317,7 @@ function escapeHtml(s: string): string {
 // Build the verdict reply. When there are no scored identifiers but sender flags
 // exist (header-only forward), the headline is driven by the flags' presence.
 export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
-  const { results, emailFlags, pixelReport, trackingFindings = [], siteUrl, senderAddress, replyToAddress } = input;
+  const { results, emailFlags, pixelReport, trackingFindings = [], siteUrl, senderAddress, replyToAddress, pressure } = input;
 
   // One shared severity decision — same rule the Check UI uses — so a header-
   // only forward still gets a meaningful headline and the two never disagree.
@@ -523,6 +530,15 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
           "",
         ]
       : []),
+    ...(pressure && pressure.count > 0
+      ? [
+          `HOW THIS MESSAGE PRESSURES YOU (${pressure.count})`,
+          ...pressure.tactics.flatMap((t) => [`  \u2022 ${t.label}`, `      ${t.explains}`]),
+          "  These techniques are not proof of anything on their own. Legitimate",
+          "  sellers use them too — which is the point worth knowing.",
+          "",
+        ]
+      : []),
     "WHAT YOU SHOULD DO",
     `  ${advice}`,
     "",
@@ -691,6 +707,32 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
       `</div>`
     : "";
 
+  // Persuasion techniques, beside the verdict rather than inside it. Rendered
+  // on the neutral surface the service notice uses, not on a verdict colour:
+  // this is an observation about how the message is written, and giving it the
+  // amber of a coverage caveat or the red of a verdict would read as a finding
+  // about safety, which it is not.
+  const pressureBox =
+    pressure && pressure.count > 0
+      ? `<div style="border:1px solid #dfe3e8;background:#ffffff;border-radius:10px;` +
+        `padding:14px 16px;margin:0 0 18px">` +
+        `<div style="font-size:13px;font-weight:bold;text-transform:uppercase;` +
+        `letter-spacing:0.04em;color:#3a4658;margin-bottom:8px">` +
+        `${escapeHtml(`How this message pressures you (${pressure.count})`)}</div>` +
+        pressure.tactics
+          .map(
+            (t) =>
+              `<div style="margin:0 0 10px"><div style="font-size:14px;font-weight:bold;` +
+              `color:#2b3648">${escapeHtml(t.label)}</div>` +
+              `<div style="font-size:13px;line-height:1.55;color:#4a5567;margin-top:2px">` +
+              `${escapeHtml(t.explains)}</div></div>`,
+          )
+          .join("") +
+        `<div style="font-size:12.5px;line-height:1.5;color:#7c879a;margin-top:2px">` +
+        `${escapeHtml("These techniques are not proof of anything on their own. Legitimate sellers use them too — which is the point worth knowing.")}` +
+        `</div></div>`
+      : "";
+
   const sectionHeading = (t: string) =>
     `<p style="margin:0 0 6px;font-size:13px;font-weight:bold;text-transform:uppercase;` +
     `letter-spacing:0.04em;color:#3a4658">${escapeHtml(t)}</p>`;
@@ -703,6 +745,7 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
         `<ul style="margin:0 0 18px;padding-left:20px">${breakdownHtml}</ul>`
       : "",
     tacticsBox,
+    pressureBox,
     actionBox,
     nothingFound ? `<p style="margin:0 0 18px;color:#444">${escapeHtml(nothingFound)}</p>` : "",
     flagLines.length

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useReducer, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { AnalyzedIdentifier, ScamType } from "@veriguard/engine/scamDetector";
 import { detectType } from "@veriguard/engine/detectType";
 import { extractIdentifiers, defangEmail } from "@veriguard/engine/urlSanitizer";
 import { parseEmailHeaders, summariseAuth } from "@veriguard/engine/emailHeaders";
 import { analyseEmailSource, EmailSourceAnalysis } from "@/lib/emailSource";
 import { distillEmailContent } from "@/lib/emailDistiller";
+import { analysePressureTactics } from "@/lib/pressureTactics";
 import { defangValue, defangFlag, composeVerdictWithEvidence, isClean, overallCoverage, pooledSignals } from "@/lib/verdictSummary";
 import { worstBy } from "@veriguard/engine/verdictRank";
 import { useLang, MessageKey } from "@/lib/lang";
@@ -526,6 +527,13 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
     emailAnalysis?.tracking.pixelReport.hasTrackingPixels ? emailAnalysis.tracking.pixelReport : null;
   const trackingReport = emailAnalysis?.tracking ?? null;
 
+  // Persuasion techniques in whatever was checked. Computed here rather than in
+  // the engine because it is a reading of the message, not a judgement about
+  // safety — nothing it finds can move the verdict. A sale email and a scam can
+  // report the same techniques, and saying so is more useful to a reader than
+  // calling a shop they subscribed to suspicious.
+  const pressure = useMemo(() => analysePressureTactics(content), [content]);
+
   // Animates the card between the textarea's height and the panel's. Keyed on
   // whether the panel is up, so it runs on the swap and on nothing else — not
   // on every stage row, and not while the reader is typing.
@@ -1030,6 +1038,46 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
     // email has tracking and sender analysis but no scored identifier).
     const supportingSections = (
       <>
+          {/* Persuasion techniques. Rendered on the same neutral surface as the
+              tracking panel and deliberately NOT on a verdict colour: this is an
+              observation about how the message is written, not a finding about
+              whether it is safe. A legitimate sale and a scam pull the same
+              levers, and the separation is what lets that be said without
+              calling a shop a scam. Nothing here contributes to the score. */}
+          {pressure.count > 0 && (
+            <div className="space-y-2 border-t border-[var(--rule)] px-5 py-4">
+              <div className="flex items-baseline justify-between gap-3">
+                <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                  {t("pressure.heading")}
+                </div>
+                <div className="font-[family-name:var(--font-mono-ui)] text-[13px] font-semibold tabular-nums text-[var(--text-dim)]">
+                  {pressure.count === 1
+                    ? t("pressure.count.one")
+                    : t("pressure.count.many", { n: String(pressure.count) })}
+                </div>
+              </div>
+              <ul className="space-y-2.5">
+                {pressure.tactics.map((tactic) => (
+                  <li key={tactic.id} className="flex items-start gap-2.5 text-sm">
+                    <span
+                      className="mt-1.5 shrink-0 w-2 h-2 rounded-full bg-[var(--faint)]"
+                      aria-hidden="true"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="text-[var(--foreground)]">{tactic.label}</span>
+                      <span className="mt-0.5 block text-[13px] leading-relaxed text-[var(--text-dim)]">
+                        {tactic.explains}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[12.5px] leading-relaxed text-[var(--faint)]">
+                {t("pressure.note")}
+              </p>
+            </div>
+          )}
+
           {/* Broader tracking surface — pixels plus click redirects, CSS
               beacons, read-receipt headers, meta refresh, etc. Sibling of the
               breakdown so it renders even for a header-only email with no scored
