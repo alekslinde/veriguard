@@ -1,5 +1,8 @@
 {
   "a11y.newTab": "opens in a new tab",
+  "service.dismiss": "Dismiss this notice",
+  "service.label": "Service status",
+  "service.inboundDelayed": "**Emailed replies are delayed.** We're fixing a problem with our mail provider. Everything you forward is still checked — but the reply may not arrive, so paste the message on the Check page for an instant answer.",
   "nav.learn": "Learn",
   "nav.reports": "Reports",
   "nav.about": "About",
