@@ -18,6 +18,11 @@ import { TrackingFinding } from "@/lib/emailTracking";
 import { defang, defangEmail, defangPhone, defangText } from "@veriguard/engine/urlSanitizer";
 import { buildReportQuery, ReportPrefill } from "@/lib/reportPrefill";
 import { matchedTactics, TACTIC_IDS, TACTIC_TITLES } from "@/lib/signalTactics";
+// Read rather than retyped: the sheet renders these same four strings through
+// the translator, and a hand-copied version already drifted once (a trailing
+// sentence was dropped silently). The email is English-only, so reading the
+// base bundle directly is both correct and the only copy that can be wrong.
+import enNormal from "@/messages/en.normal.json";
 
 // Severity ordering lives in the engine now: the WebExtension bundles the
 // engine and cannot reach `lib/`, and two rank tables that must agree is the
@@ -39,7 +44,13 @@ export function defangValue(kind: AnalyzedIdentifier["kind"], value: string): st
 // plain text. Defang both so a flag can never surface a live, clickable address
 // — matching how every other value is shown.
 export function defangFlag(flag: string): string {
-  return flag
+  // defangText first, so a full URL loses its scheme (hxxp://) as well as its
+  // dots — the domain-level pass below neutralises the dots but leaves
+  // "http://" live and clickable in clients that autolink. Applying only one of
+  // the two leaves a hole: defangText alone misses bare domains and email
+  // addresses, defangFlag alone misses the scheme. Signal text carries all
+  // three shapes, so it needs both.
+  return defangText(flag)
     .replace(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g, (a) => defangEmail(a))
     .replace(/\b[a-zA-Z0-9\-]+(?:\.[a-zA-Z0-9\-]+)+\b/g, (d) => d.replace(/\./g, "[.]"));
 }
@@ -251,6 +262,8 @@ interface BreakdownItem {
   reasons: string[];
   /** Weighted evidence for this identifier — the same rows the sheet shows. */
   signals: Signal[];
+  /** Where a shortened link actually goes. Not a scored signal; shown first. */
+  expanded: string;
 }
 
 /**
@@ -270,22 +283,22 @@ function formatPoints(points: number): string {
 /**
  * The score's meaning in words, matching the bands the sheet names.
  *
- * Bounds are scoreToResult's, and the wording is the sheet's own — someone who
- * checked on the site and someone who forwarded should read the same sentence
- * about the same number. Kept as literals here because this module is pure and
- * has no translator; that is the existing convention for every other string in
- * the reply.
+ * Bounds are scoreToResult's, and the wording is read from the same bundle the
+ * sheet renders — someone who checked on the site and someone who forwarded
+ * must read the same sentence about the same number. Retyping them here dropped
+ * a trailing sentence without anything noticing, which is why this reads rather
+ * than copies.
  */
 function scoreBand(score: number, findings: Signal[]): string {
-  if (score >= 45) {
-    return findings.length >= 4
-      ? "Past where honest messages land. Anyone can trip one of these rules; tripping this many isn't bad luck."
-      : "Past where honest messages land. A real sender trips a rule now and then, but not this hard.";
-  }
-  if (score >= 20) {
-    return "Enough to distrust, not enough to call. A careful scam scores here — so does a real message having a bad day.";
-  }
-  return "A low score is the absence of evidence, not evidence of safety. We can only score the tricks we already know.";
+  const key =
+    score >= 45
+      ? findings.length >= 4
+        ? "verdict.score.band.scamMany"
+        : "verdict.score.band.scam"
+      : score >= 20
+        ? "verdict.score.band.suspicious"
+        : "verdict.score.band.safe";
+  return (enNormal as Record<string, string>)[key] ?? "";
 }
 
 function escapeHtml(s: string): string {
@@ -301,33 +314,83 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
 
   // One shared severity decision — same rule the Check UI uses — so a header-
   // only forward still gets a meaningful headline and the two never disagree.
-  const { verdict, score } = overallVerdict(results, pixelReport, emailFlags, trackingFindings.length > 0);
+  const { verdict } = overallVerdict(results, pixelReport, emailFlags, trackingFindings.length > 0);
   const head = VERDICT_HEADLINE[verdict];
+
+  // The score and the rows under it, composed together.
+  //
+  // These cannot be sourced separately. composeVerdict returns the WORST
+  // identifier's score while evidence covers EVERY identifier, so pairing them
+  // by hand puts a headline of 75 above rows adding to 120 — in a reply that
+  // invites the reader to check our arithmetic. The results sheet had that
+  // defect, and composeVerdictWithEvidence exists to prevent it; the email
+  // reimplemented the pairing and reintroduced it. It also does the pooling
+  // (duplicate observations collapse rather than printing twice) and adds the
+  // tracking-pixel row that no identifier scores.
+  const composed = composeVerdictWithEvidence(results, pixelReport);
+  // Fall back to the headline score for a header-only forward, where no
+  // identifier scored but sender flags still imply a severity.
+  const score = composed?.score ?? overallVerdict(results, pixelReport, emailFlags, trackingFindings.length > 0).score;
+  // Context rows (source "score") are the clamp's own arithmetic, not an
+  // observation about the message, so they are excluded from the count exactly
+  // as the sheet excludes them.
+  const pooled = (composed?.signals ?? []).filter((x) => x.source !== "score");
 
   // Breakdown — each identifier, its status, and WHY. The reasons are the point:
   // "Link evil[.]tk: likely scam" with nothing under it tells someone to be
   // afraid without teaching them what to look for next time. The detector
   // already writes lay-readable flags ("Dodgy top-level domain (.tk) — commonly
   // used by scammers"); this surfaces them instead of discarding them.
+  // Rows already printed under an earlier identifier. The breakdown groups
+  // evidence by identifier, which the sheet's flat list does not, so pooling
+  // has to happen across the groups: the same observation reached from two
+  // identifiers is one finding, and printing it twice both double-counts
+  // against the score above and inflates the "how many rules did this trip"
+  // wording. Ordered by identifier, so a duplicate stays under the first
+  // identifier that produced it.
+  const alreadyShown = new Set<string>();
+
   const breakdown: BreakdownItem[] = results.map((r) => {
     const label = KIND_LABEL[r.kind];
     const value = r.kind !== "message" && r.value ? ` ${defangValue(r.kind, r.value)}` : "";
-    const reasons = r.result.flags.slice(0, MAX_REASONS_PER_ITEM).map((f) => defangFlag(f));
-    const hidden = Math.max(0, r.result.flags.length - MAX_REASONS_PER_ITEM);
+    // The weighted rows behind this verdict, deduped across identifiers — see
+    // alreadyShown. Runs before the flag fallback below, which reads the same
+    // set.
+    const signals = (r.result.signals ?? []).filter((x) => {
+      if (x.source === "score") return false;
+      if (alreadyShown.has(x.text)) return false;
+      alreadyShown.add(x.text);
+      return true;
+    });
+
+    // Flags already shown under an earlier identifier are dropped for the same
+    // reason their weighted rows are: one observation, printed once. Without
+    // this an identifier whose rows all deduped away falls back to the flag
+    // list and reprints them unweighted.
+    const freshFlags = r.result.flags.filter((f) => !alreadyShown.has(f));
+    const reasons = freshFlags.slice(0, MAX_REASONS_PER_ITEM).map((f) => defangFlag(f));
+    const hidden = Math.max(0, freshFlags.length - MAX_REASONS_PER_ITEM);
     if (hidden > 0) reasons.push(`…and ${hidden} more signal${hidden === 1 ? "" : "s"}`);
 
     // The resolved destination of a shortened link is the single most useful
-    // fact we can give someone, so it leads rather than sitting among the flags.
-    if (r.result.expandedUrl) {
-      reasons.unshift(`Real destination: ${r.result.expandedUrl}`);
-    }
+    // fact we can give someone, so it leads rather than sitting among the
+    // flags. Held separately rather than pushed into `reasons`, because the
+    // weighted path does not render `reasons` at all and would otherwise drop
+    // it — it is an observation we made, not a signal that scored.
+    const expanded = r.result.expandedUrl
+      ? `Real destination: ${defangFlag(r.result.expandedUrl)}`
+      : "";
 
     // The weighted rows behind that verdict. Context rows (source "score") are
     // the clamp's own arithmetic, not an observation about the message, so they
     // are excluded here exactly as the sheet excludes them.
-    const signals = (r.result.signals ?? []).filter((x) => x.source !== "score");
 
-    return { heading: `${label}${value} — ${VERDICT_STATUS[r.result.verdict]}`, reasons, signals };
+    return {
+      heading: `${label}${value} — ${VERDICT_STATUS[r.result.verdict]}`,
+      reasons,
+      signals,
+      expanded,
+    };
   });
   const flagLines = emailFlags.map((f) => defangFlag(f));
   // Tracking: prefer the broader findings when present; otherwise fall back to
@@ -409,18 +472,20 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
     "We've already filled in what we found — you just add anything you want to " +
     "say and hit submit.";
 
-  // Every weighted row across all identifiers, for the score band and the
-  // tactics. Gathered once so the two sections cannot disagree about what the
-  // evidence was.
-  const allSignals = breakdown.flatMap((b) => b.signals);
-  const tactics = matchedTactics(allSignals);
+  // The pooled rows drive both the band wording and the tactics, so the two
+  // sections cannot disagree about what the evidence was.
+  const tactics = matchedTactics(pooled);
   const tacticNames = TACTIC_IDS.filter((id) => tactics.has(id)).map((id) => TACTIC_TITLES[id]);
 
-  // The score and what it means — the sheet's own framing. Only when something
-  // was actually scored: "Risk score: 0/100" on a header-only forward reports a
-  // number we never computed.
-  const showScore = allSignals.length > 0 || score > 0;
-  const bandLine = showScore ? scoreBand(score, allSignals) : "";
+  // The score and what it means — the sheet's own framing.
+  //
+  // Shown whenever a check actually ran, including for a clean result: the
+  // sheet renders RiskScore unconditionally, and a low score is itself the
+  // finding there ("the absence of evidence, not evidence of safety"). What is
+  // suppressed is the case where nothing was examined at all, where "0/100"
+  // would present a number we never worked out as though it were a result.
+  const showScore = pooled.length > 0 || score > 0 || results.length > 0;
+  const bandLine = showScore ? scoreBand(score, pooled) : "";
 
   // ── Plain text ──
   const textParts = [
@@ -439,8 +504,12 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
             // A row's contribution is the thing being published; dropping it
             // leaves a list of assertions and a number that cannot be checked
             // against them.
+            // The expanded destination of a shortened link leads whatever
+            // follows: it is the single most useful fact we can give someone,
+            // and it is not a scored signal, so the weighted rows would drop it.
+            ...(b.expanded ? [`      ${b.expanded}`] : []),
             ...(b.signals.length
-              ? b.signals.map((x) => `      ${formatPoints(x.points).padStart(4)}  ${defangText(x.text)}`)
+              ? b.signals.map((x) => `      ${formatPoints(x.points).padStart(4)}  ${defangFlag(x.text)}`)
               : b.reasons.map((r) => `      - ${r}`)),
           ]),
           "",
@@ -492,7 +561,7 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
         return (
           `<tr>` +
           `<td style="padding:4px 10px 4px 0;color:#444;font-size:14px;line-height:1.5;` +
-          `vertical-align:top">${escapeHtml(defangText(x.text))}</td>` +
+          `vertical-align:top">${escapeHtml(defangFlag(x.text))}</td>` +
           `<td style="padding:4px 0;color:${colour};font-size:13px;font-weight:bold;` +
           `white-space:nowrap;text-align:right;vertical-align:top">` +
           `${escapeHtml(formatPoints(x.points))}</td>` +
@@ -504,12 +573,19 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
 
   const breakdownHtml = breakdown
     .map((b) => {
+      // The expanded destination leads, whichever path renders below it.
+      const expandedHtml = b.expanded
+        ? `<div style="margin:4px 0 0;color:#444;font-size:14px">${escapeHtml(b.expanded)}</div>`
+        : "";
       const detail = b.signals.length
         ? weightedRows(b.signals)
         : b.reasons.length
           ? `<ul style="margin:4px 0 0;padding-left:20px;color:#444;font-size:14px">${li(b.reasons)}</ul>`
           : "";
-      return `<li style="margin-bottom:10px"><strong>${escapeHtml(b.heading)}</strong>${detail}</li>`;
+      return (
+        `<li style="margin-bottom:10px"><strong>${escapeHtml(b.heading)}</strong>` +
+        `${expandedHtml}${detail}</li>`
+      );
     })
     .join("");
 
