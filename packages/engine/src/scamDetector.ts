@@ -89,16 +89,24 @@ class Signals {
       });
       return weighted;
     }
-    for (const text of sub.flags) {
+    // A sub-result with no per-signal weights of its own: its flags are the
+    // reasons and `weighted` is the whole contribution. The weight goes on the
+    // FIRST flag rather than on a row of its own, because appending a separate
+    // scoring row printed every reason twice — once at zero and once carrying
+    // the total — and the reader is invited to check that the evidence adds up.
+    // A duplicate makes it visibly not.
+    sub.flags.forEach((text, i) => {
       const pending = carried?.get(text);
       // A carried row keeps its deferred shape, so evidence found later in the
       // outer pass can still settle it. Its weight rides at the sub-result's
       // own scale; the channel discount is applied by the caller that knows it.
       if (pending) this.list.push({ text, points: 0, source, deferred: pending });
-      else this.list.push({ text, points: 0, source });
-    }
-    if (weighted !== 0) {
-      this.list.push({ text: sub.flags[0] ?? "Sub-check contribution", points: weighted, source });
+      else this.list.push({ text, points: i === 0 ? weighted : 0, source });
+    });
+    if (weighted !== 0 && sub.flags.length === 0) {
+      // Nothing to attach the weight to, but it still has to be accounted for
+      // or the rows stop summing to the score.
+      this.list.push({ text: "Sub-check contribution", points: weighted, source });
     }
     return weighted;
   }
@@ -502,120 +510,56 @@ function isMacClickFix(text: string): boolean {
     (shellPipe && (clipboard || captchaFraming));
 }
 
+/**
+ * Drop the header lines whose URLs are list plumbing rather than an ask.
+ *
+ * These are the headers a bulk sender is expected to publish: the unsubscribe
+ * endpoints, and the abuse-reporting address. A URL in one of them is the
+ * sender offering a way OUT, which is the opposite of the thing the link rule
+ * is looking for.
+ *
+ * Line-based, and only for the headers named. Continuation lines (a header
+ * value wrapped onto following lines, which start with whitespace per RFC 5322)
+ * go with their header — a List-Unsubscribe URL is long and wraps routinely, so
+ * missing them would leave half the value behind. Scanning stops at the blank
+ * line that ends the header block, so a body line beginning with whitespace is
+ * never mistaken for a continuation.
+ */
+const LIST_MANAGEMENT_HEADER = /^(list-unsubscribe|list-unsubscribe-post|list-help|list-id|x-report-abuse|feedback-id|x-feedback-id)\s*:/i;
+
+function stripListManagementHeaders(raw: string): string {
+  const lines = raw.split(/\r?\n/);
+  const out: string[] = [];
+  let inHeaders = true;
+  let dropping = false;
+
+  for (const line of lines) {
+    if (inHeaders && line.trim() === "") {
+      inHeaders = false;
+      dropping = false;
+      out.push(line);
+      continue;
+    }
+    if (!inHeaders) {
+      out.push(line);
+      continue;
+    }
+    const isContinuation = /^[ \t]/.test(line);
+    if (isContinuation) {
+      if (!dropping) out.push(line);
+      continue;
+    }
+    dropping = LIST_MANAGEMENT_HEADER.test(line);
+    if (!dropping) out.push(line);
+  }
+  return out.join("\n");
+}
+
 /** Entries matched, for the compounds that score on how many distinct hits. */
 function mentionsCount(text: string, entries: string[]): number {
   return entries.filter((entry) => mentions(text, entry)).length;
 }
 
-/**
- * Is `token` `name` with letters dropped — and close enough that no other
- * reading is plausible?
- *
- * The shape being caught is "austalsn" for "australian" and "rghts" for
- * "rights": the letters that remain are in their original order, and enough of
- * them remain that the word is still readable. Both halves are load-bearing.
- *
- * Order alone is far too weak. Short ordinary words are subsequences of longer
- * unrelated ones by sheer chance — "sent" of "statement", "post" of "auspost",
- * "count" of "account" — so an order-only test flags plain English and, worse,
- * flags the genuine mail whose vocabulary this is. Requiring most of the word to
- * survive is what makes a hit mean something: a corrupted name keeps its length
- * (mangling is meant to stay readable), while a coincidental subsequence is
- * almost always much shorter than the word it matched.
- *
- * Deliberately NOT anchored to a first-letter match: real kits corrupt the first
- * letter as readily as any other.
- *
- * Deletion only — a token that also SUBSTITUTES a letter is not matched, so
- * "austalsn" for "australian" (an l moved, not just dropped) is missed. That is
- * a known and accepted gap. Edit distance would catch it, but measured against
- * both classes it does not separate them: "austalsn" scores 0.70 similarity to
- * "australian" while "count" scores 0.71 to "account", so any threshold loose
- * enough for the first admits the second, and plurals ("payments" vs "payment",
- * 0.88) score higher than either. A rule that flags "count" and "payments" in
- * ordinary mail costs more than the corruptions it would catch, so this stays
- * the narrower test and the message is caught by its other signals.
- */
-// 0.75 is where the two classes actually separate, measured against both: at
-// 0.7 "count" still reads as corrupted "account" and at 0.8 "tis" stops reading
-// as "this". Real corruptions drop one or two letters from a word; coincidental
-// subsequences are shorter relative to what they match.
-const CORRUPTION_MIN_RETAINED = 0.75;
-
-function isLetterDeletionOf(token: string, name: string): boolean {
-  if (token.length >= name.length || token.length === 0) return false;
-  // Enough of the word must survive that the corruption is still that word.
-  if (token.length / name.length < CORRUPTION_MIN_RETAINED) return false;
-  let at = 0;
-  for (const ch of name) {
-    if (at < token.length && token[at] === ch) at += 1;
-  }
-  return at === token.length;
-}
-
-/**
- * Words mangled by dropping letters, of the specific kind that survives a human
- * skim while defeating a keyword match: "Austalsn Taxation Office", "Al rghts
- * reserved", "unsubscribe from tis fst".
- *
- * This is not a spellchecker and must not become one. Genuine mail contains
- * genuine typos, and flagging those would score real organisations for clumsy
- * proofreading. What is scored here is narrower and is a deliberate act: a word
- * from a KNOWN vocabulary — the region's agency and brand names, plus the
- * boilerplate that scam templates copy wholesale — reproduced with letters
- * removed. A sender with any relationship to the agency it names can spell it,
- * and legitimate boilerplate is pasted, not retyped from memory.
- *
- * Deletion specifically, not general edit distance: an edit-distance threshold
- * loose enough to catch "austalsn" also catches unrelated short words, and
- * every extra letter it permits is another ordinary word pulled in. Deletion is
- * both what these kits actually do and the cheapest to bound, since a token can
- * only lose letters from one source word.
- *
- * Tokens shorter than MIN are ignored: at three or four letters the space is
- * dense enough that ordinary words are subsequences of unrelated names by
- * accident ("as" of "asd", "at" of "ato"), which would flag plain English.
- */
-const CORRUPTION_MIN_TOKEN = 5;
-
-/**
- * The footer and administrative wording that scam templates copy from the mail
- * they imitate, and therefore the words their manglers corrupt. Region-neutral:
- * this is the furniture of bulk mail everywhere, not any agency's vocabulary.
- *
- * Every entry has to be a word whose CORRECT spelling is unremarkable in
- * ordinary mail, so that only the corrupted form is evidence.
- */
-const BOILERPLATE_VOCABULARY = [
-  "rights", "reserved", "copyright", "unsubscribe", "preferences",
-  "subscription", "notification", "department", "government", "official",
-  "security", "account", "statement", "assessment", "payment", "reference",
-];
-
-function corruptedNames(text: string, vocabulary: string[]): string[] {
-  // Single words only. A multi-word entry is checked by its parts, so a name
-  // split across a line break is still seen.
-  const words = new Set(
-    vocabulary
-      .flatMap((entry) => entry.toLowerCase().split(/[^a-z]+/))
-      .filter((w) => w.length >= CORRUPTION_MIN_TOKEN),
-  );
-  if (words.size === 0) return [];
-
-  const seen = new Set<string>();
-  for (const raw of text.toLowerCase().split(/[^a-z]+/)) {
-    if (raw.length < CORRUPTION_MIN_TOKEN - 1) continue;
-    // A token that IS a vocabulary word is spelled correctly — not evidence.
-    if (words.has(raw)) continue;
-    for (const name of words) {
-      if (isLetterDeletionOf(raw, name)) {
-        seen.add(name);
-        break;
-      }
-    }
-  }
-  return [...seen];
-}
 
 /**
  * The MULTI-label suffixes on which a covered region's brands legitimately
@@ -1953,8 +1897,23 @@ export function checkSms(
     sig.add("message", "Payment details presented as recently changed — this is the signature of redirect fraud, where a scammer intercepts a real invoice or tenancy thread and substitutes their own account. Confirm any change by phoning the organisation on a number you already had, never one from the message.", 20);
   }
 
-  // Contains a URL
-  const urlMatch = text.match(/https?:\/\/[^\s]+/gi);
+  // Contains a URL.
+  //
+  // List-management headers are excluded first. The email path hands this
+  // function the WHOLE raw message, headers included — deliberately, because a
+  // Subject line naming an agency is evidence like any other. But a
+  // List-Unsubscribe URL is not something the sender is asking the reader to
+  // click: it is required of bulk mail by convention and by law in several
+  // places, and scoring it penalises a sender for complying. Measured across
+  // five real bulk senders, every one scored a link from this header, and for
+  // one of them the body contained no link at all — the entire finding was the
+  // unsubscribe URL the sender is obliged to publish.
+  //
+  // Only these headers are removed, not all of them: anything else in a header
+  // is still read, and a URL that appears in BOTH a header and the body still
+  // scores, because stripping is by line rather than by URL.
+  const scannable = stripListManagementHeaders(text);
+  const urlMatch = scannable.match(/https?:\/\/[^\s]+/gi);
   if (urlMatch) {
     sig.add("message", `Contains link: ${urlMatch[0].slice(0, 50)}...`, 15);
     // Check the embedded URL too
@@ -2442,34 +2401,6 @@ export function checkSms(
   const typos = text.match(/\brecieve\b|\breciept\b|\bur\s+account\b|\bu\s+have\b|\bpls\b|\bplz\b|\bkindly\b/gi);
   if (typos && typos.length > 0) {
     sig.add("message", "Spelling/grammar patterns common in scam messages", 10);
-  }
-
-  // Names and boilerplate reproduced with letters missing — filter evasion, not
-  // sloppiness. See corruptedNames: the vocabulary is deliberately closed, so
-  // this scores a mangled agency name or a mangled copyright footer and stays
-  // silent on ordinary misspelling.
-  //
-  // Two hits rather than one before it scores on its own account: a single
-  // corrupted word is within reach of a genuine typo, whereas a message that
-  // mangles several at once is running a template through a mangler. One hit
-  // still emits at zero weight, because the reader should see what was noticed.
-  const corrupted = corruptedNames(text, [
-    ...PACK.authorityMentions,
-    ...PACK.officialSenderNames,
-    ...BOILERPLATE_VOCABULARY,
-  ]);
-  if (corrupted.length >= 2) {
-    sig.add(
-      "message",
-      `Words are misspelled by dropping letters (${corrupted.slice(0, 3).sort().join(", ")}) — a trick to slip past filters that scan for the correctly spelled words while still reading normally to you`,
-      20,
-    );
-  } else if (corrupted.length === 1) {
-    sig.add(
-      "message",
-      `A word here is spelled with letters missing (${corrupted[0]}) — on its own that can be an ordinary typo, but it is also how a scam message slips past filters looking for the real word`,
-      0,
-    );
   }
 
   // Named fraudulent investment platforms (D4 / #104). ASIC/Scamwatch have
