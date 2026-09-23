@@ -1,0 +1,148 @@
+/* First-run page.
+ *
+ * Loaded after popup.css, which it builds on rather than repeats: the tokens,
+ * the form controls, the button and the whole verdict card come from there, and
+ * this file is only what a full-width page needs that a 380px panel does not.
+ *
+ * The one thing it has to undo is popup.css's fixed `body { width: 380px }` —
+ * correct for a panel with no responsive context, wrong for a tab.
+ */
+
+.ob-body {
+  width: auto;
+  min-height: 100vh;
+  /* Comfortable measure for prose. A full-width line of body copy at this font
+     size is past what is pleasant to read, and this page is mostly reading. */
+  padding: 32px 20px 56px;
+}
+
+.ob {
+  max-width: 620px;
+  margin: 0 auto;
+  display: grid;
+  gap: 26px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.ob-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.ob-head .mark {
+  margin-top: 7px;
+}
+
+.ob-head h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.ob-sub {
+  margin: 4px 0 0;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+/* ── Steps ──────────────────────────────────────────────────────────────── */
+
+.ob-step h2 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.ob-num {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--ink-3);
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 600;
+  display: grid;
+  place-items: center;
+}
+
+.ob-step p {
+  margin: 0 0 8px;
+  color: var(--text-dim);
+  font-size: 14px;
+  /* Indented to the step text, so the numbered column reads as a column. */
+  padding-left: 31px;
+}
+
+.ob-step strong {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.ob-quiet {
+  font-size: 13px;
+  color: var(--faint);
+}
+
+/* ── Try it ─────────────────────────────────────────────────────────────── */
+
+.ob-try {
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: var(--ink-2);
+  padding: 16px;
+  display: grid;
+  gap: 11px;
+}
+
+.ob-try h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ob-try .ob-sub {
+  margin: -4px 0 0;
+  font-size: 13px;
+}
+
+/* The verdict card sits inside a panel that already has this background, so it
+   takes the page background instead to stay distinct from its container. */
+.ob-try .card {
+  background: var(--ink);
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+
+.ob-foot {
+  border-top: 1px solid var(--rule);
+  padding-top: 18px;
+}
+
+.ob-foot p {
+  margin: 0 0 8px;
+  color: var(--faint);
+  font-size: 13px;
+}
+
+.ob-foot a {
+  color: var(--clear);
+}
+
+/* ── Motion ─────────────────────────────────────────────────────────────── */
+
+/* Nothing on this page animates, and nothing should start to without honouring
+   this. A first-run page is shown to everyone exactly once, which makes it the
+   worst place to assume motion is welcome. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

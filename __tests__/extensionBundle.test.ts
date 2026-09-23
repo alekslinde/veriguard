@@ -46,39 +46,65 @@ const NETWORK_PRIMITIVES = [
 
 const INJECTION_SINKS = ["innerHTML", "outerHTML", "document.write", "eval(", "new Function("];
 
+/**
+ * Every entry that ships, read whole.
+ *
+ * Each is built separately and is self-contained — see the note on
+ * `rollupOptions` — so the blocklist fetch appears once *per entry* rather than
+ * once in total. That is why the call-count assertion below is per file: a
+ * count over the concatenation would grow with every new entry and say nothing
+ * about whether any one of them gained a second call site.
+ */
+const ENTRIES = ["popup.js", "background.js", "onboarding.js"] as const;
+
 describe.skipIf(!built)("built extension bundle", () => {
-  const popup = () => readFileSync(path.join(CHROME, "popup.js"), "utf8");
-  const background = () => readFileSync(path.join(CHROME, "background.js"), "utf8");
+  const read = (file: string) => readFileSync(path.join(CHROME, file), "utf8");
+  const everything = () => ENTRIES.map(read).join("\n");
+
+  it("ships every entry the manifest and pages reference", () => {
+    // A missing entry is a silent failure: the onboarding page would open as
+    // unstyled markup with a dead script tag, on first run, which is the one
+    // impression that cannot be retaken.
+    for (const file of [...ENTRIES, "popup.html", "popup.css", "onboarding.html", "onboarding.css"]) {
+      expect(existsSync(path.join(CHROME, file)), `${file} missing from the build`).toBe(true);
+    }
+  });
 
   it("contains no network primitive besides the one fetch", () => {
-    const bundle = popup() + background();
+    const bundle = everything();
     for (const primitive of NETWORK_PRIMITIVES) {
       expect(bundle, `${primitive} reached the extension bundle`).not.toContain(primitive);
     }
   });
 
-  it("calls fetch exactly once, and only to the configured API base", () => {
+  it("calls fetch exactly once per entry, and only to the configured API base", () => {
     // The whole network surface, asserted rather than described. A second fetch
     // — or one built from a computed URL — is the change this catches, and it is
     // the change that would quietly break the privacy claim.
-    const bundle = popup() + background();
-    const calls = bundle.match(/\bfetch\(/g) ?? [];
-    expect(calls, "expected exactly one fetch call site").toHaveLength(1);
+    //
+    // Per entry rather than in total: each is bundled self-contained, so all
+    // three carry their own copy of the one blocklist call. What must stay true
+    // is that no single entry has two.
+    for (const file of ENTRIES) {
+      const bundle = read(file);
+      const calls = bundle.match(/\bfetch\(/g) ?? [];
+      expect(calls, `${file}: expected exactly one fetch call site`).toHaveLength(1);
 
-    // The URL is a template over the build-time constant, so the literal origin
-    // appears in the bundle. A fetch to anything else would not match this.
-    expect(bundle).toMatch(/fetch\(`\$\{[A-Za-z_$][\w$]*\}\/api\/blocklist`/);
+      // The URL is a template over the build-time constant, so the literal origin
+      // appears in the bundle. A fetch to anything else would not match this.
+      expect(bundle, file).toMatch(/fetch\(`\$\{[A-Za-z_$][\w$]*\}\/api\/blocklist`/);
 
-    // The request must not carry credentials: the endpoint is unauthenticated,
-    // and a cookie would tie a client's refresh to a browsing session.
-    expect(bundle).toContain('credentials: "omit"');
+      // The request must not carry credentials: the endpoint is unauthenticated,
+      // and a cookie would tie a client's refresh to a browsing session.
+      expect(bundle, file).toContain('credentials: "omit"');
+    }
   });
 
   it("sends nothing to the server — the blocklist request has no body or query", () => {
     // The one call must stay a plain GET of a static path. A body or a query
     // parameter is how "fetch a list" quietly becomes "ask about this host",
     // which would disclose exactly what running the engine locally avoids.
-    const bundle = popup() + background();
+    const bundle = everything();
     expect(bundle).not.toMatch(/fetch\(`\$\{[A-Za-z_$][\w$]*\}\/api\/blocklist\?/);
     const fetchCall = bundle.slice(bundle.indexOf("fetch(`"), bundle.indexOf("fetch(`") + 400);
     expect(fetchCall).not.toContain("method:");
@@ -92,7 +118,7 @@ describe.skipIf(!built)("built extension bundle", () => {
     // about itself. The one-fetch assertion above already bounds the call
     // count; this names the path that would most plausibly add one, so the
     // failure message points at the reason rather than just the count.
-    const bundle = popup() + background();
+    const bundle = everything();
     expect(bundle).toContain("/report?");
     expect(bundle, "the report path must not POST").not.toMatch(/method:\s*"POST"/i);
     expect(bundle, "a report must not be submitted from the extension").not.toContain(
@@ -101,16 +127,17 @@ describe.skipIf(!built)("built extension bundle", () => {
   });
 
   it("contains no markup-execution sink", () => {
-    // The popup renders attacker-controlled text — the scam message itself, and
-    // engine signal strings that quote it. innerHTML here would be a script
-    // injection fed by the input most likely to carry one.
-    const bundle = popup() + background();
+    // The popup and the onboarding page both render attacker-controlled text —
+    // the scam message itself, and engine signal strings that quote it, through
+    // the shared `verdictView`. innerHTML here would be a script injection fed
+    // by the input most likely to carry one.
+    const bundle = everything();
     for (const sink of INJECTION_SINKS) {
       expect(bundle, `${sink} reached the extension bundle`).not.toContain(sink);
     }
   });
 
-  it("emits self-contained entries, so neither needs a module manifest", () => {
+  it("emits self-contained entries, so none needs a module manifest", () => {
     // Safari does not support `"type": "module"` on a background service
     // worker. It drops the key with a warning, the worker then fails on its
     // first import, and the context menu is never registered — nothing errors
@@ -120,8 +147,8 @@ describe.skipIf(!built)("built extension bundle", () => {
     // hoist shared code into a chunk the entries import. This asserts the
     // output property that makes that true, because the failure it prevents is
     // silent and only shows up in Safari.
-    for (const file of ["popup.js", "background.js"]) {
-      const source = readFileSync(path.join(CHROME, file), "utf8");
+    for (const file of ENTRIES) {
+      const source = read(file);
       expect(source, `${file} carries a bare import`).not.toMatch(/^\s*import\s/m);
       expect(source, `${file} carries a re-export`).not.toMatch(/^\s*export\s+\{/m);
     }
@@ -149,7 +176,7 @@ describe.skipIf(!built)("built extension bundle", () => {
     // at load time from somewhere else, which in an extension resolves to
     // nothing. Checked by looking for a scoring artefact that could only come
     // from the engine's own source.
-    expect(popup()).toContain("URL shortener detected");
+    expect(read("popup.js")).toContain("URL shortener detected");
   });
 });
 
@@ -163,11 +190,18 @@ describe("extension manifest", () => {
   it("asks for no host permissions on either target", () => {
     // Host permissions are the difference between "checks text you give it" and
     // "can read every page you visit". Nothing in this extension reads a page.
+    //
+    // The permission list is pinned exactly rather than merely checked for
+    // absences, because the list is what a store shows a user at install time
+    // and what AMO reviews line by line. Every entry here grants no read access
+    // to browsing: `contextMenus` adds a menu item, `storage` writes locally,
+    // `notifications` shows a box. A permission that reads anything about where
+    // the user has been is the change this is here to make visible.
     for (const target of ["chrome", "firefox"] as const) {
       const m = buildManifest(target, opts) as Record<string, unknown>;
       expect(m.host_permissions).toBeUndefined();
       expect(m.content_scripts).toBeUndefined();
-      expect(m.permissions).toEqual(["contextMenus", "storage"]);
+      expect(m.permissions).toEqual(["contextMenus", "storage", "notifications"]);
     }
   });
 

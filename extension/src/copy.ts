@@ -84,3 +84,83 @@ export const REPORT = {
   /** Sits under the button, in the same register as the notices above it. */
   note: "Opens the report form on veriguard.app with the link, number or address filled in. Nothing is sent until you review it there and submit.",
 };
+
+/**
+ * The toolbar badge, per verdict.
+ *
+ * **A badge is about four characters wide and is read at a glance, so it says
+ * how alarmed to be, not what was found.** The tooltip and the notification
+ * carry the words; this carries the colour.
+ *
+ * `safe` gets a tick rather than an empty badge on purpose: a cleared badge is
+ * indistinguishable from a check that never ran, and "we looked and found
+ * nothing" is a different statement from silence — the same distinction the
+ * blocklist notice exists to draw.
+ *
+ * Colours are the popup's own tokens, resolved to hex because the badge API
+ * takes a colour string and has no access to CSS custom properties. Keep them
+ * in step with `popup.css`.
+ */
+export const BADGE: Record<Verdict, { text: string; color: string }> = {
+  likely_scam: { text: "!", color: "#d6453d" },
+  suspicious: { text: "?", color: "#e8a33d" },
+  safe: { text: "✓", color: "#00a676" },
+  unknown: { text: "–", color: "#7c879a" },
+};
+
+/**
+ * The toolbar tooltip, per verdict.
+ *
+ * Every one ends by saying where the detail is, because this string is the only
+ * signal a user gets who has notifications switched off — and the tooltip
+ * appears on hover, which is a deliberate act. Someone reading it is already
+ * looking for the answer, so it should tell them the next move.
+ */
+export const ACTION_TITLE: Record<Verdict, string> = {
+  likely_scam: "Veriguard: likely a scam — click for details",
+  suspicious: "Veriguard: proceed with caution — click for details",
+  safe: "Veriguard: nothing matched — click for details",
+  unknown: "Veriguard: not enough to judge — click for details",
+};
+
+/** Idle tooltip, matching the manifest's `default_title`. */
+export const ACTION_TITLE_IDLE = "Veriguard";
+
+/**
+ * The notification raised when a right-click check finishes.
+ *
+ * **This is the only place a verdict reaches the user without them opening the
+ * popup, so it states the finding rather than announcing that a finding
+ * exists.** "Veriguard has a result for you" would be a notification that
+ * costs an interruption and pays nothing; for the malicious case especially,
+ * the useful thing is the answer.
+ *
+ * The message is not quoted back. A notification renders on the desktop, can
+ * persist in a system tray, and may be visible to whoever is near the screen —
+ * so the text a user checked, which is often a private message, stays in the
+ * popup where they chose to look at it.
+ */
+export const NOTIFY: Record<Verdict, { title: string; message: string }> = {
+  likely_scam: {
+    title: "Likely a scam — do not engage",
+    message: "Don't reply, click or pay. Open Veriguard to see what was found.",
+  },
+  suspicious: {
+    title: "Proceed with caution",
+    message: "Something looks off. Open Veriguard to see what was found.",
+  },
+  safe: {
+    title: "Nothing matched",
+    message: "No rules matched — but a new scam wouldn't either. Open Veriguard for detail.",
+  },
+  unknown: {
+    title: "Not enough to judge",
+    message: "Too little to go on. Open Veriguard to see what was checked.",
+  },
+};
+
+/** Shown when a right-click selection had nothing checkable in it. */
+export const NOTIFY_NOTHING = {
+  title: "Nothing to check",
+  message: "That selection had no link, number or message text in it.",
+};

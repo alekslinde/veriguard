@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Veriguard — getting started</title>
+    <!--
+      A packaged local page, opened in a tab on install.
+
+      It links to the site but loads nothing from it. Opening a remote URL on
+      install would be a request to our server the moment someone installs the
+      extension — which is a phone-home, carrying an IP and an install time,
+      from a product whose whole claim is that it sends nothing. So the page
+      ships in the bundle, and the one thing it renders live comes from the
+      bundled engine.
+    -->
+    <link rel="stylesheet" href="popup.css" />
+    <link rel="stylesheet" href="onboarding.css" />
+  </head>
+  <body class="ob-body">
+    <main class="ob">
+      <header class="ob-head">
+        <span class="mark" aria-hidden="true"></span>
+        <div>
+          <h1>Veriguard is installed</h1>
+          <p class="ob-sub">
+            Checks run on your device. Nothing you paste is sent anywhere.
+          </p>
+        </div>
+      </header>
+
+      <section class="ob-step">
+        <h2><span class="ob-num" aria-hidden="true">1</span> Pin it to your toolbar</h2>
+        <p>
+          Open your browser's extensions menu — the puzzle-piece or jigsaw icon
+          near the address bar — and pin Veriguard. That toolbar button is where
+          results appear, so pinning it is the difference between seeing a
+          verdict and going looking for one.
+        </p>
+      </section>
+
+      <section class="ob-step">
+        <h2><span class="ob-num" aria-hidden="true">2</span> Check something you've received</h2>
+        <p>
+          Select the suspicious text on any page — an email, a message, a link,
+          a phone number — then right-click it and choose
+          <strong>Check this with Veriguard</strong>.
+        </p>
+        <p>
+          You can also click the toolbar button at any time and paste something
+          in directly.
+        </p>
+      </section>
+
+      <section class="ob-step">
+        <h2><span class="ob-num" aria-hidden="true">3</span> Read the result</h2>
+        <p>
+          The toolbar button shows a badge as soon as the check finishes, and
+          you'll get a notification with the verdict. Click the button to see
+          the full breakdown — every signal that was found, and what it scored.
+        </p>
+        <p class="ob-quiet">
+          Veriguard also tells you what it <em>couldn't</em> check. A quiet
+          result with a coverage notice means less than a quiet result without
+          one, and the panel says so rather than leaving you to assume.
+        </p>
+      </section>
+
+      <!--
+        The live try-it box. Wired to the same bundled engine the popup uses, so
+        the first result a user sees arrives here rather than after a confused
+        detour. aria-live for the same reason as the popup's: the verdict
+        appears with no focus change.
+      -->
+      <section class="ob-try">
+        <h2>Try it now</h2>
+        <p class="ob-sub">
+          Here's a real scam pattern. Edit it, or paste something of your own.
+        </p>
+        <label class="field">
+          <span class="label">Message, link or number</span>
+          <textarea id="ob-input" rows="3" spellcheck="false"></textarea>
+        </label>
+        <div class="row">
+          <label class="region">
+            <span class="label">Region</span>
+            <select id="ob-region"></select>
+          </label>
+          <button id="ob-check" type="button" class="go">Check</button>
+        </div>
+        <section id="ob-out" class="out" aria-live="polite" aria-atomic="true"></section>
+      </section>
+
+      <footer class="ob-foot">
+        <p>
+          Veriguard is rule-based — keyword patterns, domain lists and weighted
+          scoring, all running locally. It has no AI model and makes no call to
+          an analysis service. It will miss new scams that don't match its
+          rules, which is why every verdict tells you what it checked.
+        </p>
+        <p>
+          <a id="ob-site" href="#">More at veriguard.app</a>
+        </p>
+      </footer>
+    </main>
+    <script type="module" src="onboarding.js"></script>
+  </body>
+</html>

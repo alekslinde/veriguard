@@ -39,9 +39,12 @@ const outDir = here(`dist/${TARGET}`);
  * `popup` goes first and owns clearing the output directory and emitting the
  * static assets; `background` follows and must not wipe it.
  */
-const ENTRY = (process.env.ENTRY ?? "popup") as "popup" | "background";
-if (ENTRY !== "popup" && ENTRY !== "background") {
-  throw new Error(`ENTRY must be "popup" or "background", got "${ENTRY}"`);
+const ENTRIES = ["popup", "background", "onboarding"] as const;
+type Entry = (typeof ENTRIES)[number];
+
+const ENTRY = (process.env.ENTRY ?? "popup") as Entry;
+if (!ENTRIES.includes(ENTRY)) {
+  throw new Error(`ENTRY must be one of ${ENTRIES.join(", ")}, got "${ENTRY}"`);
 }
 const IS_FIRST_PASS = ENTRY === "popup";
 
@@ -142,7 +145,12 @@ function emitStaticAssets() {
         ) + "\n",
       );
 
-      for (const file of ["popup.html", "popup.css"]) {
+      for (const file of [
+        "popup.html",
+        "popup.css",
+        "onboarding.html",
+        "onboarding.css",
+      ]) {
         copyFileSync(here(`src/${file}`), path.join(outDir, file));
       }
 
@@ -192,8 +200,9 @@ export default defineConfig({
     minify: false,
     target: "es2022",
     modulePreload: false,
-    // One entry per build. `ENTRY` selects which; `npm run ext:*` runs both in
-    // turn, the second with `emptyOutDir` off so it does not delete the first.
+    // One entry per build. `ENTRY` selects which; `npm run ext:*` runs each in
+    // turn, with `emptyOutDir` on only for the first so the later passes do not
+    // delete its output.
     //
     // Two builds rather than one with two inputs, because the bundler hoists
     // code shared between entries into a chunk each then imports — and a background
