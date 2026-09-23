@@ -27,7 +27,18 @@ export type Target = "chrome" | "firefox";
  * that cannot be justified in one line here does not belong in the manifest.
  *
  *   · contextMenus — the entire entry point: right-click selected text → check.
- *   · storage      — remembers the region choice between popups. Local only.
+ *   · storage      — remembers the region choice between popups, and carries a
+ *                    right-click result to the popup. Local only.
+ *   · notifications — tells the user a result is ready. Without it, a
+ *                    right-click check finishes with nothing visible happening
+ *                    until they think to open the popup, which is the gap the
+ *                    badge only partly closes: a badge is a small digit on an
+ *                    icon that may not even be pinned.
+ *
+ * `notifications` is worth naming as the one permission here that is not
+ * structural. It grants no read access to anything — not pages, not tabs, not
+ * history — and its entire effect is outbound: this extension can show the user
+ * a box. That is why it is acceptable where a host permission is not.
  *
  * Deliberately absent, and each absence is a property worth keeping:
  *
@@ -38,7 +49,7 @@ export type Target = "chrome" | "firefox";
  *     URL of every tab is not needed to score a string.
  *   · No `<all_urls>` content script. Nothing is injected into pages at all.
  */
-const PERMISSIONS = ["contextMenus", "storage"] as const;
+const PERMISSIONS = ["contextMenus", "storage", "notifications"] as const;
 
 interface ManifestOptions {
   version: string;

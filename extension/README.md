@@ -1,7 +1,7 @@
 # Veriguard WebExtension
 
-Right-click a suspicious message → verdict popup. Chrome, Edge, Firefox and
-Safari from one source.
+Right-click a suspicious message → badge, notification, verdict popup. Chrome,
+Edge, Firefox and Safari from one source.
 
 | Browser | Build | Status |
 |---|---|---|
@@ -10,7 +10,7 @@ Safari from one source.
 | Firefox | `npm run ext:firefox` | `dist/firefox`; differs only in the background form and the `browser_specific_settings` block (gecko id, data declaration, version floors). Desktop 140+, Android 142+ — on Android the toolbar popup is the only entry point, as that runtime has no `menus` API |
 | Safari | `npm run ext:safari` | Wraps `dist/chrome` in an Xcode project. Builds; needs a signing identity to run |
 
-*Last reviewed: 2026-09-18.*
+*Last reviewed: 2026-09-20.*
 
 ## What it does, and what it deliberately does not
 
@@ -67,7 +67,23 @@ Consequences worth understanding before changing anything here:
   half separately is what breaks the invariant, and it has broken before.
 - **No host permissions, no content scripts.** Nothing reads the page. The
   context menu hands over the text the user selected, and that is the entire
-  input path.
+  input path. The three permissions are `contextMenus`, `storage` and
+  `notifications`; none of them reads anything about where the user has been.
+  `notifications` is the only one that is not structural — it grants no read
+  access at all, and its entire effect is outbound, which is why it is
+  acceptable where a host permission is not.
+- **A right-click check runs in the background, not the popup.** The badge and
+  the notification have to appear before the popup is opened, so the verdict has
+  to exist by then; the result is stored and the popup renders it rather than
+  checking again. The selection is stashed *before* the check starts and the
+  result stored *before* the user is told, so an event page torn down mid-await
+  leaves the popup able to re-run it rather than opening empty.
+- **Signalling is decoration over a result that must exist regardless.** Badge,
+  tooltip and notification are three signals because each can be absent — a
+  badge needs a visible toolbar button, a tooltip a deliberate hover, and a
+  notification can be switched off at the OS level or missing from the runtime.
+  Every call is best-effort and swallows its own failure; tests assert the check
+  still completes when all of them throw.
 - **Reporting is a hand-off, not a submission.** On a `suspicious` or
   `likely_scam` verdict the popup offers a report button, and it opens
   `/report` on the site with the identifiers prefilled — it never POSTs. A
@@ -223,8 +239,10 @@ silently rather than loudly:
 | `package.json` | Three keys, one of them load-bearing: `"type": "module"` marks this directory as ESM. Not a workspace member (`workspaces` is `packages/*`) and nothing installs from it — deleting it makes the build warn and, once Vite's native config loader becomes the default, fail |
 | `src/manifest.ts` | Both manifest variants from one definition |
 | `src/browser.ts` | The whole cross-browser compatibility layer — promisified `chrome.*`/`browser.*`, with a timeout so a runtime that never answers cannot hang startup |
-| `src/background.ts` | Context-menu registration; stashes the selection |
-| `src/popup.ts` | Popup controller and rendering |
+| `src/background.ts` | Context-menu registration; runs the right-click check, stores the result, badges and notifies; opens the first-run page on install |
+| `src/popup.ts` | Popup controller — collects a stored result, or checks what you paste |
+| `src/verdictView.ts` | The verdict card, shared by the popup and the first-run page |
+| `src/onboarding.ts` / `.html` / `.css` | First-run page: where results appear, and a live try-it box on the bundled engine |
 | `src/check.ts` | Engine bridge — verdict collapse, coverage, shortener honesty |
 | `src/blocklist.ts` | The one network call: fetch, cache, back off, degrade |
 | `src/report.ts` | Report hand-off — which verdicts offer it, what the link carries, what it deliberately does not |
@@ -257,9 +275,14 @@ silently rather than loudly:
 
 ## Not built yet
 
-OCR (client-side WASM), toolbar badging after a right-click, and icons — the
-manifest references `icons/icon-{16,48,128}.png` and the build warns when they
-are absent.
+OCR (client-side WASM) and icons — the manifest references
+`icons/icon-{16,48,128}.png` and the build warns when they are absent.
+
+Image checking is the notable gap. The context menu is text-only: reading an
+image a user right-clicked means fetching its URL, which the CSP bounds to one
+origin and the no-host-permissions stance rules out entirely. Paste or drop
+into the popup is the shape that fits, and it needs a bundle-size and CSP
+decision first — the OCR core is tens of megabytes and wants `wasm-unsafe-eval`.
 
 Before publishing, the packaged extension's origin has to go in
 `CORS_ALLOWED_ORIGINS` (empty by default, no wildcards) — the id is not knowable
