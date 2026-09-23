@@ -59,19 +59,11 @@ const ONBOARDING_PAGE = "onboarding.html";
  * user made by dragging, so the plausible cause is an over-broad drag rather than
  * an attack, and the popup shows the text so what was kept is visible.
  *
- * **What the cap actually bounds is token length, not input length, and the two
- * come apart badly.** Measured 2026-09-20: 20,000 characters of ordinary prose
- * check in about 9ms, while 20,000 characters with no whitespace in them take
- * around 6.7 seconds — the cost is quadratic in the longest unbroken run, not
- * in the total. A page containing a long base64 blob or a minified script is
- * enough to produce one by selecting it.
- *
- * That matters more here than it did when the check ran in the popup: an event
- * page can be torn down mid-await, so a pathological selection is one that can
- * finish with no badge, no notification and no stored result. The stash above
- * is what makes that recoverable — the popup opens with the text still in the
- * box and can re-run it — but a shorter cap, or a token-length guard in the
- * engine, would be the real fix.
+ * The engine is linear in the length of an unbroken run as well as in total
+ * length — a long base64 blob or minified script is the realistic worst case,
+ * and `engineLongInput.test.ts` pins it. That matters here because an event
+ * page can be torn down mid-await; the stash above is what recovers a check
+ * cut short that way, since the popup opens with the text still in the box.
  */
 const MAX_SELECTION = 20_000;
 

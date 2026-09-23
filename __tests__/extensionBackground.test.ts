@@ -245,13 +245,6 @@ describe("a right-click check", () => {
     // so the selection is capped and checked rather than rejected.
     //
     // Asserted at the stash, which happens before the check starts.
-    //
-    // The generous timeout is not slack — it is this case's actual cost. A
-    // capped selection of ordinary prose checks in single-digit milliseconds,
-    // but one unbroken run of 20,000 identical characters takes seconds, and
-    // the test cannot finish while the floated handler is still working. That
-    // is a property of the engine rather than of this module, and the cap is
-    // what bounds it; see the note on MAX_SELECTION.
     const h = harness();
     await loadBackground();
 
@@ -260,7 +253,7 @@ describe("a right-click check", () => {
 
     expect(h.writes[0].key).toBe("pendingSelection");
     expect((h.writes[0].value as string).length).toBe(20_000);
-  }, 20_000);
+  });
 
   it("badges a quiet verdict rather than clearing the badge", async () => {
     // Punctuation and short pleasantries score `safe` rather than returning
