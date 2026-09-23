@@ -127,13 +127,30 @@ async function handleSelection(text: string): Promise<void> {
   }
 
   let check;
+  let failed = false;
   try {
     const blocklist = await getBlocklist(__API_BASE__);
     check = await runCheck(text, region, blocklist);
   } catch {
+    failed = true;
+  }
+
+  // Everything below writes to the toolbar or to storage, and both belong to
+  // the newest selection. A later right-click restashes, and the popup clears
+  // the stash when it takes the text over, so a check whose text is no longer
+  // stashed has been superseded and must publish nothing. Without this, the
+  // slower of two overlapping checks overwrote the newer result, and a check
+  // the popup had already re-run put a stale badge back afterwards.
+  if (!(await stillCurrent(text))) return;
+
+  if (failed) {
     // The engine is local, so a throw is a defect rather than a network
     // failure. Leave the stashed text in place: the popup will re-check it and
-    // surface its own error if the defect is reproducible.
+    // surface its own error if the defect is reproducible. The toolbar is
+    // reset, though — left alone it would go on showing the previous check's
+    // verdict beside a selection it says nothing about.
+    setBadge("");
+    setActionTitle(ACTION_TITLE_IDLE);
     return;
   }
 
@@ -167,6 +184,22 @@ async function handleSelection(text: string): Promise<void> {
     ...NOTIFY[check.verdict],
     iconUrl: extensionUrl("icons/icon-128.png"),
   });
+}
+
+/**
+ * Whether `text` is still the stashed selection.
+ *
+ * Two checks of identical text would publish the same result, so text is
+ * enough to tell them apart. A failed read counts as current: storage that
+ * cannot be read cannot hold a newer selection either, and a signal is better
+ * than silence.
+ */
+async function stillCurrent(text: string): Promise<boolean> {
+  try {
+    return (await storageGet<string>(PENDING_KEY)) === text;
+  } catch {
+    return true;
+  }
 }
 
 // Clicking the notification dismisses it. It cannot open the popup — no runtime

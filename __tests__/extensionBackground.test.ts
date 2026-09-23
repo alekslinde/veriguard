@@ -17,8 +17,14 @@ type Api = Record<string, unknown>;
 type MenuInfo = { menuItemId: string; selectionText?: string };
 
 /** The fake runtime, plus handles on what the module did to it. */
-function harness(over: Partial<Api> = {}) {
+function harness(over: Partial<Api> = {}, { holdRegion = false } = {}) {
   const store = new Map<string, unknown>();
+  /**
+   * With `holdRegion`, each check parks at its region read until released, in
+   * the order the checks started — which is what lets a test decide which of
+   * two overlapping checks finishes first.
+   */
+  const held: Array<() => void> = [];
   /** Every storage write in order, so the sequencing can be asserted. */
   const writes: Array<{ key: string; value: unknown }> = [];
   const badges: Array<{ text: string; color?: string }> = [];
@@ -40,7 +46,12 @@ function harness(over: Partial<Api> = {}) {
     },
     storage: {
       local: {
-        get: async (key: string) => ({ [key]: store.get(key) }),
+        get: async (key: string) => {
+          if (holdRegion && key === "region") {
+            await new Promise<void>((resolve) => held.push(resolve));
+          }
+          return { [key]: store.get(key) };
+        },
         set: async (items: Record<string, unknown>) => {
           for (const [key, value] of Object.entries(items)) {
             writes.push({ key, value });
@@ -90,6 +101,7 @@ function harness(over: Partial<Api> = {}) {
     titles,
     notifications,
     tabs,
+    held,
     menu: (info: MenuInfo) => fireMenu?.(info),
     installed: (reason: string) => fireInstalled?.({ reason }),
   };
@@ -195,11 +207,13 @@ describe("a right-click check", () => {
     // fakes themselves. Polling for the write between ticks would record it a
     // turn late and invert the order it is meant to be checking.
     const order: string[] = [];
+    const kept = new Map<string, unknown>();
     const h = harness({
       storage: {
         local: {
-          get: async () => ({}),
+          get: async (key: string) => ({ [key]: kept.get(key) }),
           set: async (items: Record<string, unknown>) => {
+            for (const [key, value] of Object.entries(items)) kept.set(key, value);
             if (items.pendingResult) order.push("stored");
           },
         },
@@ -368,6 +382,76 @@ describe("the toolbar never carries a stale claim", () => {
     await settle();
 
     expect(h.badges).toHaveLength(h.titles.length);
+  });
+
+  it("resets the toolbar when the check itself fails", async () => {
+    // Otherwise the previous check's "likely a scam" stays on the toolbar
+    // beside a selection it says nothing about. Unmocked as above.
+    const h = harness();
+    vi.doMock("../extension/src/check", () => ({
+      runCheck: async () => {
+        throw new Error("engine defect");
+      },
+    }));
+    try {
+      await loadBackground();
+
+      h.menu({ menuItemId: "veriguard-check-selection", selectionText: SCAM });
+      await settle();
+
+      expect(h.badges.at(-1)?.text, "the previous badge was left up").toBe("");
+      expect(h.titles.at(-1)).toBe("Veriguard");
+      expect(h.store.get("pendingSelection"), "the popup cannot re-run it").toBe(SCAM);
+    } finally {
+      vi.doUnmock("../extension/src/check");
+      vi.resetModules();
+    }
+  });
+});
+
+describe("a check that has been superseded", () => {
+  // Checks overlap: a second right-click can land while the first is still
+  // running, and the popup can take the text over mid-check. Only the newest
+  // selection may reach the toolbar or storage.
+  const QUIET = "thanks, see you then";
+
+  it("drops an older check that finishes after a newer one", async () => {
+    const h = harness({}, { holdRegion: true });
+    await loadBackground();
+
+    h.menu({ menuItemId: "veriguard-check-selection", selectionText: SCAM });
+    h.menu({ menuItemId: "veriguard-check-selection", selectionText: QUIET });
+    await settle();
+    expect(h.held).toHaveLength(2);
+
+    h.held[1]();
+    await settle();
+    h.held[0]();
+    await settle();
+
+    const result = h.store.get("pendingResult") as { content: string };
+    expect(result.content, "the older check overwrote the newer result").toBe(QUIET);
+    expect(h.badges.at(-1)?.text).toBe("✓");
+    expect(h.notifications).toHaveLength(1);
+  });
+
+  it("publishes nothing once the popup has taken the text over", async () => {
+    const h = harness({}, { holdRegion: true });
+    await loadBackground();
+
+    h.menu({ menuItemId: "veriguard-check-selection", selectionText: SCAM });
+    await settle();
+
+    // What the popup does on open: collect the stash and clear it, then run
+    // its own check and clear the badge.
+    h.store.delete("pendingSelection");
+
+    h.held[0]();
+    await settle();
+
+    expect(h.store.get("pendingResult")).toBeUndefined();
+    expect(h.badges).toHaveLength(0);
+    expect(h.notifications).toHaveLength(0);
   });
 });
 
