@@ -1,107 +1,75 @@
-// The first-run page's one interactive piece.
+// The first-run page's behaviour: tick off the steps, then dismiss the tab.
 //
-// The page is mostly static text; this exists so the "try it" box produces a
-// real verdict from the bundled engine rather than a screenshot of one. A
-// picture of a result would teach the layout and not the substance, and the
-// substance — that a verdict comes with its evidence and its gaps — is what
-// this page is for.
+// Small on purpose. The page is three columns of prose and three diagrams; the
+// only moving parts are the checkboxes and the button that closes the tab.
 //
-// Reuses `verdictView`, so what a user learns to read here is exactly what the
-// popup shows them later.
+// **Nothing here is persisted, and that is a decision rather than an omission.**
+// A tick is a reading aid for one sitting — it marks where someone got to while
+// they detoured into browser chrome to actually do the step. Writing it to
+// storage would mean the extension keeps a record of how far through the
+// instructions a user read, which is behavioural data this product has no use
+// for and no business holding. The page is shown once; if it is reopened, an
+// unticked list is the right starting state anyway.
 
-import { runCheck } from "./check";
-import { REGION_OPTIONS, DEFAULT_REGION } from "@veriguard/engine/regions";
-import { hasExtensionApi, storageGet } from "./browser";
-import { getBlocklist } from "./blocklist";
-import { renderVerdict, renderError, el } from "./verdictView";
-
-const REGION_KEY = "region";
-
-/**
- * The sample in the try-it box.
- *
- * A composite of patterns that are thoroughly public — the fake-delivery-fee
- * lure with a lookalike domain and an artificial deadline — rather than a real
- * captured message. It has to score, or the page teaches nothing on first
- * click; it must also be obviously a specimen, so nobody mistakes the page for
- * a report of something that happened to them.
- */
-const SAMPLE =
-  "AusPost: your parcel is held pending a $1.95 redelivery fee. " +
-  "Confirm within 24 hours or it will be returned: http://auspost-redelivery.bond/pay";
+import { hasExtensionApi } from "./browser";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
-const input = $<HTMLTextAreaElement>("ob-input");
-const regionSel = $<HTMLSelectElement>("ob-region");
-const checkBtn = $<HTMLButtonElement>("ob-check");
-const out = $<HTMLElement>("ob-out");
+const gotIt = $<HTMLButtonElement>("ob-got-it");
+const closeNote = $<HTMLParagraphElement>("ob-close-note");
 const siteLink = $<HTMLAnchorElement>("ob-site");
 
-let running = false;
+/**
+ * Close the tab, or say so when the browser will not.
+ *
+ * `window.close()` is only honoured for a tab that script opened. This one was
+ * opened by `tabs.create` on install, so it normally is — but "normally" is not
+ * a guarantee: a user who bookmarked the page, reopened it from history, or
+ * restored it with the session gets a tab the browser considers theirs, and the
+ * call is then ignored with no error to catch.
+ *
+ * So the failure is handled by observing that nothing happened rather than by
+ * trusting a return value. If the page is still here a moment later, it says
+ * what to do instead — which is better than a button that silently does
+ * nothing, the exact failure the context menu was built to avoid.
+ */
+function dismiss(): void {
+  // The button shows the confirmation and disables itself immediately —
+  // clicking it is what the user is confirming, not the tab actually going
+  // away a moment later.
+  gotIt.classList.add("is-done");
+  gotIt.disabled = true;
 
-async function check() {
-  const content = input.value.trim();
-  if (!content || running) return;
-
-  running = true;
-  checkBtn.disabled = true;
-  try {
-    const region = regionSel.value || undefined;
-    // Not persisted from this page. The region select here exists so the sample
-    // can be checked against a chosen pack; the popup is where a user makes the
-    // choice they want remembered, and writing it from a page they may never
-    // return to would override that silently.
-    const blocklist = await getBlocklist(__API_BASE__);
-    const result = await runCheck(content, region, blocklist);
-    if (result) renderVerdict(out, result, content, __API_BASE__);
-    else renderError(out, "Nothing to check in that — paste a message, link or number.");
-  } catch {
-    renderError(out, "Something went wrong checking that. Try again.");
-  } finally {
-    running = false;
-    checkBtn.disabled = false;
-  }
-}
-
-function populateRegions(selected: string) {
-  for (const { code, name } of REGION_OPTIONS) {
-    const opt = el("option", undefined, name);
-    opt.value = code;
-    if (code === selected) opt.selected = true;
-    regionSel.append(opt);
-  }
-}
-
-async function init() {
-  let region = DEFAULT_REGION as string;
-
-  if (hasExtensionApi()) {
+  // The close itself is deliberately delayed: when the tab is one the browser
+  // lets script close, doing that on the same tick as the class change means
+  // the tab is gone before the checkmark ever paints. A brief pause lets the
+  // confirmation actually be seen.
+  window.setTimeout(() => {
     try {
-      const stored = await storageGet<string>(REGION_KEY);
-      if (stored && REGION_OPTIONS.some((r) => r.code === stored)) region = stored;
+      window.close();
     } catch {
-      // Default holds.
+      // Some runtimes throw rather than ignoring it. Handled the same way.
     }
-  }
 
-  populateRegions(region);
-  input.value = SAMPLE;
+    // Still here? Then the close was refused. Tell the user rather than
+    // leaving them looking at a button that did nothing.
+    window.setTimeout(() => {
+      closeNote.hidden = false;
+      closeNote.focus?.();
+    }, 250);
+  }, 500);
+}
 
-  // Built at runtime from the same constant the manifest's `connect-src` names,
-  // so the page cannot link somewhere the extension is not allowed to reach.
-  // The href is set rather than written into the HTML because the origin is a
-  // build-time value.
+gotIt.addEventListener("click", dismiss);
+
+// Built at runtime from the same constant the manifest's `connect-src` names,
+// so the page cannot link somewhere the extension is not allowed to reach. The
+// href is set here rather than written into the HTML because the origin is a
+// build-time value.
+//
+// Guarded because the constant is injected by the build: a page opened outside
+// a built bundle should still render rather than throwing on an undefined
+// global before the checkboxes work.
+if (hasExtensionApi() || typeof __API_BASE__ === "string") {
   siteLink.href = __API_BASE__;
 }
-
-checkBtn.addEventListener("click", () => void check());
-
-input.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-    e.preventDefault();
-    void check();
-  }
-});
-
-void init();

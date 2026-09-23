@@ -77,18 +77,28 @@ describe.skipIf(!built)("built extension bundle", () => {
     }
   });
 
-  it("calls fetch exactly once per entry, and only to the configured API base", () => {
+  it("calls fetch at most once per entry, and only to the configured API base", () => {
     // The whole network surface, asserted rather than described. A second fetch
     // — or one built from a computed URL — is the change this catches, and it is
     // the change that would quietly break the privacy claim.
     //
-    // Per entry rather than in total: each is bundled self-contained, so all
-    // three carry their own copy of the one blocklist call. What must stay true
-    // is that no single entry has two.
+    // Per entry rather than in total: each is bundled self-contained, so an
+    // entry that checks anything carries its own copy of the one blocklist
+    // call. What must stay true is that no single entry has two.
+    //
+    // At most, not exactly: an entry that never checks makes no call at all.
+    // The onboarding page is one — it is three columns of prose and a button —
+    // and an entry with zero is strictly better than one with one, so requiring
+    // exactly one would fail a page for being more private than the claim.
     for (const file of ENTRIES) {
       const bundle = read(file);
       const calls = bundle.match(/\bfetch\(/g) ?? [];
-      expect(calls, `${file}: expected exactly one fetch call site`).toHaveLength(1);
+      expect(
+        calls.length,
+        `${file}: expected at most one fetch call site, found ${calls.length}`,
+      ).toBeLessThanOrEqual(1);
+
+      if (calls.length === 0) continue;
 
       // The URL is a template over the build-time constant, so the literal origin
       // appears in the bundle. A fetch to anything else would not match this.
@@ -98,6 +108,15 @@ describe.skipIf(!built)("built extension bundle", () => {
       // and a cookie would tie a client's refresh to a browsing session.
       expect(bundle, file).toContain('credentials: "omit"');
     }
+  });
+
+  it("keeps the first-run page off the network entirely", () => {
+    // Stronger than the bound above, and worth pinning separately because it is
+    // a property of this page rather than of the extension: it runs on install,
+    // before the user has decided anything, and a request from it would be the
+    // closest thing to a phone-home this product could have. The page is
+    // packaged prose — nothing it shows requires the network or the engine.
+    expect(read("onboarding.js")).not.toMatch(/\bfetch\(/);
   });
 
   it("sends nothing to the server — the blocklist request has no body or query", () => {
