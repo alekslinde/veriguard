@@ -18,6 +18,38 @@ import { defangText } from "@veriguard/engine/urlSanitizer";
 import { openTab } from "./browser";
 import { isReportable, prefillFor, reportUrl } from "./report";
 
+/**
+ * Whether a value read back from storage can be rendered by `renderVerdict`.
+ *
+ * Storage survives extension updates, so a result written by an older version
+ * can be read by a newer one whose `ExtensionCheck` has a different shape. This
+ * is a shape check, not a validation: it establishes enough structure to render
+ * without throwing, and a caller failing it should discard the value and
+ * re-check the text, which is cheap, local and always correct.
+ *
+ * **The verdict is checked against `VERDICT_COPY`, not merely for being a
+ * string**, because that is the table `renderVerdict` indexes first. A verdict
+ * this build does not know — a name an older version wrote, or one a newer
+ * version has since renamed — would otherwise pass, make the lookup `undefined`
+ * and throw on the first property read, which is precisely the cross-version
+ * case this guard exists for.
+ *
+ * It lives here rather than beside its caller so it sits next to the table it
+ * is protecting: a verdict added to one and not the other is then a change to
+ * one file.
+ */
+export function isRenderableCheck(value: unknown): value is ExtensionCheck {
+  if (!value || typeof value !== "object") return false;
+  const c = value as Partial<ExtensionCheck>;
+  return (
+    typeof c.verdict === "string" &&
+    Object.prototype.hasOwnProperty.call(VERDICT_COPY, c.verdict) &&
+    typeof c.score === "number" &&
+    Array.isArray(c.signals) &&
+    Array.isArray(c.results)
+  );
+}
+
 export function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   cls?: string,

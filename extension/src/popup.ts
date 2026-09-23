@@ -9,11 +9,11 @@
 // The verdict card itself is rendered by `verdictView`, shared with the
 // onboarding page.
 
-import { runCheck, type ExtensionCheck } from "./check";
+import { runCheck } from "./check";
 import { REGION_OPTIONS, DEFAULT_REGION } from "@veriguard/engine/regions";
 import { hasExtensionApi, storageGet, storageSet, setBadge, setActionTitle } from "./browser";
 import { getBlocklist } from "./blocklist";
-import { renderVerdict, renderError, el } from "./verdictView";
+import { renderVerdict, renderError, el, isRenderableCheck } from "./verdictView";
 import { ACTION_TITLE_IDLE } from "./copy";
 
 const REGION_KEY = "region";
@@ -69,26 +69,6 @@ function populateRegions(selected: string) {
     if (code === selected) opt.selected = true;
     regionSel.append(opt);
   }
-}
-
-/**
- * Whether a value read back from storage is a usable check result.
- *
- * Storage survives extension updates, so a result written by an older version
- * can be read by a newer one whose `ExtensionCheck` has a different shape. This
- * is a shape check, not a validation: it establishes enough structure to render
- * without throwing, and anything failing it is discarded in favour of
- * re-checking the stashed text — which is cheap, local, and always correct.
- */
-function isRenderableCheck(value: unknown): value is ExtensionCheck {
-  if (!value || typeof value !== "object") return false;
-  const c = value as Partial<ExtensionCheck>;
-  return (
-    typeof c.verdict === "string" &&
-    typeof c.score === "number" &&
-    Array.isArray(c.signals) &&
-    Array.isArray(c.results)
-  );
 }
 
 async function init() {
@@ -159,4 +139,16 @@ input.addEventListener("keydown", (e) => {
   }
 });
 
-void init();
+// Caught rather than floated. `init` renders a stored result, and a throw
+// anywhere in it would otherwise escape with no handler above — leaving a popup
+// that is blank, silent and, because the handoff is cleared on read, not
+// retryable by reopening. The shape guard above makes the known version of that
+// unreachable; this is what covers the one nobody predicted.
+void init().catch(() => {
+  // The advice has to be actionable, so make sure the panel it points at works.
+  // `populateRegions` runs before anything that renders, but a throw from it —
+  // or from before it — would leave an empty dropdown behind this message.
+  if (!regionSel.options.length) populateRegions(DEFAULT_REGION as string);
+  renderError(out, "Something went wrong opening that. Paste it again to check it.");
+  input.focus();
+});

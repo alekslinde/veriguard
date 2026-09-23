@@ -284,3 +284,74 @@ describe("badge vocabulary", () => {
     }
   });
 });
+
+describe("a stored result read back by a different version", () => {
+  // Storage survives extension updates, so the popup can read a result written
+  // by an older build. It renders that result directly rather than re-checking,
+  // and a throw while rendering escapes an unawaited `init()` — leaving a popup
+  // that is blank, silent, and not retryable by reopening, because the handoff
+  // was already cleared on read. The guard is what makes that unreachable.
+
+  it("accepts a well-formed result", async () => {
+    const { isRenderableCheck } = await import("../extension/src/verdictView");
+    expect(
+      isRenderableCheck({ verdict: "likely_scam", score: 80, signals: [], results: [] }),
+    ).toBe(true);
+  });
+
+  it("rejects a verdict this build does not know", async () => {
+    // The case the guard exists for. A string check alone would pass this,
+    // `VERDICT_COPY[verdict]` would be undefined, and reading `.label` off it
+    // throws — so the check is against the table the renderer actually indexes.
+    const { isRenderableCheck } = await import("../extension/src/verdictView");
+    for (const verdict of ["definitely_scam", "SAFE", "", "probably_fine"]) {
+      expect(
+        isRenderableCheck({ verdict, score: 80, signals: [], results: [] }),
+        `"${verdict}" would reach the renderer`,
+      ).toBe(false);
+    }
+  });
+
+  it("rejects an inherited property rather than an own one", async () => {
+    // `hasOwnProperty` via Object.prototype, not `verdict in VERDICT_COPY`:
+    // "toString" and "constructor" are on every object's prototype chain and
+    // would otherwise pass, then index to a function rather than copy.
+    const { isRenderableCheck } = await import("../extension/src/verdictView");
+    for (const verdict of ["toString", "constructor", "__proto__"]) {
+      expect(
+        isRenderableCheck({ verdict, score: 80, signals: [], results: [] }),
+        `"${verdict}" would reach the renderer`,
+      ).toBe(false);
+    }
+  });
+
+  it("rejects missing or wrongly-typed fields", async () => {
+    const { isRenderableCheck } = await import("../extension/src/verdictView");
+    const ok = { verdict: "safe", score: 0, signals: [], results: [] };
+    expect(isRenderableCheck({ ...ok, score: "0" })).toBe(false);
+    expect(isRenderableCheck({ ...ok, signals: undefined })).toBe(false);
+    expect(isRenderableCheck({ ...ok, results: {} })).toBe(false);
+    expect(isRenderableCheck({ verdict: "safe" })).toBe(false);
+  });
+
+  it("rejects what storage returns when nothing is there", async () => {
+    const { isRenderableCheck } = await import("../extension/src/verdictView");
+    for (const value of [null, undefined, "", 0, [], "a string"]) {
+      expect(isRenderableCheck(value)).toBe(false);
+    }
+  });
+
+  it("knows every verdict the engine can actually produce", async () => {
+    // The guard rejecting a real verdict would be a silent downgrade — the
+    // popup would re-check instead of rendering, which is correct but wasteful,
+    // and would hide a copy table that had fallen behind the engine.
+    const { isRenderableCheck } = await import("../extension/src/verdictView");
+    const { VERDICT_COPY } = await import("../extension/src/copy");
+    for (const verdict of Object.keys(VERDICT_COPY)) {
+      expect(
+        isRenderableCheck({ verdict, score: 0, signals: [], results: [] }),
+        `${verdict} is a real verdict the guard turns away`,
+      ).toBe(true);
+    }
+  });
+});

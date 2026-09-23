@@ -39,7 +39,7 @@ import {
 } from "./browser";
 import { runCheck } from "./check";
 import { getBlocklist } from "./blocklist";
-import { BADGE, ACTION_TITLE, NOTIFY, NOTIFY_NOTHING } from "./copy";
+import { BADGE, ACTION_TITLE, ACTION_TITLE_IDLE, NOTIFY, NOTIFY_NOTHING } from "./copy";
 
 const MENU_ID = "veriguard-check-selection";
 const PENDING_KEY = "pendingSelection";
@@ -151,6 +151,12 @@ async function handleSelection(text: string): Promise<void> {
     // stashed text so the popup does not open onto a box it cannot check.
     await storageSet(PENDING_KEY, null).catch(() => {});
     setBadge("");
+    // Reset with the badge, never without it. The tooltip outlives a check, so
+    // clearing one and not the other leaves the toolbar asserting the *previous*
+    // check's verdict beside a badge and a notification saying nothing was
+    // found — the two signals contradicting each other, with the stale one
+    // sounding more specific.
+    setActionTitle(ACTION_TITLE_IDLE);
     await notify(NOTIFICATION_ID, {
       ...NOTIFY_NOTHING,
       iconUrl: extensionUrl("icons/icon-128.png"),

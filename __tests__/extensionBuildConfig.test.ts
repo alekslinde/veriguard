@@ -122,6 +122,30 @@ describe("extension build config is native-loader safe", () => {
     }
   });
 
+  it("does not claim the extension stores nothing it checks", () => {
+    // The storage justification is read by a reviewer against the code, and it
+    // went false once already: a right-click result is written to local storage
+    // and held until the popup reads it, while the copy still said no checked
+    // content was ever stored.
+    //
+    // Matched on the shape of the claim rather than an exact sentence, because
+    // the copy gets reworded and a test pinned to one phrasing would be deleted
+    // rather than heeded. What must not reappear is a blanket denial.
+    const listing = read("extension/STORE.md");
+    const denials = [
+      /no checked content[^.]*is ever stored/i,
+      /never stores (?:the |any )?(?:checked |pasted )?(?:content|text|message)/i,
+      /nothing (?:you|the user) check(?:s|ed)? is (?:ever )?stored/i,
+    ];
+    for (const denial of denials) {
+      expect(
+        listing,
+        "STORE.md denies storing checked content, but a right-click result is " +
+          "written to local storage until the popup collects it",
+      ).not.toMatch(denial);
+    }
+  });
+
   it("counts the regions the listing claims", () => {
     // The listing names a number of rule packs, and a store description is
     // read far more often than it is edited — so the number is the claim most

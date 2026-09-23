@@ -82,7 +82,7 @@ PERMISSIONS
 
 Three, all minimal. None of them can read the pages you visit:
 · contextMenus — adds the right-click entry (desktop; Firefox for Android has no extension context menu, so there the toolbar button is the way in)
-· storage — remembers your region and caches the malicious-site list
+· storage — remembers your region, caches the malicious-site list, and holds a right-click result until you open the popup to read it
 · notifications — tells you the verdict when a right-click check finishes, so you aren't left wondering whether anything happened
 
 REPORTING
@@ -151,7 +151,7 @@ Adds a single right-click menu item, "Check this with Veriguard", shown only whe
 
 **storage**
 ```
-Stores two things locally: the user's chosen region, so it persists between sessions, and a cached copy of a public malicious-host list so checks work offline. Neither is transmitted. No checked content, and no history of what was checked, is ever stored.
+Stores three things locally, none of them transmitted: the user's chosen region, so it persists between sessions; a cached copy of a public malicious-host list, so checks work offline; and, between a right-click check and the next time the popup is opened, the selected text and its result, so the popup can display the verdict the user was just notified about. That last item is a hand-off, not a history — it is written when a check runs, cleared as soon as the popup reads it, and holds only the most recent check. No log of what was checked is kept.
 ```
 
 **notifications**

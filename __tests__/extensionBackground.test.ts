@@ -336,6 +336,116 @@ describe("the check survives a runtime that cannot signal", () => {
   });
 });
 
+describe("the toolbar never carries a stale claim", () => {
+  it("resets the tooltip when nothing checkable was found", async () => {
+    // The tooltip outlives a check. Clearing the badge without it would leave
+    // the toolbar asserting the *previous* check's verdict beside a badge and a
+    // notification saying nothing was found — two signals contradicting each
+    // other, with the stale one sounding the more specific.
+    //
+    // Driven through the module's own code path by making the check return
+    // nothing: whitespace is rejected earlier, so the runCheck null branch is
+    // only reachable by stubbing it.
+    //
+    // Unmocked in a `finally` and followed by `resetModules`, because
+    // `doMock` otherwise persists for the rest of the file — every later test
+    // would import the same stub, run against a check that returns nothing,
+    // and fail for a reason that has nothing to do with what it asserts.
+    const h = harness();
+    vi.doMock("../extension/src/check", () => ({ runCheck: async () => null }));
+    try {
+      await loadBackground();
+
+      h.menu({ menuItemId: "veriguard-check-selection", selectionText: "anything at all" });
+      await settle();
+
+      expect(h.badges.at(-1)?.text).toBe("");
+      expect(h.titles.at(-1), "the tooltip still claims the last verdict").toBe("Veriguard");
+    } finally {
+      vi.doUnmock("../extension/src/check");
+      vi.resetModules();
+    }
+  });
+
+  it("pairs a badge with a tooltip on every verdict path", async () => {
+    const h = harness();
+    await loadBackground();
+
+    h.menu({ menuItemId: "veriguard-check-selection", selectionText: SCAM });
+    await settle();
+
+    expect(h.badges).toHaveLength(h.titles.length);
+  });
+});
+
+describe("a blocklist refresh cut short by a teardown", () => {
+  it("does not book a backoff for a request nobody refused", async () => {
+    // An MV3 event page can be torn down as soon as the handler that started
+    // the refresh settles, which rejects the in-flight fetch with an
+    // AbortError. Recorded as an ordinary failure that is a 30-minute lockout
+    // for a request nobody refused — and on a worker torn down at the same
+    // point every time, the list would never refresh again while every check
+    // quietly ran against a copy that only got older.
+    //
+    // Asserted on what is written to storage, because `failedAt` is the whole
+    // mechanism: it is what a later call reads to decide it is backing off.
+    const abort = Object.assign(new Error("The operation was aborted."), {
+      name: "AbortError",
+    });
+    vi.stubGlobal("fetch", vi.fn(() => Promise.reject(abort)));
+
+    const h = harness();
+    await loadBackground();
+
+    h.menu({ menuItemId: "veriguard-check-selection", selectionText: SCAM });
+    await settle();
+
+    const cached = h.writes.find((w) => w.key === "blocklist")?.value as
+      | { failedAt?: number }
+      | undefined;
+    expect(
+      cached?.failedAt,
+      "an aborted request booked a backoff, so the list stops refreshing",
+    ).toBeUndefined();
+  });
+
+  it("still backs off when the server actually refused", async () => {
+    // The other direction, and the reason the abort case cannot simply be
+    // ignored wholesale: a refusal is exactly what the backoff exists for. A
+    // client that trips the rate limit and retries on every check keeps itself
+    // locked out for the whole window.
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve({ ok: false, status: 429 })));
+
+    const h = harness();
+    await loadBackground();
+
+    h.menu({ menuItemId: "veriguard-check-selection", selectionText: SCAM });
+    await settle();
+
+    const cached = h.writes.find((w) => w.key === "blocklist")?.value as
+      | { failedAt?: number }
+      | undefined;
+    expect(cached?.failedAt, "a refused request must still back off").toBeTypeOf("number");
+  });
+
+  it("checks normally while a refresh is in flight", async () => {
+    // Whatever happens to the refresh, it is not on the path the user is
+    // waiting on: the result is stored and the badge set from the cached copy,
+    // which is the property the float exists to provide.
+    const abort = Object.assign(new Error("aborted"), { name: "AbortError" });
+    vi.stubGlobal("fetch", vi.fn(() => Promise.reject(abort)));
+
+    const h = harness();
+    await loadBackground();
+
+    h.menu({ menuItemId: "veriguard-check-selection", selectionText: SCAM });
+    await settle();
+
+    expect(h.store.get("pendingResult")).toBeTruthy();
+    expect(h.badges.at(-1)?.text).toBe("!");
+  });
+});
+
 describe("first run", () => {
   it("opens the packaged onboarding page on install", async () => {
     const h = harness();
