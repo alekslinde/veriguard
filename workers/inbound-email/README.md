@@ -183,6 +183,10 @@ mailbox providers still judge it on authentication. To land in the inbox:
    keeps the thread root and the most recent entries and drops the middle
    (permitted by RFC 5322 §3.6.4). Clients still group and nest the reply
    correctly, and a long-lived thread cannot grow itself into that refusal.
+4. **The reply is 7-bit ASCII.** Both parts are base64-encoded, because the
+   verdict copy carries em dashes, curly quotes and emoji. Sent as raw UTF-8, a
+   receiving server that does not accept 8-bit mail refuses the reply
+   (`message content requires 8BITMIME but upstream did not advertise it`).
 
 ### Why this uses reply() and not a fresh send
 
