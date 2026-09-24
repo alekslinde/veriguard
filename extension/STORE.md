@@ -80,9 +80,10 @@ It won't ask to read the pages you visit. No host permissions, no content script
 
 PERMISSIONS
 
-Two, both minimal:
+Three, all minimal. None of them can read the pages you visit:
 · contextMenus — adds the right-click entry (desktop; Firefox for Android has no extension context menu, so there the toolbar button is the way in)
-· storage — remembers your region and caches the malicious-site list
+· storage — remembers your region, caches the malicious-site list, and holds a right-click result until you open the popup to read it
+· notifications — tells you the verdict when a right-click check finishes, so you aren't left wondering whether anything happened
 
 REPORTING
 
@@ -129,7 +130,7 @@ bundle of features. The dashboard field sits above the permission
 justifications below.
 
 ```
-Veriguard checks text the user gives it — a message, link, email address or phone number — against a built-in set of scam-detection rules, and shows a verdict with the rules that matched and what each contributed to the score. That is the extension's only function. Text reaches it two ways, both user-initiated: pasted into the popup, or selected on a page and sent via the right-click menu. Scoring happens on the user's device.
+Veriguard checks text the user gives it — a message, link, email address or phone number — against a built-in set of scam-detection rules, and shows a verdict with the rules that matched and what each contributed to the score. That is the extension's only function. Text reaches it two ways, both user-initiated: pasted into the popup, or selected on a page and sent via the right-click menu. A right-click check shows the verdict on the toolbar icon and in a notification; the full breakdown is in the popup. Scoring happens on the user's device.
 ```
 
 Chrome is a desktop target, so the right-click sentence is accurate there and
@@ -150,7 +151,12 @@ Adds a single right-click menu item, "Check this with Veriguard", shown only whe
 
 **storage**
 ```
-Stores two things locally: the user's chosen region, so it persists between sessions, and a cached copy of a public malicious-host list so checks work offline. Neither is transmitted. No checked content, and no history of what was checked, is ever stored.
+Stores three things locally, none of them transmitted: the user's chosen region, so it persists between sessions; a cached copy of a public malicious-host list, so checks work offline; and, between a right-click check and the next time the popup is opened, the selected text and its result, so the popup can display the verdict the user was just notified about. That last item is a hand-off, not a history — it is written when a check runs, cleared as soon as the popup reads it, and holds only the most recent check. No log of what was checked is kept.
+```
+
+**notifications**
+```
+Shows one notification when a check started from the right-click menu finishes, giving the verdict. Without it the check completes with no visible indication, and the user has to open the toolbar popup to discover a result is waiting. The notification states the verdict only; it never quotes the text that was checked.
 ```
 
 **Remote code**

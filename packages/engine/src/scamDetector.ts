@@ -1524,9 +1524,15 @@ export const SPLICED_WORDING_FLAG = "Disguised wording";
  */
 function stripUrlOwnedText(text: string, pack: RegionPack): string {
   const flagged = bareHostFlaggedTlds(pack.suspiciousTlds);
+  // Scheme capped at 30 chars (real ones are a handful): an unbounded `*`
+  // before a required `://` rescans to the end from every start position,
+  // which is quadratic on a long run with no `://` in it.
   return text
-    .replace(/[a-z][a-z0-9+.-]*:\/\/\S+/gi, " ")
-    .replace(/\S+@\S+/g, " ")
+    .replace(/[a-z][a-z0-9+.-]{0,30}:\/\/\S+/gi, " ")
+    // Starts only at a token boundary. The leftmost match always begins there
+    // anyway, but unanchored, every position in a long token with no `@`
+    // rescanned to its end — the same quadratic shape as the scheme above.
+    .replace(/(?<!\S)\S+@\S+/g, " ")
     .replace(BARE_HOST_GLOBAL, (...args) => {
       const groups = args.slice(0, -2) as string[];
       const index = args[args.length - 2] as number;
@@ -2302,7 +2308,12 @@ export function checkSms(
   const brandInHostname = [...BRAND_MENTIONS.substring, ...BRAND_MENTIONS.word].some((b) => {
     const brand = b.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     // The brand appears inside a hostname label.
-    const glued = new RegExp(`[a-z0-9-]*${brand}[a-z0-9-]*\\.[a-z]{2,}`, "i");
+    // No leading `[a-z0-9-]*`: under `.test` it changes nothing a match can
+    // be, but it made every start position in a long run of letters scan to
+    // the end hunting for the dot — quadratic, times the brand list. The
+    // trailing run stays inside one label, so 63 (the DNS label maximum)
+    // bounds it without refusing any real hostname.
+    const glued = new RegExp(`${brand}[a-z0-9-]{0,63}\\.[a-z]{2,}`, "i");
     // …but not as the sender's own registrable domain. The leading class admits
     // a DOT so a subdomain qualifies: "tools.usps.com" and "www.royalmail.com"
     // are the carrier's own tracking pages, and without it every legitimate

@@ -152,10 +152,38 @@ async function refresh(apiBase: string, now: number): Promise<CachedBlocklist | 
     if (!parsed) return await recordFailure(now);
     if (hasExtensionApi()) await storageSet(CACHE_KEY, parsed);
     return parsed;
-  } catch {
-    // Offline, blocked, timed out, malformed — all the same from here.
+  } catch (err) {
+    // Offline, blocked, timed out, malformed — all the same from here, with
+    // one exception that is not a failure of the server's at all.
+    //
+    // **An aborted request must not book a backoff.** In an MV3 event page the
+    // runtime can tear the worker down as soon as the handler that started this
+    // settles, which rejects the in-flight fetch with an AbortError. Recorded as
+    // a failure, that is a 30-minute lockout for a request nobody refused — and
+    // on a worker that is torn down at the same point every time, the two
+    // compound into a list that never refreshes again while every check quietly
+    // runs against a copy that only gets older.
+    //
+    // The client's own timeout also aborts, and that one *is* a failure worth
+    // backing off: it means the server took longer than this client will wait.
+    // The two are told apart by whether that timeout has actually elapsed,
+    // since both arrive as the same error name.
+    if (isAbort(err) && Date.now() - now < FETCH_TIMEOUT_MS) return null;
     return await recordFailure(now);
   }
+}
+
+/**
+ * Whether a rejection is an aborted request.
+ *
+ * `AbortSignal.timeout` rejects with a `TimeoutError` and an explicit abort with
+ * an `AbortError`; both are `DOMException`s, whose constructor is not guaranteed
+ * present in every environment this module is exercised in, so the check is on
+ * the name rather than the type.
+ */
+function isAbort(err: unknown): boolean {
+  const name = (err as { name?: unknown } | null)?.name;
+  return name === "AbortError" || name === "TimeoutError";
 }
 
 /**

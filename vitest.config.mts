@@ -6,6 +6,20 @@ export default defineConfig({
     // workers/** has its own deps and runs under node:test, not vitest.
     exclude: ["**/node_modules/**", "workers/**"],
   },
+  // The extension's build-time constant, which its Vite config injects and
+  // `extension/src/env.d.ts` declares. A test that imports an extension entry
+  // would otherwise hit an undefined global — and because the background
+  // script reaches it inside the try that guards the engine, the module's own
+  // catch turns that into a check which silently produces nothing. That is a
+  // failure shaped exactly like the bug these tests exist to catch, so it is
+  // fixed here rather than stubbed per test.
+  //
+  // A value that is obviously not a real origin: anything reaching the network
+  // from a test is a defect, and it should fail against a host nobody owns
+  // rather than quietly succeed against production.
+  define: {
+    __API_BASE__: JSON.stringify("https://api.example.invalid"),
+  },
   resolve: {
     // Only the app's own "@/" alias is declared here.
     //

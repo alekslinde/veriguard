@@ -34,6 +34,7 @@ function fakeMessage(
     replyThrows?: boolean;
     references?: string;
     authResults?: string[];
+    arcResults?: string[];
     envelope?: Record<string, string>;
   } = {},
 ) {
@@ -51,6 +52,9 @@ function fakeMessage(
       // has to read back apart.
       for (const value of overrides.authResults ?? []) {
         h.append("Authentication-Results", value);
+      }
+      for (const value of overrides.arcResults ?? []) {
+        h.append("ARC-Authentication-Results", value);
       }
       for (const [k, v] of Object.entries(overrides.envelope ?? {})) h.set(k, v);
       return h;
@@ -305,7 +309,7 @@ test("groups each MTA's verdicts separately", async () => {
   await handler.email(
     fakeMessage({
       authResults: [
-        "mx.veriguard.app; dkim=pass header.d=gmail.com; spf=pass; dmarc=pass header.from=gmail.com",
+        "mx.cloudflare.net; dkim=pass header.d=gmail.com; spf=pass; dmarc=pass header.from=gmail.com",
         "mx.google.com; spf=none; dmarc=none header.from=scammer.test",
       ],
     }) as never,
@@ -319,18 +323,18 @@ test("groups each MTA's verdicts separately", async () => {
 test("records a single set for an ordinary direct send", async () => {
   stubFetch(okReply);
   await handler.email(
-    fakeMessage({ authResults: ["mx.veriguard.app; dmarc=pass header.from=gmail.com; spf=pass"] }) as never,
+    fakeMessage({ authResults: ["mx.cloudflare.net; dmarc=pass header.from=gmail.com; spf=pass"] }) as never,
     ENV,
   );
   const line = infoLogs.find((l) => /auth:/.test(l))!;
-  assert.match(line, /\[dmarc=pass spf=pass\]|\[spf=pass dmarc=pass\]/);
+  assert.match(line, /\[receiver: dmarc=pass spf=pass\]/);
   assert.equal((line.match(/\[/g) ?? []).length, 1, "one identity, one set");
 });
 
 test("records failing verdicts, which is what a refusal is read against", async () => {
   stubFetch(okReply);
   await handler.email(
-    fakeMessage({ authResults: ["mx.veriguard.app; dmarc=fail; spf=softfail"] }) as never,
+    fakeMessage({ authResults: ["mx.cloudflare.net; dmarc=fail; spf=softfail"] }) as never,
     ENV,
   );
   const line = infoLogs.find((l) => /auth:/.test(l))!;
@@ -345,12 +349,60 @@ test("a comma inside a quoted value does not invent a second identity", async ()
   stubFetch(okReply);
   await handler.email(
     fakeMessage({
-      authResults: ['mx.veriguard.app; dkim=pass header.d=gmail.com header.b="ab,cd"; dmarc=pass'],
+      authResults: ['mx.cloudflare.net; dkim=pass header.d=gmail.com header.b="ab,cd"; dmarc=pass'],
     }) as never,
     ENV,
   );
   const line = infoLogs.find((l) => /auth:/.test(l))!;
   assert.equal((line.match(/\[/g) ?? []).length, 1, "one header is one set, commas and all");
+});
+
+test("labels which set the receiving platform wrote", async () => {
+  // A reply is refused on the platform's own DMARC verdict, and a forward
+  // carries sets from several servers. The label is what says which one to
+  // read.
+  stubFetch(okReply);
+  await handler.email(
+    fakeMessage({
+      authResults: [
+        "mx.cloudflare.net; dmarc=fail header.from=gmail.com",
+        "mx.google.com; dkim=pass; dmarc=pass",
+      ],
+    }) as never,
+    ENV,
+  );
+  const line = infoLogs.find((l) => /auth:/.test(l))!;
+  assert.match(line, /\[receiver: dmarc=fail\]/);
+  assert.match(line, /\[other: dkim=pass dmarc=pass\]/);
+});
+
+test("reads the writer of an ARC set past its instance number", async () => {
+  stubFetch(okReply);
+  await handler.email(
+    fakeMessage({
+      arcResults: [
+        "i=2; mx.cloudflare.net; dmarc=pass; spf=none",
+        "i=1; mx.google.com; dkim=pass",
+      ],
+    }) as never,
+    ENV,
+  );
+  const line = infoLogs.find((l) => /auth:/.test(l))!;
+  assert.match(line, /\[arc receiver: dmarc=pass spf=none\]/);
+  assert.match(line, /\[arc other: dkim=pass\]/);
+});
+
+test("names no server except the platform's", async () => {
+  // Another set's server is often the forwarder's own mail host, which says
+  // who they are and answers nothing about the refusal.
+  stubFetch(okReply);
+  await handler.email(
+    fakeMessage({ authResults: ["mail.private-employer.test; dmarc=pass"] }) as never,
+    ENV,
+  );
+  const everything = [...infoLogs, ...logs.map((l) => l.text)].join(" ");
+  assert.ok(!everything.includes("private-employer"), "a server name was logged");
+  assert.match(everything, /\[other: dmarc=pass\]/);
 });
 
 test("says so plainly when no verdict was recorded", async () => {
@@ -366,7 +418,7 @@ test("keeps the correspondent's host and addresses out of the log", async () => 
   await handler.email(
     fakeMessage({
       authResults: [
-        "mx.veriguard.app; dmarc=pass header.from=example.test; " +
+        "mx.cloudflare.net; dmarc=pass header.from=example.test; " +
           "spf=pass smtp.mailfrom=someone@private.test; dkim=pass header.d=private.test",
       ],
     }) as never,
@@ -383,7 +435,7 @@ test("a refusal carries both measured conditions", async () => {
   // succeeded, so it has to carry them itself.
   stubFetch(okReply);
   await handler.email(
-    fakeMessage({ replyThrows: true, authResults: ["mx.veriguard.app; dmarc=fail"] }) as never,
+    fakeMessage({ replyThrows: true, authResults: ["mx.cloudflare.net; dmarc=fail"] }) as never,
     ENV,
   );
   const warned = logs.find((l) => l.level === "warn")!.text;

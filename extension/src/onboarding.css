@@ -1,0 +1,420 @@
+/* First-run page.
+ *
+ * Loaded after popup.css, which it builds on rather than repeats: the tokens,
+ * the form controls, the button and the focus treatment all come from there,
+ * and this file is only what a full-width page needs that a 380px panel does
+ * not.
+ *
+ * The one thing it has to undo is popup.css's fixed `body { width: 380px }` —
+ * correct for a panel with no responsive context, wrong for a tab.
+ */
+
+.ob-body {
+  width: auto;
+  min-height: 100vh;
+  padding: 40px 20px 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ob {
+  /* Wide enough for three readable columns, capped so the header's prose does
+     not run to an unreadable measure on a large display. */
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  display: grid;
+  gap: 30px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.ob-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  /* Its own row above the columns, and held to a comfortable measure rather
+     than stretched across all three. */
+  max-width: 620px;
+}
+
+.ob-head .mark {
+  margin-top: 9px;
+}
+
+.ob-head h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.ob-sub {
+  margin: 5px 0 0;
+  color: var(--text-dim);
+  font-size: 14.5px;
+}
+
+/* ── The three steps ────────────────────────────────────────────────────── */
+
+/* `auto-fit` with a min track width rather than a media query: the columns
+ * collapse when they can no longer hold their content, which is the actual
+ * condition, at whatever width that happens to be. One breakpoint guessed in
+ * advance would be wrong for a narrow desktop window, which is a shape a tab
+ * takes all the time.
+ *
+ * 260px is the narrowest a column can be before the diagram and the prose stop
+ * reading — below that it goes to two columns, then one. */
+.ob-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 22px;
+}
+
+.ob-step {
+  display: grid;
+  /* Stretched to the tallest card in the row, so the three columns end at the
+     same line. The label and figure keep their natural size; the closing
+     paragraph is the row that grows, so the extra space lands after the
+     prose rather than stretching it. */
+  grid-template-rows: auto auto 1fr;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: var(--ink-2);
+}
+
+.ob-step p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 13.5px;
+}
+
+/* The second paragraph in a step needs separating from the first. */
+.ob-step p + p {
+  margin-top: 9px;
+}
+
+.ob-step strong {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+/* The closing band: the honesty caveat and the dismiss control, as one row
+ * rather than two fragments separated by a gap. It reads as a single unit —
+ * "here's the last thing to know, here's how to close this" — set apart from
+ * the three step-cards above it by its own border rather than by distance.
+ *
+ * Row rather than a fourth card: at three-column width the caveat and button
+ * sit side by side; the caveat still owns most of the width so it reads as
+ * prose with a control at its edge, not a card with a stray sentence in it. */
+.ob-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px 20px;
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--caution);
+  border-radius: 12px;
+  background: var(--ink-2);
+}
+
+.ob-caveat {
+  margin: 0;
+  max-width: 640px;
+  color: var(--text-dim);
+  font-size: 13.5px;
+}
+
+.ob-caveat strong {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+/* Below the narrower breakpoint the caveat and button can no longer share a
+   row without crowding, so the button drops under the text instead. */
+@media (max-width: 640px) {
+  .ob-band {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* ── Step checkbox ──────────────────────────────────────────────────────── */
+
+.ob-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  /* The whole row is the label, so the target is the width of the column
+     rather than the 16px box — which matters most on a touch screen. */
+  user-select: none;
+}
+
+/* The native control, restyled rather than replaced: `appearance: none` keeps
+ * the real input, so it stays keyboard-reachable, announces itself correctly
+ * and inherits the focus ring popup.css already defines for form controls. A
+ * div pretending to be a checkbox would have to reimplement all three. */
+.ob-box {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 19px;
+  height: 19px;
+  margin: 0;
+  border: 1.5px solid var(--faint);
+  border-radius: 5px;
+  background: var(--ink);
+  cursor: pointer;
+  display: grid;
+  place-content: center;
+}
+
+.ob-box::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  transform: scale(0);
+  background: var(--ink);
+  /* A tick, as a clipped shape rather than a glyph — no font dependency, and
+     it stays crisp at any zoom. */
+  clip-path: polygon(14% 44%, 0 60%, 39% 100%, 100% 18%, 84% 4%, 39% 69%);
+}
+
+.ob-box:checked {
+  background: var(--clear);
+  border-color: var(--clear);
+}
+
+.ob-box:checked::before {
+  transform: scale(1);
+}
+
+/* Honoured because this is the one thing on the page that moves. The guard at
+   the foot of this file covers anything added later. */
+@media (prefers-reduced-motion: no-preference) {
+  .ob-box::before {
+    transition: transform 120ms ease-out;
+  }
+}
+
+.ob-step-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+/* A ticked step recedes: the point of the tick is to tell the reader what is
+ * left, so what is done should stop competing for attention. Not hidden and
+ * not struck through — it stays readable, because someone who ticked a step by
+ * mistake has to be able to read it again. */
+.ob-box:checked ~ .ob-step-title {
+  color: var(--text-dim);
+}
+
+/* ── Step diagrams ──────────────────────────────────────────────────────── */
+
+/* Inline SVG rather than screenshots, and the reasoning is in the markup.
+ * Everything here is driven by the same tokens as the rest of the page, so the
+ * diagrams track the theme instead of being images that suit only one. */
+
+.ob-fig {
+  margin: 0;
+}
+
+.ob-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Browser chrome and panels: the frame the action happens in, drawn quietly so
+   it reads as context rather than content. */
+.d-chrome {
+  fill: var(--ink-3);
+}
+
+.d-panel {
+  fill: var(--ink-3);
+  stroke: var(--rule);
+}
+
+/* An address bar, or an unremarkable toolbar button. */
+.d-field {
+  fill: var(--ink);
+}
+
+/* Inert content — lines of text, menu items that are not ours. */
+.d-text {
+  fill: var(--faint);
+  opacity: 0.55;
+}
+
+.d-dot-off {
+  fill: var(--faint);
+  opacity: 0.4;
+}
+
+.d-mark {
+  fill: var(--text-dim);
+}
+
+/* The line from the menu button down to its dropdown. Without it the panel
+   reads as a separate object that happens to sit nearby. */
+.d-tether {
+  fill: none;
+  stroke: var(--rule);
+  stroke-width: 1.5;
+}
+
+/* ── The one thing to act on ────────────────────────────────────────────── */
+
+/* Exactly one element per diagram carries the accent. More than one and it
+ * stops directing attention, which is the whole job of the drawing. */
+
+.d-row-on {
+  fill: var(--clear);
+  opacity: 0.14;
+}
+
+.d-dot {
+  fill: var(--clear);
+}
+
+.d-text-on {
+  fill: var(--foreground);
+  opacity: 0.8;
+}
+
+.d-pin {
+  fill: var(--clear);
+}
+
+/* Selected text, as a selection highlight rather than another panel. */
+.d-selection {
+  fill: var(--clear);
+  opacity: 0.18;
+}
+
+/* The mouse pointer. Deliberately in the foreground colour rather than the
+   accent: the accent marks what to click, and here that is the menu item, not
+   the cursor. Its job is to connect the selection to the menu. */
+.d-cursor {
+  fill: var(--foreground);
+  stroke: var(--ink);
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+
+/* The badge is the scam colour, matching what the toolbar actually shows on a
+   likely_scam verdict — see BADGE in copy.ts. Display-only at this size. */
+.d-badge {
+  fill: var(--scam);
+}
+
+.d-badge-text {
+  fill: #fff;
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+/* ── Dismiss ────────────────────────────────────────────────────────────── */
+
+/* Stacked and right-aligned rather than beside the button: the close note
+   only appears if the tab refuses to close, and a row would widen the band
+   unpredictably at that point. Stacking keeps the button's position fixed
+   and lets the note simply appear underneath it. */
+.ob-done {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+/* The button carries its own confirmation: a check appears beside the label
+   and the fill mutes, so clicking it reads as "done" rather than as a button
+   that kept behaving exactly as before while an unrelated line of text
+   appeared next to it.
+ *
+ * `display: none` rather than a zero width, so the hidden check reserves no
+ * space and cannot add width (or a stray gap) to the button before it's
+ * clicked. */
+#ob-got-it {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.go-check {
+  display: none;
+  color: var(--clear);
+  flex: 0 0 auto;
+}
+
+.go.is-done .go-check {
+  display: block;
+}
+
+/* Overrides popup.css's `.go[disabled]` dimming: the button is disabled the
+   moment it's clicked (see onboarding.ts), but the whole point of this state
+   is to be seen, not faded out. */
+.go.is-done[disabled] {
+  opacity: 1;
+  background: var(--ink-3);
+  color: var(--text-dim);
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .go {
+    transition: background-color 160ms ease-out;
+  }
+}
+
+.ob-close-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+
+/* The rule spans the full row, matching every other divider on the page
+   (the band above it, the card borders); only the prose beneath it is capped
+   to a readable measure, so the line no longer stops short of the columns
+   it sits under. */
+.ob-foot {
+  border-top: 1px solid var(--rule);
+  padding-top: 20px;
+}
+
+.ob-foot p {
+  margin: 0 0 8px;
+  max-width: 620px;
+  color: var(--faint);
+  font-size: 13px;
+}
+
+.ob-foot a {
+  color: var(--clear);
+}
+
+/* ── Motion ─────────────────────────────────────────────────────────────── */
+
+/* A first-run page is shown to everyone exactly once, which makes it the worst
+   place to assume motion is welcome. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
