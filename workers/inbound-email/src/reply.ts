@@ -64,7 +64,24 @@ export function buildReplyMime(
   );
   if (references) msg.setHeader("References", references);
   msg.setHeader("Auto-Submitted", "auto-replied");
-  msg.addMessage({ contentType: "text/plain", data: reply.text });
-  msg.addMessage({ contentType: "text/html", data: reply.html });
+  msg.addMessage({ contentType: "text/plain", data: base64Lines(reply.text), encoding: "base64" });
+  msg.addMessage({ contentType: "text/html", data: base64Lines(reply.html), encoding: "base64" });
   return msg.asRaw();
+}
+
+// Base64 so the whole reply is 7-bit ASCII. The verdict copy carries em
+// dashes, curly quotes and emoji, and sent as raw UTF-8 a server that does not
+// accept 8-bit mail refuses the reply outright ("requires 8BITMIME"). mimetext
+// only writes the encoding label, so the encoding itself happens here, wrapped
+// at the 76 characters MIME allows per line.
+function base64Lines(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  const encoded = btoa(binary);
+  const lines: string[] = [];
+  for (let i = 0; i < encoded.length; i += 76) lines.push(encoded.slice(i, i + 76));
+  return lines.join("\r\n");
 }
