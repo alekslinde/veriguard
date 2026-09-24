@@ -1,6 +1,6 @@
 # Inbound Email Worker
 
-*Last reviewed: 2026-09-20.*
+*Last reviewed: 2026-09-24.*
 
 Receives forwarded suspicious emails at `check@<domain>`, sends the raw message
 to the Next app's `/api/inbound` for analysis, and replies to the forwarder with
@@ -139,8 +139,13 @@ value silently reverts at the next merge to `main`.
 
 Every way a forward can die now says so in the Worker's logs
 (`npx wrangler tail`, or the dashboard's live logs). A healthy forward logs only
-its `inbound References entries: N, auth: [...] [...]` line, so any *warning or error*
-here is the diagnosis:
+its `inbound References entries: N, auth: [...], envelope: ...` line, so any
+*warning or error* here is the diagnosis.
+
+In `auth:`, each bracket is one server's authentication verdicts, labelled
+`receiver` when the platform that received the forward wrote it and `other`
+otherwise (`arc` marks the ARC copy). The `receiver` set is the one that
+decides whether a reply is allowed.
 
 | Log line | Means |
 | --- | --- |
@@ -148,7 +153,7 @@ here is the diagnosis:
 | `inbound webhook rejected: HTTP 5xx` | The app is up but erroring — check the app's own logs for `inbound analysis failed`. |
 | `inbound webhook unreachable` | Wrong `INBOUND_WEBHOOK_URL`, or the app is down. |
 | `inbound skipped by API: rate-limited` | Working as intended — the per-sender budget. |
-| `reply refused by the mail platform (inbound References entries: N, auth: [...])` | The platform declined the reply and reports several distinct causes through one error, so it passes that wording through rather than naming one. Both measured conditions ride along: the inbound chain length, and the authentication verdicts, grouped one bracket per identity. A forward carries more than one — the forwarder's own send, and the original it quotes. `[dmarc=pass …] [dmarc=none …]` is a forward of unauthenticated mail, which is refused although the forwarder themselves authenticated fine. See *When NO reply is sent*. |
+| `reply refused by the mail platform (inbound References entries: N, auth: [...], envelope: ...)` | The platform declined the reply and reports several distinct causes through one error, so it passes that wording through rather than naming one. Everything measured rides along. Read the `receiver` set first: `dmarc=fail` there is the DMARC condition. A `References` count over 100 is the chain condition. See *When NO reply is sent*. |
 | `inbound dropped: raw unreadable or over …` | The forward exceeded `MAX_RAW_BYTES`. |
 
 Silence in the Worker's log while mail still goes unanswered means the message
@@ -179,21 +184,24 @@ mailbox providers still judge it on authentication. To land in the inbox:
    (permitted by RFC 5322 §3.6.4). Clients still group and nest the reply
    correctly, and a long-lived thread cannot grow itself into that refusal.
 
-### Cost: why this uses reply() and not outbound sending
+### Why this uses reply() and not a fresh send
 
-Sending to **arbitrary recipients** (Cloudflare Email Service / the `send_email`
-binding to unverified addresses) requires the **Workers Paid** plan ($5/mo +
-$0.35/1k after 3,000/mo). We deliberately avoid that: `message.reply()` is an
-**Email Routing** primitive that replies *on the inbound SMTP transaction* back to
-the original sender only — part of the free Email Routing tier, and inherently
-abuse-proof (it can only reach whoever forwarded the mail). So the verdict reply
-costs nothing.
+There are two ways a Worker can send mail, and this one uses only the first:
 
-> Re-verify at go-live: Cloudflare's docs are explicit that *arbitrary* sending is
-> paid, but don't state in writing that `reply()` is exempt. Confirm in the
-> dashboard that replies deliver on your plan before flipping the UI flag. (Heads
-> up: replies show as **"dropped"** in the Email Routing summary even when
-> delivered — that's expected, not a failure.)
+| | `message.reply()` | A `send_email` binding |
+| --- | --- | --- |
+| Reaches | only the sender of the message being answered | any address |
+| Needs | nothing declared in `wrangler.toml` | the binding, and an onboarded sending domain to reach unverified addresses |
+| Limited by | the five conditions in *When NO reply is sent* | separate sending quotas |
+
+`reply()` goes back on the inbound message itself, so it cannot be pointed at
+anyone else, and it is not subject to the rules or quotas for fresh sends. That
+is also why `wrangler.toml` declares no `send_email` binding: the Worker has no
+way to send mail anywhere except back to whoever forwarded it.
+
+A refused reply is therefore one of those five conditions, never a matter of
+which addresses are allowed. (Replies show as **"dropped"** in the Email Routing
+summary even when delivered — that's expected, not a failure.)
 
 ### Two authentications, two jobs
 
@@ -243,9 +251,10 @@ a refusal in production. Two are properties of the forward itself:
   *reply* we build is bounded (see *Deliverability*), but the limit is checked
   against the incoming message, so a chain that long is refused regardless.
 
-All of these throw, and the Worker logs the refusal with both measured
-conditions rather than failing silently. The error names no cause, so those two
-figures are what discriminate between them.
+All of these throw, and the Worker logs the refusal with everything measured
+rather than failing silently. The error names no cause, so those figures are
+what discriminate between them: the `receiver` authentication set for the DMARC
+condition, the `References` count for the chain condition.
 
 **A malformed reply is refused the same way, with the same wording.** A reply
 built with a `References` entry repeated — which happened when the inbound chain

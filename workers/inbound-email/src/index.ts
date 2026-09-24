@@ -25,18 +25,23 @@ export interface Env {
 
 /**
  * The authentication verdicts recorded on the forward, grouped one bracket per
- * set as written: "[dkim=pass dmarc=pass spf=pass] [dmarc=none spf=none]".
+ * set as written and labelled by who wrote it:
+ * "[receiver: dkim=pass dmarc=pass spf=pass] [other: dmarc=none spf=none]".
  *
- * MEASURED: these do NOT discriminate a refused forward from an answered one.
- * Forwards that were answered carried the same "dmarc=none spf=none" tokens as
- * forwards that were refused, and forwarding an airline notice and a bank
- * notice — both from domains publishing DMARC — produced verdicts identical to
- * forwarding a scam email. The tokens describe how the forwarding provider
- * relays, not the mail being forwarded, and not whether a reply is possible.
+ * The label is the point. A reply is refused unless the forward has a valid
+ * DMARC result as the receiving platform judged it, and a forward carries sets
+ * from several servers. Unlabelled, the log could not say which set was the
+ * platform's own, so "identical on both sides" may have compared the wrong one.
+ * Only whether the platform wrote a set is kept: the other server names are
+ * often the forwarder's own mail host, which does not belong in a log.
  *
- * Kept because a per-message authentication fault would still show up here, and
- * ruling it out on every forward is what let it be ruled out at all. Not
- * because it explains the refusals seen so far — it does not.
+ * MEASURED, before the labels: the tokens did not discriminate a refused forward
+ * from an answered one. Forwards that were answered carried the same
+ * "dmarc=none spf=none" tokens as forwards that were refused, and forwarding an
+ * airline notice and a bank notice — both from domains publishing DMARC —
+ * produced verdicts identical to forwarding a scam email. What that compared
+ * was every set at once, so the receiver's own set is the comparison still to
+ * make.
  *
  * A forward's authentication has no bearing on whether its contents are
  * analysed: every forward goes to the engine whatever these say. A failing
@@ -50,28 +55,54 @@ export interface Env {
  * belong in a log.
  */
 function authSummary(headers: Headers): string {
-  const raw = headers.get("Authentication-Results");
-  if (!raw) return "none recorded";
-  const groups = raw
-    .toLowerCase()
-    // Quoted strings are dropped before splitting: a DKIM signature value may
-    // contain a comma, which would otherwise split one MTA's verdicts into two
-    // and invent a second identity that was never there.
-    .replace(/"[^"]*"/g, "")
-    .split(",")
-    .map(
-      (part) =>
-        part.match(
-          /\b(?:dmarc|spf|dkim|compauth|arc)=(?:pass|fail|none|neutral|softfail|hardfail|temperror|permerror|bestguesspass)\b/g,
-        ) ?? [],
-    )
-    .filter((found) => found.length > 0)
-    .map((found) => [...new Set(found)].join(" "));
-
+  const groups = [
+    ...authSets(headers.get("Authentication-Results"), ""),
+    // ARC copies of the same verdicts, which is where a platform records its
+    // own when it does not write the plain header.
+    ...authSets(headers.get("ARC-Authentication-Results"), "arc "),
+  ];
   if (groups.length === 0) return "none recorded";
   // De-duplicated across sets too: an identical set repeated says nothing extra,
   // while two DIFFERENT sets are the finding.
   return [...new Set(groups)].map((g) => `[${g}]`).join(" ");
+}
+
+function authSets(raw: string | null, prefix: string): string[] {
+  if (!raw) return [];
+  return (
+    raw
+      .toLowerCase()
+      // Quoted strings are dropped before splitting: a DKIM signature value may
+      // contain a comma, which would otherwise split one MTA's verdicts into two
+      // and invent a second identity that was never there.
+      .replace(/"[^"]*"/g, "")
+      .split(",")
+      .map((part) => {
+        const found =
+          part.match(
+            /\b(?:dmarc|spf|dkim|compauth|arc)=(?:pass|fail|none|neutral|softfail|hardfail|temperror|permerror|bestguesspass)\b/g,
+          ) ?? [];
+        return found.length > 0
+          ? `${prefix}${writerOf(part)}: ${[...new Set(found)].join(" ")}`
+          : "";
+      })
+      .filter(Boolean)
+  );
+}
+
+/**
+ * Whether the receiving platform wrote this set, from the server name that
+ * opens it. An ARC set opens with its instance number ("i=1; host; …"), so
+ * that is skipped first.
+ *
+ * Anyone can put a header naming the platform into their own mail, so this is
+ * diagnostic only and gates nothing. The platform's real set is the first one.
+ */
+function writerOf(set: string): "receiver" | "other" {
+  const fields = set.split(";").map((f) => f.trim());
+  const host = /^i=\d+$/.test(fields[0] ?? "") ? fields[1] : fields[0];
+  const name = (host ?? "").split(/\s+/)[0];
+  return name.includes("cloudflare") ? "receiver" : "other";
 }
 
 /**

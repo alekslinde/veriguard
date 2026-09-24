@@ -3,10 +3,10 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
 # This Worker is bound to a Cloudflare Email Routing address (set up in the
-# dashboard — see README.md). The send_email binding authorises replying to the
-# original sender via message.reply(); no destination_address is listed because
-# replies can only ever go back to the forwarder, never to an arbitrary address.
-send_email = [{ name = "VERIGUARD_REPLY" }]
+# dashboard — see README.md). It answers with message.reply(), which needs no
+# binding: the reply rides the inbound message and can only go back to its
+# sender. There is deliberately no send_email binding, since that is the path
+# that can send to other addresses.
 
 # INBOUND_WEBHOOK_URL points at the deployed Next app's /api/inbound route.
 # INBOUND_SECRET is NOT here — set it as a secret: `wrangler secret put INBOUND_SECRET`
