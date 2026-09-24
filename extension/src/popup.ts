@@ -1,22 +1,26 @@
 // Popup controller: paste or arrive with a selection, get a verdict.
 //
-// Rendering is done with `textContent` and `createElement` throughout, never
-// `innerHTML`. The content being rendered is a scam message the user pasted —
-// it is hostile by assumption, and it reaches the DOM alongside engine signal
-// text that quotes it. An `innerHTML` path here would be a script-injection
-// sink fed by exactly the input most likely to carry one.
+// A right-click check has already run in the background by the time this opens
+// — that is what the badge and the notification were about — so the popup's
+// first job is to collect that result rather than to repeat the check. It falls
+// back to checking the stashed text itself when only text arrived, which is the
+// state a torn-down worker leaves behind.
+//
+// The verdict card itself is rendered by `verdictView`, shared with the
+// onboarding page.
 
-import { runCheck, type ExtensionCheck } from "./check";
-import { VERDICT_COPY, SOURCE_LABEL, NOTICE, REPORT } from "./copy";
+import { runCheck } from "./check";
 import { REGION_OPTIONS, DEFAULT_REGION } from "@veriguard/engine/regions";
-import { defangText } from "@veriguard/engine/urlSanitizer";
-import { hasExtensionApi, storageGet, storageSet, openTab } from "./browser";
+import { hasExtensionApi, storageGet, storageSet, setBadge, setActionTitle } from "./browser";
 import { getBlocklist } from "./blocklist";
-import { isReportable, prefillFor, reportUrl } from "./report";
+import { renderVerdict, renderError, el, isRenderableCheck } from "./verdictView";
+import { ACTION_TITLE_IDLE } from "./copy";
 
 const REGION_KEY = "region";
 /** Where the background script leaves text from a right-click check. */
 const PENDING_KEY = "pendingSelection";
+/** Where the background script leaves a completed right-click result. */
+const PENDING_RESULT_KEY = "pendingResult";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -24,133 +28,6 @@ const input = $<HTMLTextAreaElement>("input");
 const regionSel = $<HTMLSelectElement>("region");
 const checkBtn = $<HTMLButtonElement>("check");
 const out = $<HTMLElement>("out");
-
-// ── Rendering ───────────────────────────────────────────────────────────────
-
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  cls?: string,
-  text?: string,
-): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  if (cls) node.className = cls;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
-
-function renderError(message: string) {
-  out.replaceChildren(el("div", "err", message));
-}
-
-function renderVerdict(check: ExtensionCheck, content: string) {
-  const copy = VERDICT_COPY[check.verdict];
-  const card = el("div", "card");
-
-  // Headline.
-  const head = el("div", `verdict v-${check.verdict}`);
-  head.append(el("span", "dot"));
-  const headText = el("div");
-  headText.append(el("h2", undefined, copy.label), el("p", undefined, copy.sub));
-  head.append(headText);
-  card.append(head);
-
-  // Evidence, already pooled across identifiers with duplicates collapsed and
-  // any clamp row last — see `evidenceFor`. Taken as composed rather than
-  // re-derived here: these rows sum to `check.score`, and recomputing either
-  // half separately is what breaks that.
-  const signals = check.signals;
-  if (signals.length) {
-    const list = el("ul", "ev");
-    for (const s of signals) {
-      const li = el("li");
-      const left = el("div");
-      left.append(
-        el("span", "src", SOURCE_LABEL[s.source] ?? s.source),
-        // Defanged on the way out: signal text quotes the user's input, and a
-        // live-looking URL in a verdict panel is the one place it must not be.
-        el("span", undefined, defangText(s.text)),
-      );
-      const weight = s.points > 0 ? `+${s.points}` : s.points < 0 ? `${s.points}` : "—";
-      const cls = s.points > 0 ? "up" : s.points < 0 ? "down" : "zero";
-      li.append(left, el("span", `pts ${cls}`, weight));
-      list.append(li);
-    }
-    card.append(list);
-  }
-
-  // Score.
-  const score = el("div", "score");
-  const top = el("div", "top");
-  top.append(el("span", "label", "Risk score"));
-  const n = el("span", "n");
-  n.textContent = String(check.score);
-  const denom = el("span");
-  denom.textContent = "/100";
-  denom.style.color = "var(--text-dim)";
-  denom.style.fontSize = "13px";
-  const figure = el("div");
-  figure.append(n, denom);
-  top.append(figure);
-  const track = el("div", "track");
-  const fill = el("div");
-  fill.style.width = `${check.score}%`;
-  fill.style.background =
-    check.verdict === "likely_scam"
-      ? "var(--scam)"
-      : check.verdict === "suspicious"
-        ? "var(--caution)"
-        : check.verdict === "safe"
-          ? "var(--clear)"
-          : "var(--faint)";
-  track.append(fill);
-  score.append(top, track);
-  card.append(score);
-
-  // Notices — what this surface could not do. Always after the score, so the
-  // reader has the number before the qualification on it.
-  if (check.coverage && check.coverage !== "full") {
-    const note = el("div", "notice");
-    note.append(el("strong", undefined, "Limited coverage. "), document.createTextNode(NOTICE.coverage(check.coverage)));
-    card.append(note);
-  }
-  if (check.unexpandedShortener) {
-    const note = el("div", "notice");
-    note.append(el("strong", undefined, "Link not followed. "), document.createTextNode(NOTICE.shortener));
-    card.append(note);
-  }
-  // Only where it changes what the result is worth. On a verdict that already
-  // found something, the missing list would not have altered the advice, and a
-  // third caveat under a scam warning dilutes the warning itself.
-  if (!check.blocklistConsulted && (check.verdict === "safe" || check.verdict === "unknown")) {
-    const note = el("div", "notice");
-    note.append(
-      el("strong", undefined, "One check did not run. "),
-      document.createTextNode(NOTICE.noBlocklist),
-    );
-    card.append(note);
-  }
-
-  // Report — last, after the verdict and everything qualifying it. The user
-  // should know what was found, and what could not be, before being asked to
-  // act on it.
-  //
-  // A button rather than a link: an <a href> would put the prefilled URL in the
-  // DOM, where "copy link address" hands someone a URL with the scam
-  // identifiers in it and no indication that it is about to become a public
-  // report. The click builds it and goes.
-  if (isReportable(check.verdict)) {
-    const block = el("div", "report");
-    const button = el("button", "report-go", REPORT.label);
-    button.type = "button";
-    button.addEventListener("click", () => {
-      openTab(reportUrl(__API_BASE__, prefillFor(check.results, content)));
-    });
-    block.append(button, el("p", "report-note", REPORT.note));
-    card.append(block);
-  }
-
-  out.replaceChildren(card);
-}
 
 // ── Behaviour ───────────────────────────────────────────────────────────────
 
@@ -173,12 +50,12 @@ async function check() {
     // current rather than merely present.
     const blocklist = await getBlocklist(__API_BASE__);
     const result = await runCheck(content, region, blocklist);
-    if (result) renderVerdict(result, content);
-    else renderError("Nothing to check in that — paste a message, link or number.");
+    if (result) renderVerdict(out, result, content, __API_BASE__);
+    else renderError(out, "Nothing to check in that — paste a message, link or number.");
   } catch {
     // The engine is local, so a throw here is a defect rather than a network
     // failure. Say something true and unalarming rather than surfacing a stack.
-    renderError("Something went wrong checking that. Try again.");
+    renderError(out, "Something went wrong checking that. Try again.");
   } finally {
     running = false;
     checkBtn.disabled = false;
@@ -197,6 +74,7 @@ function populateRegions(selected: string) {
 async function init() {
   let region = DEFAULT_REGION as string;
   let pending: string | null = null;
+  let pendingResult: { content: string; check: unknown } | null = null;
 
   if (hasExtensionApi()) {
     // Storage is a convenience here — a remembered region and a handed-over
@@ -211,18 +89,38 @@ async function init() {
       if (stored && REGION_OPTIONS.some((r) => r.code === stored)) region = stored;
 
       pending = await storageGet<string>(PENDING_KEY);
-      // Cleared on read: the selection is a one-shot handoff, and leaving it in
-      // storage means the next popup opens showing text the user did not paste.
+      pendingResult = await storageGet<{ content: string; check: unknown }>(PENDING_RESULT_KEY);
+      // Cleared on read: both are one-shot handoffs, and leaving either in
+      // storage means the next popup opens showing something the user did not
+      // just ask about.
       if (pending) await storageSet(PENDING_KEY, null);
+      if (pendingResult) await storageSet(PENDING_RESULT_KEY, null);
     } catch {
       // Defaults already hold. Nothing to tell the user: they asked for a
       // popup, and they are getting one.
     }
+
+    // The badge said a result was waiting; it is being collected now, so the
+    // signal has done its job. Left up, it would still be there tomorrow
+    // claiming something about a check the user has already read.
+    setBadge("");
+    setActionTitle(ACTION_TITLE_IDLE);
   }
 
   populateRegions(region);
 
-  if (pending) {
+  // Three ways in, in order of how much work each saves.
+  if (pendingResult && isRenderableCheck(pendingResult.check)) {
+    // The background already checked this. Render what the notification
+    // described rather than checking again — a second check could consult a
+    // blocklist that refreshed in between and quietly contradict what the user
+    // was already told.
+    input.value = pendingResult.content;
+    renderVerdict(out, pendingResult.check, pendingResult.content, __API_BASE__);
+  } else if (pending) {
+    // Text but no result: the worker was torn down mid-check, or the stored
+    // result was written by a version whose shape this one does not recognise.
+    // Re-checking is cheap and local.
     input.value = pending;
     await check();
   } else {
@@ -241,4 +139,16 @@ input.addEventListener("keydown", (e) => {
   }
 });
 
-void init();
+// Caught rather than floated. `init` renders a stored result, and a throw
+// anywhere in it would otherwise escape with no handler above — leaving a popup
+// that is blank, silent and, because the handoff is cleared on read, not
+// retryable by reopening. The shape guard above makes the known version of that
+// unreachable; this is what covers the one nobody predicted.
+void init().catch(() => {
+  // The advice has to be actionable, so make sure the panel it points at works.
+  // `populateRegions` runs before anything that renders, but a throw from it —
+  // or from before it — would leave an empty dropdown behind this message.
+  if (!regionSel.options.length) populateRegions(DEFAULT_REGION as string);
+  renderError(out, "Something went wrong opening that. Paste it again to check it.");
+  input.focus();
+});

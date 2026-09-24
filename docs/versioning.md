@@ -66,6 +66,32 @@ fix, or a revert that restores the previous version.
 
 ---
 
+## Parts versioned on their own
+
+Three parts ship on their own schedule, so each carries its own version in its
+own `package.json`. The app's version never moves because of them, and they
+never move because of the app.
+
+| Part | File | Bump it when |
+|---|---|---|
+| Detection engine | `packages/engine/package.json` | Anything in `packages/engine/src` changes. The app bumps too, since it serves the engine. |
+| Browser extension | `extension/package.json` | Anything in the extension build changes. Every store submission needs a number higher than the last one shipped, and a shipped number can never be reused. |
+| Inbound email worker | `workers/inbound-email/package.json` | Anything in `workers/inbound-email/src` changes. |
+
+The same table of PATCH, MINOR and MAJOR applies to each, judged by what that
+part's own users would notice. For the worker, that means the reply someone
+gets after forwarding an email: a reply where there used to be silence is
+MINOR, and so is new wording in the reply. A fix nobody would see in their
+inbox is PATCH.
+
+Bump each from its own directory, the same way:
+
+```bash
+cd workers/inbound-email && npm version patch --no-git-tag-version
+```
+
+---
+
 ## Tagging
 
 Tags mark a deployed state worth referring back to, not every merge. Tag when

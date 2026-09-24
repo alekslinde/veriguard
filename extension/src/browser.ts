@@ -34,10 +34,51 @@ interface ContextMenus {
 interface Runtime {
   lastError?: { message?: string };
   openOptionsPage?: () => void;
+  getURL?: (path: string) => string;
+  onInstalled?: { addListener(cb: (details: { reason: string }) => void): void };
 }
 
 interface Tabs {
   create(props: { url: string }): unknown;
+}
+
+/**
+ * The toolbar button.
+ *
+ * `action` on MV3 everywhere, but every method is optional here because Safari
+ * and Firefox for Android each omit parts of it, and a badge is a nicety — the
+ * popup still shows the result without one, so nothing may throw for its sake.
+ */
+interface Action {
+  openPopup?: () => Promise<void>;
+  setBadgeText?: (details: { text: string }) => unknown;
+  setBadgeBackgroundColor?: (details: { color: string }) => unknown;
+  setTitle?: (details: { title: string }) => unknown;
+}
+
+/**
+ * OS notifications.
+ *
+ * Optional throughout: the `notifications` permission is declared, but Firefox
+ * for Android does not implement the API, and on every desktop platform the
+ * user can switch notifications off at the OS level — in which case `create`
+ * fails rather than being absent. Both are the same thing to a caller, and
+ * neither is worth an error.
+ */
+interface Notifications {
+  create(
+    id: string,
+    options: {
+      type: string;
+      iconUrl: string;
+      title: string;
+      message: string;
+      priority?: number;
+    },
+    cb?: (id: string) => void,
+  ): unknown;
+  onClicked?: { addListener(cb: (id: string) => void): void };
+  clear?: (id: string, cb?: (wasCleared: boolean) => void) => unknown;
 }
 
 interface ExtensionApi {
@@ -50,7 +91,8 @@ interface ExtensionApi {
   contextMenus?: ContextMenus;
   runtime: Runtime;
   tabs?: Tabs;
-  action?: { openPopup?: () => Promise<void> };
+  action?: Action;
+  notifications?: Notifications;
 }
 
 /**
@@ -259,5 +301,181 @@ export function onContextMenuClicked(
   } catch {
     // No context-menu API on this runtime. Nothing to listen to, and nothing
     // the caller can do about it.
+  }
+}
+
+/**
+ * Set the toolbar badge, or clear it with an empty string.
+ *
+ * **Every call here is best-effort and swallows its failure, deliberately.**
+ * The badge is a hint that a result is waiting; the result itself is in
+ * storage and the popup renders it regardless. So a runtime that omits
+ * `setBadgeText` (Safari has shipped without parts of the action API, and
+ * Firefox for Android has no toolbar badge at all) must degrade to the
+ * pre-badge behaviour rather than take the check down with it — the background
+ * script's whole job at that moment is to have stored a verdict.
+ *
+ * Colour is passed separately from text because they are separate calls on
+ * both runtimes, and a runtime can honour one and not the other.
+ */
+export function setBadge(text: string, color?: string): void {
+  const action = (() => {
+    try {
+      return api().action;
+    } catch {
+      return undefined;
+    }
+  })();
+  if (!action) return;
+
+  try {
+    action.setBadgeText?.({ text });
+  } catch {
+    // No badge on this runtime.
+  }
+  if (color) {
+    try {
+      action.setBadgeBackgroundColor?.({ color });
+    } catch {
+      // Text without colour is still legible; the default background is used.
+    }
+  }
+}
+
+/**
+ * Set the toolbar button's tooltip.
+ *
+ * The badge can hold about four characters, so it says *that* something was
+ * found; the title is where the verdict is spelled out. Together they are the
+ * no-permission half of the "a result is ready" signal, which matters because
+ * the notification half can be switched off by the user at the OS level and
+ * this cannot.
+ */
+export function setActionTitle(title: string): void {
+  try {
+    api().action?.setTitle?.({ title });
+  } catch {
+    // Tooltip unavailable. The badge still carries the signal.
+  }
+}
+
+/**
+ * Raise an OS notification. Resolves false when none was shown.
+ *
+ * Returning a boolean rather than throwing, because "the user has notifications
+ * switched off" is an ordinary outcome and not an error — every caller's
+ * response to it is the same as its response to success: nothing. The return
+ * exists so a caller *can* distinguish them, not because one must.
+ *
+ * `iconUrl` is resolved through `runtime.getURL` by the caller, since a bare
+ * relative path resolves against the wrong base in a service worker.
+ */
+export function notify(
+  id: string,
+  options: { title: string; message: string; iconUrl: string },
+): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    let notifications: Notifications | undefined;
+    try {
+      notifications = api().notifications;
+    } catch {
+      resolve(false);
+      return;
+    }
+    if (!notifications) {
+      resolve(false);
+      return;
+    }
+
+    let settled = false;
+    const done = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      // Read so Chrome does not log an unchecked error when the user has
+      // notifications disabled — which is a preference, not a fault.
+      try {
+        void api().runtime.lastError;
+      } catch {
+        // Nothing to read.
+      }
+      resolve(ok);
+    };
+
+    // Same reasoning as `callMaybeAsync`: a runtime that neither returns a
+    // thenable nor calls back would otherwise leave this pending forever, and
+    // this promise is awaited on the path that stores the verdict.
+    const timer = setTimeout(() => done(false), API_TIMEOUT_MS);
+
+    try {
+      const returned = notifications.create(
+        id,
+        { type: "basic", priority: 2, ...options },
+        () => done(true),
+      ) as Promise<unknown> | undefined;
+      if (returned && typeof returned.then === "function") {
+        returned.then(
+          () => done(true),
+          () => done(false),
+        );
+      }
+    } catch {
+      done(false);
+    }
+  });
+}
+
+/** Dismiss a notification we raised, if the runtime supports clearing one. */
+export function clearNotification(id: string): void {
+  try {
+    const cleared = api().notifications?.clear?.(id, () => {
+      void api().runtime.lastError;
+    }) as Promise<unknown> | undefined;
+    // Firefox returns a promise and ignores the callback; an unhandled
+    // rejection here would be logged for a dismissal nobody is waiting on.
+    if (cleared && typeof cleared.then === "function") cleared.then(undefined, () => {});
+  } catch {
+    // Nothing to clear.
+  }
+}
+
+/** Listen for a notification being clicked. No-op where unsupported. */
+export function onNotificationClicked(cb: (id: string) => void): void {
+  try {
+    api().notifications?.onClicked?.addListener(cb);
+  } catch {
+    // No notifications on this runtime, so no clicks to hear about.
+  }
+}
+
+/**
+ * Resolve a packaged file to an absolute extension URL.
+ *
+ * Needed for both the notification icon and the onboarding tab: a relative path
+ * resolves against the document base, and a background service worker has no
+ * document. Falls back to the input so a test environment gets something
+ * usable rather than a throw.
+ */
+export function extensionUrl(path: string): string {
+  try {
+    return api().runtime.getURL?.(path) ?? path;
+  } catch {
+    return path;
+  }
+}
+
+/**
+ * Listen for the extension being installed or updated.
+ *
+ * The callback receives the raw reason string rather than a parsed enum,
+ * because the set differs by browser ("install", "update", "browser_update",
+ * "chrome_update", "shared_module_update") and a caller that only acts on
+ * "install" should not have to know the rest.
+ */
+export function onInstalled(cb: (reason: string) => void): void {
+  try {
+    api().runtime.onInstalled?.addListener((details) => cb(details?.reason ?? ""));
+  } catch {
+    // No lifecycle events here — under test, and in a plain page.
   }
 }

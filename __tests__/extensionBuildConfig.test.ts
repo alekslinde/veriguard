@@ -14,6 +14,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { supportedRegions, FALLBACK_REGION } from "@veriguard/engine/regions";
+import { buildManifest } from "../extension/src/manifest";
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(path.join(ROOT, p), "utf8");
@@ -94,6 +95,55 @@ describe("extension build config is native-loader safe", () => {
     // Chrome's short-description limit, checked here rather than discovered on
     // upload.
     expect(described!.length).toBeLessThanOrEqual(132);
+  });
+
+  it("lists every shipped permission in the store copy", () => {
+    // The listing enumerates the permissions and Chrome requires a written
+    // justification for each, which a reviewer reads against the manifest. A
+    // permission added to the manifest and not to the copy is a submission that
+    // asks for something the listing never mentions — and it is the drift most
+    // likely to happen, since the two files are edited for different reasons.
+    //
+    // One direction only: the copy may explain more than the manifest declares
+    // (an absence worth naming is still worth naming), but it must never
+    // declare less.
+    const listing = read("extension/STORE.md");
+    const manifest = buildManifest("chrome", {
+      version: "9.9.9",
+      geckoId: "t@example.invalid",
+      apiBase: "https://api.example.invalid",
+    }) as { permissions: string[] };
+
+    for (const permission of manifest.permissions) {
+      expect(
+        listing,
+        `STORE.md does not mention the "${permission}" permission the manifest asks for`,
+      ).toContain(permission);
+    }
+  });
+
+  it("does not claim the extension stores nothing it checks", () => {
+    // The storage justification is read by a reviewer against the code, and it
+    // went false once already: a right-click result is written to local storage
+    // and held until the popup reads it, while the copy still said no checked
+    // content was ever stored.
+    //
+    // Matched on the shape of the claim rather than an exact sentence, because
+    // the copy gets reworded and a test pinned to one phrasing would be deleted
+    // rather than heeded. What must not reappear is a blanket denial.
+    const listing = read("extension/STORE.md");
+    const denials = [
+      /no checked content[^.]*is ever stored/i,
+      /never stores (?:the |any )?(?:checked |pasted )?(?:content|text|message)/i,
+      /nothing (?:you|the user) check(?:s|ed)? is (?:ever )?stored/i,
+    ];
+    for (const denial of denials) {
+      expect(
+        listing,
+        "STORE.md denies storing checked content, but a right-click result is " +
+          "written to local storage until the popup collects it",
+      ).not.toMatch(denial);
+    }
   });
 
   it("counts the regions the listing claims", () => {

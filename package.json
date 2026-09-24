@@ -1,6 +1,6 @@
 {
   "name": "veriguard",
-  "version": "0.28.0",
+  "version": "0.28.1",
   "private": true,
   "engines": {
     "node": ">=22"
@@ -33,8 +33,8 @@
     "eval": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/eval.ts",
     "eval:metamorphic": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/eval-metamorphic.ts",
     "check-deploy-drift": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/check-deploy-drift.ts",
-    "ext:chrome": "TARGET=chrome ENTRY=popup vite build --config extension/vite.config.mts && TARGET=chrome ENTRY=background vite build --config extension/vite.config.mts",
-    "ext:firefox": "TARGET=firefox ENTRY=popup vite build --config extension/vite.config.mts && TARGET=firefox ENTRY=background vite build --config extension/vite.config.mts",
+    "ext:chrome": "TARGET=chrome ENTRY=popup vite build --config extension/vite.config.mts && TARGET=chrome ENTRY=background vite build --config extension/vite.config.mts && TARGET=chrome ENTRY=onboarding vite build --config extension/vite.config.mts",
+    "ext:firefox": "TARGET=firefox ENTRY=popup vite build --config extension/vite.config.mts && TARGET=firefox ENTRY=background vite build --config extension/vite.config.mts && TARGET=firefox ENTRY=onboarding vite build --config extension/vite.config.mts",
     "ext": "npm run ext:chrome && npm run ext:firefox",
     "ext:safari": "npm run ext:chrome && node scripts/build-safari.mjs",
     "ext:pack": "npm run ext && node scripts/pack-extension.mjs",

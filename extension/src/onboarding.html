@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Veriguard — getting started</title>
+    <!--
+      A packaged local page, opened in a tab on install.
+
+      It links to the site but loads nothing from it. Opening a remote URL on
+      install would be a request to our server the moment someone installs the
+      extension — which is a phone-home, carrying an IP and an install time,
+      from a product whose whole claim is that it sends nothing. So the page
+      ships in the bundle.
+    -->
+    <link rel="stylesheet" href="popup.css" />
+    <link rel="stylesheet" href="onboarding.css" />
+  </head>
+  <body class="ob-body">
+    <main class="ob">
+      <header class="ob-head">
+        <span class="mark" aria-hidden="true"></span>
+        <div>
+          <h1>Veriguard is installed</h1>
+          <p class="ob-sub">
+            Three things to know. Checks run on your device — nothing you paste
+            is sent anywhere.
+          </p>
+        </div>
+      </header>
+
+      <!--
+        The three steps, as a row that wraps to one column on a narrow viewport.
+
+        Each is a checkbox rather than a static heading: the page is read once,
+        often while doing the thing it describes, and a tick is how someone
+        keeps their place across a detour into browser chrome. It tracks nothing
+        and gates nothing — see the note on persistence in onboarding.ts.
+      -->
+      <ol class="ob-steps">
+        <li class="ob-step">
+          <label class="ob-check">
+            <input type="checkbox" id="step-1" class="ob-box" />
+            <span class="ob-step-title">Pin it to your toolbar</span>
+          </label>
+
+          <!--
+            Schematic, not a screenshot.
+
+            Browser chrome differs across the four targets and changes between
+            versions, so a realistic drawing would be wrong somewhere on the day
+            it shipped. A diagram reads as "here is the idea" and keeps working
+            when a button moves; the prose carries the variation the picture
+            deliberately does not (Safari's flow differs most).
+
+            Colours come from the popup's tokens, so these track the theme. One
+            element per diagram is in --clear: the thing to act on.
+          -->
+          <figure class="ob-fig">
+            <svg viewBox="0 0 320 96" role="img" aria-labelledby="ob-d1-t" class="ob-svg">
+              <title id="ob-d1-t">
+                A browser toolbar with the extensions menu open and Veriguard's
+                pin control highlighted.
+              </title>
+
+              <!-- Toolbar strip -->
+              <rect x="8" y="8" width="304" height="26" rx="6" class="d-chrome" />
+              <rect x="16" y="15" width="180" height="12" rx="6" class="d-field" />
+              <!-- The extensions menu button, drawn as a framed puzzle piece. The
+                   frame is what makes it read as a button at this size; the glyph
+                   alone was an indistinct blob. -->
+              <rect x="264" y="12" width="18" height="18" rx="4" class="d-field" />
+              <path
+                d="M269 17.5h2.2a1.8 1.8 0 0 1 3.6 0H277v2.2a1.8 1.8 0 0 0 0 3.6V25h-2.2a1.8 1.8 0 0 0-3.6 0H269v-2.2a1.8 1.8 0 0 1 0-3.6v-2.2Z"
+                class="d-mark"
+              />
+              <!-- A tail from the button to the panel, so the dropdown reads as
+                   belonging to it rather than floating next to it. -->
+              <path d="M269 34v4h-79a4 4 0 0 0-4 4v2" class="d-tether" />
+
+              <!-- Dropdown panel, hanging off that tether -->
+              <rect x="168" y="44" width="144" height="44" rx="7" class="d-panel" />
+              <!-- Our row, called out -->
+              <rect x="174" y="49" width="132" height="17" rx="4" class="d-row-on" />
+              <circle cx="184" cy="57.5" r="4" class="d-dot" />
+              <rect x="193" y="54.5" width="58" height="6" rx="3" class="d-text-on" />
+              <!-- The pin control: the one thing to click.
+                   Drawn as a pushpin seen at an angle — head, shaft, point —
+                   because a symmetrical upright one reads as a tree at 12px. -->
+              <g transform="translate(288 50) rotate(45 6 6)">
+                <rect x="2.5" y="0" width="7" height="4.5" rx="1" class="d-pin" />
+                <rect x="4.5" y="4.5" width="3" height="5" class="d-pin" />
+                <path d="M6 15.5 4.8 9.5h2.4L6 15.5Z" class="d-pin" />
+              </g>
+              <!-- A second, unremarkable row, so the panel reads as a list -->
+              <circle cx="184" cy="76" r="4" class="d-dot-off" />
+              <rect x="193" y="73" width="44" height="6" rx="3" class="d-text" />
+            </svg>
+          </figure>
+
+          <p>
+            Open your browser's extensions menu — the puzzle-piece or jigsaw
+            icon near the address bar — and pin Veriguard. That toolbar button
+            is where results appear, so pinning it is the difference between
+            seeing a verdict and going looking for one.
+          </p>
+        </li>
+
+        <li class="ob-step">
+          <label class="ob-check">
+            <input type="checkbox" id="step-2" class="ob-box" />
+            <span class="ob-step-title">Check something you've received</span>
+          </label>
+
+          <figure class="ob-fig">
+            <svg viewBox="0 0 320 96" role="img" aria-labelledby="ob-d2-t" class="ob-svg">
+              <title id="ob-d2-t">
+                A block of text with one line selected, and a right-click menu
+                beside it showing the Veriguard entry.
+              </title>
+
+              <!-- A page of text, with one line selected -->
+              <rect x="8" y="10" width="150" height="6" rx="3" class="d-text" />
+              <rect x="8" y="24" width="132" height="14" rx="3" class="d-selection" />
+              <rect x="12" y="28" width="124" height="6" rx="3" class="d-text-on" />
+              <rect x="8" y="46" width="140" height="6" rx="3" class="d-text" />
+              <rect x="8" y="60" width="96" height="6" rx="3" class="d-text" />
+
+              <!-- The pointer, at the selection's edge: it is what connects the
+                   highlighted line to the menu, and it says the menu was opened
+                   ON the selection rather than somewhere else on the page. -->
+              <path d="M140 31 L140 45 L144 41.5 L147 47 L149.5 46 L146.5 40.5 L151 40 Z"
+                    class="d-cursor" />
+
+              <!-- Context menu, hanging off the pointer as a real one does -->
+              <rect x="150" y="30" width="162" height="58" rx="7" class="d-panel" />
+              <!-- Our item, called out -->
+              <rect x="156" y="36" width="150" height="17" rx="4" class="d-row-on" />
+              <circle cx="166" cy="45" r="4" class="d-dot" />
+              <rect x="175" y="42" width="98" height="6" rx="3" class="d-text-on" />
+              <!-- Two ordinary items below -->
+              <rect x="166" y="60" width="74" height="6" rx="3" class="d-text" />
+              <rect x="166" y="74" width="58" height="6" rx="3" class="d-text" />
+            </svg>
+          </figure>
+
+          <p>
+            Select the suspicious text on any page — an email, a message, a
+            link, a phone number — then right-click it and choose
+            <strong>Check this with Veriguard</strong>. You can also click the
+            toolbar button at any time and paste something in directly.
+          </p>
+        </li>
+
+        <li class="ob-step">
+          <label class="ob-check">
+            <input type="checkbox" id="step-3" class="ob-box" />
+            <span class="ob-step-title">Read the result</span>
+          </label>
+
+          <figure class="ob-fig">
+            <svg viewBox="0 0 320 96" role="img" aria-labelledby="ob-d3-t" class="ob-svg">
+              <title id="ob-d3-t">
+                The toolbar button carrying a badge once a check has finished.
+              </title>
+              <!-- Drawn on the same canvas as its siblings so the three figures
+                   share a height and the columns line up; the object itself is
+                   small and sits at the left, where the other two begin. -->
+              <rect x="8" y="30" width="130" height="32" rx="7" class="d-chrome" />
+              <!-- Our button, carrying the mark from the page header so it is
+                   identifiable as Veriguard's rather than just the first one. -->
+              <rect x="17" y="38" width="16" height="16" rx="4" class="d-field" />
+              <circle cx="25" cy="46" r="3.5" class="d-dot" />
+              <!-- The badge, on its corner -->
+              <circle cx="34" cy="39" r="6" class="d-badge" />
+              <text x="34" y="42.5" class="d-badge-text" text-anchor="middle">!</text>
+              <!-- Two unremarkable neighbours, so it reads as a toolbar -->
+              <rect x="47" y="38" width="16" height="16" rx="4" class="d-field" />
+              <rect x="69" y="38" width="16" height="16" rx="4" class="d-field" />
+            </svg>
+          </figure>
+
+          <p>
+            The toolbar button shows a badge as soon as the check finishes, and
+            you'll get a notification with the verdict. Click the button for the
+            full breakdown — every signal found, and what it scored.
+          </p>
+        </li>
+      </ol>
+
+      <!--
+        Out of step 3 and under the row. It is the most important thing on the
+        page — a quiet verdict read as a clean one is the failure this product
+        most needs to avoid — but it is about every verdict rather than about
+        the step, and inside the third column it both read as a footnote to that
+        one step and made the column half again as tall as its siblings.
+      -->
+      <!--
+        The caveat and the dismiss control as one closing band, rather than
+        two pieces stacked with a gap between them: the last thing to know,
+        and how to leave, read as a single unit at the bottom of the page.
+      -->
+      <div class="ob-band">
+        <p class="ob-caveat">
+          <strong>Veriguard also tells you what it couldn't check.</strong> A quiet
+          result carrying a coverage notice means less than a quiet one without;
+          the panel says so rather than leaving you to assume. It is rule-based, so
+          a brand-new scam that matches nothing will pass — treat anything that
+          asks for money or details with suspicion regardless of the verdict.
+        </p>
+
+        <div class="ob-done">
+          <!--
+            Never disabled on load, deliberately. The checkboxes are a reading
+            aid, not a gate — someone who already knows how extensions work
+            should be able to close the tab immediately, and a button that
+            stays dead because a checkbox did not register would trap them
+            with no way out.
+
+            The click still lands somewhere: a check fades in and the button
+            disables itself, so the button itself carries the confirmation
+            instead of leaving a static sentence to appear beside an
+            otherwise-unchanged control.
+          -->
+          <button id="ob-got-it" type="button" class="go">
+            <svg
+              class="go-check"
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path
+                d="M3 8.5 6.2 12 13 4"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span class="go-label">Got it</span>
+          </button>
+          <p id="ob-close-note" class="ob-close-note" hidden>
+            You can close this tab now.
+          </p>
+        </div>
+      </div>
+
+      <footer class="ob-foot">
+        <p>
+          Veriguard is rule-based — keyword patterns, domain lists and weighted
+          scoring, all running locally. It has no AI model and makes no call to
+          an analysis service. It will miss new scams that don't match its
+          rules, which is why every verdict tells you what it checked.
+        </p>
+        <p>
+          <a id="ob-site" href="#">More at veriguard.app</a>
+        </p>
+      </footer>
+    </main>
+    <script type="module" src="onboarding.js"></script>
+  </body>
+</html>
