@@ -16,6 +16,7 @@ import { EmailMessage } from "cloudflare:email";
 // Worker's tests) only resolves the explicit form.
 import { buildReplyMime } from "./reply.ts";
 import { authSummary, freshSendAllowed } from "./auth.ts";
+import { readCapped } from "./stream.ts";
 
 export interface Env {
   // Set via `wrangler secret put` — must match the Next app's INBOUND_SECRET.
@@ -86,7 +87,9 @@ function envelopeShape(headers: Headers, from: string, to: string): string {
   return parts.join(" ");
 }
 
-const MAX_RAW_BYTES = 1_000_000; // drop anything larger before calling the API
+// Bytes of a forward sent to the API. Anything larger is cut here, and the API
+// gives a partial verdict on the part that arrived rather than none at all.
+const MAX_RAW_BYTES = 1_000_000;
 
 interface VerdictReply {
   ok: boolean;
@@ -95,34 +98,15 @@ interface VerdictReply {
   reply?: { subject: string; text: string; html: string };
 }
 
-async function streamToString(stream: ReadableStream, maxBytes: number): Promise<string | null> {
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.length;
-    if (total > maxBytes) {
-      reader.cancel();
-      return null; // too large — bail
-    }
-    chunks.push(value);
-  }
-  const merged = new Uint8Array(total);
-  let offset = 0;
-  for (const c of chunks) { merged.set(c, offset); offset += c.length; }
-  return new TextDecoder().decode(merged);
-}
-
 const handler = {
   async email(message: ForwardableEmailMessage, env: Env): Promise<void> {
-    const raw = await streamToString(message.raw, MAX_RAW_BYTES);
+    const { text: raw, bytes, truncated } = await readCapped(message.raw, MAX_RAW_BYTES);
     if (!raw) {
-      // Over MAX_RAW_BYTES or unreadable. Still a forward someone is waiting on,
-      // so say so rather than dropping in silence.
-      console.warn(`inbound dropped: raw unreadable or over ${MAX_RAW_BYTES} bytes`);
+      console.warn("inbound dropped: raw message empty or unreadable");
       return;
+    }
+    if (truncated) {
+      console.log(`inbound truncated: kept ${bytes} of ${message.rawSize} bytes`);
     }
 
     let data: VerdictReply;
@@ -133,7 +117,12 @@ const handler = {
           "content-type": "application/json",
           "x-inbound-secret": env.INBOUND_SECRET,
         },
-        body: JSON.stringify({ raw, from: message.from, to: message.to }),
+        body: JSON.stringify({
+          raw,
+          from: message.from,
+          to: message.to,
+          ...(truncated ? { truncated, receivedBytes: bytes, totalBytes: message.rawSize } : {}),
+        }),
       });
 
       // A non-2xx RESOLVES — it does not throw — so without this check the
@@ -275,6 +264,8 @@ export default handler;
 // standalone without pulling that into the Next tsconfig.
 interface ForwardableEmailMessage {
   readonly from: string;
+  // Size of the whole message in bytes, known before it is read.
+  readonly rawSize: number;
   readonly to: string;
   readonly headers: Headers;
   readonly raw: ReadableStream;

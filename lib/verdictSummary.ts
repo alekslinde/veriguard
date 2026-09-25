@@ -19,6 +19,7 @@ import { defang, defangEmail, defangPhone, defangText } from "@veriguard/engine/
 import { buildReportQuery, ReportPrefill } from "@/lib/reportPrefill";
 import { matchedTactics, TACTIC_IDS, TACTIC_TITLES } from "@/lib/signalTactics";
 import type { PressureReport } from "@/lib/pressureTactics";
+import { formatBytes, type PartialCheck } from "@/lib/partialCheck";
 // Read rather than retyped: the sheet renders these same four strings through
 // the translator, and a hand-copied version already drifted once (a trailing
 // sentence was dropped silently). The email is English-only, so reading the
@@ -241,6 +242,12 @@ export interface VerdictEmailInput {
    * separation is what lets this be said without calling a shop a scam.
    */
   pressure?: PressureReport;
+  /**
+   * Set when the forward was larger than we accept and only its first part was
+   * analysed. The reply then says what it checked and what it could not, and a
+   * clean result is reported as "not sure" — see formatVerdictEmail.
+   */
+  partial?: PartialCheck;
 }
 
 export interface VerdictEmail {
@@ -317,11 +324,17 @@ function escapeHtml(s: string): string {
 // Build the verdict reply. When there are no scored identifiers but sender flags
 // exist (header-only forward), the headline is driven by the flags' presence.
 export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
-  const { results, emailFlags, pixelReport, trackingFindings = [], siteUrl, senderAddress, replyToAddress, pressure } = input;
+  const { results, emailFlags, pixelReport, trackingFindings = [], siteUrl, senderAddress, replyToAddress, pressure, partial } = input;
 
   // One shared severity decision — same rule the Check UI uses — so a header-
   // only forward still gets a meaningful headline and the two never disagree.
-  const { verdict } = overallVerdict(results, pixelReport, emailFlags, trackingFindings.length > 0);
+  //
+  // A partial check never reports "safe". A scam signal found in the part that
+  // arrived stands — nothing further on can make it less of a scam — but a
+  // clean result only says the first part was clean, which is "not sure", the
+  // same downgrade the checkers apply under partial regional coverage.
+  const composedVerdict = overallVerdict(results, pixelReport, emailFlags, trackingFindings.length > 0).verdict;
+  const verdict: Verdict = partial && composedVerdict === "safe" ? "unknown" : composedVerdict;
   const head = VERDICT_HEADLINE[verdict];
 
   // The score and the rows under it, composed together.
@@ -417,6 +430,39 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
       : "Heads up: we don't have full scam-detection rules for this region yet, so " +
         "this check is less thorough than usual. Treat a quiet result as 'not checked', not 'safe'.";
 
+  // What a cut-off forward covered. Stated right under the verdict, because it
+  // qualifies everything after it.
+  //
+  // Attachment filenames are the sender's own text, so they are defanged like
+  // every other value from the scam: a file named after a URL or a phone number
+  // must not arrive as a live link in our reply. The extension is kept apart so
+  // "invoice.pdf" still reads as a file.
+  const defangName = (name: string) => {
+    const ext = name.match(/\.[a-z0-9]{1,5}$/i)?.[0] ?? "";
+    return defangPhone(defangFlag(name.slice(0, name.length - ext.length))) + ext;
+  };
+  const partialNotChecked = partial
+    ? [
+        ...(partial.textCut ? ["the rest of the message text"] : []),
+        ...partial.attachments.map(
+          (a) => `${defangName(a.name)} (${a.complete ? "we don't open attachments" : "cut off"})`,
+        ),
+        `everything after the first ${formatBytes(partial.receivedBytes)}`,
+      ]
+    : [];
+  const partialHeading = partial
+    ? `Partial check: this email was ${formatBytes(partial.totalBytes)}, and we checked the first ${formatBytes(partial.receivedBytes)}.`
+    : "";
+  // Only when nothing was found: a "not sure" verdict can still list findings
+  // (partial region coverage downgrades to it), and this line would contradict
+  // them.
+  const foundNothing =
+    breakdown.every((b) => b.reasons.length === 0 && b.signals.length === 0) && flagLines.length === 0;
+  const partialCaveat =
+    partial && foundNothing && (verdict === "unknown" || verdict === "safe")
+      ? "We found no scam signs in the part we checked. Treat that as 'not fully checked', not 'safe'."
+      : "";
+
   // The clear next step, matched to the verdict. This used to sit buried in the
   // footer; for a non-technical reader it's the whole point, so it leads.
   const advice = actionAdvice(verdict);
@@ -442,8 +488,10 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
 
   // When nothing was flagged, say what we looked at rather than going quiet.
   // Silence reads as "we didn't bother"; naming the checks is the reassurance.
+  // Not on a partial check: its own caveat says the same about the part we
+  // received, and this line would read as covering the whole email.
   const nothingFound =
-    breakdown.length > 0 && breakdown.every((b) => b.reasons.length === 0) && flagLines.length === 0
+    !partial && breakdown.length > 0 && breakdown.every((b) => b.reasons.length === 0) && flagLines.length === 0
       ? "We checked the sender's details, the links, and the wording against our scam patterns, " +
         "and nothing matched."
       : "";
@@ -457,7 +505,9 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
   // The forwarded email is never stored and never travels in the URL — the same
   // reply promises we didn't keep a copy, and that has to stay true.
   const reportUrl = (() => {
-    if (!siteUrl || verdict === "safe") return "";
+    // The underlying result, not the displayed one: a clean partial check is
+    // shown as "not sure", but it found nothing to report.
+    if (!siteUrl || composedVerdict === "safe") return "";
     const first = (kind: AnalyzedIdentifier["kind"]) =>
       results.find((r) => r.kind === kind)?.value;
     const scamEmail = senderAddress || first("email");
@@ -501,6 +551,15 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
     `${head.emoji} ${head.line}`,
     head.meaning,
     "",
+    ...(partial
+      ? [
+          partialHeading,
+          `  Checked: ${partial.checked.join("; ") || "nothing we could read"}`,
+          `  Not checked: ${partialNotChecked.join("; ")}`,
+          ...(partialCaveat ? [`  ${partialCaveat}`] : []),
+          "",
+        ]
+      : []),
     ...(showScore ? [`RISK SCORE: ${score}/100`, `  ${bandLine}`, ""] : []),
     ...(breakdown.length
       ? [
@@ -737,8 +796,19 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
     `<p style="margin:0 0 6px;font-size:13px;font-weight:bold;text-transform:uppercase;` +
     `letter-spacing:0.04em;color:#3a4658">${escapeHtml(t)}</p>`;
 
+  const partialBox = partial
+    ? `<div style="border:1px solid #f0dfb5;background:#fdf6e3;border-radius:10px;` +
+      `padding:14px 16px;margin:0 0 18px;color:#5c4a1f;font-size:14px;line-height:1.55">` +
+      `<div style="font-weight:bold;margin-bottom:6px">${escapeHtml(partialHeading)}</div>` +
+      `<div><strong>Checked:</strong> ${escapeHtml(partial.checked.join("; ") || "nothing we could read")}</div>` +
+      `<div><strong>Not checked:</strong> ${escapeHtml(partialNotChecked.join("; "))}</div>` +
+      (partialCaveat ? `<div style="margin-top:6px">${escapeHtml(partialCaveat)}</div>` : "") +
+      `</div>`
+    : "";
+
   const body = [
     banner,
+    partialBox,
     scoreBox,
     breakdown.length
       ? sectionHeading("What we found") +

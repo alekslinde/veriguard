@@ -270,20 +270,44 @@ test("a forward with no References header counts zero rather than failing", asyn
   assert.ok(infoLogs.some((l) => /References entries: 0/.test(l)));
 });
 
-test("an oversized forward is reported rather than dropped in silence", async () => {
-  stubFetch(() => new Response("{}", { status: 200 }));
+test("an oversized forward is sent on cut, with its full size, rather than dropped", async () => {
+  // Past MAX_RAW_BYTES the forwarder used to hear nothing. The first part now
+  // goes to the API flagged as truncated, and the reply says what was left out.
+  let sent: Record<string, unknown> | undefined;
+  stubFetch((_url, init) => {
+    sent = JSON.parse(String(init.body));
+    return new Response("{}", { status: 200 });
+  });
+  const head = new TextEncoder().encode("From: scammer@evil.test\r\n\r\n");
   const msg = {
     ...fakeMessage(),
+    rawSize: 3_000_000,
     raw: new ReadableStream({
       start(c) {
+        c.enqueue(head);
         // Comfortably past MAX_RAW_BYTES (1 MB).
-        c.enqueue(new Uint8Array(1_000_001));
+        c.enqueue(new Uint8Array(1_500_000).fill(120));
         c.close();
       },
     }),
   };
   await handler.email(msg as never, ENV);
-  assert.match(logs.find((l) => l.level === "warn")!.text, /unreadable or over/i);
+  assert.ok(sent, "the forward must still reach the API");
+  assert.equal(sent.truncated, true);
+  assert.equal(sent.receivedBytes, 1_000_000);
+  assert.equal(sent.totalBytes, 3_000_000);
+  assert.match(String(sent.raw), /^From: scammer@evil\.test/);
+});
+
+test("a forward under the cap carries no truncation fields", async () => {
+  let sent: Record<string, unknown> | undefined;
+  stubFetch((_url, init) => {
+    sent = JSON.parse(String(init.body));
+    return new Response("{}", { status: 200 });
+  });
+  await handler.email(fakeMessage() as never, ENV);
+  assert.equal(sent?.truncated, undefined);
+  assert.equal(sent?.totalBytes, undefined);
 });
 
 // A reply is refused unless the incoming forward has a valid DMARC result, and
