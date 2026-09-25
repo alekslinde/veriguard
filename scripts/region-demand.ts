@@ -15,7 +15,7 @@
 //   - the timestamp column is `submitted_at` (epoch ms), not `created_at`.
 
 import { getDb } from "../lib/db";
-import { REGION_OPTIONS } from "@veriguard/engine/regions";
+import { REGION_OPTIONS } from "@veriguard/scam-detect/regions";
 
 const isProd = Boolean(process.env.TURSO_DATABASE_URL);
 

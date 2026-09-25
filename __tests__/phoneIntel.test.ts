@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { analysePhone } from "@veriguard/engine/phoneIntel";
-import { checkPhone } from "@veriguard/engine/scamDetector";
+import { analysePhone } from "@veriguard/scam-detect/phoneIntel";
+import { checkPhone } from "@veriguard/scam-detect/scamDetector";
 import {
   FALLBACK_REGION,
   ALL_EMERGENCY_NUMBERS,
   supportedRegions,
   resolveRegionPack,
-} from "@veriguard/engine/regions";
+} from "@veriguard/scam-detect/regions";
 
 // Phase 4 — phone number generalisation.
 //

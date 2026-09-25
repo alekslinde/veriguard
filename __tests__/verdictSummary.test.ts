@@ -10,7 +10,7 @@ import {
   composeVerdictWithEvidence,
   VERDICT_RANK,
 } from "@/lib/verdictSummary";
-import { AnalyzedIdentifier, CheckResult } from "@veriguard/engine/scamDetector";
+import { AnalyzedIdentifier, CheckResult } from "@veriguard/scam-detect/scamDetector";
 import { TrackingPixelReport } from "@/lib/trackingPixel";
 import enNormal from "@/messages/en.normal.json";
 

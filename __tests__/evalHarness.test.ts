@@ -4,7 +4,7 @@ import { computeMetrics, wilson, type Outcome } from "@/eval/metrics";
 import { checkThresholds } from "@/eval/report";
 import { loadCorpus } from "@/eval/corpus";
 import { join } from "node:path";
-import type { CheckResult } from "@veriguard/engine/engineTypes";
+import type { CheckResult } from "@veriguard/scam-detect/engineTypes";
 
 // The harness gates detection changes, so it needs its own coverage: a bug that
 // silently scores every case as correct would make the gate useless while

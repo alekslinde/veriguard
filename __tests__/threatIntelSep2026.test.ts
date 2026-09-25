@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkSms } from "@veriguard/engine/scamDetector";
+import { checkSms } from "@veriguard/scam-detect/scamDetector";
 
 // Coverage for the 2026-09-06 threat-intel roadmap additions (issues #270-#275).
 // Same shape as threatIntelAug2026: each block asserts the new phrasing raises

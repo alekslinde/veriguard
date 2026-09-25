@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { analyzeContent } from "@veriguard/engine/scamDetector";
+import { analyzeContent } from "@veriguard/scam-detect/scamDetector";
 import { CHECK_RATE_LIMIT, checkAndRecordRateLimit, incrementCheckCount, recordTargetRegion } from "@/lib/reportStore";
 import { inferTargetRegion } from "@/lib/targetRegion";
 import { clientIpFromHeaders } from "@/lib/geo";

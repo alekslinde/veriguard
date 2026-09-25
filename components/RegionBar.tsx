@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useLang } from "@/lib/lang";
-import { REGION_OPTIONS, type RegionCode } from "@veriguard/engine/regions";
+import { REGION_OPTIONS, type RegionCode } from "@veriguard/scam-detect/regions";
 
 /**
  * Says which region's data is on screen, and lets the reader change it.

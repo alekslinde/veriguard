@@ -13,7 +13,7 @@ import {
   LEGACY_LANG_STORAGE_KEY,
 } from "@/lib/lang";
 import enNormal from "@/messages/en.normal.json";
-import { checkUrl } from "@veriguard/engine/scamDetector";
+import { checkUrl } from "@veriguard/scam-detect/scamDetector";
 
 const NORMAL: LangMode = { locale: "en", tone: "normal" };
 

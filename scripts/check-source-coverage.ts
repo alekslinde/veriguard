@@ -43,7 +43,7 @@ import { dirname, resolve } from "node:path";
 // Plain .mjs helper; `allowJs` resolves it and infers its shape from JSDoc —
 // the documented { tiers, brands, indicators, errors } shape.
 import { parseRegistry } from "./check-sources.mjs";
-import { supportedRegions } from "@veriguard/engine/regions";
+import { supportedRegions } from "@veriguard/scam-detect/regions";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REGISTRY = resolve(HERE, "../docs/threat-intel/sources.yml");

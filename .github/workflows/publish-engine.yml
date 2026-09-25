@@ -1,0 +1,85 @@
+name: Publish engine
+
+# Publishes @veriguard/scam-detect to npm when a tag names a version of it.
+#
+# Tagged rather than run on every push to main: a version on npm cannot be
+# replaced, and unpublishing is restricted after 72 hours. Publishing needs to
+# be something somebody does on purpose, with a tag naming which version.
+#
+# The tag carries the package prefix (engine-v0.13.0) because this repo also
+# releases the app and the extension, each on its own version line. A bare
+# "v0.13.0" would not say which one it meant.
+
+on:
+  push:
+    tags:
+      - "engine-v*"
+  # Publishing is irreversible, so it is also available by hand — for a retry
+  # after a transient registry failure, without moving a tag that is already
+  # pointing at the right commit.
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Pack and verify, but do not publish"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build, verify and publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required for npm provenance: the signed statement linking this tarball
+      # to the commit and workflow that produced it is minted from this token.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci
+
+      - name: Build the engine
+        run: npm run build:engine
+
+      # The whole suite, not just the engine's own tests. The package is
+      # consumed by the app and the extension in this same tree, so a break in
+      # either is a break in what is about to be published.
+      - name: Typecheck, lint and test
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+
+      # The tag must agree with the version being published. Without this, a
+      # mistyped tag publishes whatever package.json happens to say — under a
+      # version number nothing in the history points at, and it cannot be taken
+      # back.
+      - name: Check the tag matches the package version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tag_version="${GITHUB_REF_NAME#engine-v}"
+          pkg_version="$(node -p "require('./packages/engine/package.json').version")"
+          if [ "$tag_version" != "$pkg_version" ]; then
+            echo "tag ${GITHUB_REF_NAME} does not match package version ${pkg_version}" >&2
+            exit 1
+          fi
+
+      # What npm would actually ship, printed before it ships. `files` is easy
+      # to get wrong in the direction that matters least visibly — omitting
+      # something the package needs, or including something it should not.
+      - name: Show the tarball contents
+        run: npm pack --dry-run --workspace @veriguard/scam-detect
+
+      - name: Publish
+        if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != true
+        run: npm publish --workspace @veriguard/scam-detect
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

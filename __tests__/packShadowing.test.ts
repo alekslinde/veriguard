@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { resolveRegionPack, supportedRegions } from "@veriguard/engine/regions";
-import { checkSms, mentions } from "@veriguard/engine/scamDetector";
+import { resolveRegionPack, supportedRegions } from "@veriguard/scam-detect/regions";
+import { checkSms, mentions } from "@veriguard/scam-detect/scamDetector";
 
 // Guards the substring-collision failure mode for multi-word entries (#196).
 //

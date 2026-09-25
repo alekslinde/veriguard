@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { analyzeContent } from "@veriguard/engine/scamDetector";
+import { analyzeContent } from "@veriguard/scam-detect/scamDetector";
 
 // Scam SMS routinely omits the scheme — "Login at commbank-secure-login.tk/auth".
 // URL_GLOBAL requires http(s)://, so those produced no URL card at all and the

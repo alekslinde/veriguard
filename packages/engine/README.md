@@ -1,8 +1,44 @@
-# `@veriguard/engine`
+# `@veriguard/scam-detect`
 
-The rule-based scam detection engine, extracted so it can be bundled into
-clients that are not the Next.js app — the WebExtension first (roadmap Phase
-2b), bots after that.
+Rule-based scam, phishing and impersonation detection. Runs offline: no API key,
+no model, no external service — you install it and call a function.
+
+Extracted from the Veriguard app so it can be bundled into clients that are not
+the Next.js app: the WebExtension first, then anything else that needs to score
+a message without sending it anywhere.
+
+*Last reviewed: 2026-09-26.*
+
+```bash
+npm install @veriguard/scam-detect
+```
+
+```ts
+import { checkUrl, analyzeContent } from "@veriguard/scam-detect";
+
+const result = await checkUrl("https://commbank-secure-login.tk/verify");
+// → verdict "likely_scam", score 85, flags explaining why
+
+// Or hand it arbitrary text and get one result per identifier found:
+const results = await analyzeContent("Your parcel is held: pay at auspost-redelivery.bond");
+```
+
+Every check is synchronous work behind an async signature, deterministic, and
+free of I/O unless you hand it a transport yourself — see below.
+
+## Reading a result
+
+`verdict` is one of `safe`, `suspicious`, `likely_scam`, `unknown`; `score` is
+0–100. The part worth using is `signals`: each carries the sentence a reader
+sees and the points it contributed, so a verdict can explain itself rather than
+asserting a number. `flags` is the same reasons as plain strings.
+
+**`coverage` is not optional to handle.** It reports how much of the region pack
+applied, and a low score under `partial`, `minimal` or `none` means "no rules
+matched", not "this is safe". Rendering a confident *safe* on a result whose
+coverage is not `full` is the one misuse of this package that produces a false
+reassurance, which is worse than no answer. `downgradeForCoverage` is applied
+inside the engine; consumers still need to present the distinction.
 
 ## What makes it portable
 
@@ -59,3 +95,43 @@ belongs in `regions/base.ts` so a new region inherits it for free.
 
 One: `libphonenumber-js`. Keeping it that way is a feature — every dependency
 here ships in every client.
+
+## Building and publishing
+
+```bash
+npm run build:engine   # from the repo root; tsup for JS, tsc for declarations
+```
+
+The workspace and a consumer resolve this package differently, on purpose:
+
+| Condition | Resolves to | Who gets it |
+|---|---|---|
+| `development` | `src/*.ts` | The app, the extension, vitest, tsc |
+| `default` | `dist/*.js` | Anyone who installs it |
+
+Vite and Vitest apply `development` by default in dev, so there is still no
+build step between an edit and a test run. The cost is that **a green
+`npm test` says nothing about the published artifact** — the suite loads source
+and never touches `dist/`. `__tests__/enginePublish.test.ts` is what checks the
+built form, and it skips (visibly) when `dist/` is absent, so run the build
+before trusting a green run on anything under `packages/engine`.
+
+This is deliberately not `publishConfig.exports`, which reads as the obvious
+tool for the job. npm only applies that from v11; under npm 10 it is ignored
+silently and the tarball ships an `exports` map pointing at `src/`, which
+`files` excludes — an install that resolves to nothing. A condition map is
+applied by the resolver rather than the publisher, so it does not depend on
+which npm the publisher happened to run.
+
+Two properties of the build are load-bearing and easy to undo:
+
+- **Every source file is an entry.** `bundle: false` splits per entry, not per
+  module, so a file reached only as an import emits a `.d.ts` and no `.js` —
+  it type-checks for a consumer and has nothing behind it at runtime.
+- **Relative imports are rewritten to carry `.js`.** The source writes them
+  extensionless, which is correct in-repo and fatal in a consumer's Node
+  process. A directory import resolves to `/index.js`, not `.js`, so the
+  rewrite consults what was actually emitted rather than guessing.
+
+Publication runs from CI with provenance, so the tarball carries a verifiable
+link back to the commit and workflow that built it.

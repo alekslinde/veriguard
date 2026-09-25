@@ -12,7 +12,7 @@
 //
 // Pure string work over the received prefix. No I/O.
 
-import type { AnalyzedIdentifier } from "@veriguard/engine/scamDetector";
+import type { AnalyzedIdentifier } from "@veriguard/scam-detect/scamDetector";
 import { mimeManifest, ManifestPart } from "@/lib/mime";
 
 export interface PartialCheck {

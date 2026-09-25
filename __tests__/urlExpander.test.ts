@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { isShortened, expandUrl, SHORTENER_HOSTS } from "@veriguard/engine/urlExpander";
+import { isShortened, expandUrl, SHORTENER_HOSTS } from "@veriguard/scam-detect/urlExpander";
 
 // ── Feature: isShortened ──────────────────────────────────────────────────────
 

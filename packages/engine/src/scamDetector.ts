@@ -4,7 +4,7 @@ import { registrableLabel, registrableDomain, publicSuffix, isNationalCommercial
 import { findKeyboardTypo } from "./keyboardAdjacency";
 import { BASE_SIGNALS } from "./regions/base";
 import { detectType } from "./detectType";
-import { analysePhone, PhoneIntel } from "./phoneIntel";
+import { analysePhone, type PhoneIntel } from "./phoneIntel";
 import { isShortened, expandUrl, type ExpandFetch } from "./urlExpander";
 import { resolveRegionPack, supportedRegions, DEFAULT_REGION, type RegionInput, type RegionCoverage, type RegionPack } from "./regions";
 import { KEYS_BY_POST_PHRASES, FAMILY_RELATION_TERMS, NEW_NUMBER_PRETEXT_PHRASES } from "./regions/base";

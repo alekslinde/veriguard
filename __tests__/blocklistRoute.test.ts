@@ -6,7 +6,7 @@
 // and that argument only holds while there is no way to ask it about one host.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { hashHost, HOST_HASH_ALGORITHM, HOST_HASH_HEX_LENGTH } from "@veriguard/engine/hostHash";
+import { hashHost, HOST_HASH_ALGORITHM, HOST_HASH_HEX_LENGTH } from "@veriguard/scam-detect/hostHash";
 
 const HOSTS = ["evil.example", "phish.test", "malware.invalid"];
 

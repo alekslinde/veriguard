@@ -9,7 +9,7 @@
 // forgetting to unwrap a forwarded email and analysing the forwarder instead of
 // the original scammer). Pure string work — no I/O, no fetching of any URL.
 
-import { parseEmailHeaders, analyseEmailIdentities, EmailHeaders } from "@veriguard/engine/emailHeaders";
+import { parseEmailHeaders, analyseEmailIdentities, EmailHeaders } from "@veriguard/scam-detect/emailHeaders";
 import { analyseEmailTracking, EmailTrackingReport } from "@/lib/emailTracking";
 import { unwrapForwarded, ForwardSource, UnwrapOptions } from "@/lib/forwardedEmail";
 

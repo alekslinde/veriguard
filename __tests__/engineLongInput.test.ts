@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyzeContent } from "@veriguard/engine/scamDetector";
+import { analyzeContent } from "@veriguard/scam-detect/scamDetector";
 
 // The engine runs over attacker-controlled text, and the extension hands it up
 // to 20,000 characters of whatever a drag selected. Each case below is a shape

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { checkUrl, checkSms, checkEmail, checkPhone, checkCustom } from "@veriguard/engine/scamDetector";
-import type { CheckResult } from "@veriguard/engine/engineTypes";
+import { checkUrl, checkSms, checkEmail, checkPhone, checkCustom } from "@veriguard/scam-detect/scamDetector";
+import type { CheckResult } from "@veriguard/scam-detect/engineTypes";
 
 // Signals exist so a verdict can explain itself: every reason carries the
 // weight it contributed. The invariant that makes the evidence trustworthy is

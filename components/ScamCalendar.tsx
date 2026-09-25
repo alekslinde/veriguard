@@ -38,7 +38,7 @@ import {
   type ScamSeason,
   type CivilDate,
 } from "@/lib/scamCalendar";
-import type { RegionCode } from "@veriguard/engine/regions";
+import type { RegionCode } from "@veriguard/scam-detect/regions";
 
 // Matches the card styling used across Learn, About and the radar.
 const CARD = "bg-[var(--ink-2)] border border-[var(--rule)] rounded-2xl p-6 space-y-6";

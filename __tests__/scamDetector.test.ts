@@ -6,14 +6,14 @@ import {
   checkPhone,
   checkCustom,
   analyzeContent,
-} from "@veriguard/engine/scamDetector";
-import { expandUrl } from "@veriguard/engine/urlExpander";
+} from "@veriguard/scam-detect/scamDetector";
+import { expandUrl } from "@veriguard/scam-detect/urlExpander";
 
 // Keep isShortened from the real module so shortener-detection tests stay valid.
 // Replace expandUrl with a controllable spy that returns null by default so
 // existing tests are unaffected by network I/O.
-vi.mock("@veriguard/engine/urlExpander", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@veriguard/engine/urlExpander")>();
+vi.mock("@veriguard/scam-detect/urlExpander", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@veriguard/scam-detect/urlExpander")>();
   return { ...actual, expandUrl: vi.fn().mockResolvedValue({ expandedUrl: null, hops: [], status: "failed" }) };
 });
 

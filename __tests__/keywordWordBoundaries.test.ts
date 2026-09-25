@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkSms, checkCustom, mentions } from "@veriguard/engine/scamDetector";
+import { checkSms, checkCustom, mentions } from "@veriguard/scam-detect/scamDetector";
 
 // Regression cover for #233 — keyword entries firing inside ordinary words.
 //

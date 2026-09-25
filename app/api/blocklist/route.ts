@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUrlhausBlocklist, BLOCKLIST_TTL_SECONDS } from "@/lib/urlhausBlocklist";
-import { hashHost, HOST_HASH_ALGORITHM, HOST_HASH_HEX_LENGTH } from "@veriguard/engine/hostHash";
+import { hashHost, HOST_HASH_ALGORITHM, HOST_HASH_HEX_LENGTH } from "@veriguard/scam-detect/hostHash";
 import { checkAndRecordRateLimit, FEED_RATE_LIMIT } from "@/lib/reportStore";
 import { clientIpFromHeaders } from "@/lib/geo";
 import { corsHeaders, corsPreflightHeaders } from "@/lib/cors";

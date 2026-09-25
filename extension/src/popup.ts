@@ -10,7 +10,7 @@
 // onboarding page.
 
 import { runCheck } from "./check";
-import { REGION_OPTIONS, DEFAULT_REGION } from "@veriguard/engine/regions";
+import { REGION_OPTIONS, DEFAULT_REGION } from "@veriguard/scam-detect/regions";
 import { hasExtensionApi, storageGet, storageSet, setBadge, setActionTitle } from "./browser";
 import { getBlocklist } from "./blocklist";
 import { renderVerdict, renderError, el, isRenderableCheck } from "./verdictView";

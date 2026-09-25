@@ -16,7 +16,7 @@
 // Pure module: no React, no I/O. Shared by lib/verdictSummary.ts (builds the
 // link) and app/report/page.tsx (reads it).
 
-import type { ScamType } from "@veriguard/engine/scamDetector";
+import type { ScamType } from "@veriguard/scam-detect/scamDetector";
 
 export interface ReportPrefill {
   type?: ScamType;

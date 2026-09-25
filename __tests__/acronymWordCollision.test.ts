@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { resolveRegionPack, supportedRegions } from "@veriguard/engine/regions";
-import type { LanguageCode } from "@veriguard/engine/regions/types";
-import { checkSms, mentions } from "@veriguard/engine/scamDetector";
+import { resolveRegionPack, supportedRegions } from "@veriguard/scam-detect/regions";
+import type { LanguageCode } from "@veriguard/scam-detect/regions/types";
+import { checkSms, mentions } from "@veriguard/scam-detect/scamDetector";
 
 // Guards the failure mode where an agency's own bare acronym is also an
 // ordinary English word.

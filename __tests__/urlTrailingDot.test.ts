@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkUrl, checkSms, checkEmail } from "@veriguard/engine/scamDetector";
+import { checkUrl, checkSms, checkEmail } from "@veriguard/scam-detect/scamDetector";
 
 /**
  * The FQDN root dot, in the SCAM direction.

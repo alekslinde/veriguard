@@ -14,7 +14,7 @@
 
 import type { ExtensionCheck } from "./check";
 import { VERDICT_COPY, SOURCE_LABEL, NOTICE, REPORT } from "./copy";
-import { defangText } from "@veriguard/engine/urlSanitizer";
+import { defangText } from "@veriguard/scam-detect/urlSanitizer";
 import { openTab } from "./browser";
 import { isReportable, prefillFor, reportUrl } from "./report";
 

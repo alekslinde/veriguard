@@ -19,9 +19,9 @@
 // bound. A second copy here is the defect shape this repo has paid for before.
 
 import { buildReportQuery, REPORT_SOURCES, type ReportPrefill } from "../../lib/reportPrefill";
-import type { AnalyzedIdentifier } from "@veriguard/engine/scamDetector";
-import { detectType } from "@veriguard/engine/detectType";
-import type { Verdict } from "@veriguard/engine/verdictRank";
+import type { AnalyzedIdentifier } from "@veriguard/scam-detect/scamDetector";
+import { detectType } from "@veriguard/scam-detect/detectType";
+import type { Verdict } from "@veriguard/scam-detect/verdictRank";
 
 /**
  * Verdicts that get a report link.

@@ -69,6 +69,11 @@ yarn-error.log*
 # zipped from it. Neither is source.
 /extension/dist/
 
+# the published engine build — reproducible via `npm run build:engine`, and
+# what npm packs into the tarball. Committing it would put a second copy of
+# every detection rule in the diff of any change to one.
+/packages/engine/dist/
+
 # extension icons — generated from app/icon.svg by `npm run icons`, same as the
 # PWA set. Committing them would be a second copy of the mark to keep in step.
 /extension/icons/

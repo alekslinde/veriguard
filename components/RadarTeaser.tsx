@@ -32,7 +32,7 @@
 import Link from "next/link";
 import { useLang, type MessageKey } from "@/lib/lang";
 import { circulatingLures, type RadarLure } from "@/lib/threatRadar";
-import type { RegionCode } from "@veriguard/engine/regions";
+import type { RegionCode } from "@veriguard/scam-detect/regions";
 
 /**
  * How many quotes to show.

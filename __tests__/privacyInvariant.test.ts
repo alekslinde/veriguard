@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
-import { analyzeContent, checkUrl, checkSms, checkEmail, checkCustom } from "@veriguard/engine/scamDetector";
-import { SHORTENER_HOSTS } from "@veriguard/engine/urlExpander";
+import { analyzeContent, checkUrl, checkSms, checkEmail, checkCustom } from "@veriguard/scam-detect/scamDetector";
+import { SHORTENER_HOSTS } from "@veriguard/scam-detect/urlExpander";
 
 // The app's core promise to users is that submitting a suspicious link does not
 // visit it. Fetching a scam URL tells the scammer's infrastructure their link is

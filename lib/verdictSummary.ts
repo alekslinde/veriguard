@@ -8,14 +8,14 @@
 //
 // Pure module: no React, no I/O. Safe to unit test and to import from a route.
 
-import { AnalyzedIdentifier } from "@veriguard/engine/scamDetector";
-import { isWorse, worstBy, evidenceFor } from "@veriguard/engine/verdictRank";
-import type { Verdict } from "@veriguard/engine/verdictRank";
-import type { RegionCoverage } from "@veriguard/engine/regions";
-import type { Signal } from "@veriguard/engine/engineTypes";
+import { AnalyzedIdentifier } from "@veriguard/scam-detect/scamDetector";
+import { isWorse, worstBy, evidenceFor } from "@veriguard/scam-detect/verdictRank";
+import type { Verdict } from "@veriguard/scam-detect/verdictRank";
+import type { RegionCoverage } from "@veriguard/scam-detect/regions";
+import type { Signal } from "@veriguard/scam-detect/engineTypes";
 import { TrackingPixelReport } from "@/lib/trackingPixel";
 import { TrackingFinding } from "@/lib/emailTracking";
-import { defang, defangEmail, defangPhone, defangText } from "@veriguard/engine/urlSanitizer";
+import { defang, defangEmail, defangPhone, defangText } from "@veriguard/scam-detect/urlSanitizer";
 import { buildReportQuery, ReportPrefill } from "@/lib/reportPrefill";
 import { matchedTactics, TACTIC_IDS, TACTIC_TITLES } from "@/lib/signalTactics";
 import type { PressureReport } from "@/lib/pressureTactics";
@@ -30,8 +30,8 @@ import enNormal from "@/messages/en.normal.json";
 // engine and cannot reach `lib/`, and two rank tables that must agree is the
 // defect shape this codebase has paid for more than once. Re-exported here so
 // existing app-side call sites keep their import unchanged.
-export { VERDICT_RANK } from "@veriguard/engine/verdictRank";
-export type { Verdict } from "@veriguard/engine/verdictRank";
+export { VERDICT_RANK } from "@veriguard/scam-detect/verdictRank";
+export type { Verdict } from "@veriguard/scam-detect/verdictRank";
 
 // Defang an identifier for display, per its kind. Mirrors how every value on
 // the Check page is shown — nothing live or clickable ever surfaces.
@@ -897,7 +897,7 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
  * things about a score a different identifier produced.
  *
  * The pooling, the cap and the clamp row now live in
- * `@veriguard/engine/verdictRank` alongside the rank table, because the
+ * `@veriguard/scam-detect/verdictRank` alongside the rank table, because the
  * WebExtension shows the same evidence list and cannot reach `lib/`. It had a
  * second copy of this pairing and got it wrong in exactly the way described
  * above. This function is what remains app-side: the verdict, and the tracking
@@ -926,4 +926,4 @@ export function composeVerdictWithEvidence(
   return { verdict: composed.verdict, score, signals };
 }
 
-export { pooledSignals } from "@veriguard/engine/verdictRank";
+export { pooledSignals } from "@veriguard/scam-detect/verdictRank";
