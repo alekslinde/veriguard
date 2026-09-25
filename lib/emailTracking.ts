@@ -18,7 +18,7 @@
 // these fire for the user — that reassurance is worth showing in the UI.
 
 import { analyseTrackingPixels, TrackingPixelReport } from "@/lib/trackingPixel";
-import { splitHeadersBody } from "@/lib/forwardedEmail";
+import { splitHeadersBody } from "@/lib/mime";
 
 export type TrackingKind =
   | "pixel"

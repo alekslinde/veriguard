@@ -8,6 +8,7 @@ import { formatVerdictEmail } from "@/lib/verdictSummary";
 import { checkAndRecordRateLimit, incrementCheckCount, recordCheckEvent, recordTargetRegion } from "@/lib/reportStore";
 import { inferTargetRegion } from "@/lib/targetRegion";
 import { SITE_URL } from "@/lib/siteUrl";
+import { describePartialCheck, trimToLastLine } from "@/lib/partialCheck";
 
 // Inbound webhook for the forward-to-us flow. A Cloudflare Email Worker (see
 // workers/inbound-email/) receives a forwarded suspicious email, POSTs the raw
@@ -44,14 +45,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  let body: { raw?: string; from?: string; delivered?: boolean };
+  let body: {
+    raw?: string;
+    from?: string;
+    delivered?: boolean;
+    truncated?: boolean;
+    totalBytes?: number;
+    receivedBytes?: number;
+  };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ ok: true, skip: "bad-json" });
   }
 
-  const raw = typeof body.raw === "string" ? body.raw : "";
+  // A forward over the Worker's size cap arrives as its first part, flagged
+  // `truncated`, with the full size alongside. It is trimmed back to its last
+  // complete line and analysed like any other; the reply says what that part
+  // covered. See lib/partialCheck.ts.
+  const truncated = body.truncated === true;
+  const raw = typeof body.raw === "string" ? (truncated ? trimToLastLine(body.raw) : body.raw) : "";
+  const count = (n: unknown) => (typeof n === "number" && Number.isFinite(n) && n > 0 ? Math.floor(n) : 0);
   const from = typeof body.from === "string" ? body.from.trim().toLowerCase() : "";
 
   // Delivery confirmation. The Worker calls back here once message.reply() has
@@ -99,9 +113,11 @@ export async function POST(req: NextRequest) {
     // This counts forwards we accepted and tried to analyse — not successes.
     void recordCheckEvent("email", "analysed");
 
-    // Reach the ORIGINAL scam inside the forward and run the shared analysis —
-    // the top-level headers belong to the forwarder, not the scammer.
-    const { source, original, headers, identityFlags, tracking } = analyseEmailSource(raw);
+    // Reach the ORIGINAL scam inside the forward and run the shared analysis.
+    // Everything outside it — the top-level headers, the note and signature
+    // above the forward marker — belongs to the person who forwarded it, and
+    // `forwarded` keeps all of it out, even when no original can be located.
+    const { source, original, headers, identityFlags, tracking } = analyseEmailSource(raw, { forwarded: true });
 
     const blocklist = await getUrlhausBlocklist();
     // No region argument: this request originates from the inbound-email
@@ -112,6 +128,20 @@ export async function POST(req: NextRequest) {
     // Server-side expansion, as in /api/check — the forwarder's IP is never
     // exposed to a shortener.
     const results = await analyzeContent(original, blocklist, undefined, { fetcher: fetch });
+
+    // What a cut-off forward did and did not cover. The sizes come from the
+    // Worker, which alone saw the whole message; a missing total falls back to
+    // what arrived, so the reply never claims a size it was not told.
+    const receivedBytes = count(body.receivedBytes) || Buffer.byteLength(raw);
+    const partial = truncated
+      ? describePartialCheck({
+          raw,
+          receivedBytes,
+          totalBytes: Math.max(count(body.totalBytes), receivedBytes),
+          hasSender: Boolean(headers.fromAddress),
+          results,
+        })
+      : undefined;
 
     // Which country the scam was aimed at — the same aggregate /api/check
     // writes, on the surface that carries the traffic. Without this the
@@ -154,6 +184,7 @@ export async function POST(req: NextRequest) {
       siteUrl: SITE_URL,
       senderAddress: headers.fromAddress,
       replyToAddress: headers.replyTo,
+      partial,
     });
 
     // NOT counted here: the Worker confirms delivery with a `delivered` POST
@@ -163,7 +194,7 @@ export async function POST(req: NextRequest) {
     // Worker (or logs) know whether we got a high-fidelity attachment or a
     // lower-fidelity inline quote. The raw email is now out of scope and
     // discarded with this request.
-    return NextResponse.json({ ok: true, source, reply });
+    return NextResponse.json({ ok: true, source, reply, ...(truncated ? { partial: true } : {}) });
   } catch (err) {
     // Still a 200 — never bounce mail back to a possibly-spoofed sender — but
     // not silent. Analysis throwing means this forward produced no verdict for

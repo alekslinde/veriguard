@@ -103,6 +103,40 @@ describe("POST /api/inbound — analysis", () => {
     expect(data.reply.text).toMatch(/read-receipt request/i);
   });
 
+  // The scope of a forward is the email inside it. These shapes used to fall
+  // through to the forwarder's own headers, so the reply reported on the
+  // person asking instead of the scam they forwarded.
+  it("reports on the scam, not the forwarder, when the forward is base64-encoded", async () => {
+    const body = Buffer.from(
+      "Is this real?\r\n\r\n" + SCAM_FORWARD.split("\n").slice(3).join("\r\n"),
+    ).toString("base64");
+    const raw = [
+      "From: Victim <victim@gmail.com>",
+      "Subject: Fwd: refund",
+      "Content-Type: text/plain; charset=UTF-8",
+      "Content-Transfer-Encoding: base64",
+      "",
+      body,
+    ].join("\r\n");
+    const data = await (await POST(inbound({ raw, from: "b64-forwarder@x.com" }))).json();
+    expect(data.source).toBe("inline");
+    expect(data.reply.text).toContain("payme[.]cc");
+    expect(data.reply.text).not.toMatch(/victim/i);
+  });
+
+  it("never reports the forwarder when no original can be located", async () => {
+    const raw = [
+      "From: Victim <victim@gmail.com>",
+      "Subject: Fwd: text I got",
+      "",
+      "Got this: your refund is ready at http://ato-refund.xyz/claim",
+    ].join("\n");
+    const data = await (await POST(inbound({ raw, from: "markerless-forwarder@x.com" }))).json();
+    expect(data.source).toBe("body");
+    expect(data.reply.text).toContain("ato-refund[.]xyz");
+    expect(data.reply.text).not.toMatch(/victim/i);
+  });
+
   it("skips (200, no reply) on empty raw", async () => {
     const res = await POST(inbound({ raw: "", from: "a@b.com" }));
     expect(res.status).toBe(200);
