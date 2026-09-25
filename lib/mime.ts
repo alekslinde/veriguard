@@ -77,15 +77,20 @@ export function decodeBody(body: string, encoding: string): string {
   const enc = encoding.trim().toLowerCase();
   if (enc === "quoted-printable") return decodeQuotedPrintable(body);
   if (enc === "base64") {
-    try {
-      // Whitespace isn't valid base64 input; strip the MIME line wrapping.
-      const clean = body.replace(/\s+/g, "");
-      const binary = atob(clean);
-      const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
-      return new TextDecoder("utf-8").decode(bytes);
-    } catch {
-      return body;
+    // Whitespace isn't valid base64 input; strip the MIME line wrapping.
+    const clean = body.replace(/\s+/g, "");
+    // A part cut off by the size limit ends mid-quantum, which atob rejects.
+    // Retry on the whole 4-character groups so the text that did arrive still
+    // decodes; a complete body is always whole groups and never needs it.
+    for (const candidate of [clean, clean.slice(0, clean.length - (clean.length % 4))]) {
+      try {
+        const bytes = Uint8Array.from(atob(candidate), (c) => c.charCodeAt(0));
+        return new TextDecoder("utf-8").decode(bytes);
+      } catch {
+        // fall through to the next candidate
+      }
     }
+    return body;
   }
   return body; // 7bit / 8bit / binary / absent — already text
 }
@@ -260,4 +265,60 @@ export function textParts(raw: string, depth = 0): TextParts {
   if (ct.startsWith("text/html")) out.html = decodeBody(body, cte);
   else if (ct.startsWith("text/plain") || ct === "") out.plain = decodeBody(body, cte);
   return out;
+}
+
+export interface ManifestPart {
+  // Lowercased media type, "" when the part's headers did not say.
+  type: string;
+  // Declared filename (Content-Disposition filename, else Content-Type name).
+  filename: string;
+  // Whether the part ends inside what we received. False for the part the
+  // size limit cut through, and for every part enclosing it.
+  complete: boolean;
+}
+
+// The declared filename of a part, from its header block.
+function filenameOf(headerBlock: string): string {
+  const disposition = headerValue(headerBlock, "content-disposition");
+  const type = headerValue(headerBlock, "content-type");
+  const m =
+    disposition.match(/filename\*?\s*=\s*"?([^";\r\n]+)/i) ||
+    type.match(/\bname\s*=\s*"?([^";\r\n]+)/i);
+  // RFC 2231 form: charset'lang'percent-encoded.
+  const raw = m ? m[1].trim().replace(/^[\w-]*'[\w-]*'/, "") : "";
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+// Every leaf part of a message that may have been cut off at the size limit,
+// with whether it arrived whole. Descends into multipart containers and into
+// attached messages (message/rfc822), since a forwarded original's own parts
+// are what a reader will recognise ("invoice.pdf").
+//
+// `cut` says the input itself was truncated. Within a multipart body, every
+// part before the next delimiter is whole; the last part is whole only if the
+// closing delimiter ("--boundary--") arrived after it.
+export function mimeManifest(raw: string, cut: boolean, depth = 0): ManifestPart[] {
+  if (depth > 10) return [];
+  const { headerBlock, body } = splitHeadersBody(raw);
+  const ctRaw = headerValue(headerBlock, "content-type");
+  const type = ctRaw.split(";")[0].trim().toLowerCase();
+
+  if (type.startsWith("multipart/")) {
+    const boundary = boundaryOf(ctRaw);
+    if (!boundary) return [{ type, filename: "", complete: !cut }];
+    const segments = body.split(`--${boundary}`).slice(1);
+    const close = segments.findIndex((seg) => seg.startsWith("--"));
+    const parts = close === -1 ? segments : segments.slice(0, close);
+    return parts.flatMap((seg, i) => {
+      const whole = !cut || close !== -1 || i < parts.length - 1;
+      const text = seg.replace(/^\r?\n/, "");
+      return text.trim() ? mimeManifest(text, !whole, depth + 1) : [];
+    });
+  }
+  if (type === "message/rfc822") return mimeManifest(body, cut, depth + 1);
+  return [{ type, filename: filenameOf(headerBlock), complete: !cut }];
 }

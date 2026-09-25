@@ -334,8 +334,11 @@ exercise those with `wrangler dev` (it can simulate an inbound message) pointing
 
 ## Notes
 
-- `MAX_RAW_BYTES` (1 MB) drops oversized messages before calling the API; the
-  API enforces the same cap as defence in depth.
+- `MAX_RAW_BYTES` (1 MB) caps what is sent to the API. A larger message is cut
+  there rather than dropped: the first 1 MB goes on flagged `truncated`, with
+  `receivedBytes` and `totalBytes` (`message.rawSize`), and the reply gives a
+  partial verdict listing what was and was not checked. The API enforces the
+  same cap as defence in depth.
 - Per-sender rate limiting lives in the API (`/api/inbound`), so a flood of
   forwards from one address stops generating replies.
 - The verdict copy is English-only for now (the email channel has no locale).
