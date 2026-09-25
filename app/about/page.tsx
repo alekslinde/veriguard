@@ -5,7 +5,7 @@ import PageHeader from "@/components/PageHeader";
 export const metadata: Metadata = {
   title: "About & Privacy — Veriguard",
   description:
-    "What Veriguard stores, what it never stores (your IP, your uploads), how the checker works, which countries it covers, and the browser extension's privacy policy. Step-by-step guides for blocking and reporting spam live on the Learn page.",
+    "What Veriguard stores, what it never stores (your IP, your uploads), what a mail provider records if you forward an email, how the checker works, which countries it covers, and the browser extension's privacy policy. Step-by-step guides for blocking and reporting spam live on the Learn page.",
 };
 
 // This page is the canonical record of the project's privacy behaviour, so it
@@ -62,7 +62,7 @@ export default function AboutPage() {
       <PageHeader
         eyebrow="About & privacy"
         title="What we store, and what we **never** store"
-        lede="Detection here is hardcoded pattern logic — no models in the scoring path, nothing sent off-device for scoring."
+        lede="Every verdict here comes from hardcoded pattern logic — no AI anywhere in the scoring, and nothing about your message leaves your device to be judged."
       />
 
       <div className="space-y-10">
@@ -86,9 +86,9 @@ export default function AboutPage() {
               contacting any outside server at all.
             </DataCard>
             <DataCard kicker="Stored, scrubbed" title="Reports you choose to submit">
-              Only if you submit the report form — and personal details are removed before
-              storage, not before display. What&apos;s kept is the scam: the link, the sender,
-              the wording.
+              Only if you submit the report form — and personal details are stripped before
+              anything is written down, not merely hidden when it&apos;s shown. What&apos;s kept
+              is the scam: the link, the sender, the wording.
             </DataCard>
             <DataCard kicker="Counted only" title="How many checks ran">
               A running total with no content attached. That&apos;s what the numbers on the
@@ -192,38 +192,43 @@ export default function AboutPage() {
           anonymous.
         */}
         <section className={SECTION} id="email">
-          <h2 className={H2}>If you forward an email to us</h2>
+          <h2 className={H2}>Email is the one exception</h2>
           <p className={P}>
-            You can send a suspicious email to our check address instead of pasting it. The email
-            itself is treated exactly like a paste:{" "}
-            <strong className={STRONG}>analysed in memory, never stored</strong>, never used to
-            train anything. The reply comes back to you and that is the end of it.
+            You can forward a suspicious email to our check address instead of pasting it. What
+            happens to the message is the same:{" "}
+            <strong className={STRONG}>read in memory, never stored</strong>, never used to train
+            anything. The reply comes back to you and that&apos;s the end of it.
           </p>
           <p className={P}>
-            One difference is worth knowing about. Email has to arrive somewhere before it
-            reaches our code, and ours arrives through Cloudflare Email Routing. Like every mail
-            provider, it keeps a delivery record of each message for about a month:{" "}
+            The difference is everything around it. Email has to be delivered before we can read
+            it, and ours is delivered by Cloudflare Email Routing — which, like every mail
+            service, keeps a record of each message it handles for about a month:{" "}
             <strong className={STRONG}>your address, the subject line, the time, whether the
             message passed its authentication checks, and whether our reply went out</strong>. Not
-            the body, and not the scam you forwarded.
+            the body. Not the scam you forwarded.
           </p>
           <p className={P}>
-            <strong className={STRONG}>We can&apos;t switch that off.</strong> It is part of how
-            mail is delivered rather than a setting we chose, and no paid plan or configuration
-            removes it — your own mail provider keeps a similar record at the other end. We would
-            rather say so than let &ldquo;never stored&rdquo; imply more than it can.
+            <strong className={STRONG}>We can&apos;t switch that off.</strong> It&apos;s part of
+            how mail gets delivered, not a setting we chose, and no paid plan removes it — your
+            own email provider is keeping a similar record at the other end. We&apos;d rather tell
+            you that than let &ldquo;never stored&rdquo; quietly cover something it doesn&apos;t.
           </p>
           <p className={P}>
-            So: <strong className={STRONG}>if you&apos;d rather leave no record of having asked,
-            paste the message on the site instead.</strong> A paste never touches a mail server.
-            Forwarding is there because it is far easier than copying a whole email on a phone —
-            it is a fair trade, but it should be yours to make.
+            So if you&apos;d rather leave no record of having asked,{" "}
+            <strong className={STRONG}>paste the message here instead</strong> — nothing about a
+            paste touches a mail server. Forwarding exists because it beats retyping a whole email
+            on a phone. That&apos;s a fair trade, but it should be yours to make.
           </p>
-          <p className="text-[13.5px] text-[var(--faint)] leading-relaxed">
+          {/* Same treatment as the coverage warning above, because it is the
+              same failure: a quiet result read as a clean one. A reply that
+              never arrives is the most dangerous thing this service can do, so
+              it is set apart rather than left to close a paragraph. */}
+          <p className="text-[14.5px] leading-relaxed text-[var(--text-dim)] border-l-2 border-l-[var(--caution)] pl-4 py-0.5">
             Replies aren&apos;t guaranteed, either. Whether we&apos;re allowed to answer depends
-            on how your mail provider vouches for the forward, and for some accounts we simply
-            can&apos;t. If nothing comes back within a few minutes, that&apos;s why — check the
-            message on the site rather than reading silence as &ldquo;probably fine&rdquo;.
+            on how your email provider vouches for the forward, and for some accounts we simply
+            can&apos;t. <strong className={STRONG}>If nothing comes back within a few minutes,
+            don&apos;t read the silence as &ldquo;probably fine&rdquo;</strong> — check the message
+            here instead.
           </p>
         </section>
 
