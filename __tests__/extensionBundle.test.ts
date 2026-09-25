@@ -145,6 +145,39 @@ describe.skipIf(!built)("built extension bundle", () => {
     );
   });
 
+  it("stamps each build with its own report label", () => {
+    // The `source` param on a report link is the extension's ONLY measurable
+    // outcome — it scores on-device and never calls the API, so an unlabelled
+    // report is indistinguishable from someone who typed the URL.
+    //
+    // Asserted against the built files because the value comes from a Vite
+    // `define` keyed on TARGET: a source test sees whatever vitest.config
+    // injects and would pass for both builds no matter what the real build
+    // did. Reading the Firefox output is the point — a mistake here ships two
+    // bundles claiming to be Chromium, and the failure is invisible until the
+    // numbers are read months later.
+    const firefox = path.join(DIST, "firefox");
+    if (!existsSync(path.join(firefox, "popup.js"))) return;
+
+    expect(read("popup.js"), "the chrome build is mislabelled").toContain('=== "ext-chromium"');
+    expect(
+      readFileSync(path.join(firefox, "popup.js"), "utf8"),
+      "the firefox build is mislabelled",
+    ).toContain('=== "ext-firefox"');
+  });
+
+  it("keeps the report label free of anything identifying", () => {
+    // It names a build, never a person or a session. The allowlist in
+    // lib/reportPrefill.ts is what enforces that, and this pins the property
+    // at the artifact: no id, timestamp or random value may ride along.
+    const bundle = everything();
+    const sourceParam = /params\.set\("source"/;
+    if (!sourceParam.test(bundle)) return;
+    expect(bundle, "a report link must not carry a generated id").not.toMatch(
+      /params\.set\("(uid|cid|sid|session|install)/i,
+    );
+  });
+
   it("contains no markup-execution sink", () => {
     // The popup and the onboarding page both render attacker-controlled text —
     // the scam message itself, and engine signal strings that quote it, through

@@ -73,4 +73,39 @@ describe("parseReportPrefill", () => {
   it("takes the first value when a param is repeated", () => {
     expect(parseReportPrefill({ scamUrl: ["https://a.tk", "https://b.tk"] }).scamUrl).toBe("https://a.tk");
   });
+
+  describe("source", () => {
+    it("round-trips a known surface", () => {
+      const query = buildReportQuery({ type: "url", scamUrl: "https://evil.tk", source: "ext-firefox" });
+      expect(parseReportPrefill(new URLSearchParams(query)).source).toBe("ext-firefox");
+    });
+
+    it("drops an unknown source rather than bucketing it", () => {
+      // The param arrives from a link anyone can edit. A catch-all bucket would
+      // fill with whatever strangers typed and read as if it meant something.
+      expect(parseReportPrefill({ source: "twitter-campaign-42" }).source).toBeUndefined();
+      expect(parseReportPrefill({ source: "unknown" }).source).toBeUndefined();
+    });
+
+    it("refuses to emit an unallowlisted source", () => {
+      // Allowlisted on the way out too, so a bad value cannot be reflected into
+      // a link we publish in an email or a popup.
+      const query = buildReportQuery({ source: "not-a-surface" as never });
+      expect(query).toBe("");
+    });
+
+    it("carries no source when none was given", () => {
+      expect(parseReportPrefill({ type: "url" }).source).toBeUndefined();
+      expect(buildReportQuery({ type: "url" })).not.toContain("source");
+    });
+
+    it("cannot carry an identifier", () => {
+      // The closed list is what makes this a surface label rather than a
+      // tracking parameter — there is no value it can hold that identifies a
+      // person, a session or a campaign.
+      for (const crafted of ["user-1234", "session:abcdef", "ext-chromium&uid=9"]) {
+        expect(parseReportPrefill({ source: crafted }).source).toBeUndefined();
+      }
+    });
+  });
 });

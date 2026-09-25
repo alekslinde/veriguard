@@ -10,7 +10,7 @@ Edge, Firefox and Safari from one source.
 | Firefox | `npm run ext:firefox` | `dist/firefox`; differs only in the background form and the `browser_specific_settings` block (gecko id, data declaration, version floors). Desktop 140+, Android 142+ — on Android the toolbar popup is the only entry point, as that runtime has no `menus` API |
 | Safari | `npm run ext:safari` | Wraps `dist/chrome` in an Xcode project. Builds; needs a signing identity to run |
 
-*Last reviewed: 2026-09-20.*
+*Last reviewed: 2026-09-25.*
 
 ## What it does, and what it deliberately does not
 
@@ -95,6 +95,13 @@ Consequences worth understanding before changing anything here:
   that is the field most likely to hold the reporter's own details. The query is
   built with `lib/reportPrefill.ts` — the same module the form parses it with,
   imported rather than copied, so the two cannot disagree about a parameter.
+  It also carries a `source` naming which build sent the reader (`ext-chromium`
+  or `ext-firefox`, stamped at build time from `TARGET`). That is a surface
+  label, not a tracking parameter: the accepted values are a closed list, so it
+  cannot hold an identifier, and it rides a link the user clicks rather than a
+  request the extension makes — which is why it leaves the one-call property
+  untouched. It exists because on-device scoring makes every other extension
+  outcome unmeasurable, so a prompted report is the only signal that reaches us.
   Opening a tab needs no permission; `tabs` would only be required to *read*
   tab URLs, which nothing here does.
 
@@ -168,7 +175,7 @@ gitignored.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `TARGET` | `chrome` | `chrome` or `firefox` — selects the manifest variant |
+| `TARGET` | `chrome` | `chrome` or `firefox` — selects the manifest variant, and stamps the `source` label on report links |
 | `GECKO_ID` | `veriguard@veriguard.app` | Firefox add-on id; must stay stable across uploads or the add-on becomes a different add-on |
 | `API_BASE` | `https://veriguard.app` | Origin the blocklist is fetched from. Inlined into the bundle *and* into the manifest's `connect-src`, so the two cannot disagree |
 

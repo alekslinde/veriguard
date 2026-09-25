@@ -87,7 +87,7 @@ Three, all minimal. None of them can read the pages you visit:
 
 REPORTING
 
-On a suspicious verdict you can report the scam to the public database. The extension opens the report form on veriguard.app with the link or number filled in — it never submits anything itself. You review it and send it.
+On a suspicious verdict you can report the scam to the public database. The extension opens the report form on veriguard.app with the link or number filled in, and a note of which browser's version sent you — it never submits anything itself. You review it and send it.
 
 OPEN SOURCE
 

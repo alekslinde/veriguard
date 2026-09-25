@@ -24,7 +24,38 @@ export interface ReportPrefill {
   scamEmail?: string;
   scamReplyTo?: string;
   scamPhone?: string;
+  /** Which surface sent the reporter here. See `REPORT_SOURCES`. */
+  source?: ReportSource;
 }
+
+/**
+ * Where a prefilled report link came from.
+ *
+ * This exists because the WebExtension is otherwise unmeasurable: it scores
+ * on-device and never calls our API, so a report it prompted is the ONE
+ * extension outcome that reaches us at all. Without this the report arrives
+ * indistinguishable from someone who typed the URL.
+ *
+ * **This is not a tracking parameter and must never become one.** It names a
+ * surface, not a person, a session or a campaign — the values are a closed list
+ * below, so the field cannot carry an identifier even if something tried to put
+ * one there. It rides a link the USER clicks, which is why it does not touch
+ * the extension's "exactly one network request" property: that claim is about
+ * requests the extension makes on its own, and a navigation the reader chose is
+ * a different thing entirely. Nothing here is stored against a report row
+ * unless a caller does so deliberately.
+ *
+ * `email` is the forward-to-us reply CTA, which predates this field and was
+ * previously unattributed for the same reason.
+ */
+export type ReportSource = "ext-chromium" | "ext-firefox" | "ext-safari" | "email";
+
+export const REPORT_SOURCES: readonly ReportSource[] = [
+  "ext-chromium",
+  "ext-firefox",
+  "ext-safari",
+  "email",
+];
 
 const SCAM_TYPES: ScamType[] = ["url", "sms", "email", "phone", "qr", "custom"];
 
@@ -47,6 +78,10 @@ function clean(value: string | undefined | null): string | undefined {
 export function buildReportQuery(prefill: ReportPrefill): string {
   const params = new URLSearchParams();
   if (prefill.type && SCAM_TYPES.includes(prefill.type)) params.set("type", prefill.type);
+  // Allowlisted on the way out as well as the way in. A caller passing
+  // something arbitrary gets it dropped rather than reflected into a link we
+  // then publish in an email or an extension popup.
+  if (prefill.source && REPORT_SOURCES.includes(prefill.source)) params.set("source", prefill.source);
   for (const key of ["scamUrl", "scamEmail", "scamReplyTo", "scamPhone"] as const) {
     const value = clean(prefill[key]);
     if (value) params.set(key, value);
@@ -69,9 +104,16 @@ export function parseReportPrefill(params: URLSearchParams | Record<string, stri
 
   const rawType = get("type");
   const type = SCAM_TYPES.find((t) => t === rawType);
+  // An unrecognised source is DROPPED, not bucketed as "unknown". Unlike the
+  // surface enum in reportStore — where a miswired first-party client should
+  // show up as unattributed volume — this value arrives from a link anyone can
+  // edit, so a catch-all bucket would fill with whatever strangers typed and
+  // read as if it meant something.
+  const source = REPORT_SOURCES.find((s) => s === get("source"));
 
   return {
     ...(type ? { type } : {}),
+    ...(source ? { source } : {}),
     ...(clean(get("scamUrl")) ? { scamUrl: clean(get("scamUrl")) } : {}),
     ...(clean(get("scamEmail")) ? { scamEmail: clean(get("scamEmail")) } : {}),
     ...(clean(get("scamReplyTo")) ? { scamReplyTo: clean(get("scamReplyTo")) } : {}),

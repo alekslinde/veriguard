@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
+import { EXTENSION_LISTINGS } from "@/lib/extensionInstalls";
 
 export const metadata: Metadata = {
   title: "About & Privacy — Veriguard",
@@ -324,6 +325,50 @@ export default function AboutPage() {
             What it keeps on your device: the region you picked, and the downloaded site list. No
             history of what you checked is stored anywhere, by us or by it — there is nothing to
             request a copy of, because nothing is kept.
+          </p>
+          {/* The reach figures, and — more importantly — the number that is
+              absent. On-device scoring means there is no check event to count,
+              so "how many scams did it catch" is a question this project cannot
+              answer about its own product. Saying that plainly is a stronger
+              privacy claim than any usage number would be, which is why the
+              absence is stated here rather than quietly left out. */}
+          <p className={P}>
+            <strong className={STRONG}>How many people use it</strong>, as the stores report it:
+          </p>
+          <ul className="space-y-1.5">
+            {EXTENSION_LISTINGS.map((listing) => (
+              <li key={listing.store} className={`${P} flex flex-wrap items-baseline gap-x-2`}>
+                <span className={STRONG}>
+                  {listing.url ? (
+                    <a href={listing.url} className={LINK} target="_blank" rel="noopener noreferrer">
+                      {listing.name}
+                    </a>
+                  ) : (
+                    listing.name
+                  )}
+                </span>
+                {typeof listing.users === "number" && listing.asOf ? (
+                  <span>
+                    {listing.users.toLocaleString("en-AU")} users, as the store reported it on{" "}
+                    {listing.asOf}
+                  </span>
+                ) : (
+                  <span>{listing.note}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className={P}>
+            Those come from the store dashboards, which anyone can open and check against what we
+            say here — each one is dated with the day it was read, because a count without a date
+            quietly becomes a claim about today.
+          </p>
+          <p className={P}>
+            There is <strong className={STRONG}>no figure for how many checks it has run</strong>,
+            and there never will be. Scoring happens on your device, so no check is reported to us
+            — there is no event to count, and creating one would mean the extension phoning home
+            about the thing it promises never to send. We would rather publish a missing number
+            with the reason attached than collect the data to fill it in.
           </p>
           <p className={P}>
             None of this is a promise you have to take on trust. The extension ships unminified

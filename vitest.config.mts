@@ -19,6 +19,11 @@ export default defineConfig({
   // rather than quietly succeed against production.
   define: {
     __API_BASE__: JSON.stringify("https://api.example.invalid"),
+    // The build target, for the `source` label on report links. A real value
+    // rather than a placeholder: it is validated against the allowlist in
+    // lib/reportPrefill.ts, so an invented one would be dropped and every
+    // assertion about attribution would pass vacuously.
+    __REPORT_SOURCE__: JSON.stringify("ext-chromium"),
   },
   resolve: {
     // Only the app's own "@/" alias is declared here.
