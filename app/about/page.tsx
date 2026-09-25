@@ -174,6 +174,59 @@ export default function AboutPage() {
           </p>
         </section>
 
+        {/*
+          The forwarding path, disclosed separately.
+
+          Everywhere else on this page, "analysed in memory and discarded" is
+          the whole story, because the message reaches us over the web and
+          nothing else touches it. Email is the one surface where that is not
+          the whole story: getting a message to us at all means handing it to a
+          mail provider first, and mail providers keep delivery records. That
+          record is not ours to decline — it is how the mail is routed — and a
+          page whose title promises what we store owes the reader the part we
+          do not control as plainly as the part we do.
+
+          Naming the provider is deliberate. The domain's public MX records
+          already name it, so this discloses nothing a lookup would not, and a
+          reader cannot judge a disclosure about a third party that is kept
+          anonymous.
+        */}
+        <section className={SECTION} id="email">
+          <h2 className={H2}>If you forward an email to us</h2>
+          <p className={P}>
+            You can send a suspicious email to our check address instead of pasting it. The email
+            itself is treated exactly like a paste:{" "}
+            <strong className={STRONG}>analysed in memory, never stored</strong>, never used to
+            train anything. The reply comes back to you and that is the end of it.
+          </p>
+          <p className={P}>
+            One difference is worth knowing about. Email has to arrive somewhere before it
+            reaches our code, and ours arrives through Cloudflare Email Routing. Like every mail
+            provider, it keeps a delivery record of each message for about a month:{" "}
+            <strong className={STRONG}>your address, the subject line, the time, whether the
+            message passed its authentication checks, and whether our reply went out</strong>. Not
+            the body, and not the scam you forwarded.
+          </p>
+          <p className={P}>
+            <strong className={STRONG}>We can&apos;t switch that off.</strong> It is part of how
+            mail is delivered rather than a setting we chose, and no paid plan or configuration
+            removes it — your own mail provider keeps a similar record at the other end. We would
+            rather say so than let &ldquo;never stored&rdquo; imply more than it can.
+          </p>
+          <p className={P}>
+            So: <strong className={STRONG}>if you&apos;d rather leave no record of having asked,
+            paste the message on the site instead.</strong> A paste never touches a mail server.
+            Forwarding is there because it is far easier than copying a whole email on a phone —
+            it is a fair trade, but it should be yours to make.
+          </p>
+          <p className="text-[13.5px] text-[var(--faint)] leading-relaxed">
+            Replies aren&apos;t guaranteed, either. Whether we&apos;re allowed to answer depends
+            on how your mail provider vouches for the forward, and for some accounts we simply
+            can&apos;t. If nothing comes back within a few minutes, that&apos;s why — check the
+            message on the site rather than reading silence as &ldquo;probably fine&rdquo;.
+          </p>
+        </section>
+
         <section className={SECTION}>
           <h2 className={H2}>When you report a scam</h2>
           <p className={P}>A report stores exactly these things, and nothing else:</p>
