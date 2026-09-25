@@ -5,7 +5,7 @@ import PageHeader from "@/components/PageHeader";
 export const metadata: Metadata = {
   title: "About & Privacy — Veriguard",
   description:
-    "What Veriguard stores, what it never stores (your IP, your uploads), how the checker works, which countries it covers, and the browser extension's privacy policy. Step-by-step guides for blocking and reporting spam live on the Learn page.",
+    "What Veriguard stores, what it never stores (your IP, your uploads), what a mail provider records if you forward an email, how the checker works, which countries it covers, and the browser extension's privacy policy. Step-by-step guides for blocking and reporting spam live on the Learn page.",
 };
 
 // This page is the canonical record of the project's privacy behaviour, so it
@@ -62,7 +62,7 @@ export default function AboutPage() {
       <PageHeader
         eyebrow="About & privacy"
         title="What we store, and what we **never** store"
-        lede="Detection here is hardcoded pattern logic — no models in the scoring path, nothing sent off-device for scoring."
+        lede="Every verdict here comes from hardcoded pattern logic — no AI anywhere in the scoring, and nothing about your message leaves your device to be judged."
       />
 
       <div className="space-y-10">
@@ -86,9 +86,9 @@ export default function AboutPage() {
               contacting any outside server at all.
             </DataCard>
             <DataCard kicker="Stored, scrubbed" title="Reports you choose to submit">
-              Only if you submit the report form — and personal details are removed before
-              storage, not before display. What&apos;s kept is the scam: the link, the sender,
-              the wording.
+              Only if you submit the report form — and personal details are stripped before
+              anything is written down, not merely hidden when it&apos;s shown. What&apos;s kept
+              is the scam: the link, the sender, the wording.
             </DataCard>
             <DataCard kicker="Counted only" title="How many checks ran">
               A running total with no content attached. That&apos;s what the numbers on the
@@ -171,6 +171,64 @@ export default function AboutPage() {
             of the score: a tax scam in March is still a scam, and a genuine ATO email in July is
             still genuine. The radar also says plainly which campaigns we catch and which we
             don&apos;t yet.
+          </p>
+        </section>
+
+        {/*
+          The forwarding path, disclosed separately.
+
+          Everywhere else on this page, "analysed in memory and discarded" is
+          the whole story, because the message reaches us over the web and
+          nothing else touches it. Email is the one surface where that is not
+          the whole story: getting a message to us at all means handing it to a
+          mail provider first, and mail providers keep delivery records. That
+          record is not ours to decline — it is how the mail is routed — and a
+          page whose title promises what we store owes the reader the part we
+          do not control as plainly as the part we do.
+
+          Naming the provider is deliberate. The domain's public MX records
+          already name it, so this discloses nothing a lookup would not, and a
+          reader cannot judge a disclosure about a third party that is kept
+          anonymous.
+        */}
+        <section className={SECTION} id="email">
+          <h2 className={H2}>Email is the one exception</h2>
+          <p className={P}>
+            You can forward a suspicious email to our check address instead of pasting it. What
+            happens to the message is the same:{" "}
+            <strong className={STRONG}>read in memory, never stored</strong>, never used to train
+            anything. The reply comes back to you and that&apos;s the end of it.
+          </p>
+          <p className={P}>
+            The difference is everything around it. Email has to be delivered before we can read
+            it, and ours is delivered by Cloudflare Email Routing — which, like every mail
+            service, keeps a record of each message it handles for about a month:{" "}
+            <strong className={STRONG}>your address, the subject line, the time, whether the
+            message passed its authentication checks, and whether our reply went out</strong>. Not
+            the body. Not the scam you forwarded.
+          </p>
+          <p className={P}>
+            <strong className={STRONG}>We can&apos;t switch that off.</strong> It&apos;s part of
+            how mail gets delivered, not a setting we chose, and no paid plan removes it — your
+            own email provider is keeping a similar record at the other end. We&apos;d rather tell
+            you that than let &ldquo;never stored&rdquo; quietly cover something it doesn&apos;t.
+          </p>
+          <p className={P}>
+            So if you&apos;d rather leave no record of having asked,{" "}
+            <strong className={STRONG}>paste the message here instead</strong> — nothing about a
+            paste touches a mail server. Forwarding exists because it beats retyping a whole email
+            on a phone. That&apos;s a fair trade, but it should be yours to make.
+          </p>
+          {/* Same treatment as the coverage warning above, because it is the
+              same failure: a quiet result read as a clean one. A reply that
+              never arrives is the most dangerous thing this service can do, so
+              it is set apart rather than left to close a paragraph. */}
+          <p className="text-[14.5px] leading-relaxed text-[var(--text-dim)] border-l-2 border-l-[var(--caution)] pl-4 py-0.5">
+            Replies aren&apos;t guaranteed, either. Whether we&apos;re allowed to answer depends
+            on how your email provider vouches for the forward, and for some accounts we simply
+            can&apos;t. <strong className={STRONG}>If nothing comes back within a few minutes,
+            don&apos;t read the silence as &ldquo;probably fine&rdquo;</strong> — check the message
+            here instead.
           </p>
         </section>
 
