@@ -345,9 +345,23 @@ function foldAccents(value: string): string {
   return value.normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
+/**
+ * `foldAccents` for the message side of a match, remembering the last one.
+ * The same message is matched against every entry in a pack, and on accented
+ * text refolding it each time was most of the check: 100,000 characters of
+ * "ã" took a second. Kept apart from the entry side, which changes every call.
+ */
+function foldMessage(text: string): string {
+  if (text !== lastFoldedMessage.input) {
+    lastFoldedMessage = { input: text, folded: foldAccents(text) };
+  }
+  return lastFoldedMessage.folded;
+}
+let lastFoldedMessage = { input: "", folded: "" };
+
 export function mentions(text: string, entry: string): boolean {
   const needle = foldAccents(entry.toLowerCase());
-  text = foldAccents(text);
+  text = foldMessage(text);
   const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // Multi-word phrases keep substring matching — their specificity is their
   // own protection, and \b would break matching across punctuation — but the
@@ -438,7 +452,7 @@ function messageIsMostlyCaps(text: string): boolean {
  */
 export function mentionsAsAcronym(text: string, entry: string): boolean {
   if (messageIsMostlyCaps(text)) return false;
-  const folded = foldAccents(text);
+  const folded = foldMessage(text);
   // An all-lower entry means "the caps form of this", so that authors do not
   // have to shout every acronym; any entry carrying a capital is taken
   // literally.

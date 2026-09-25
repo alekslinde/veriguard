@@ -391,6 +391,15 @@ export function defangPhone(phone: string): string {
   return phone.replace(/(\d)(?=\d)/g, "$1⁠");
 }
 
+// An address in free text. Matches what `\b[local]+@domain` would, but only
+// tries to start at the beginning of a run of local-part characters: `\b`
+// fires at every "." or "-" in "a.a.a.…", and each of those starts scanned to
+// the end of the run hunting for an "@". The run's leading punctuation is
+// skipped outside the capture, so group 1 begins at the run's first word
+// character — the same place `\b` put the leftmost match.
+const EMAIL_IN_TEXT =
+  /(?<![a-zA-Z0-9._%+\-])[.%+\-]*([a-zA-Z0-9_][a-zA-Z0-9._%+\-]*@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b)/;
+
 // ── Extract scam identifiers from free text ───────────────────────────────────
 // Pulls out the first URL, the first email address, and (only if the entire
 // trimmed string is a phone number) the phone number.  Intentionally conservative
@@ -398,11 +407,11 @@ export function defangPhone(phone: string): string {
 export function extractIdentifiers(text: string): { scamUrl: string; scamEmail: string; scamPhone: string } {
   const t = text.trim();
   const urlMatch   = t.match(/https?:\/\/[^\s<>"']+/i);
-  const emailMatch = t.match(/\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b/);
+  const emailMatch = t.match(EMAIL_IN_TEXT);
   const isPhone    = /^[\+\d][\d\s\-().]{5,25}[\d]$/.test(t);
   return {
     scamUrl:   urlMatch   ? urlMatch[0].replace(/[.,;:!?)]+$/, "") : "",
-    scamEmail: emailMatch ? emailMatch[0] : "",
+    scamEmail: emailMatch ? emailMatch[1] : "",
     scamPhone: isPhone    ? t : "",
   };
 }
