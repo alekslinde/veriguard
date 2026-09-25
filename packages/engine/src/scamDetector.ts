@@ -1,6 +1,6 @@
 import { parseEmailHeaders, analyseEmailIdentities, domainOf } from "./emailHeaders";
 import { extractIdentifiers, normaliseForAnalysis, defang, refang, isDefanged, normaliseUnicode, hasMixedScriptHost, mixedScriptWords, displayedHyphenCount } from "./urlSanitizer";
-import { registrableLabel, publicSuffix, isNationalCommercialSuffix } from "./publicSuffix";
+import { registrableLabel, registrableDomain, publicSuffix, isNationalCommercialSuffix } from "./publicSuffix";
 import { findKeyboardTypo } from "./keyboardAdjacency";
 import { BASE_SIGNALS } from "./regions/base";
 import { detectType } from "./detectType";
@@ -1054,6 +1054,46 @@ export function checkUrl(
   // Legit-looking patterns but suspicious
   if (fullUrl.includes("login") || fullUrl.includes("signin") || fullUrl.includes("verify") || fullUrl.includes("secure")) {
     sig.add("link", "Contains login/verify/secure keywords — common in phishing URLs", 10);
+  }
+
+  // AiTM (adversary-in-the-middle) phishing-kit path shape (D3 / #357 /
+  // 2026-09-25 sweep). Tycoon 2FA, Mamba 2FA, EvilProxy, Sneaky 2FA and
+  // Evilginx — the dominant 2026 phishing-as-a-service kits — all proxy a
+  // Microsoft 365 or Google Workspace login page behind an "/oauth2/" or
+  // "/openid/" path to relay MFA and steal the resulting session cookie. A
+  // genuine OAuth2/OpenID endpoint lives on a small, known set of identity-
+  // provider hosts; that same path shape on any other domain is the kit's
+  // fingerprint, not a coincidence.
+  //
+  // Matched on the registrable domain, not a naive last-two-labels split — AU
+  // and UK domains routinely have three-label public suffixes (.com.au,
+  // .co.uk), which a naive split would misread as the "domain" and match
+  // nothing. registrableDomain() already handles this correctly elsewhere in
+  // this file (see the typosquat check above).
+  //
+  // Scored independently at +20, same shape as the other link signals here: it
+  // cannot alone cross a verdict threshold, only compounds with another
+  // signal. That is a deliberate FP guard — self-hosted OAuth2/OIDC servers
+  // (Keycloak, Ory Hydra, an Azure AD B2C custom domain) legitimately use this
+  // path shape on a non-provider domain, and a lone hit staying below
+  // "suspicious" keeps that traffic clean.
+  const KNOWN_OAUTH_HOSTS = new Set([
+    "login.microsoftonline.com", "login.live.com", "login.windows.net",
+    "account.microsoft.com", "accounts.google.com", "appleid.apple.com",
+    "auth0.com", "okta.com", "login.okta.com",
+  ]);
+  if (/\/(oauth2|openid)\//i.test(urlObj.pathname)) {
+    const registrable = registrableDomain(hostname);
+    const isKnownOauthHost =
+      KNOWN_OAUTH_HOSTS.has(hostname) ||
+      (registrable !== "" && KNOWN_OAUTH_HOSTS.has(registrable));
+    if (!isKnownOauthHost) {
+      sig.add(
+        "link",
+        "OAuth2/OpenID login path on a domain that isn't a known identity provider — a hallmark of adversary-in-the-middle phishing kits that proxy Microsoft 365 or Google login pages to steal session cookies",
+        20,
+      );
+    }
   }
 
   const score = Math.min(sig.total(), 100);
