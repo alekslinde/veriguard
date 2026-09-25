@@ -519,6 +519,10 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
       ...(scamEmail ? { scamEmail } : {}),
       ...(replyToAddress ? { scamReplyTo: replyToAddress } : {}),
       ...(first("phone") ? { scamPhone: first("phone") } : {}),
+      // The forward-to-us path, labelled. It was unattributed for the same
+      // reason the extension was: a prefilled report arriving from an emailed
+      // CTA is indistinguishable from someone who typed the URL.
+      source: "email",
     };
     const query = buildReportQuery(prefill);
     return `${siteUrl.replace(/\/$/, "")}/report${query ? `?${query}` : ""}`;

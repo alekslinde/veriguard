@@ -191,6 +191,14 @@ export default defineConfig({
   // two impossible to desynchronise.
   define: {
     __API_BASE__: JSON.stringify(API_BASE),
+    // Which build this is, for the `source` param on a report link the USER
+    // clicks. Derived from TARGET rather than sniffed at runtime: the browser
+    // is known at build time, and reading a user agent to tell Edge from Chrome
+    // would buy a distinction the stores do not report anyway (Edge installs
+    // the Chromium build from the Chrome Web Store) at the cost of inspecting
+    // something identifying. Safari wraps the Chrome build, so it reports as
+    // chromium until it ships its own listing.
+    __REPORT_SOURCE__: JSON.stringify(TARGET === "firefox" ? "ext-firefox" : "ext-chromium"),
   },
   build: {
     outDir,

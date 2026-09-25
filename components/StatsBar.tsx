@@ -25,6 +25,16 @@ interface Stats {
  *
  * `null` is the explicit "the server tried and could not" value, and it is
  * distinct from "the server never tried" — which is now unrepresentable.
+ *
+ * **The label says "on this site", and that qualifier is load-bearing.** These
+ * counters come from `/api/check` and the inbound mail path, which are the only
+ * two places a check is reported to us. The WebExtension scores on the user's
+ * own device and never calls the API, so none of its checks are in this number
+ * and none ever can be — the alternative would be the extension phoning home
+ * about the thing it promises never to send. Shortening this to "scams checked"
+ * would make it a claim about the whole product while measuring one part of it,
+ * and the gap grows with every install. See lib/extensionInstalls.ts, which
+ * carries the reach figures that this counter deliberately excludes.
  */
 export default function StatsBar({ initial }: { initial: Stats | null }) {
   const { t } = useLang();

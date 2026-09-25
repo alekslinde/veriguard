@@ -8,6 +8,7 @@ import { EmailTrackingReport } from "@/lib/emailTracking";
 import { analyseEmailSource } from "@/lib/emailSource";
 import { useLang, MessageKey } from "@/lib/lang";
 import { reportingFor, victimHelpline } from "@/lib/reportingResources";
+import type { ReportSource } from "@/lib/reportPrefill";
 import { useBugReport } from "./BugReportProvider";
 import EmailExportGuide from "./EmailExportGuide";
 import ReportingLink from "./ReportingLink";
@@ -138,7 +139,7 @@ function AuthChip({ label, verdict }: { label: string; verdict: string }) {
   );
 }
 
-export default function ReportForm({ initialType, initialContent, initialScamUrl, initialScamPhone, initialScamEmail, initialScamReplyTo, initialAuth, region }: { initialType?: ScamType; initialContent?: string; initialScamUrl?: string; initialScamPhone?: string; initialScamEmail?: string; initialScamReplyTo?: string; initialAuth?: EmailAuth; /** Explicit check region (or null for auto). Decides the reporting advice; absent keeps the historical AU behaviour. */ region?: string | null } = {}) {
+export default function ReportForm({ initialType, initialContent, initialScamUrl, initialScamPhone, initialScamEmail, initialScamReplyTo, initialAuth, region, source }: { initialType?: ScamType; initialContent?: string; initialScamUrl?: string; initialScamPhone?: string; initialScamEmail?: string; initialScamReplyTo?: string; initialAuth?: EmailAuth; /** Explicit check region (or null for auto). Decides the reporting advice; absent keeps the historical AU behaviour. */ region?: string | null; /** Which surface sent the reporter here, from the prefill link. Posted as-is and never rendered: unlike every other field on this form it is not the reporter's to edit, because it describes how they arrived rather than what they are reporting. Absent for someone who came to the form directly. */ source?: ReportSource } = {}) {
   const { t } = useLang();
   const { reportFailure } = useBugReport();
   // Reporting advice follows the check region: a UK reporter told to contact
@@ -276,6 +277,10 @@ export default function ReportForm({ initialType, initialContent, initialScamUrl
           // onto a URL/phone/etc. report.
           ...(type === "email" ? auth : EMPTY_AUTH),
           contact,
+          // Omitted entirely when absent, rather than sent as "": the route
+          // allowlists it anyway, and a key that is only present when it means
+          // something keeps the payload honest about what is being claimed.
+          ...(source ? { source } : {}),
           hp,
           loadedAt: loadedAt.current,
           formToken: formToken.current.token,

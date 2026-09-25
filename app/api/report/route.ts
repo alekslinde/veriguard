@@ -8,6 +8,7 @@ import { distillEmailContent } from "@/lib/emailDistiller";
 import { clientIpFromHeaders, locationFromHeaders } from "@/lib/geo";
 import { resolveRegion } from "@/lib/regionResolver";
 import { issueFormToken, verifyFormToken } from "@/lib/formToken";
+import { REPORT_SOURCES } from "@/lib/reportPrefill";
 
 // The client IP is used ONLY for transient, in-memory rate limiting inside
 // guardSubmission. It is never written to the database — the only geographic
@@ -127,6 +128,13 @@ export async function POST(req: NextRequest) {
       scamEmail:   String(body.scamEmail ?? "").slice(0, 200),
       scamReplyTo: String(body.scamReplyTo ?? "").slice(0, 200),
       emailAuth,
+      // Allowlisted, not trusted and not clamped. This arrives from a query
+      // param anyone can edit, so a length-bounded free-text field would still
+      // let a stranger write whatever they liked into an operational column —
+      // matching a closed list is what makes it a surface label. Anything
+      // unrecognised becomes '', which is the same value a direct arrival
+      // produces, so a crafted link cannot invent a category.
+      source: REPORT_SOURCES.find((s) => s === body.source) ?? "",
     },
     guardResult.verdict === "suspect",
   );

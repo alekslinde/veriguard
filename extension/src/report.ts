@@ -18,7 +18,7 @@
 // the form that reads it cannot disagree about a parameter name or a length
 // bound. A second copy here is the defect shape this repo has paid for before.
 
-import { buildReportQuery, type ReportPrefill } from "../../lib/reportPrefill";
+import { buildReportQuery, REPORT_SOURCES, type ReportPrefill } from "../../lib/reportPrefill";
 import type { AnalyzedIdentifier } from "@veriguard/engine/scamDetector";
 import { detectType } from "@veriguard/engine/detectType";
 import type { Verdict } from "@veriguard/engine/verdictRank";
@@ -66,7 +66,14 @@ export function prefillFor(results: AnalyzedIdentifier[], content: string): Repo
   // way.
   const type = detectType(content);
 
-  return { type, scamUrl, scamEmail, scamPhone };
+  // Which build sent them, so a report this extension prompted is attributable
+  // when it lands. It names the build, never the user — and it rides a link the
+  // user chooses to open, so it is not a request this extension makes. That
+  // distinction is what keeps the one-network-call claim intact; see the note
+  // on `ReportSource`.
+  const source = REPORT_SOURCES.find((s) => s === __REPORT_SOURCE__);
+
+  return { type, scamUrl, scamEmail, scamPhone, ...(source ? { source } : {}) };
 }
 
 /**

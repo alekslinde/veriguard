@@ -99,6 +99,27 @@ describe("reportUrl", () => {
     expect(parsed.scamUrl).toBe(prefill.scamUrl);
   });
 
+  it("labels the report with the build that sent it", async () => {
+    // The extension's only measurable outcome. It scores on-device and never
+    // calls the API, so a report it prompted is the one signal that reaches us
+    // — unlabelled, it is indistinguishable from someone who typed the URL.
+    const results = await analyzeContent(SCAM_SMS, undefined, "AU");
+    const url = new URL(reportUrl(API, prefillFor(results, SCAM_SMS)));
+
+    expect(parseReportPrefill(url.searchParams).source).toBe("ext-chromium");
+  });
+
+  it("carries no identifier alongside the label", async () => {
+    // The param names a build, not a person. Nothing here may grow into a
+    // per-user or per-session value.
+    const results = await analyzeContent(SCAM_SMS, undefined, "AU");
+    const url = new URL(reportUrl(API, prefillFor(results, SCAM_SMS)));
+
+    expect([...url.searchParams.keys()].sort()).toEqual(
+      ["scamUrl", "source", "type"].sort(),
+    );
+  });
+
   it("stays on the configured origin", () => {
     // The link cannot point somewhere the manifest has not already named.
     const url = new URL(reportUrl(API, { type: "url", scamUrl: "http://evil.tk" }));

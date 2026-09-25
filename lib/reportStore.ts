@@ -38,6 +38,16 @@ export interface Report {
   // DEFAULT_REGION rather than returning empty), so every caller already has
   // one. Requiring it here makes that a type error rather than a silent ''.
   region: string;
+  // Which surface prompted this report — see `ReportSource` in
+  // lib/reportPrefill.ts. Empty for someone who came to the form directly,
+  // which is the common case and NOT a gap.
+  //
+  // Optional, unlike `region` above, and for the opposite reason: '' here is a
+  // real, expected value (nobody sent them) rather than a missing one, so there
+  // is nothing for a required field to protect against. Operational only —
+  // never surfaced in the public feed, because a report is about a scam, not
+  // about how the reporter arrived.
+  source?: string;
 }
 
 // ── Rate limiter ──────────────────────────────────────────────────────────────
@@ -240,13 +250,14 @@ export async function storeReport(report: Report, suspect: boolean): Promise<voi
   await db.execute({
     sql: `INSERT INTO reports
             (id, type, content, description, contact, submitted_at, suspect,
-             scam_url, scam_phone, scam_email, scam_reply_to, email_auth, report_count, location, region)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             scam_url, scam_phone, scam_email, scam_reply_to, email_auth, report_count, location, region, source)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       report.id, report.type, report.content, report.description, report.contact,
       report.submittedAt, suspect ? 1 : 0,
       report.scamUrl, report.scamPhone, report.scamEmail, report.scamReplyTo,
       report.emailAuth ?? "", reportCount, report.location, report.region,
+      report.source ?? "",
     ],
   });
 
