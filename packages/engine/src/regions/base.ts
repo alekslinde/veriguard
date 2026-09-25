@@ -56,7 +56,16 @@ const URGENCY_GENERIC = [
 
 // AI voice-clone scams. The first block is the original "Hi Mum" follow-up
 // signals (D17 — watchlist); the second is the 2026 bail/kidnap/stranded
-// escalation (D8 / #68), arriving as text after a cloned-voice call.
+// escalation (D8 / #68), arriving as text after a cloned-voice call. The third
+// is the post-call pressure framing (D2 / #356 / 2026-09-25 sweep): a cloned
+// voice call impersonating an authority or bank fraud team, followed by an SMS
+// that references "the call" to manufacture false familiarity before a fund
+// request. A lone hit scores 10 — below any verdict threshold — and only tips
+// a verdict compounding with an authority mention or another urgency signal,
+// which is exactly the shape this lure produces. Bare "as per our call" is
+// deliberately absent: too short and collides with legitimate business SMS
+// (an accountant or solicitor following up a real call); the longer anchored
+// forms below keep that false-positive rate down.
 const URGENCY_VOICE_CLONE = [
   "i've been in an accident", "don't tell mum", "don't tell anyone",
   "western union", "wire transfer",
@@ -64,6 +73,9 @@ const URGENCY_VOICE_CLONE = [
   "stranded overseas", "stuck overseas", "stranded abroad", "wallet stolen overseas",
   "do not call police", "don't call the police", "don't contact police",
   "emergency transfer", "emergency funds needed", "we have your",
+  "as per our phone call", "as discussed in our call", "following our recent call",
+  "as i mentioned on the call", "confirming what we discussed on the call",
+  "following up on our call",
 ];
 
 const REWARD_WORDS = [
