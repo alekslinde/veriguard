@@ -192,9 +192,10 @@ function aligned(sender: string, signing: string): boolean {
 function domainOf(address: string): string {
   const at = address.lastIndexOf("@");
   if (at === -1) return "";
-  return address
-    .slice(at + 1)
-    .replace(/[>\s]+$/, "")
-    .trim()
-    .toLowerCase();
+  // Trailing ">" and whitespace trimmed by index: `/[>\s]+$/` retries from
+  // every character of a long run, and this address is sender-controlled.
+  const domain = address.slice(at + 1);
+  let end = domain.length;
+  while (end > 0 && (domain[end - 1] === ">" || /\s/.test(domain[end - 1]))) end--;
+  return domain.slice(0, end).trim().toLowerCase();
 }

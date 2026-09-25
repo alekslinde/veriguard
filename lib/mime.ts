@@ -171,6 +171,17 @@ function stripTags(s: string): string {
   return out + s.slice(pos);
 }
 
+// The entities htmlToText decodes: the handful Outlook emits.
+const ENTITIES: Record<string, string> = {
+  nbsp: " ",
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  "#39": "'",
+};
+
 // Convert an HTML body to readable plain text: drop <style>/<script>/<head>
 // blocks and MSO conditional comments wholesale, turn <a> links and block
 // elements into something legible, strip remaining tags, decode basic entities,
@@ -185,7 +196,7 @@ function stripTags(s: string): string {
 // output is only ever rendered as text, stored, or analysed — never as markup.
 // The tag stripping below is defeatable on purpose-built input and known to
 // be: a "</style >" with a space survives it, a nested "<scr<script>ipt>"
-// leaves residue, and "&amp;lt;" decodes to "<" because the entity pass runs
+// leaves residue, and "&lt;b&gt;" decodes to "<b>" because the entity pass runs
 // after the tag pass. That is acceptable for readability and would not be for
 // safety, so if you ever need to render this output as HTML, do not reach for
 // this function — escape at the render site or bring in a real sanitizer.
@@ -206,14 +217,9 @@ export function htmlToText(html: string, links: "redact" | "keep"): string {
   // removes its attributes without a regex having to find the ">".
   s = s.replace(/<br(?=[\s/>])/gi, "\n<");
   s = stripTags(s);
-  // Decode the handful of entities Outlook emits.
-  s = s
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'");
+  // Decode the handful of entities Outlook emits, in one pass: decoding
+  // "&amp;" first and the rest after would turn "&amp;lt;" into "<".
+  s = s.replace(/&(nbsp|amp|lt|gt|quot|apos|#39);/gi, (_, name: string) => ENTITIES[name.toLowerCase()]);
   // Trailing spaces off each line, then collapse runs of blank lines.
   s = s.split("\n").map((l) => l.trimEnd()).join("\n").replace(/\n{3,}/g, "\n\n");
   return s.trim();

@@ -143,3 +143,12 @@ test("a header packed with hostile input is decided in bounded time", () => {
   assert.ok(Date.now() - started < 1000, "must not degrade on hostile input");
   assert.equal(allowed, false);
 });
+
+test("an address with a long whitespace tail is decided in bounded time", () => {
+  const h = headersWith([`${CF}; dkim=pass header.d=gmail.com`]);
+  const started = Date.now();
+  const allowed = freshSendAllowed(h, "forwarder@gmail.com" + "\t".repeat(100_000) + "x");
+  assert.ok(Date.now() - started < 1000, "must not degrade on hostile input");
+  assert.equal(allowed, false);
+  assert.equal(freshSendAllowed(h, "<forwarder@gmail.com> \t"), true);
+});

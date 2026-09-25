@@ -467,3 +467,9 @@ describe("hostile input stays linear", () => {
     });
   }
 });
+
+describe("htmlToText entity decoding", () => {
+  it("decodes each entity once, so an escaped entity stays escaped", () => {
+    expect(htmlToText("&amp;lt;b&amp;gt; &lt;i&gt; &nbsp;&#39;&quot;", "keep")).toBe(`&lt;b&gt; <i>  '"`);
+  });
+});
