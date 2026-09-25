@@ -50,6 +50,40 @@ test("includes both a plain-text and an HTML part", () => {
   assert.match(mime, /multipart\/alternative/);
 });
 
+// The verdict copy carries em dashes, curly quotes and emoji. Sent as raw UTF-8
+// under a 7bit label, a receiving server that does not accept 8-bit mail
+// refused the reply outright: "message content requires 8BITMIME but upstream
+// did not advertise it". A reply has to be deliverable to every server, so the
+// whole message must be 7-bit ASCII.
+
+test("the whole reply is 7-bit ASCII, however much non-ASCII the verdict holds", () => {
+  const mime = buildReplyMime(REPLY, OPTS);
+  const offending = [...mime].filter((c) => c.charCodeAt(0) > 127);
+  assert.deepEqual(offending, [], "raw non-ASCII in the MIME needs 8BITMIME to deliver");
+});
+
+test("each part decodes back to the verdict exactly", () => {
+  const mime = buildReplyMime(REPLY, OPTS);
+  const decoded = (type: string) => {
+    const part = mime.split(/\r\n--/).find((p) => p.includes(`Content-Type: ${type}`)) ?? "";
+    assert.match(part, /Content-Transfer-Encoding: base64/);
+    const body = part.split("\r\n\r\n")[1] ?? "";
+    return Buffer.from(body.replace(/\s+/g, ""), "base64").toString("utf8");
+  };
+  assert.equal(decoded("text/plain"), REPLY.text);
+  assert.equal(decoded("text/html"), REPLY.html);
+});
+
+test("no encoded line runs past the 76 characters MIME allows", () => {
+  const long = { ...REPLY, text: "é".repeat(2_000), html: `<p>${"é".repeat(2_000)}</p>` };
+  const mime = buildReplyMime(long, OPTS);
+  const longest = Math.max(...mime.split("\r\n").map((l) => l.length));
+  assert.ok(longest <= 998, "RFC 5322 hard limit");
+  const bodyLines = mime.split("\r\n").filter((l) => /^[A-Za-z0-9+/=]{20,}$/.test(l));
+  assert.ok(bodyLines.length > 0);
+  assert.ok(bodyLines.every((l) => l.length <= 76), "base64 lines must wrap at 76");
+});
+
 test("omits threading headers when there is no Message-ID", () => {
   const mime = buildReplyMime(REPLY, { from: OPTS.from, to: OPTS.to });
   assert.doesNotMatch(mime, /^In-Reply-To:/m);

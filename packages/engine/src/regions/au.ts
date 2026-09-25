@@ -132,16 +132,26 @@ const URGENCY_TAX = [
   "government rebate", "tax refund waiting", "refund is waiting",
 ];
 
-// ATO debt / audit coercion lures (D7 / #124). The threat framing is
-// psychologically distinct from the refund lures above and reaches a different
-// demographic (business owners, contractors, older Australians) ahead of EOFY
-// and the August BAS deadline. The real ATO does contact people about genuine
-// debts, so these carry the same shared urgency cap as URGENCY_TAX: +10 per
-// hit, +35 maximum, with an "ato" authority hit adding +25 on top. The two are
-// independent, so several of these together reach "suspicious" with no
-// authority mention present — the cap, not a gate, is what holds them back.
+// ATO debt / audit coercion lures (D7 / #124), plus benefit-suspension threats
+// against other government payments (D1 / #355 / 2026-09-25 sweep). The threat
+// framing is psychologically distinct from the refund lures above and reaches a
+// different demographic (business owners, contractors, older Australians)
+// ahead of EOFY and the August BAS deadline. The real ATO does contact people
+// about genuine debts, so these carry the same shared urgency cap as
+// URGENCY_TAX: +10 per hit, +35 maximum, with an "ato" authority hit adding
+// +25 on top. The two are independent, so several of these together reach
+// "suspicious" with no authority mention present — the cap, not a gate, is
+// what holds them back.
 // "arrest warrant" is deliberately absent: it already lives in
 // URGENCY_FOREIGN_AUTHORITY and listing it twice would double-score.
+//
+// The Centrelink/Medicare "payments will be suspended" phrases (#355) belong
+// here rather than in URGENCY_PENSION: that array is superannuation-specific,
+// and this is the same coercion-by-suspension shape as the ATO phrases above,
+// just naming a different agency. Sourced from a Mimecast-measured 270K-email
+// impersonation campaign (Services Australia advisory + Yahoo Finance Sep
+// 2026) that blends Medicare, Centrelink, JobSeeker and Family Tax Benefit
+// framing into one AI-generated lure.
 const URGENCY_TAX_THREAT = [
   "tax debt", "outstanding tax", "overdue tax", "unpaid tax",
   "tax liability", "ato debt",
@@ -149,6 +159,8 @@ const URGENCY_TAX_THREAT = [
   "tfn suspended", "tfn cancell", "tax file number suspended",
   "legal action will be taken", "warrant issued", "federal police",
   "your assets will be",
+  "payments will be suspended", "payments will be stopped",
+  "medicare payments suspended", "centrelink payments suspended",
 ];
 
 // Foreign-authority threat phrases (D3 / #103). AFP May 2026 and Victoria

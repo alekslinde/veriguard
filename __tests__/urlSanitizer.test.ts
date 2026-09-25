@@ -253,6 +253,12 @@ describe("extractIdentifiers", () => {
     expect(scamEmail).toBe("noreply@fake-ato.com");
   });
 
+  it("starts an address at its first letter, not at punctuation before it", () => {
+    expect(extractIdentifiers("reply to ...scammer@evil.com").scamEmail).toBe("scammer@evil.com");
+    expect(extractIdentifiers("-_ops@evil.com").scamEmail).toBe("_ops@evil.com");
+    expect(extractIdentifiers("x .. @evil.com and real@evil.com").scamEmail).toBe("real@evil.com");
+  });
+
   it("extracts a phone number when the entire content is a phone number", () => {
     const { scamPhone } = extractIdentifiers("+61 412 345 678");
     expect(scamPhone).toBe("+61 412 345 678");
