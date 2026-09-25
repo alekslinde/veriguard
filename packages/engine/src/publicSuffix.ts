@@ -18,6 +18,18 @@
 
 import { PSL_RULES, PSL_WILDCARDS, PSL_EXCEPTIONS } from "./publicSuffixList";
 
+const labelCount = (rule: string) => rule.split(".").length;
+
+/**
+ * The most labels a candidate can have and still match a rule: the deepest
+ * rule or exception, or one more than the deepest wildcard parent, since a
+ * wildcard adds a label in front of what it stores.
+ */
+const MAX_CANDIDATE_LABELS = [
+  ...[...PSL_RULES, ...PSL_EXCEPTIONS].map(labelCount),
+  ...[...PSL_WILDCARDS].map((w) => labelCount(w) + 1),
+].reduce((a, b) => Math.max(a, b), 1);
+
 /**
  * The public suffix of a hostname — the part no single registrant controls.
  *
@@ -41,9 +53,14 @@ export function publicSuffix(hostname: string): string {
   const labels = hostname.toLowerCase().replace(/\.+$/, "").split(".");
   if (labels.length <= 1) return labels.join(".");
 
+  // No candidate longer than the deepest rule can match one, so the walks
+  // start there. Joining every suffix of the host made this quadratic in its
+  // label count, and "www." repeated 20,000 times took 13 seconds.
+  const start = Math.max(0, labels.length - MAX_CANDIDATE_LABELS);
+
   // Rule 1. Checked first and independently: an exception must beat a longer
   // wildcard match, so it cannot be folded into the length loop below.
-  for (let i = 0; i < labels.length; i++) {
+  for (let i = start; i < labels.length; i++) {
     const candidate = labels.slice(i).join(".");
     if (PSL_EXCEPTIONS.has(candidate)) {
       return labels.slice(i + 1).join(".");
@@ -52,7 +69,7 @@ export function publicSuffix(hostname: string): string {
 
   // Rules 2 and 3. Walk from the longest candidate to the shortest and take the
   // first hit, which is the longest match by construction.
-  for (let i = 0; i < labels.length - 1; i++) {
+  for (let i = start; i < labels.length - 1; i++) {
     const candidate = labels.slice(i).join(".");
     if (PSL_RULES.has(candidate)) return candidate;
 
