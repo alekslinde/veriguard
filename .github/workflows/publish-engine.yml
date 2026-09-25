@@ -19,6 +19,10 @@ on:
   # pointing at the right commit.
   workflow_dispatch:
     inputs:
+      tag:
+        description: "Existing tag to publish from, e.g. engine-v0.13.0. Leave blank to verify only."
+        type: string
+        required: false
       dry_run:
         description: "Pack and verify, but do not publish"
         type: boolean
@@ -37,7 +41,13 @@ jobs:
       # to the commit and workflow that produced it is minted from this token.
       id-token: write
     steps:
+      # A manual run checks out the tag it was given rather than the branch it
+      # was dispatched from, so a retry publishes the same commit the tag names
+      # rather than whatever main has moved on to. Blank means verify-only, and
+      # the default checkout is fine for that.
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -62,8 +72,11 @@ jobs:
       # mistyped tag publishes whatever package.json happens to say — under a
       # version number nothing in the history points at, and it cannot be taken
       # back.
+      #
+      # Only meaningful on a tag run. A manual run has a branch ref, so there is
+      # no tag to agree with; the publish step below is what refuses to run.
       - name: Check the tag matches the package version
-        if: startsWith(github.ref, 'refs/tags/')
+        if: github.event_name == 'push'
         run: |
           tag_version="${GITHUB_REF_NAME#engine-v}"
           pkg_version="$(node -p "require('./packages/engine/package.json').version")"
@@ -78,8 +91,20 @@ jobs:
       - name: Show the tarball contents
         run: npm pack --dry-run --workspace @veriguard/scam-detect
 
+      # Packing edits package.json and postpack restores it. If a pack died
+      # between the two, the tree still holds a dist/-pointing map — publishing
+      # from that state would ship a package whose `exports` was rewritten
+      # twice. Cheap to check, and the failure is otherwise silent.
+      - name: Check packing left the tree clean
+        run: git diff --exit-code -- packages/engine/package.json
+
+      # Publishes on a tag push, or on a manual run that named a tag and turned
+      # dry_run off. The manual path previously could not publish at all: it was
+      # gated on `refs/tags/`, which a workflow_dispatch ref never matches, so
+      # the retry it existed for reported green and uploaded nothing.
       - name: Publish
-        if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != true
+        if: |
+          (github.event_name == 'push' || inputs.tag != '') && inputs.dry_run != true
         run: npm publish --workspace @veriguard/scam-detect
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

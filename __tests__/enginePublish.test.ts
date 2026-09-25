@@ -31,12 +31,27 @@ import { pathToFileURL } from "url";
 const PKG_DIR = path.join(process.cwd(), "packages/engine");
 const DIST = path.join(PKG_DIR, "dist");
 
-type Exports = Record<string, { development: string; types: string; default: string }>;
 const pkg = JSON.parse(readFileSync(path.join(PKG_DIR, "package.json"), "utf8")) as {
   name: string;
   files: string[];
-  exports: Exports;
+  scripts: Record<string, string>;
+  exports: Record<string, string>;
 };
+
+/**
+ * The published `exports` map, derived exactly as `prepack` derives it.
+ *
+ * In-repo the map points at `src/*.ts`, because the app, the extension and
+ * vitest all resolve this package through the workspace symlink — a map
+ * pointing at dist/ makes a fresh clone fail to build and, worse, makes a stale
+ * dist/ silently score with rules that do not match the source being edited.
+ * The swap to dist/ happens at pack time, so the assertions below have to
+ * perform it too rather than reading it off the file.
+ */
+function published(target: string): { types: string; default: string } {
+  const js = target.replace(/^\.\/src\//, "./dist/").replace(/\.ts$/, ".js");
+  return { types: js.replace(/\.js$/, ".d.ts"), default: js };
+}
 
 const built = existsSync(DIST);
 
@@ -53,27 +68,41 @@ if (!built) {
 }
 
 describe("engine publish surface (no build required)", () => {
-  it("advertises a development and a default target for every subpath", () => {
-    // The two-condition shape is what lets the workspace stay on source while
-    // consumers get dist/. A subpath added with only one of them silently
-    // resolves the wrong way for somebody.
+  it("resolves to source in the repo, so no build stands between an edit and a test", () => {
+    // The property that keeps `npm test` and `npm run ext` working on a fresh
+    // clone. Pointing `exports` at dist/ breaks both until someone builds, and
+    // then does something worse than breaking: a stale dist/ scores with
+    // detection rules that do not match the source being edited, and nothing
+    // says so.
     for (const [subpath, target] of Object.entries(pkg.exports)) {
-      expect(target.development, `${subpath} has no development target`).toMatch(/^\.\/src\//);
-      expect(target.default, `${subpath} has no default target`).toMatch(/^\.\/dist\//);
-      expect(target.types, `${subpath} has no types target`).toMatch(/^\.\/dist\//);
+      expect(target, `${subpath} does not resolve to source`).toMatch(/^\.\/src\/.*\.ts$/);
     }
   });
 
-  it("orders types before default, so TypeScript sees the declarations", () => {
-    // Condition order is significant: the resolver takes the first match. With
-    // `default` first, `types` is unreachable and every consumer silently gets
-    // `any` for the whole package while the build still succeeds.
+  it("swaps that map to dist/ at pack time, and puts it back", () => {
+    // Because `exports` points at source, something has to rewrite it for the
+    // tarball — otherwise the published package resolves to files `files` does
+    // not ship. npm runs `prepack` before building the tarball and `postpack`
+    // after, for both `npm pack` and `npm publish`.
+    //
+    // publishConfig.exports is the declarative spelling of this and does not
+    // work: neither npm 10 nor npm 11 applies it to the tarball, verified by
+    // packing with both and reading package.json back out.
+    expect(pkg.scripts.prepack, "nothing rewrites exports for the tarball").toBeTruthy();
+    expect(pkg.scripts.postpack, "nothing restores exports after packing").toBeTruthy();
+  });
+
+  it("derives a types target that precedes default for every subpath", () => {
+    // Condition order is significant: the resolver takes the first match, so a
+    // `types` listed after `default` is unreachable and every consumer silently
+    // gets `any` for the whole package.
     for (const [subpath, target] of Object.entries(pkg.exports)) {
-      const keys = Object.keys(target);
-      expect(
-        keys.indexOf("types"),
-        `${subpath} lists default before types, so the declarations are unreachable`,
-      ).toBeLessThan(keys.indexOf("default"));
+      const entry = published(target);
+      expect(Object.keys(entry), `${subpath} lists default before types`).toEqual([
+        "types",
+        "default",
+      ]);
+      expect(entry.default, `${subpath} does not publish to dist/`).toMatch(/^\.\/dist\//);
     }
   });
 
@@ -93,11 +122,16 @@ describe("engine publish surface (no build required)", () => {
 });
 
 whenBuilt("engine publish surface (built)", () => {
-  /** Every emitted `.js`, as a path relative to dist/ with POSIX separators. */
+  /** Everything in dist/, as paths relative to it with POSIX separators. */
+  function allEmitted(): string[] {
+    return readdirSync(DIST, { recursive: true, encoding: "utf8" }).map((f) =>
+      f.split(path.sep).join("/"),
+    );
+  }
+
+  /** Every emitted `.js`. What a relative specifier has to resolve to. */
   function emitted(): string[] {
-    return readdirSync(DIST, { recursive: true, encoding: "utf8" })
-      .map((f) => f.split(path.sep).join("/"))
-      .filter((f) => f.endsWith(".js"));
+    return allEmitted().filter((f) => f.endsWith(".js"));
   }
 
   it("emits a JavaScript file for every TypeScript source file", () => {
@@ -115,24 +149,35 @@ whenBuilt("engine publish surface (built)", () => {
     expect(missing, "source files with no compiled output").toEqual([]);
   });
 
-  it("leaves no relative import that Node cannot resolve", () => {
-    // Static and dynamic relative specifiers in the emitted JS, checked against
-    // what was actually emitted rather than against a naming rule — a directory
-    // import and a module import are both legal and resolve differently.
+  it.each([".js", ".d.ts"])("leaves no relative import %s cannot resolve", (ext) => {
+    // Static and dynamic relative specifiers, checked against what was actually
+    // emitted rather than against a naming rule — a directory import and a
+    // module import are both legal and resolve differently.
+    //
+    // Declarations are checked on the same terms as runtime code, and were not
+    // at first: this filtered to `.js`, so 51 extensionless specifiers shipped
+    // in `.d.ts` files while the test that claimed to cover them passed. A
+    // consumer on `moduleResolution: "nodenext"` got TS2835 on every one, nine
+    // from the barrel alone. Declarations point at the `.js` path too —
+    // TypeScript resolves the runtime specifier and finds the declaration
+    // beside it — so both are checked against the same set.
     const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*)["'](\.{1,2}\/[^"']+)["']/g;
-    const js = new Set(emitted());
-    const broken: string[] = [];
+    const modules = new Set(emitted());
+    const files = allEmitted().filter((f) => f.endsWith(ext));
 
-    for (const file of emitted()) {
+    expect(files.length, `no ${ext} files were emitted`).toBeGreaterThan(10);
+
+    const broken: string[] = [];
+    for (const file of files) {
       const src = readFileSync(path.join(DIST, file), "utf8");
       const dir = path.posix.dirname(file);
       for (const [, spec] of src.matchAll(SPECIFIER)) {
         const resolved = path.posix.normalize(path.posix.join(dir, spec));
-        if (!js.has(resolved)) broken.push(`${file} → ${spec}`);
+        if (!modules.has(resolved)) broken.push(`${file} → ${spec}`);
       }
     }
 
-    expect(broken, "relative imports pointing at files that were not emitted").toEqual([]);
+    expect(broken, `relative imports in ${ext} pointing at files that were not emitted`).toEqual([]);
   });
 
   it("resolves and loads every advertised subpath through Node", async () => {
@@ -141,10 +186,16 @@ whenBuilt("engine publish surface (built)", () => {
     // evaluate — a module that loads its own broken import throws here.
     for (const [subpath, target] of Object.entries(pkg.exports)) {
       if (subpath.includes("*")) continue; // covered below
-      const file = path.join(PKG_DIR, target.default);
-      expect(existsSync(file), `${subpath} advertises ${target.default}, which does not exist`).toBe(
-        true,
-      );
+      const { default: js, types } = published(target);
+      const file = path.join(PKG_DIR, js);
+      expect(existsSync(file), `${subpath} publishes ${js}, which does not exist`).toBe(true);
+      // The declaration beside it, which is what a consumer type-checks
+      // against. A subpath shipping JS with no types is usable and untyped,
+      // which for a package whose result shape is the product is a defect.
+      expect(
+        existsSync(path.join(PKG_DIR, types)),
+        `${subpath} publishes ${types}, which does not exist`,
+      ).toBe(true);
       await expect(
         import(pathToFileURL(file).href),
         `${subpath} does not load`,

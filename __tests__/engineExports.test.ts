@@ -42,8 +42,16 @@ describe("engine package exports map", () => {
   });
 
   it("resolves every subpath it advertises", () => {
-    // Node's own resolver, which honours `exports` strictly — if this passes,
-    // a real consumer can import each of these.
+    // Resolution as the WORKSPACE performs it — vitest patches createRequire,
+    // so `exports` is honoured but the targets land on `src/*.ts`. That is the
+    // thing worth asserting here: every subpath this package advertises is
+    // reachable by the app, the extension and this suite.
+    //
+    // It is deliberately NOT a claim about a consumer. An earlier version of
+    // this comment said "if this passes, a real consumer can import each of
+    // these", which was false in a way that mattered: the same resolve throws
+    // outside vitest whenever the target does not exist. What a consumer gets
+    // is checked in __tests__/enginePublish.test.ts, against the built output.
     const require = createRequire(path.join(process.cwd(), "package.json"));
     for (const subpath of Object.keys(pkg.exports)) {
       if (subpath.includes("*")) continue; // wildcards checked below

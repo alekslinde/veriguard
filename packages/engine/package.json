@@ -25,98 +25,21 @@
   "engines": {
     "node": ">=18"
   },
-  "//exports": [
-    "Every subpath resolves two ways, and the order of conditions is the whole",
-    "mechanism:",
-    "",
-    "  development → ./src/*.ts   the workspace: app, extension, vitest, tsc",
-    "  default     → ./dist/*.js  what a consumer installing this gets",
-    "",
-    "Vite and Vitest apply the `development` condition in dev by default, so a",
-    "test run and `next dev` load TypeScript source with no build step between",
-    "an edit and a result — the loop this package has always had.",
-    "",
-    "This is NOT done with publishConfig.exports, which reads as the obvious",
-    "tool for it. npm only applies that from v11; under npm 10 it is silently",
-    "ignored, and the tarball ships `exports` pointing at ./src/*.ts while",
-    "`files` omits src — an install that resolves to nothing. Verified against",
-    "the npm in use rather than assumed. A condition map is applied by the",
-    "resolver instead of the publisher, so it cannot depend on a client version.",
-    "",
-    "`types` must precede `default` within each entry; TypeScript takes the",
-    "first match and ignores a later `types`."
-  ],
   "exports": {
-    ".": {
-      "development": "./src/index.ts",
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    },
-    "./detectType": {
-      "development": "./src/detectType.ts",
-      "types": "./dist/detectType.d.ts",
-      "default": "./dist/detectType.js"
-    },
-    "./emailHeaders": {
-      "development": "./src/emailHeaders.ts",
-      "types": "./dist/emailHeaders.d.ts",
-      "default": "./dist/emailHeaders.js"
-    },
-    "./engineTypes": {
-      "development": "./src/engineTypes.ts",
-      "types": "./dist/engineTypes.d.ts",
-      "default": "./dist/engineTypes.js"
-    },
-    "./hostHash": {
-      "development": "./src/hostHash.ts",
-      "types": "./dist/hostHash.d.ts",
-      "default": "./dist/hostHash.js"
-    },
-    "./keyboardAdjacency": {
-      "development": "./src/keyboardAdjacency.ts",
-      "types": "./dist/keyboardAdjacency.d.ts",
-      "default": "./dist/keyboardAdjacency.js"
-    },
-    "./phoneIntel": {
-      "development": "./src/phoneIntel.ts",
-      "types": "./dist/phoneIntel.d.ts",
-      "default": "./dist/phoneIntel.js"
-    },
-    "./publicSuffix": {
-      "development": "./src/publicSuffix.ts",
-      "types": "./dist/publicSuffix.d.ts",
-      "default": "./dist/publicSuffix.js"
-    },
-    "./regions": {
-      "development": "./src/regions/index.ts",
-      "types": "./dist/regions/index.d.ts",
-      "default": "./dist/regions/index.js"
-    },
-    "./regions/*": {
-      "development": "./src/regions/*.ts",
-      "types": "./dist/regions/*.d.ts",
-      "default": "./dist/regions/*.js"
-    },
-    "./scamDetector": {
-      "development": "./src/scamDetector.ts",
-      "types": "./dist/scamDetector.d.ts",
-      "default": "./dist/scamDetector.js"
-    },
-    "./urlExpander": {
-      "development": "./src/urlExpander.ts",
-      "types": "./dist/urlExpander.d.ts",
-      "default": "./dist/urlExpander.js"
-    },
-    "./urlSanitizer": {
-      "development": "./src/urlSanitizer.ts",
-      "types": "./dist/urlSanitizer.d.ts",
-      "default": "./dist/urlSanitizer.js"
-    },
-    "./verdictRank": {
-      "development": "./src/verdictRank.ts",
-      "types": "./dist/verdictRank.d.ts",
-      "default": "./dist/verdictRank.js"
-    }
+    ".": "./src/index.ts",
+    "./detectType": "./src/detectType.ts",
+    "./emailHeaders": "./src/emailHeaders.ts",
+    "./engineTypes": "./src/engineTypes.ts",
+    "./hostHash": "./src/hostHash.ts",
+    "./keyboardAdjacency": "./src/keyboardAdjacency.ts",
+    "./phoneIntel": "./src/phoneIntel.ts",
+    "./publicSuffix": "./src/publicSuffix.ts",
+    "./regions": "./src/regions/index.ts",
+    "./regions/*": "./src/regions/*.ts",
+    "./scamDetector": "./src/scamDetector.ts",
+    "./urlExpander": "./src/urlExpander.ts",
+    "./urlSanitizer": "./src/urlSanitizer.ts",
+    "./verdictRank": "./src/verdictRank.ts"
   },
   "publishConfig": {
     "access": "public",
@@ -128,10 +51,13 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "npm run build:js && npm run build:types",
+    "build": "npm run build:js && npm run build:types && npm run build:finish",
     "build:js": "tsup",
     "build:types": "tsc -p tsconfig.build.json --emitDeclarationOnly",
-    "prepublishOnly": "npm run build"
+    "build:finish": "node scripts/finish-build.mjs",
+    "prepublishOnly": "npm run build",
+    "prepack": "node scripts/prepare-publish.mjs",
+    "postpack": "node scripts/restore-publish.mjs"
   },
   "dependencies": {
     "libphonenumber-js": "^1.13.14"

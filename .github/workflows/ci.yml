@@ -46,6 +46,21 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      # The engine is published to npm, and nothing above this line looks at
+      # the form it is published in: the workspace resolves its TypeScript
+      # source, so the whole suite can be green while the built artifact is
+      # unloadable. enginePublish.test.ts is the suite that checks it, and it
+      # skips when dist/ is absent — which, without this step, is always.
+      #
+      # Three ways the build shipped broken while reporting success: emitted JS
+      # kept extensionless imports (ERR_MODULE_NOT_FOUND on first import),
+      # declarations kept them too (TS2835 for any consumer on nodenext), and
+      # the region packs emitted declarations with no JavaScript behind them.
+      - name: Build the published engine
+        run: npm run build:engine
+      - name: Publish-surface tests
+        run: npx vitest run __tests__/enginePublish.test.ts
+
       # The Worker is outside the npm workspaces and vitest excludes workers/**,
       # so the root `npm test` above does not reach it — its suite would only
       # ever run if someone remembered to by hand. That is how the email()

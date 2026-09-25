@@ -18,15 +18,27 @@
     // the root config, which includes dom for the app, would accept it.
     "lib": ["ES2022"],
     "module": "ESNext",
-    // "bundler" resolution is a lie for a published package: it lets an import
-    // omit an extension that Node's ESM resolver requires at runtime. The
-    // declaration files this emits are read by consumers on every resolution
-    // mode, so the strictest one is the one to build under.
+    // Declarations are emitted with whatever specifiers the source wrote, so
+    // "Bundler" here produced `.d.ts` files full of extensionless relative
+    // imports. A consumer on `moduleResolution: "nodenext"` then gets TS2835
+    // on every one of them — nine errors from the barrel alone, before any of
+    // their own code is checked. The `.js` rewrite in tsup.config.ts does not
+    // reach declarations.
+    //
+    // "Bundler" also cannot be tightened into correctness, because it is the
+    // mode that PERMITS the omission; the extensions have to be added after
+    // emit, which is what rewriteRelativeSpecifiers in scripts/ does for both
+    // outputs. This stays "Bundler" to match how the source is written, and
+    // the rewrite is what makes the output resolvable.
     "moduleResolution": "Bundler",
     "strict": true,
     "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
+    // No declarationMap. The maps point at `../src/*.ts`, and `files` ships
+    // dist/ without src/ — so every one of them dangles in the tarball, sending
+    // a consumer's go-to-definition at a path that is not there. Inlining the
+    // sources instead would ship the whole engine a second time.
+    "declarationMap": false,
+    "sourceMap": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "isolatedModules": true,

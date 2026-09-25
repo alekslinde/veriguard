@@ -64,7 +64,12 @@ export default defineConfig({
   // dts generation flattens declarations, which breaks the per-file layout the
   // wildcard export depends on — the same reason `bundle: false` is set above.
   dts: false,
-  sourcemap: true,
+  // No sourcemaps. tsup inlines the full source into `sourcesContent`, so the
+  // maps were 1.2MB of a 1.9MB build — a second copy of every detection rule,
+  // shipped to every consumer, of source that is public on GitHub anyway. A
+  // debugger stepping into this package shows readable ES2022 either way,
+  // because the build is file-per-module and unminified.
+  sourcemap: false,
   // The published tarball is the source of truth for what a consumer gets, so
   // a stale file from a previous build must never survive into it.
   clean: true,
@@ -75,60 +80,15 @@ export default defineConfig({
   // copy that no lockfile, audit or dedupe pass can see.
   external: ["libphonenumber-js"],
   outExtension: () => ({ js: ".js" }),
-  // Rewrite relative imports to carry `.js`.
+  // The `.js`/`.d.ts` specifier rewrite does NOT run here.
   //
-  // The source writes them extensionless, which is correct in-repo: the
-  // workspace resolves this package's TypeScript directly under "bundler"
-  // resolution. Node's ESM resolver does not guess extensions, so the same
-  // specifier in emitted JS throws ERR_MODULE_NOT_FOUND on a consumer's
-  // machine — the package imports cleanly here and fails on install.
+  // `onSuccess` fires when tsup finishes, which is before `build:types` has
+  // emitted a single declaration — so a rewrite hooked here covered the `.js`
+  // output and silently missed every `.d.ts`. It runs as its own step after
+  // both, in scripts/rewrite-specifiers.mjs.
   //
-  // `outExtension` does NOT do this; it names the output file and leaves every
-  // import inside it untouched. That distinction cost a build that looked
-  // entirely successful and could not be loaded at all.
-  //
-  // Done at build time rather than by rewriting ~100 source imports, so the
-  // in-repo form stays extensionless and the published form stays loadable
-  // without either constraining the other. `enginePublish.test.ts` imports the
-  // built barrel through Node's real resolver, which is the only check that
-  // would have caught this.
-  //
-  // Rewritten on the emitted text rather than through an esbuild `onResolve`
-  // hook, which is the natural-looking place for it and does nothing here:
-  // `bundle: false` means esbuild transpiles each file without ever resolving
-  // an import, so the hook simply never fires and the build still succeeds.
-  async onSuccess() {
-    const { readdir, readFile, writeFile } = await import("node:fs/promises");
-    const path_ = await import("node:path");
-    const dist = new URL("dist/", import.meta.url);
-    const files = (await readdir(dist, { recursive: true, encoding: "utf8" })).filter((f) =>
-      f.endsWith(".js"),
-    );
-    // A relative specifier in a static import/export, or a dynamic import, that
-    // does not already end in a recognised extension. The quote character is
-    // captured and replayed so the rewrite cannot change how the string is
-    // delimited.
-    const SPECIFIER =
-      /(\bfrom\s*|\bimport\s*\(\s*)(["'])(\.{1,2}\/[^"']*?)(?<!\.[cm]?js|\.json|\.[cm]?ts)\2/g;
-    const emitted = new Set(files.map((f) => f.split(path_.sep).join("/")));
-    for (const file of files) {
-      const target = new URL(file, dist);
-      const before = await readFile(target, "utf8");
-      const dir = file.includes("/") ? file.slice(0, file.lastIndexOf("/") + 1) : "";
-      const after = before.replace(SPECIFIER, (_m, kw, q, spec: string) => {
-        // `./regions` is a directory, not a module: Node resolves neither it
-        // nor `./regions.js`, so appending an extension blindly produces a
-        // specifier as broken as the one it replaced — just later, and only
-        // for the one import that happens to name a folder.
-        //
-        // Which it is cannot be decided from the specifier's text, so it is
-        // decided from what the build actually emitted: resolve the specifier
-        // against this file's own directory and look for the file.
-        const resolved = new URL(spec, new URL(dir, dist)).href.slice(dist.href.length);
-        const suffix = emitted.has(`${resolved}.js`) ? ".js" : "/index.js";
-        return `${kw}${q}${spec}${suffix}${q}`;
-      });
-      if (after !== before) await writeFile(target, after);
-    }
-  },
+  // `outExtension` above names the output file and leaves the imports inside it
+  // untouched; an esbuild `onResolve` hook does nothing either, because
+  // `bundle: false` means imports are never resolved. Both look like the right
+  // place and neither is.
 });

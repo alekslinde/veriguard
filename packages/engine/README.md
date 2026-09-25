@@ -102,36 +102,38 @@ here ships in every client.
 npm run build:engine   # from the repo root; tsup for JS, tsc for declarations
 ```
 
-The workspace and a consumer resolve this package differently, on purpose:
+`exports` points at `src/*.ts`, and stays that way in the repo: the app, the
+extension and the test suite all resolve this package through the workspace
+symlink, so there is no build step between an edit and a test run. `prepack`
+rewrites the map to `dist/*.js` for the tarball and `postpack` puts it back.
 
-| Condition | Resolves to | Who gets it |
-|---|---|---|
-| `development` | `src/*.ts` | The app, the extension, vitest, tsc |
-| `default` | `dist/*.js` | Anyone who installs it |
+That rewrite is a script rather than a declaration because no declarative
+spelling works. `publishConfig.exports` is ignored by both npm 10 and npm 11
+(verified by packing with each and reading `package.json` back out of the
+tarball), so the published map would still point at `src/`, which `files`
+excludes — an install resolving to nothing. A `development` condition fails
+differently and worse: it splits per *tool*, not per audience, so `vitest` takes
+the source branch while `vite build` and `next build` take `dist/` and fail on a
+fresh clone — or, with a stale `dist/` present, quietly score using detection
+rules that do not match the source being edited.
 
-Vite and Vitest apply `development` by default in dev, so there is still no
-build step between an edit and a test run. The cost is that **a green
-`npm test` says nothing about the published artifact** — the suite loads source
-and never touches `dist/`. `__tests__/enginePublish.test.ts` is what checks the
-built form, and it skips (visibly) when `dist/` is absent, so run the build
-before trusting a green run on anything under `packages/engine`.
-
-This is deliberately not `publishConfig.exports`, which reads as the obvious
-tool for the job. npm only applies that from v11; under npm 10 it is ignored
-silently and the tarball ships an `exports` map pointing at `src/`, which
-`files` excludes — an install that resolves to nothing. A condition map is
-applied by the resolver rather than the publisher, so it does not depend on
-which npm the publisher happened to run.
+The cost of resolving to source is that **a green `npm test` says nothing about
+the published artifact**. `__tests__/enginePublish.test.ts` is what checks the
+built form; it skips (visibly) when `dist/` is absent, and CI builds the engine
+so it actually runs.
 
 Two properties of the build are load-bearing and easy to undo:
 
 - **Every source file is an entry.** `bundle: false` splits per entry, not per
   module, so a file reached only as an import emits a `.d.ts` and no `.js` —
   it type-checks for a consumer and has nothing behind it at runtime.
-- **Relative imports are rewritten to carry `.js`.** The source writes them
-  extensionless, which is correct in-repo and fatal in a consumer's Node
-  process. A directory import resolves to `/index.js`, not `.js`, so the
-  rewrite consults what was actually emitted rather than guessing.
+- **Relative imports are rewritten to carry `.js`, in both `.js` and `.d.ts`.**
+  The source writes them extensionless, which is correct in-repo, fatal in a
+  consumer's Node process, and a wall of TS2835 for a consumer on
+  `moduleResolution: "nodenext"`. Declarations need the rewrite as much as
+  runtime code and are easy to forget, since they are emitted by a later step
+  than the one that rewrites. A directory import resolves to `/index.js`, not
+  `.js`, so the rewrite consults what was actually emitted rather than guessing.
 
 Publication runs from CI with provenance, so the tarball carries a verifiable
 link back to the commit and workflow that built it.
