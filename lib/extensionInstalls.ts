@@ -92,11 +92,6 @@ export const EXTENSION_LISTINGS: readonly ExtensionListing[] = [
   },
 ];
 
-/** The listings a reader can actually install from. */
-export function publishedListings(): ExtensionListing[] {
-  return EXTENSION_LISTINGS.filter((l) => l.url !== null);
-}
-
 /**
  * Total reported users across every store that reports one.
  *

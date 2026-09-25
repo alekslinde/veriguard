@@ -3,12 +3,7 @@
 // date attached to it, or a missing figure that renders as zero.
 
 import { describe, it, expect } from "vitest";
-import {
-  EXTENSION_LISTINGS,
-  publishedListings,
-  totalReportedUsers,
-  reportedAsOf,
-} from "../lib/extensionInstalls";
+import { EXTENSION_LISTINGS, totalReportedUsers, reportedAsOf } from "../lib/extensionInstalls";
 
 describe("extension listings", () => {
   it("pairs every reported figure with the date it was read", () => {
@@ -24,12 +19,18 @@ describe("extension listings", () => {
     }
   });
 
-  it("explains every store that has no figure", () => {
+  it("explains every store that will not render a figure", () => {
     // A blank cell invites the reader to supply their own reason, and the most
     // available one is "nobody uses it". Each absence says why it is absent.
+    //
+    // The condition matches what the about page actually branches on — a count
+    // WITH a date — rather than just `users === null`. A listing with a count
+    // and no date takes the same fallback path, so testing the narrower
+    // condition left exactly one shape that rendered empty.
     for (const listing of EXTENSION_LISTINGS) {
-      if (listing.users === null) {
-        expect(listing.note, `${listing.store} has no count and no explanation`).toBeTruthy();
+      const willRenderFigure = typeof listing.users === "number" && listing.asOf !== null;
+      if (!willRenderFigure) {
+        expect(listing.note, `${listing.store} shows no count and no explanation`).toBeTruthy();
       }
     }
   });
@@ -53,8 +54,8 @@ describe("extension listings", () => {
   });
 
   it("gives every published listing an https URL", () => {
-    for (const listing of publishedListings()) {
-      expect(listing.url).toMatch(/^https:\/\//);
+    for (const listing of EXTENSION_LISTINGS) {
+      if (listing.url !== null) expect(listing.url).toMatch(/^https:\/\//);
     }
   });
 

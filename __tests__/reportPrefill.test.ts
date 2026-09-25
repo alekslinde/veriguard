@@ -94,6 +94,14 @@ describe("parseReportPrefill", () => {
       expect(query).toBe("");
     });
 
+    it("does not build a link out of a source alone", () => {
+      // A source with nothing to label says how someone reached a form
+      // carrying no prefill, which is the bare /report page with extra
+      // characters. Callers fall back to that bare URL on an empty string, so
+      // emitting one here would quietly defeat that contract.
+      expect(buildReportQuery({ source: "ext-chromium" })).toBe("");
+    });
+
     it("carries no source when none was given", () => {
       expect(parseReportPrefill({ type: "url" }).source).toBeUndefined();
       expect(buildReportQuery({ type: "url" })).not.toContain("source");

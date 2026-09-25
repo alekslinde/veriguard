@@ -78,13 +78,28 @@ function clean(value: string | undefined | null): string | undefined {
 export function buildReportQuery(prefill: ReportPrefill): string {
   const params = new URLSearchParams();
   if (prefill.type && SCAM_TYPES.includes(prefill.type)) params.set("type", prefill.type);
-  // Allowlisted on the way out as well as the way in. A caller passing
-  // something arbitrary gets it dropped rather than reflected into a link we
-  // then publish in an email or an extension popup.
-  if (prefill.source && REPORT_SOURCES.includes(prefill.source)) params.set("source", prefill.source);
   for (const key of ["scamUrl", "scamEmail", "scamReplyTo", "scamPhone"] as const) {
     const value = clean(prefill[key]);
     if (value) params.set(key, value);
+  }
+  // Added LAST, and only when there is something for it to label.
+  //
+  // A source alone is not worth a link: it says how someone arrived at a form
+  // carrying nothing, which is the bare /report page with extra characters.
+  // Written before the identifiers it would also defeat the documented
+  // "returns '' when there is nothing worth carrying" contract, since callers
+  // fall back to the bare URL on an empty string and would instead emit
+  // `/report?source=…`.
+  //
+  // Allowlisted on the way out as well as the way in: a caller passing
+  // something arbitrary gets it dropped rather than reflected into a link we
+  // then publish in an email or an extension popup.
+  if (
+    params.toString() &&
+    prefill.source &&
+    REPORT_SOURCES.includes(prefill.source)
+  ) {
+    params.set("source", prefill.source);
   }
   return params.toString();
 }

@@ -156,12 +156,19 @@ describe.skipIf(!built)("built extension bundle", () => {
     // did. Reading the Firefox output is the point — a mistake here ships two
     // bundles claiming to be Chromium, and the failure is invisible until the
     // numbers are read months later.
-    const firefox = path.join(DIST, "firefox");
-    if (!existsSync(path.join(firefox, "popup.js"))) return;
+    // No early return on a missing Firefox build. Skipping would make this
+    // pass while asserting nothing about the build it exists to check — the
+    // failure shape this whole file is written against. `npm run ext` builds
+    // both, so an absent one is a broken build, not a valid state.
+    const firefoxPopup = path.join(DIST, "firefox", "popup.js");
+    expect(
+      existsSync(firefoxPopup),
+      "the firefox build is missing — run `npm run ext`, which builds both targets",
+    ).toBe(true);
 
     expect(read("popup.js"), "the chrome build is mislabelled").toContain('=== "ext-chromium"');
     expect(
-      readFileSync(path.join(firefox, "popup.js"), "utf8"),
+      readFileSync(firefoxPopup, "utf8"),
       "the firefox build is mislabelled",
     ).toContain('=== "ext-firefox"');
   });
@@ -170,9 +177,13 @@ describe.skipIf(!built)("built extension bundle", () => {
     // It names a build, never a person or a session. The allowlist in
     // lib/reportPrefill.ts is what enforces that, and this pins the property
     // at the artifact: no id, timestamp or random value may ride along.
+    // Asserted, not guarded on. An early return here would pass silently if
+    // the label were removed altogether, which is the change most likely to
+    // happen by accident and the one nothing else in this file would notice.
     const bundle = everything();
-    const sourceParam = /params\.set\("source"/;
-    if (!sourceParam.test(bundle)) return;
+    expect(bundle, "the report link no longer carries a source label").toMatch(
+      /params\.set\("source"/,
+    );
     expect(bundle, "a report link must not carry a generated id").not.toMatch(
       /params\.set\("(uid|cid|sid|session|install)/i,
     );
