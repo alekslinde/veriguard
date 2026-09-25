@@ -99,9 +99,11 @@ export async function POST(req: NextRequest) {
     // This counts forwards we accepted and tried to analyse — not successes.
     void recordCheckEvent("email", "analysed");
 
-    // Reach the ORIGINAL scam inside the forward and run the shared analysis —
-    // the top-level headers belong to the forwarder, not the scammer.
-    const { source, original, headers, identityFlags, tracking } = analyseEmailSource(raw);
+    // Reach the ORIGINAL scam inside the forward and run the shared analysis.
+    // Everything outside it — the top-level headers, the note and signature
+    // above the forward marker — belongs to the person who forwarded it, and
+    // `forwarded` keeps all of it out, even when no original can be located.
+    const { source, original, headers, identityFlags, tracking } = analyseEmailSource(raw, { forwarded: true });
 
     const blocklist = await getUrlhausBlocklist();
     // No region argument: this request originates from the inbound-email

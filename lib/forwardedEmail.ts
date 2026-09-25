@@ -23,48 +23,28 @@
 // Pure string logic. No MIME library — a focused splitter covers the shapes
 // real clients actually produce, and is auditable in one screen.
 
-export type ForwardSource = "attachment" | "inline" | "toplevel";
+import { splitHeadersBody, headerValue, boundaryOf, multipartParts, htmlToText, textParts } from "@/lib/mime";
+
+// "body" only arises for a known forward (see UnwrapOptions): no original was
+// found, so the forwarder's headers are dropped and the decoded body alone is
+// analysed.
+export type ForwardSource = "attachment" | "inline" | "toplevel" | "body";
 
 export interface UnwrappedEmail {
   // Raw text to feed parseEmailHeaders — the innermost original we could find.
   raw: string;
   // How we found it. "toplevel" means no forward wrapper was detected, so the
   // input is treated as the original (e.g. a raw .eml the user exported).
+  // "body" means the same for a known forward, whose headers are dropped.
   source: ForwardSource;
 }
 
-// Pull the value of a top-level header (first occurrence), unfolding
-// continuation lines. Scoped to the header block only.
-function headerValue(headerBlock: string, name: string): string {
-  const unfolded = headerBlock.replace(/\r?\n[ \t]+/g, " ");
-  const re = new RegExp(`^${name}\\s*:\\s*(.*)$`, "im");
-  return unfolded.match(re)?.[1].trim() ?? "";
-}
-
-// Split a raw email into its header block and body at the first blank line,
-// accounting for the CRLF-or-LF separator length. Shared with emailTracking.
-export function splitHeadersBody(raw: string): { headerBlock: string; body: string } {
-  const idx = raw.search(/\r?\n\r?\n/);
-  if (idx === -1) return { headerBlock: raw, body: "" };
-  const sepLen = raw.slice(idx).match(/^\r?\n\r?\n/)?.[0].length ?? 2;
-  return { headerBlock: raw.slice(0, idx), body: raw.slice(idx + sepLen) };
-}
-
-// Strip the boundary parameter out of a Content-Type value, honouring optional
-// quoting: boundary="..." or boundary=...
-function boundaryOf(contentType: string): string {
-  const m = contentType.match(/boundary\s*=\s*"([^"]+)"/i) || contentType.match(/boundary\s*=\s*([^\s;]+)/i);
-  return m ? m[1] : "";
-}
-
-// Walk a multipart body, returning each part as raw text (its own headers +
-// body), split on the MIME boundary.
-function multipartParts(body: string, boundary: string): string[] {
-  const delim = `--${boundary}`;
-  return body
-    .split(delim)
-    .map((p) => p.replace(/^\r?\n/, "").replace(/\r?\n--\s*$/, ""))
-    .filter((p) => p.trim() && p.trim() !== "--");
+export interface UnwrapOptions {
+  // The outer message is known to be someone forwarding a suspect email to us
+  // (the forward-to-check inbox), not the suspect email itself (a pasted or
+  // exported .eml). Its headers and its text above the forward marker belong
+  // to the forwarder, so neither is ever part of what we analyse.
+  forwarded?: boolean;
 }
 
 // Recursively descend through multipart containers looking for a
@@ -165,32 +145,78 @@ function findInline(body: string): string {
   return bodyText ? `${headerLines.join("\n")}\n\n${bodyText}` : headerLines.join("\n");
 }
 
+// Markers at which an HTML part's quoted original begins. The Outlook
+// header-block marker is left out: in markup its From and Sent sit in separate
+// tags, so it cannot match there.
+const HTML_MARKERS = INLINE_MARKERS.slice(0, 3);
+
+// The HTML part from its first forward marker on, so tracking analysis (pixels,
+// CSS beacons, meta refresh) sees the original's markup and not the
+// forwarder's. "" when the marker is not in the markup.
+function htmlFromMarker(html: string): string {
+  let cut = -1;
+  for (const re of HTML_MARKERS) {
+    const m = html.match(re);
+    if (m && m.index !== undefined && (cut === -1 || m.index < cut)) cut = m.index;
+  }
+  return cut === -1 ? "" : html.slice(cut);
+}
+
 // Find the original message inside a (possibly) forwarded email. Tries the
 // high-fidelity attachment path first, then inline quotes, then falls back to
-// treating the whole input as the original.
-export function unwrapForwarded(raw: string): UnwrappedEmail {
+// treating the whole input as the original — or, for a known forward, to its
+// body alone.
+//
+// The body is decoded before the marker search. Mail clients routinely send it
+// base64 or quoted-printable, and searching the encoded form found no marker,
+// so a forwarded scam was scored as the forwarder's own message.
+export function unwrapForwarded(raw: string, opts: UnwrapOptions = {}): UnwrappedEmail {
   const attachment = findRfc822(raw);
   if (attachment) return { raw: attachment, source: "attachment" };
 
-  const { body } = splitHeadersBody(raw);
-  const inline = findInline(body);
+  const { headerBlock } = splitHeadersBody(raw);
+  const { plain, html } = textParts(raw);
+  // Links are kept as their hrefs: this text is analysed, not displayed.
+  const text = plain.trim() ? plain : html ? htmlToText(html, "keep") : "";
+
+  const inline = findInline(text);
   if (inline) {
-    // Keep whatever preceded the marker as well, rather than analysing only the
-    // quoted original. Dropping it is an evasion an attacker gets for free:
-    // append "---------- Forwarded message ---------" plus an innocuous block
-    // to a scam, and the real content sits ABOVE the marker and is discarded.
-    // Measured at the time of the fix, that took a myGov phishing email from
-    // 100/likely_scam (with its URL flagged) to 10, with the malicious link
-    // gone from the analysis entirely.
+    // The original's markup rides along for tracking analysis. The plain
+    // quote above carries its headers and text; the HTML carries its pixels.
+    const quotedHtml = plain.trim() && html ? htmlFromMarker(html) : "";
+    const original = quotedHtml ? `${inline}\n\n${quotedHtml}` : inline;
+
+    // For a known forward, the text above the marker is the forwarder's note
+    // and signature — outside the scam, and it carries the forwarder's own
+    // name, address and number. Stop there.
+    if (opts.forwarded) return { raw: original, source: "inline" };
+
+    // Otherwise keep whatever preceded the marker as well, rather than
+    // analysing only the quoted original. Dropping it is an evasion an attacker
+    // gets for free: append "---------- Forwarded message ---------" plus an
+    // innocuous block to a scam, and the real content sits ABOVE the marker and
+    // is discarded. Measured at the time of the fix, that took a myGov phishing
+    // email from 100/likely_scam (with its URL flagged) to 10, with the
+    // malicious link gone from the analysis entirely.
     //
-    // The lead-in is usually the forwarder's own "have a look at this" note, so
-    // it is almost always short and harmless; analysing it costs nothing and
-    // closes the hole. The quoted original still leads, so header parsing —
-    // which reads the FIRST header block — continues to see the original's
-    // headers rather than the forwarder's.
-    const leadIn = body.slice(0, body.indexOf(inline.split(/\r?\n/)[0] ?? "")).trim();
-    const combined = leadIn ? `${inline}\n\n${leadIn}` : inline;
-    return { raw: combined, source: "inline" };
+    // A known forward does not reopen this: the forwarder's client writes the
+    // first marker, so a marker the scam planted comes after it and the text
+    // above the planted one is inside the quote.
+    //
+    // The quoted original still leads, so header parsing — which reads the
+    // FIRST header block — continues to see the original's headers rather than
+    // the forwarder's.
+    const leadIn = text.slice(0, text.indexOf(inline.split(/\r?\n/)[0] ?? "")).trim();
+    return { raw: leadIn ? `${original}\n\n${leadIn}` : original, source: "inline" };
+  }
+
+  // A redirect (bounce) re-sends the original with its headers intact and
+  // records the redirector in Resent-* headers, so the top level IS the scam.
+  const resent = /^resent-(from|sender)\s*:/im.test(headerBlock);
+  if (opts.forwarded && !resent) {
+    // No marker and no attachment, but the headers are still the forwarder's.
+    // Analyse what they sent us — the decoded body — and nothing about them.
+    return { raw: [text.trim(), html].filter(Boolean).join("\n\n"), source: "body" };
   }
 
   return { raw, source: "toplevel" };

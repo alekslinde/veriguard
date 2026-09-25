@@ -11,7 +11,7 @@
 
 import { parseEmailHeaders, analyseEmailIdentities, EmailHeaders } from "@veriguard/engine/emailHeaders";
 import { analyseEmailTracking, EmailTrackingReport } from "@/lib/emailTracking";
-import { unwrapForwarded, ForwardSource } from "@/lib/forwardedEmail";
+import { unwrapForwarded, ForwardSource, UnwrapOptions } from "@/lib/forwardedEmail";
 
 export interface EmailSourceAnalysis {
   // How the original was located inside the (possibly forwarded) input.
@@ -27,8 +27,10 @@ export interface EmailSourceAnalysis {
   tracking: EmailTrackingReport;
 }
 
-export function analyseEmailSource(raw: string): EmailSourceAnalysis {
-  const { raw: original, source } = unwrapForwarded(raw);
+// Pass `{ forwarded: true }` when the input is someone forwarding a suspect
+// email to us, so nothing about the forwarder is analysed — see UnwrapOptions.
+export function analyseEmailSource(raw: string, opts: UnwrapOptions = {}): EmailSourceAnalysis {
+  const { raw: original, source } = unwrapForwarded(raw, opts);
   const headers = parseEmailHeaders(original);
   const identityFlags = headers.fromAddress ? analyseEmailIdentities(headers).flags : [];
   const tracking = analyseEmailTracking(original);
