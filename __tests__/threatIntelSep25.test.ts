@@ -145,11 +145,19 @@ describe("#357 URL — AiTM OAuth2-path phishing kit heuristic", () => {
     expect(linkFlag(r, "adversary-in-the-middle")).toBeFalsy();
   });
 
-  it("correctly resolves the registrable domain on a multi-label public suffix", () => {
-    // A naive last-two-labels split would treat "oauth2.example.com.au" as
-    // domain "com.au" and never match KNOWN_OAUTH_HOSTS correctly either way —
-    // this just confirms the AU-suffix case doesn't crash or misfire.
+  it("keeps a lone hit on a self-hosted OAuth server below suspicious", () => {
+    // The FP guard: a self-hosted OAuth2 server (here on a multi-label .com.au
+    // suffix) carrying no other signal must stay "safe" — the flag explains the
+    // path shape, but one signal alone must not accuse a legitimate login page.
     const r = checkUrl("https://sso.mycompany.com.au/oauth2/authorize", undefined, "AU");
     expect(linkFlag(r, "adversary-in-the-middle")).toBeTruthy();
+    expect(r.score).toBeLessThan(20);
+    expect(r.verdict).toBe("safe");
+  });
+
+  it("reaches suspicious when the URL also carries a login keyword (accepted tradeoff)", () => {
+    const r = checkUrl("https://login.mycompany.com/oauth2/authorize", undefined, "AU");
+    expect(linkFlag(r, "adversary-in-the-middle")).toBeTruthy();
+    expect(r.verdict).toBe("suspicious");
   });
 });

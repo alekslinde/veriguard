@@ -1071,12 +1071,14 @@ export function checkUrl(
   // nothing. registrableDomain() already handles this correctly elsewhere in
   // this file (see the typosquat check above).
   //
-  // Scored independently at +20, same shape as the other link signals here: it
-  // cannot alone cross a verdict threshold, only compounds with another
-  // signal. That is a deliberate FP guard — self-hosted OAuth2/OIDC servers
-  // (Keycloak, Ory Hydra, an Azure AD B2C custom domain) legitimately use this
-  // path shape on a non-provider domain, and a lone hit staying below
-  // "suspicious" keeps that traffic clean.
+  // Scored at +15, one point under the "suspicious" threshold (score >= 20 in
+  // scoreToResult), so a lone hit stays "safe". That is a deliberate FP guard —
+  // self-hosted OAuth2/OIDC servers (Ory Hydra, an Azure AD B2C custom domain)
+  // legitimately use this path shape on a non-provider domain. It is not a full
+  // guard: a self-hosted host whose URL also carries "login"/"verify"/"secure"
+  // picks up the +10 keyword signal above and reaches "suspicious". Accepted —
+  // a real kit URL almost always carries further signals (abused hosting, a
+  // high-abuse TLD) and lands at likely_scam regardless.
   const KNOWN_OAUTH_HOSTS = new Set([
     "login.microsoftonline.com", "login.live.com", "login.windows.net",
     "account.microsoft.com", "accounts.google.com", "appleid.apple.com",
@@ -1091,7 +1093,7 @@ export function checkUrl(
       sig.add(
         "link",
         "OAuth2/OpenID login path on a domain that isn't a known identity provider — a hallmark of adversary-in-the-middle phishing kits that proxy Microsoft 365 or Google login pages to steal session cookies",
-        20,
+        15,
       );
     }
   }
