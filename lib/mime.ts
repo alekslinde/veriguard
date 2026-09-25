@@ -90,6 +90,87 @@ export function decodeBody(body: string, encoding: string): string {
   return body; // 7bit / 8bit / binary / absent — already text
 }
 
+// Every helper from here to htmlToText scans with indexOf and gives up at the
+// first missing terminator, so each runs in one pass over its input. The
+// regexes they replace — `<a\b[^>]*?…>([\s\S]*?)<\/a>`, `<style[\s\S]*?<\/style>`,
+// `<[^>]+>`, `[ \t]+\n` — restart a full scan from every opening they fail to
+// close. On 40KB of unclosed `<a href=` the anchor pattern alone took 83s, and
+// this runs on hostile mail up to 1MB, on the server and on paste.
+
+// Whether `lower[i]` ends a tag name: whitespace, "/", ">" or end of input.
+// Stops "<a" matching "<abbr" and "<head" matching "<header".
+function endsTagName(lower: string, i: number): boolean {
+  const c = lower[i];
+  return c === undefined || c === ">" || c === "/" || c === " " || c === "\t" || c === "\n" || c === "\r";
+}
+
+// Drop every span from `open` through the next `close`, inclusive. `open` is a
+// lowercase literal; when it is a tag opener ("<style") it must end the tag
+// name. An opener with no close ends the scan and keeps the rest as it is.
+function dropSpans(s: string, open: string, close: string): string {
+  const lower = s.toLowerCase();
+  const tag = open.startsWith("<") && /[a-z]$/.test(open);
+  let out = "";
+  let pos = 0;
+  for (;;) {
+    const at = lower.indexOf(open, pos);
+    if (at === -1) break;
+    if (tag && !endsTagName(lower, at + open.length)) {
+      out += s.slice(pos, at + open.length);
+      pos = at + open.length;
+      continue;
+    }
+    const end = lower.indexOf(close, at + open.length);
+    if (end === -1) break;
+    out += s.slice(pos, at);
+    pos = end + close.length;
+  }
+  return out + s.slice(pos);
+}
+
+// Replace each <a …>text</a> with `render(text, href)`. An anchor left
+// unclosed ends the scan; the tag stripper removes what remains of it.
+function replaceAnchors(s: string, render: (text: string, href: string) => string): string {
+  const lower = s.toLowerCase();
+  let out = "";
+  let pos = 0;
+  for (;;) {
+    const open = lower.indexOf("<a", pos);
+    if (open === -1) break;
+    if (!endsTagName(lower, open + 2)) {
+      out += s.slice(pos, open + 2);
+      pos = open + 2;
+      continue;
+    }
+    const tagEnd = lower.indexOf(">", open);
+    if (tagEnd === -1) break;
+    const close = lower.indexOf("</a", tagEnd);
+    if (close === -1) break;
+    const closeEnd = lower.indexOf(">", close);
+    // One opening tag, bounded by its own ">": the match cannot run past it.
+    const href = s.slice(open, tagEnd).match(/\bhref\s*=\s*["']?([^"'\s>]+)/i)?.[1] ?? "";
+    out += s.slice(pos, open) + render(s.slice(tagEnd + 1, close), href);
+    pos = closeEnd === -1 ? s.length : closeEnd + 1;
+  }
+  return out + s.slice(pos);
+}
+
+// Remove every <…> tag. A "<" with no ">" after it ends the scan, keeping the
+// rest as text.
+function stripTags(s: string): string {
+  let out = "";
+  let pos = 0;
+  for (;;) {
+    const open = s.indexOf("<", pos);
+    if (open === -1) break;
+    const close = s.indexOf(">", open + 1);
+    if (close === -1) break;
+    out += s.slice(pos, open);
+    pos = close + 1;
+  }
+  return out + s.slice(pos);
+}
+
 // Convert an HTML body to readable plain text: drop <style>/<script>/<head>
 // blocks and MSO conditional comments wholesale, turn <a> links and block
 // elements into something legible, strip remaining tags, decode basic entities,
@@ -111,19 +192,20 @@ export function decodeBody(body: string, encoding: string): string {
 export function htmlToText(html: string, links: "redact" | "keep"): string {
   let s = html;
   // Remove non-content blocks entirely (including their inner text).
-  s = s.replace(/<!--[\s\S]*?-->/g, "");
-  s = s.replace(/<style[\s\S]*?<\/style>/gi, "");
-  s = s.replace(/<script[\s\S]*?<\/script>/gi, "");
-  s = s.replace(/<head[\s\S]*?<\/head>/gi, "");
-  s =
-    links === "redact"
-      ? s.replace(/<a\b[^>]*>([\s\S]*?)<\/a>/gi, "$1 [scam link removed]")
-      : s.replace(/<a\b[^>]*?\bhref\s*=\s*["']?([^"'\s>]+)[^>]*>([\s\S]*?)<\/a>/gi, "$2 $1");
-  // Block-level breaks → newlines so paragraphs survive.
-  s = s.replace(/<\/(p|div|tr|h[1-6]|li|blockquote)>/gi, "\n");
-  s = s.replace(/<br\b[^>]*>/gi, "\n");
-  // Strip every remaining tag.
-  s = s.replace(/<[^>]+>/g, "");
+  s = dropSpans(s, "<!--", "-->");
+  s = dropSpans(s, "<style", "</style>");
+  s = dropSpans(s, "<script", "</script>");
+  s = dropSpans(s, "<head", "</head>");
+  s = replaceAnchors(s, (text, href) =>
+    links === "redact" ? `${text} [scam link removed]` : href ? `${text} ${href}` : text,
+  );
+  // Block-level breaks → newlines so paragraphs survive. Each alternative is a
+  // fixed-length literal, so a failed match costs a bounded look.
+  s = s.replace(/<\/(?:p|div|tr|h[1-6]|li|blockquote)>/gi, "\n");
+  // A <br> of any shape: mark the newline and leave "<…>" for stripTags, which
+  // removes its attributes without a regex having to find the ">".
+  s = s.replace(/<br(?=[\s/>])/gi, "\n<");
+  s = stripTags(s);
   // Decode the handful of entities Outlook emits.
   s = s
     .replace(/&nbsp;/gi, " ")
@@ -132,8 +214,8 @@ export function htmlToText(html: string, links: "redact" | "keep"): string {
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
     .replace(/&#39;|&apos;/gi, "'");
-  // Collapse runs of blank lines and trailing spaces.
-  s = s.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n");
+  // Trailing spaces off each line, then collapse runs of blank lines.
+  s = s.split("\n").map((l) => l.trimEnd()).join("\n").replace(/\n{3,}/g, "\n\n");
   return s.trim();
 }
 

@@ -30,9 +30,11 @@ export interface EmailSourceAnalysis {
 // Pass `{ forwarded: true }` when the input is someone forwarding a suspect
 // email to us, so nothing about the forwarder is analysed — see UnwrapOptions.
 export function analyseEmailSource(raw: string, opts: UnwrapOptions = {}): EmailSourceAnalysis {
-  const { raw: original, source } = unwrapForwarded(raw, opts);
+  const { raw: original, markup, source } = unwrapForwarded(raw, opts);
   const headers = parseEmailHeaders(original);
   const identityFlags = headers.fromAddress ? analyseEmailIdentities(headers).flags : [];
-  const tracking = analyseEmailTracking(original);
+  // The original's decoded HTML is read here and nowhere else: it is where
+  // pixels and beacons live, and only tracking analysis looks for them.
+  const tracking = analyseEmailTracking(markup ? `${original}\n\n${markup}` : original);
   return { source, original, headers, identityFlags, tracking };
 }

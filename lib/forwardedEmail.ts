@@ -33,6 +33,11 @@ export type ForwardSource = "attachment" | "inline" | "toplevel" | "body";
 export interface UnwrappedEmail {
   // Raw text to feed parseEmailHeaders — the innermost original we could find.
   raw: string;
+  // The original's decoded HTML, for tracking analysis only (pixels, CSS
+  // beacons, meta refresh live in markup). Kept apart from `raw` because `raw`
+  // is also distilled into text people read and store, where markup is noise.
+  // "" when there is none, or none that can be told apart from the forwarder's.
+  markup: string;
   // How we found it. "toplevel" means no forward wrapper was detected, so the
   // input is treated as the original (e.g. a raw .eml the user exported).
   // "body" means the same for a known forward, whose headers are dropped.
@@ -73,11 +78,18 @@ function findRfc822(raw: string, depth = 0): string {
 }
 
 // Markers different clients place before an inline-quoted forwarded message.
-const INLINE_MARKERS = [
-  /-{2,}\s*forwarded message\s*-{2,}/i,           // Gmail, generic
+// The dash runs are anchored to their first dash: unanchored, a failed match
+// retried from every dash of a long run, which is quadratic on hostile input.
+const SEPARATOR_MARKERS = [
+  /(?<!-)-{2,}\s*forwarded message\s*-{2,}/i,     // Gmail, Yahoo, generic
   /begin forwarded message:/i,                    // Apple Mail
-  /-{2,}\s*original message\s*-{2,}/i,            // Outlook (older)
-  /^from:\s.+\bsent:\s/im,                        // Outlook header-style block
+  /(?<!-)-{2,}\s*original message\s*-{2,}/i,      // Outlook (older)
+];
+// Outlook writes no separator line, only the quoted header block itself, so
+// the match starts ON the original's From line and that line is kept.
+const HEADER_BLOCK_MARKERS = [
+  /^[ \t>]*from:\s[^\n]*\bsent:\s/im,              // From and Sent on one line
+  /^[ \t>]*from:\s[^\n]*\n[ \t>]*sent:\s/im,        // From, then Sent
 ];
 
 // A line that looks like an email header: "Header-Name: value".
@@ -95,17 +107,25 @@ const QUOTED_HEADER_RE = /^(from|to|cc|reply-to|sent|date|subject|disposition-no
 function findInline(body: string): string {
   // Find the earliest marker; everything after it is the quoted original.
   let cut = -1;
-  for (const re of INLINE_MARKERS) {
-    const m = body.match(re);
-    if (m && m.index !== undefined && (cut === -1 || m.index < cut)) cut = m.index;
+  let isSeparator = false;
+  for (const [markers, separator] of [[SEPARATOR_MARKERS, true], [HEADER_BLOCK_MARKERS, false]] as const) {
+    for (const re of markers) {
+      const at = body.search(re);
+      if (at !== -1 && (cut === -1 || at < cut)) {
+        cut = at;
+        isSeparator = separator;
+      }
+    }
   }
   if (cut === -1) return "";
 
-  // De-quote (`> `) every line after the marker, dropping the marker line itself.
+  // De-quote (`> `) every line after the marker, dropping a separator line
+  // ("---- Forwarded message ----", "Begin forwarded message:") but not a
+  // header-block marker, whose first line is the original's From.
   const lines = body
     .slice(cut)
     .split(/\r?\n/)
-    .slice(1) // skip the "---- Forwarded message ----" / "Begin forwarded message:" line
+    .slice(isSeparator ? 1 : 0)
     .map((l) => l.replace(/^\s*>+\s?/, ""));
 
   // Walk the de-quoted lines: the leading run of header-looking lines (allowing
@@ -145,21 +165,47 @@ function findInline(body: string): string {
   return bodyText ? `${headerLines.join("\n")}\n\n${bodyText}` : headerLines.join("\n");
 }
 
-// Markers at which an HTML part's quoted original begins. The Outlook
-// header-block marker is left out: in markup its From and Sent sit in separate
-// tags, so it cannot match there.
-const HTML_MARKERS = INLINE_MARKERS.slice(0, 3);
+// Where the quoted original starts in an HTML part, found without a regex
+// over the markup: the text markers some clients write into it, then the
+// wrappers others put around the quote.
+const HTML_TEXT_MARKERS = SEPARATOR_MARKERS;
+const HTML_QUOTE_OPENERS = [
+  'class="gmail_quote',   // Gmail
+  'id="divrplyfwdmsg"',   // Outlook
+  "id=divrplyfwdmsg",
+  'type="cite"',          // Apple Mail
+];
 
-// The HTML part from its first forward marker on, so tracking analysis (pixels,
-// CSS beacons, meta refresh) sees the original's markup and not the
-// forwarder's. "" when the marker is not in the markup.
-function htmlFromMarker(html: string): string {
-  let cut = -1;
-  for (const re of HTML_MARKERS) {
-    const m = html.match(re);
-    if (m && m.index !== undefined && (cut === -1 || m.index < cut)) cut = m.index;
+// The HTML part from where the quoted original starts, so tracking analysis
+// sees the original's markup and not the forwarder's (whose signature can
+// carry its own images). Falls back to the first mention of the original's
+// sender address, which every client writes into the quoted header block.
+// "" when neither is found.
+function quotedMarkup(html: string, senderAddress: string): string {
+  const lower = html.toLowerCase();
+  const found: number[] = [];
+  for (const re of HTML_TEXT_MARKERS) {
+    const at = html.search(re);
+    if (at !== -1) found.push(at);
   }
-  return cut === -1 ? "" : html.slice(cut);
+  for (const opener of HTML_QUOTE_OPENERS) {
+    const at = lower.indexOf(opener);
+    if (at !== -1) found.push(lower.lastIndexOf("<", at));
+  }
+  if (found.length === 0 && senderAddress) {
+    const at = lower.indexOf(senderAddress.toLowerCase());
+    if (at !== -1) found.push(at);
+  }
+  return found.length ? html.slice(Math.max(0, Math.min(...found))) : "";
+}
+
+// The From (else Reply-To) address in a quoted header block, lowercased.
+function quotedSender(original: string): string {
+  const { headerBlock } = splitHeadersBody(original);
+  const value = headerValue(headerBlock, "from") || headerValue(headerBlock, "reply-to");
+  const open = value.indexOf("<");
+  const close = value.indexOf(">", open + 1);
+  return (open !== -1 && close !== -1 ? value.slice(open + 1, close) : value).trim().toLowerCase();
 }
 
 // Find the original message inside a (possibly) forwarded email. Tries the
@@ -172,7 +218,7 @@ function htmlFromMarker(html: string): string {
 // so a forwarded scam was scored as the forwarder's own message.
 export function unwrapForwarded(raw: string, opts: UnwrapOptions = {}): UnwrappedEmail {
   const attachment = findRfc822(raw);
-  if (attachment) return { raw: attachment, source: "attachment" };
+  if (attachment) return { raw: attachment, markup: textParts(attachment).html, source: "attachment" };
 
   const { headerBlock } = splitHeadersBody(raw);
   const { plain, html } = textParts(raw);
@@ -181,15 +227,12 @@ export function unwrapForwarded(raw: string, opts: UnwrapOptions = {}): Unwrappe
 
   const inline = findInline(text);
   if (inline) {
-    // The original's markup rides along for tracking analysis. The plain
-    // quote above carries its headers and text; the HTML carries its pixels.
-    const quotedHtml = plain.trim() && html ? htmlFromMarker(html) : "";
-    const original = quotedHtml ? `${inline}\n\n${quotedHtml}` : inline;
+    const markup = html ? quotedMarkup(html, quotedSender(inline)) : "";
 
     // For a known forward, the text above the marker is the forwarder's note
     // and signature — outside the scam, and it carries the forwarder's own
     // name, address and number. Stop there.
-    if (opts.forwarded) return { raw: original, source: "inline" };
+    if (opts.forwarded) return { raw: inline, markup, source: "inline" };
 
     // Otherwise keep whatever preceded the marker as well, rather than
     // analysing only the quoted original. Dropping it is an evasion an attacker
@@ -205,9 +248,10 @@ export function unwrapForwarded(raw: string, opts: UnwrapOptions = {}): Unwrappe
     //
     // The quoted original still leads, so header parsing — which reads the
     // FIRST header block — continues to see the original's headers rather than
-    // the forwarder's.
+    // the forwarder's. For the same reason the whole HTML part goes to
+    // tracking: nothing in it is out of scope here.
     const leadIn = text.slice(0, text.indexOf(inline.split(/\r?\n/)[0] ?? "")).trim();
-    return { raw: leadIn ? `${original}\n\n${leadIn}` : original, source: "inline" };
+    return { raw: leadIn ? `${inline}\n\n${leadIn}` : inline, markup: html, source: "inline" };
   }
 
   // A redirect (bounce) re-sends the original with its headers intact and
@@ -216,8 +260,8 @@ export function unwrapForwarded(raw: string, opts: UnwrapOptions = {}): Unwrappe
   if (opts.forwarded && !resent) {
     // No marker and no attachment, but the headers are still the forwarder's.
     // Analyse what they sent us — the decoded body — and nothing about them.
-    return { raw: [text.trim(), html].filter(Boolean).join("\n\n"), source: "body" };
+    return { raw: text.trim(), markup: html, source: "body" };
   }
 
-  return { raw, source: "toplevel" };
+  return { raw, markup: html, source: "toplevel" };
 }

@@ -292,8 +292,10 @@ describe("unwrapForwarded — encoded forwards", () => {
       "--b1--",
     ].join("\r\n");
     const out = unwrapForwarded(raw, { forwarded: true });
-    expect(out.raw).toContain("trk.auspost-redelivery.top/o.gif");
-    expect(out.raw).not.toContain("forwarder-signature.example");
+    expect(out.markup).toContain("trk.auspost-redelivery.top/o.gif");
+    expect(out.markup).not.toContain("forwarder-signature.example");
+    // Markup is for tracking only: `raw` is also distilled into readable text.
+    expect(out.raw).not.toContain("<img");
   });
 });
 
@@ -346,4 +348,122 @@ describe("unwrapForwarded — { forwarded: true }", () => {
     expect(out.source).toBe("toplevel");
     expect(parseEmailHeaders(out.raw).fromAddress).toBe("noreply@auspost-redelivery.top");
   });
+});
+
+// ── Markup reaches tracking, and only tracking ────────────────────────────────
+
+import { analyseEmailSource } from "@/lib/emailSource";
+import { distillEmailContent } from "@/lib/emailDistiller";
+import { htmlToText } from "@/lib/mime";
+
+const PIXEL = '<img src="https://trk.auspost-redelivery.top/o.gif" width="1" height="1">';
+
+function htmlOnly(html: string): string {
+  return [...WRAPPER, 'Content-Type: text/html; charset="UTF-8"', "Content-Transfer-Encoding: base64", "", b64(html)].join("\r\n");
+}
+
+function alternative(plain: string, html: string): string {
+  return [
+    ...WRAPPER,
+    'Content-Type: multipart/alternative; boundary="b1"',
+    "",
+    "--b1",
+    "Content-Type: text/plain",
+    "Content-Transfer-Encoding: base64",
+    "",
+    b64(plain),
+    "--b1",
+    "Content-Type: text/html",
+    "Content-Transfer-Encoding: base64",
+    "",
+    b64(html),
+    "--b1--",
+  ].join("\r\n");
+}
+
+const pixelFound = (raw: string) =>
+  analyseEmailSource(raw, { forwarded: true }).tracking.findings.some((f) => f.kind === "pixel");
+
+describe("tracking on forwards whose HTML carries no text marker", () => {
+  it("finds the pixel in an HTML-only Gmail forward", () => {
+    const html =
+      '<div>Is this real?</div><div class="gmail_quote"><div>---------- Forwarded message ---------<br>' +
+      "From: Australia Post &lt;noreply@auspost-redelivery.top&gt;<br><br>" +
+      `Pay the fee.${PIXEL}</div></div>`;
+    expect(pixelFound(htmlOnly(html))).toBe(true);
+  });
+
+  it("finds the pixel in an Outlook forward, whose From and Sent sit on separate lines", () => {
+    const plain = [
+      "Is this real?",
+      "",
+      "________________________________",
+      "From: Australia Post <noreply@auspost-redelivery.top>",
+      "Sent: Thursday, 24 September 2026 9:12 AM",
+      `To: ${FORWARDER}`,
+      "Subject: Your parcel is on hold",
+      "",
+      "Pay the fee at https://auspost-redelivery.top/pay",
+    ].join("\r\n");
+    const html =
+      '<p>Is this real?<img src="https://forwarder-signature.example/logo.png"></p>' +
+      '<div id="divRplyFwdMsg"><b>From:</b> Australia Post &lt;noreply@auspost-redelivery.top&gt;<br>' +
+      `<b>Sent:</b> Thursday</div><div>Pay the fee.${PIXEL}</div>`;
+    const out = unwrapForwarded(alternative(plain, html), { forwarded: true });
+    expect(out.source).toBe("inline");
+    expect(parseEmailHeaders(out.raw).fromAddress).toBe("noreply@auspost-redelivery.top");
+    expect(out.markup).toContain("trk.auspost-redelivery.top");
+    expect(out.markup).not.toContain("forwarder-signature.example");
+    expect(pixelFound(alternative(plain, html))).toBe(true);
+  });
+
+  it("falls back to the quoted sender's address when the HTML has no known wrapper", () => {
+    const plain = `---------- Forwarded message ---------\r\nFrom: noreply@auspost-redelivery.top\r\n\r\nPay the fee.`;
+    const html =
+      '<p><img src="https://forwarder-signature.example/logo.png"></p>' +
+      `<p>From: noreply@auspost-redelivery.top</p><p>Pay the fee.${PIXEL}</p>`;
+    const out = unwrapForwarded(alternative(plain, html), { forwarded: true });
+    expect(out.markup).toContain("trk.auspost-redelivery.top");
+    expect(out.markup).not.toContain("forwarder-signature.example");
+  });
+});
+
+describe("distilled report content carries no markup", () => {
+  it("shows the forward's text, not its HTML part", () => {
+    const plain = `---------- Forwarded message ---------\r\nFrom: noreply@auspost-redelivery.top\r\n\r\nPay the fee.`;
+    const html = `<div>---------- Forwarded message ---------<br>From: noreply@auspost-redelivery.top<br><p>Pay the fee.</p>${PIXEL}</div>`;
+    const distilled = distillEmailContent(alternative(plain, html));
+    expect(distilled).toContain("Pay the fee.");
+    expect(distilled).not.toMatch(/<(img|p|div|br)\b/i);
+  });
+});
+
+// ── Hostile markup stays linear ───────────────────────────────────────────────
+//
+// htmlToText and the marker search run on mail anyone can send, up to 1MB.
+// Measured before the rewrite: 40KB of unclosed `<a href=` took 83s in the
+// anchor regex. Each shape below restarted a full scan from every opening it
+// failed to close.
+
+describe("hostile input stays linear", () => {
+  const shapes: Record<string, string> = {
+    "unclosed anchors": "<a href=x ".repeat(50_000),
+    "anchors with no </a>": "<a href=x>t ".repeat(50_000),
+    "unclosed style blocks": "<style ".repeat(50_000),
+    "unclosed comments": "<!-- ".repeat(50_000),
+    "tags with no >": "<b ".repeat(100_000),
+    "br with no >": "<br x ".repeat(50_000),
+    "spaces with no newline": " ".repeat(300_000) + "x",
+    "dash runs": "-".repeat(300_000),
+  };
+  for (const [name, input] of Object.entries(shapes)) {
+    it(`${name}: htmlToText and unwrapForwarded`, () => {
+      const start = performance.now();
+      htmlToText(input, "keep");
+      htmlToText(input, "redact");
+      unwrapForwarded(htmlOnly(input), { forwarded: true });
+      unwrapForwarded(`From: a@b.c\n\n${input}`);
+      expect(performance.now() - start).toBeLessThan(1000);
+    });
+  }
 });
