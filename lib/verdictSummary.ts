@@ -432,11 +432,34 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
 
   // What a cut-off forward covered. Stated right under the verdict, because it
   // qualifies everything after it.
+  //
+  // Attachment filenames are the sender's own text, so they are defanged like
+  // every other value from the scam: a file named after a URL or a phone number
+  // must not arrive as a live link in our reply. The extension is kept apart so
+  // "invoice.pdf" still reads as a file.
+  const defangName = (name: string) => {
+    const ext = name.match(/\.[a-z0-9]{1,5}$/i)?.[0] ?? "";
+    return defangPhone(defangFlag(name.slice(0, name.length - ext.length))) + ext;
+  };
+  const partialNotChecked = partial
+    ? [
+        ...(partial.textCut ? ["the rest of the message text"] : []),
+        ...partial.attachments.map(
+          (a) => `${defangName(a.name)} (${a.complete ? "we don't open attachments" : "cut off"})`,
+        ),
+        `everything after the first ${formatBytes(partial.receivedBytes)}`,
+      ]
+    : [];
   const partialHeading = partial
     ? `Partial check: this email was ${formatBytes(partial.totalBytes)}, and we checked the first ${formatBytes(partial.receivedBytes)}.`
     : "";
+  // Only when nothing was found: a "not sure" verdict can still list findings
+  // (partial region coverage downgrades to it), and this line would contradict
+  // them.
+  const foundNothing =
+    breakdown.every((b) => b.reasons.length === 0 && b.signals.length === 0) && flagLines.length === 0;
   const partialCaveat =
-    partial && (verdict === "unknown" || verdict === "safe")
+    partial && foundNothing && (verdict === "unknown" || verdict === "safe")
       ? "We found no scam signs in the part we checked. Treat that as 'not fully checked', not 'safe'."
       : "";
 
@@ -482,7 +505,9 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
   // The forwarded email is never stored and never travels in the URL — the same
   // reply promises we didn't keep a copy, and that has to stay true.
   const reportUrl = (() => {
-    if (!siteUrl || verdict === "safe") return "";
+    // The underlying result, not the displayed one: a clean partial check is
+    // shown as "not sure", but it found nothing to report.
+    if (!siteUrl || composedVerdict === "safe") return "";
     const first = (kind: AnalyzedIdentifier["kind"]) =>
       results.find((r) => r.kind === kind)?.value;
     const scamEmail = senderAddress || first("email");
@@ -530,7 +555,7 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
       ? [
           partialHeading,
           `  Checked: ${partial.checked.join("; ") || "nothing we could read"}`,
-          `  Not checked: ${partial.notChecked.join("; ")}`,
+          `  Not checked: ${partialNotChecked.join("; ")}`,
           ...(partialCaveat ? [`  ${partialCaveat}`] : []),
           "",
         ]
@@ -776,7 +801,7 @@ export function formatVerdictEmail(input: VerdictEmailInput): VerdictEmail {
       `padding:14px 16px;margin:0 0 18px;color:#5c4a1f;font-size:14px;line-height:1.55">` +
       `<div style="font-weight:bold;margin-bottom:6px">${escapeHtml(partialHeading)}</div>` +
       `<div><strong>Checked:</strong> ${escapeHtml(partial.checked.join("; ") || "nothing we could read")}</div>` +
-      `<div><strong>Not checked:</strong> ${escapeHtml(partial.notChecked.join("; "))}</div>` +
+      `<div><strong>Not checked:</strong> ${escapeHtml(partialNotChecked.join("; "))}</div>` +
       (partialCaveat ? `<div style="margin-top:6px">${escapeHtml(partialCaveat)}</div>` : "") +
       `</div>`
     : "";

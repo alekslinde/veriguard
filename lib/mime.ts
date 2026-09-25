@@ -316,7 +316,10 @@ export function mimeManifest(raw: string, cut: boolean, depth = 0): ManifestPart
     return parts.flatMap((seg, i) => {
       const whole = !cut || close !== -1 || i < parts.length - 1;
       const text = seg.replace(/^\r?\n/, "");
-      return text.trim() ? mimeManifest(text, !whole, depth + 1) : [];
+      if (text.trim()) return mimeManifest(text, !whole, depth + 1);
+      // A delimiter with nothing after it: the cut landed right after a part
+      // began. That part still exists, so it is listed rather than dropped.
+      return whole ? [] : [{ type: "", filename: "", complete: false }];
     });
   }
   if (type === "message/rfc822") return mimeManifest(body, cut, depth + 1);

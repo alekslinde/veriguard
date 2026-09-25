@@ -18,8 +18,14 @@ import { mimeManifest, ManifestPart } from "@/lib/mime";
 export interface PartialCheck {
   receivedBytes: number;
   totalBytes: number;
+  // Our own phrases for what the verdict covered.
   checked: string[];
-  notChecked: string[];
+  // Whether the message text itself was cut off partway.
+  textCut: boolean;
+  // Every attachment, which is never opened whether it arrived whole or not.
+  // `name` is the sender's filename when there is one — attacker-controlled
+  // text, so the reply formatter defangs it before it is shown.
+  attachments: { name: string; complete: boolean }[];
 }
 
 // Cut a truncated message back to its last complete line, so no analyser sees
@@ -35,15 +41,21 @@ export function formatBytes(bytes: number): string {
   return `${Math.max(1, Math.round(bytes / 1_000))} KB`;
 }
 
-const isText = (p: ManifestPart) => p.type === "text/plain" || p.type === "text/html" || p.type === "";
+// A part with no Content-Type is text by default, but only if it arrived whole:
+// one the cut went through may have lost its Content-Type line, and is as
+// likely the start of an attachment as more text.
+const isText = (p: ManifestPart) =>
+  p.type === "text/plain" || p.type === "text/html" || (p.type === "" && p.complete);
 
-// A reader-facing name for a part we did not check.
+// A reader-facing name for a part we did not check. A filename is returned as
+// the sender wrote it; see PartialCheck.attachments.
 function describe(p: ManifestPart): string {
   if (p.filename) return p.filename;
   if (p.type.startsWith("image/")) return "an image";
   if (p.type === "application/pdf") return "a PDF";
   if (p.type.startsWith("audio/")) return "an audio file";
   if (p.type.startsWith("video/")) return "a video";
+  if (p.type === "") return "one more part";
   return "an attachment";
 }
 
@@ -79,14 +91,6 @@ export function describePartialCheck(input: PartialCheckInput): PartialCheck {
   if (links) checked.push(plural(links, "link", "links"));
   if (phones) checked.push(plural(phones, "phone number", "phone numbers"));
 
-  // Attachments are never opened, whole or not — saying so here keeps a
-  // "partial check" from implying a full one would have read them.
-  const notChecked: string[] = [];
-  if (textCut) notChecked.push("the rest of the message text");
-  for (const p of parts.filter((x) => !isText(x))) {
-    notChecked.push(p.complete ? `${describe(p)} (we don't open attachments)` : `${describe(p)} (cut off)`);
-  }
-  notChecked.push(`everything after the first ${formatBytes(receivedBytes)}`);
-
-  return { receivedBytes, totalBytes, checked, notChecked };
+  const attachments = parts.filter((x) => !isText(x)).map((p) => ({ name: describe(p), complete: p.complete }));
+  return { receivedBytes, totalBytes, checked, textCut, attachments };
 }

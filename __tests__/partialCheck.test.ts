@@ -121,7 +121,38 @@ describe("describePartialCheck", () => {
       results: [{ kind: "url", value: "https://x.test" } as never],
     });
     expect(out.checked).toEqual(["who it claims to be from", "the message text", "1 link"]);
-    expect(out.notChecked).toEqual(["invoice.pdf (cut off)", "everything after the first 1.0 MB"]);
+    expect(out.textCut).toBe(false);
+    expect(out.attachments).toEqual([{ name: "invoice.pdf", complete: false }]);
+  });
+
+  it("does not mistake a cut inside an attachment's headers for cut-off text", () => {
+    // The cut lands after the part's boundary line but before its Content-Type,
+    // so the part has no type. It must not read as the message text.
+    const full = forwardWithPdf(20_000);
+    const raw = full.slice(0, full.indexOf("Content-Type: application/pdf"));
+    const out = describePartialCheck({ raw, receivedBytes: 1_000_000, totalBytes: 2_000_000, hasSender: true, results: [] });
+    expect(out.textCut).toBe(false);
+    expect(out.checked).toContain("the message text");
+    expect(out.attachments).toEqual([{ name: "one more part", complete: false }]);
+  });
+
+  it("does not count a typeless part the cut went through as text", () => {
+    // Headers arrived up to the Content-Disposition line, so the part has a
+    // header block but no Content-Type.
+    const raw = [
+      'Content-Type: multipart/mixed; boundary="o"',
+      "",
+      "--o",
+      "Content-Type: text/plain",
+      "",
+      "Pay at https://evil.test/pay",
+      "--o",
+      'Content-Disposition: attachment; filename="statement.pdf"',
+      "X-Attachment-Id: f_1",
+    ].join("\r\n");
+    const out = describePartialCheck({ raw, receivedBytes: 1_000_000, totalBytes: 2_000_000, hasSender: false, results: [] });
+    expect(out.textCut).toBe(false);
+    expect(out.attachments).toEqual([{ name: "statement.pdf", complete: false }]);
   });
 });
 
@@ -130,7 +161,8 @@ describe("formatVerdictEmail with a partial check", () => {
     receivedBytes: 1_000_000,
     totalBytes: 7_400_000,
     checked: ["the message text"],
-    notChecked: ["invoice.pdf (cut off)"],
+    textCut: false,
+    attachments: [{ name: "invoice.pdf", complete: false }],
   };
   const clean = [
     { kind: "url", value: "https://example.com", result: { verdict: "safe", score: 0, flags: [], signals: [] } },
@@ -153,6 +185,43 @@ describe("formatVerdictEmail with a partial check", () => {
     const reply = formatVerdictEmail({ results: scam, emailFlags: [], pixelReport: null, partial });
     expect(reply.text).toContain("This looks like a scam.");
     expect(reply.text).not.toContain("'not fully checked'");
+  });
+
+  it("defangs attachment filenames, which the sender wrote", () => {
+    const hostile = {
+      ...partial,
+      attachments: [
+        { name: "https://secure-login.example.com/verify.pdf", complete: false },
+        { name: "Call 1800 123 456 to cancel.pdf", complete: true },
+      ],
+    };
+    const reply = formatVerdictEmail({ results: clean, emailFlags: [], pixelReport: null, partial: hostile });
+    for (const body of [reply.text, reply.html]) {
+      expect(body).not.toContain("https://secure-login");
+      expect(body).not.toContain("secure-login.example.com");
+      expect(body).not.toContain("1800 123 456");
+      expect(body).toContain("hxxps://secure-login[.]example[.]com/verify.pdf (cut off)");
+      expect(body).toMatch(/to cancel\.pdf \(we don(?:'|&#39;)t open attachments\)/);
+    }
+  });
+
+  it("does not claim nothing was found when findings are listed", () => {
+    const flagged = [
+      { kind: "url", value: "https://x.test", result: { verdict: "unknown", score: 15, flags: ["Odd link"], signals: [] } },
+    ] as never;
+    const reply = formatVerdictEmail({ results: flagged, emailFlags: [], pixelReport: null, partial });
+    expect(reply.text).toContain("Odd link");
+    expect(reply.text).not.toContain("We found no scam signs in the part we checked");
+  });
+
+  it("offers no report link for a partial check that found nothing", () => {
+    const reply = formatVerdictEmail({ results: clean, emailFlags: [], pixelReport: null, partial, siteUrl: "https://veriguard.test" });
+    expect(reply.text).not.toContain("/report");
+    const scam = [
+      { kind: "url", value: "https://evil.top", result: { verdict: "likely_scam", score: 90, flags: ["x"], signals: [] } },
+    ] as never;
+    const scamReply = formatVerdictEmail({ results: scam, emailFlags: [], pixelReport: null, partial, siteUrl: "https://veriguard.test" });
+    expect(scamReply.text).toContain("/report");
   });
 
   it("is unchanged without a partial check", () => {
