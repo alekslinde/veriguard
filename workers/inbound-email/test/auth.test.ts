@@ -26,10 +26,11 @@ test("the platform's own DKIM pass for the sender's domain permits a fresh send"
   assert.equal(freshSendAllowed(h, "forwarder@gmail.com"), true);
 });
 
-test("a DKIM pass recorded in the platform's ARC copy also counts", () => {
-  // Where a platform records its verdicts varies; both are its own writing.
+test("an ARC set is not evidence, whoever it names", () => {
+  // The sender can write an ARC set opening with the platform's name and any
+  // instance number, so nothing tells the platform's own apart from a forgery.
   const h = headersWith([], [`i=1; ${CF}; dkim=pass header.d=gmail.com; dmarc=none`]);
-  assert.equal(freshSendAllowed(h, "forwarder@gmail.com"), true);
+  assert.equal(freshSendAllowed(h, "forwarder@gmail.com"), false);
 });
 
 test("a signature at the organisational domain covers a subdomain sender", () => {
@@ -66,15 +67,31 @@ test("a DKIM pass claimed by any other server is not evidence", () => {
 });
 
 test("a forged set naming the platform cannot be smuggled in behind the real one", () => {
-  // The attacker controls their own headers, so they can name the platform.
-  // What they cannot do is make the signature verify: a pass they assert for a
-  // domain they do not control still has to be paired with that domain, and
-  // here it is paired with one that fails the alignment check.
+  // The attacker controls their own headers, so they can name the platform and
+  // claim a pass for the very domain they are spoofing. Only the first set —
+  // the one the platform prepended — is read, so theirs is never seen.
   const h = headersWith([
     `${CF}; dkim=fail header.d=gmail.com; spf=softfail`,
-    `${CF} spoofed; dkim=pass header.d=attacker.test`,
+    `${CF}; dkim=pass header.d=gmail.com; dmarc=pass`,
   ]);
   assert.equal(freshSendAllowed(h, "victim@gmail.com"), false);
+});
+
+test("a forged platform set is refused behind any other server's set", () => {
+  // The first set must itself be the platform's; a later one naming it is not
+  // promoted when the first is someone else's.
+  const h = headersWith([
+    `mx.google.com; dkim=fail header.d=gmail.com`,
+    `${CF}; dkim=pass header.d=gmail.com`,
+  ]);
+  assert.equal(freshSendAllowed(h, "victim@gmail.com"), false);
+});
+
+test("a comma in a parenthesised comment does not split the platform's set", () => {
+  const h = headersWith([
+    `${CF}; spf=pass (domain of a@gmail.com designates 192.0.2.1, as permitted) smtp.mailfrom=gmail.com; dkim=pass header.d=gmail.com`,
+  ]);
+  assert.equal(freshSendAllowed(h, "forwarder@gmail.com"), true);
 });
 
 test("a failing DKIM for the sender's own domain is refused", () => {

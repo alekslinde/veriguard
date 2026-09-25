@@ -98,12 +98,21 @@ export function writerOf(set: string): "receiver" | "other" {
  * sender's OWN domain: a valid signature from some other domain says only that
  * that domain sent something, not that this address did.
  *
- * Only Cloudflare's own verdict set is read. Anyone can add an
- * `Authentication-Results` header to their own mail claiming a pass, so a set
- * written by any other server is attacker-controlled input here, not evidence.
- * The receiver's is the first set on a message it accepted.
+ * Only the platform's own verdict set is read, and that is the FIRST
+ * `Authentication-Results` set: a receiving server prepends its header, so it
+ * sits above every set the message arrived with. Anyone can write their own
+ * set into their mail, naming the platform as its author and claiming a pass,
+ * so a set further down is attacker-controlled input here, not evidence —
+ * however it is labelled. `headers.get()` joins every instance of the header
+ * in message order, which is why the first set is taken rather than any set
+ * `writerOf` calls the receiver's.
  *
- * Defaults closed: no readable verdict from the platform means no fresh send.
+ * ARC copies are not read. Nothing in the set tells the platform's own apart
+ * from one the sender wrote, since both can open with the platform's name and
+ * any instance number, so it cannot be evidence either.
+ *
+ * Defaults closed: no readable verdict from the platform means no fresh send,
+ * and neither does a first set some other server wrote.
  *
  * NOT a prediction of whether reply() will be refused. The platform's own
  * header reports `dmarc=pass` on forwards it goes on to refuse, so the refusal
@@ -114,21 +123,23 @@ export function freshSendAllowed(headers: Headers, from: string): boolean {
   const sender = domainOf(from);
   if (!sender) return false;
 
-  for (const raw of [
-    headers.get("Authentication-Results"),
-    headers.get("ARC-Authentication-Results"),
-  ]) {
-    if (!raw) continue;
-    // Same quote-stripping as authSets, and for the same reason: a signature
-    // value may contain a comma and would otherwise split one set into two.
-    for (const set of raw.toLowerCase().replace(/"[^"]*"/g, "").split(",")) {
-      if (writerOf(set) !== "receiver") continue;
-      for (const signing of dkimPassDomains(set)) {
-        if (aligned(sender, signing)) return true;
-      }
-    }
-  }
-  return false;
+  const first = firstSet(headers.get("Authentication-Results"));
+  if (!first || writerOf(first) !== "receiver") return false;
+  return dkimPassDomains(first).some((signing) => aligned(sender, signing));
+}
+
+/**
+ * The first verdict set in a joined `Authentication-Results` value, lowercased.
+ *
+ * Instances are joined with ", ", so a comma ends the first set — once the
+ * commas that are not separators are gone. Quoted strings go first, as in
+ * authSets: a signature value may contain a comma. Parenthesised comments go
+ * next, for the same reason: an SPF comment is prose and may contain one.
+ * Both patterns stop at the first closing character and cannot backtrack.
+ */
+function firstSet(raw: string | null): string {
+  if (!raw) return "";
+  return raw.toLowerCase().replace(/"[^"]*"/g, "").replace(/\([^()]*\)/g, "").split(",")[0] ?? "";
 }
 
 /**
