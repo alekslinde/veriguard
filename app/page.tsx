@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import CheckStage from "@/components/CheckStage";
 import HomeHero from "@/components/HomeHero";
 import RadarTeaser from "@/components/RadarTeaser";
+import WaysTeaser from "@/components/WaysTeaser";
 import { resolveRegion } from "@/lib/regionResolver";
 import { getStats } from "@/lib/reportStore";
 
@@ -43,6 +44,14 @@ export default async function Home() {
           rather than placed after it so it retires when the verdict arrives —
           "what's circulating" is context for the question, not the answer. */}
       <CheckStage belowFold={<RadarTeaser region={region} />} />
+
+      {/* Outside the stage, so it survives a check rather than retiring with
+          the radar teaser. The two are below the fold for the same reason but
+          answer to different moments: "what's circulating" is context for a
+          question not yet asked, while "here are the other ways in" is most
+          useful to someone who has just had their answer and is deciding
+          whether to keep the tool to hand. */}
+      <WaysTeaser />
     </main>
   );
 }

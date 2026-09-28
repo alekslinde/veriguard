@@ -67,7 +67,14 @@ export default function ForwardPanel() {
     // level whatever this one is currently saying. The trailing note is pushed
     // to the bottom (mt-auto) so the slack lands there rather than as a gap
     // under the last box.
-    <aside className="rounded-2xl border border-[var(--rule)] bg-[var(--ink-2)] p-5 flex flex-col gap-3 h-full">
+    // `id` so /ways can link straight to the forwarding instructions rather
+    // than restating the address — it is configured in one place, and a second
+    // copy on another page is the one that goes stale after a change here.
+    // `scroll-mt` keeps the heading clear of the sticky header on arrival.
+    <aside
+      id="forward"
+      className="scroll-mt-24 rounded-2xl border border-[var(--rule)] bg-[var(--ink-2)] p-5 flex flex-col gap-3 h-full"
+    >
       <p className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
         <span className="shrink-0 text-[var(--faint)]">
           <ForwardIcon />
