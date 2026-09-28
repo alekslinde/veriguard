@@ -31,7 +31,6 @@ export default function CheckStage({
   initialContent,
   surface = "web",
   children,
-  belowFold,
   after,
 }: {
   /** Seeds the check box — used by the share target. */
@@ -40,24 +39,18 @@ export default function CheckStage({
   /** Rendered above the box on the input step only (the share truncation notice). */
   children?: ReactNode;
   /**
-   * Rendered below the stage on the input step only — the radar teaser.
+   * Rendered last, on every step — the ways-in rows and the threat radar.
    *
-   * It lives in the page as CheckStage's sibling, so like the forwarding panel
-   * nothing inside the flow can hide it, and it was still offering "here's what
-   * is circulating" underneath a verdict about the very thing the reader had
-   * just checked. Passing it through here lets the stage retire it along with
-   * everything else that belongs to the question rather than the answer.
-   */
-  belowFold?: ReactNode;
-  /**
-   * Rendered last, on every step — the ways-in section.
+   * On every step deliberately. There used to be a second slot that retired
+   * with the input, on the reasoning that background material belonged to the
+   * question rather than the answer; the radar sat in it and vanished the
+   * moment a verdict arrived, which is when someone told "this looks clean"
+   * most wants to know what is going around.
    *
-   * Unlike `belowFold` this survives a check, because it answers a different
-   * moment: someone who has their verdict is exactly who might want the checker
-   * somewhere other than this page. It is passed through the stage rather than
-   * placed after it in the page so it shares the stage's width — the input step
-   * caps at a readable measure, and a full-width strip underneath a 760px column
-   * left the page with two different right edges.
+   * Passed through the stage rather than placed after it in the page so it
+   * shares the stage's width: the input step caps at a readable measure, and a
+   * full-width strip underneath a 760px column left the page with two different
+   * right edges.
    */
   after?: ReactNode;
 } = {}) {
@@ -132,12 +125,12 @@ export default function CheckStage({
         />
       </div>
 
-      {/* Both share the input step's measure, for the reason given on the grid
-          above. `after` keeps it on the result step too: the stage goes full
-          width there for the verdict, but a two-row aside stretched to 1180px
-          reads as a banner rather than a footnote. */}
-      {!done && belowFold && <div className="max-w-[760px]">{belowFold}</div>}
-      {after && <div className="max-w-[760px]">{after}</div>}
+      {/* Capped on every step, including the one where the stage above is not:
+          the verdict wants the full width, but an aside stretched to 1180px
+          reads as a banner rather than a footnote. space-y rather than a gap on
+          the parent, because this holds two sections and they need separating
+          from each other as well as from the box. */}
+      {after && <div className="max-w-[760px] space-y-6">{after}</div>}
     </>
   );
 }

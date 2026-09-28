@@ -33,26 +33,34 @@ export default async function Home() {
     <main className="max-w-[1180px] mx-auto px-5 sm:px-8 py-8 sm:py-10 space-y-6">
       <HomeHero stats={stats} />
 
-      {/* The fold is the box, with forwarding collapsed beneath it as an aside.
-          Those were two side-by-side cards until the forwarding panel — six
-          elements to offer an email address — measured taller than the check box
-          itself; it is one row now, and a row does not want half the page. Once
-          a check has run the stage takes the full width, because the verdict
-          splits into an evidence sheet and a tactics rail that need it. See
-          CheckStage for why the step lives there rather than inside the flow.
+      {/* The fold is the box. Forwarding used to sit beside it as a second card,
+          then under it as a collapsed row; it is one of the ways-in rows now, so
+          nothing competes with the box for the fold. Once a check has run the
+          stage takes the full width, because the verdict splits into an evidence
+          sheet and a tactics rail that need it. See CheckStage for why the step
+          lives there rather than inside the flow.
 
-          Below the fold on purpose: someone arriving mid-panic with a dodgy SMS
-          needs the paste field first, and background information pushing it down
-          the page would trade their urgent need for ours. The radar is handed to
-          the stage rather than placed after it so it retires when the verdict
-          arrives — "what's circulating" is context for the question, not the
-          answer.
+          Everything else is below the fold on purpose: someone arriving
+          mid-panic with a dodgy SMS needs the paste field first, and background
+          information pushing it down the page would trade their urgent need for
+          ours.
 
-          Ways sits outside the stage, so it survives a check instead: it answers
-          a different moment. "What's circulating" is context for a question not
-          yet asked, while "take it with you" is for someone who has just had
-          their answer and is deciding whether to keep the tool to hand. */}
-      <CheckStage belowFold={<RadarTeaser region={region} />} after={<WaysTeaser />} />
+          Both trailing sections survive a check, and that is the change from
+          before — the radar used to retire with the input, on the reasoning that
+          "what's circulating" was context for a question not yet asked. It is
+          the opposite: a reader who has just been told their message looks clean
+          is exactly who should see what is going around, and retiring it there
+          removed it at the moment it started being useful.
+
+          Ways first, radar last. Ways answers "can I keep this?", which follows
+          directly from having just used it; the radar is reading material, and
+          reading material goes at the bottom. */}
+      <CheckStage after={
+        <>
+          <WaysTeaser />
+          <RadarTeaser region={region} />
+        </>
+      } />
     </main>
   );
 }

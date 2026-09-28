@@ -938,6 +938,81 @@ export function lastUpdated(code: RegionCode): string | null {
   return entries.reduce((latest, t) => (t.lastSeen > latest ? t.lastSeen : latest), entries[0].lastSeen);
 }
 
+/** One circulating phrasing, with the campaign it belongs to. */
+export interface RadarLure {
+  /** The entry this came from — the React key, and what the caller labels it with. */
+  id: string;
+  channel: RadarChannel;
+  coverage: RadarCoverage;
+  /** The campaign's name, for the line under the quote. */
+  title: string;
+  /** The verbatim phrasing a reader might receive. */
+  text: string;
+}
+
+/**
+ * A spread of currently-circulating phrasings — one per campaign, widest first.
+ *
+ * The home page shows lures rather than campaign titles because a title is a
+ * category and a lure is the thing that actually arrives on someone's phone.
+ * "NBN and telco disconnection threats" is what we call it; "Your NBN service
+ * will be disconnected today" is what they will read at 9pm, and only one of
+ * those teaches recognition.
+ *
+ * ONE PER CAMPAIGN, deliberately. Entries carry four to six lures each and
+ * printing them all would be a wall — and worse, would weight the section
+ * toward whichever campaign happened to be researched most thoroughly. Taking
+ * the first of each spreads the sample across campaigns, and the first is the
+ * authored opener rather than an arbitrary pick: the lure lists are written
+ * most-recognisable first.
+ *
+ * Only `active` entries qualify. A quote from a campaign that died down months
+ * ago is a history lesson presented as a warning, which is exactly the failure
+ * the `active`/`watchlist` split exists to prevent.
+ *
+ * Returns fewer than `limit` when a region has fewer active campaigns, and an
+ * empty array for a region with no radar at all — the caller renders nothing
+ * rather than an empty shell.
+ */
+export function circulatingLures(code: RegionCode, limit = 4): RadarLure[] {
+  const out: RadarLure[] = [];
+  for (const entry of activeThreats(code)) {
+    if (out.length >= limit) break;
+    const text = stripQuotes(entry.lures[0] ?? "");
+    // An entry with no lures is an authoring gap a test already catches; skip
+    // rather than render an empty quotation mark if one ever slips through.
+    if (!text) continue;
+    out.push({
+      id: entry.id,
+      channel: entry.channel,
+      coverage: entry.coverage,
+      title: entry.title,
+      text,
+    });
+  }
+  return out;
+}
+
+/**
+ * Drop wrapping quotation marks from an authored lure.
+ *
+ * The lure lists mix two shapes, and both are correct in place: a verbatim
+ * phrasing is quoted ("Your withdrawal is pending approval"), while a described
+ * behaviour is not (A "support agent" who moves you to a phone call). A caller
+ * that renders every lure inside quotation marks therefore doubles the marks on
+ * half of them, which is what this is for.
+ *
+ * Only a matched outer pair is removed, so the inner quotes in the described
+ * shape survive — stripping every quote character would turn that second shape
+ * into something that reads as our own words.
+ */
+function stripQuotes(text: string): string {
+  const trimmed = text.trim();
+  return trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length > 1
+    ? trimmed.slice(1, -1)
+    : trimmed;
+}
+
 /**
  * Whether an ISO date string is a real YYYY-MM-DD calendar date.
  *

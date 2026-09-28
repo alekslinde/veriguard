@@ -14,6 +14,7 @@ import {
   radarSummary,
   filterByChannel,
   channelCounts,
+  circulatingLures,
   type ThreatEntry,
 } from "@/lib/threatRadar";
 import { supportedRegions } from "@veriguard/engine/regions";
@@ -273,6 +274,70 @@ describe("uncoveredThreats", () => {
 
   it("is empty for an unauthored region", () => {
     expect(uncoveredThreats("GB")).toEqual([]);
+  });
+});
+
+describe("circulatingLures", () => {
+  it("quotes only campaigns that are currently active", () => {
+    // A quote from a campaign that died down months ago is a history lesson
+    // presented as a warning — the exact thing the active/watchlist split
+    // exists to prevent.
+    const activeIds = new Set(activeThreats("AU").map((t) => t.id));
+    for (const lure of circulatingLures("AU", 10)) {
+      expect(activeIds.has(lure.id)).toBe(true);
+    }
+  });
+
+  it("takes at most one lure per campaign", () => {
+    // Entries carry four to six lures each. Printing several from one would
+    // weight the section toward whichever campaign was researched hardest,
+    // rather than showing a spread of what is going around.
+    const ids = circulatingLures("AU", 10).map((l) => l.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("uses each entry's first lure, which is authored most-recognisable first", () => {
+    const first = circulatingLures("AU", 1)[0];
+    const entry = activeThreats("AU")[0];
+    // Compared against the unquoted form: the lure is the same string, minus
+    // the wrapping marks the section renders itself.
+    expect(entry.lures[0].replace(/^"|"$/g, "")).toBe(first.text);
+    expect(first.title).toBe(entry.title);
+  });
+
+  it("honours the limit and carries the fields the section renders", () => {
+    const lures = circulatingLures("AU", 3);
+    expect(lures).toHaveLength(3);
+    for (const l of lures) {
+      expect(l.text.length).toBeGreaterThan(0);
+      expect(["sms", "email", "phone", "web", "mixed"]).toContain(l.channel);
+      expect(["covered", "partial", "none", "n/a"]).toContain(l.coverage);
+    }
+  });
+
+  it("strips the wrapping quotes the section adds back itself", () => {
+    // Lures are authored in two shapes: a verbatim phrasing is quoted, a
+    // described behaviour is not. The section renders every one inside quotation
+    // marks, so a lure that arrives already quoted would print doubled ones.
+    for (const lure of circulatingLures("AU", 10)) {
+      expect(lure.text.startsWith('"')).toBe(false);
+      expect(lure.text.endsWith('"')).toBe(false);
+    }
+  });
+
+  it("keeps quotes that are inside a described lure", () => {
+    // Stripping every quote character rather than a matched outer pair would
+    // turn `A "support agent" who moves you to a phone call` into something
+    // that reads as our own words rather than a description of theirs.
+    const inner = radarForRegion("AU")
+      .filter((t) => t.status === "active")
+      .flatMap((t) => t.lures)
+      .filter((l) => !l.startsWith('"') && l.includes('"'));
+    expect(inner.length).toBeGreaterThan(0);
+  });
+
+  it("is empty for an unauthored region, so the section renders nothing", () => {
+    expect(circulatingLures("GB")).toEqual([]);
   });
 });
 
