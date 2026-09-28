@@ -1,6 +1,14 @@
 "use client";
 
-// Home-page section for taking the checker somewhere else.
+// The other ways in, as a bare group of rows.
+//
+// No heading and no lede. Both were removed deliberately: "Take it with you"
+// plus a sentence explaining that the same engine runs behind all of them was
+// two lines of framing over three lines of content, and the rows say what they
+// are — a name, what you do with it, where it runs, and how to get it. A
+// section label earns its place when a reader has to be told what they are
+// looking at; these rows are self-describing, and the label was the part that
+// made this read as a second offer competing with the check box.
 //
 // Below the fold on purpose, and last on the page: someone arriving mid-panic
 // with a dodgy SMS needs the paste field first, and "you could also install an
@@ -17,17 +25,10 @@ import WaysGrid from "@/components/WaysGrid";
 export default function WaysTeaser() {
   const { t } = useLang();
   return (
-    <section id="ways" className="scroll-mt-24 pt-2">
-      <h2 className="text-[15px] font-semibold text-[var(--foreground)]">
-        {t("home.ways.heading")}
-      </h2>
-      {/* One line, not a card. It answers the question the two cards raise —
-          "is this really the same checker?" — and that is a sentence, not a
-          section. The per-surface privacy lines in the cards carry the part
-          that actually differs between them. */}
-      <p className="mt-1 mb-3 max-w-[68ch] text-[13.5px] text-[var(--text-dim)] leading-relaxed">
-        {t("home.ways.lede")}
-      </p>
+    // The label is for assistive technology only — it replaces the visible
+    // heading that used to name this group, so the section is still announced
+    // and navigable rather than being an unlabelled run of links.
+    <section id="ways" aria-label={t("home.ways.label")} className="scroll-mt-24">
       <WaysGrid />
     </section>
   );
