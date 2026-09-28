@@ -1,10 +1,12 @@
-// Generates the PWA/home-screen icon set from app/icon.svg.
+// Generates the PWA/home-screen icon set from app/icon.svg and its dark-ground
+// counterpart, app/icon-dark.svg.
 //
-// The source mark is a solid path with the check knocked out via
-// fill-rule="evenodd", so it rasterises to a clean alpha channel. We use that
-// alpha as a mask and tint it the brand emerald on the dark page background —
-// which is why the mark must read as one filled silhouette: a stroked check
-// laid over the shield would be tinted the same colour and disappear.
+// The source mark is two-tone (emerald fill + ink negative-space) — both
+// colours are baked into the SVG itself, so this script rasterises it
+// directly and composites it onto the brand ground, rather than tinting a
+// single-colour silhouette. Every icon this script generates sits on the ink
+// ground, so it uses icon-dark.svg (paper negative-space) throughout —
+// icon.svg itself is the light-ground variant, used inline on paper surfaces.
 //   public/icon-192.png           — manifest icon (any)
 //   public/icon-512.png           — manifest icon (any)
 //   public/icon-maskable-512.png  — manifest icon (maskable, 80% safe zone)
@@ -15,25 +17,14 @@ import sharp from "sharp";
 import { readFileSync, mkdirSync } from "fs";
 import { dirname } from "path";
 
-const SVG = readFileSync(new URL("../app/icon.svg", import.meta.url));
-const BG = { r: 3, g: 7, b: 18, alpha: 1 };      // gray-950 #030712
-const FG = { r: 52, g: 211, b: 153, alpha: 1 };  // emerald-400 #34d399
+const SVG = readFileSync(new URL("../app/icon-dark.svg", import.meta.url));
+const BG = { r: 20, g: 28, b: 43, alpha: 1 }; // --ink #141C2B
 
-// Render the glyph at `glyphSize`, tint it FG, centre it on a BG square of `size`.
+// Render the glyph at `glyphSize` (its own colours, from the SVG), centre it
+// on a BG square of `size`.
 async function makeIcon(size, glyphRatio, out) {
   const glyphSize = Math.round(size * glyphRatio);
-  const alpha = await sharp(SVG)
-    .resize(glyphSize, glyphSize)
-    .ensureAlpha()
-    .extractChannel("alpha")
-    .toBuffer();
-
-  const tinted = await sharp({
-    create: { width: glyphSize, height: glyphSize, channels: 3, background: FG },
-  })
-    .joinChannel(alpha)
-    .png()
-    .toBuffer();
+  const glyph = await sharp(SVG).resize(glyphSize, glyphSize).png().toBuffer();
 
   const outPath = new URL(`../${out}`, import.meta.url).pathname;
   // The extension icons land in a directory that is not committed (it holds only
@@ -43,7 +34,7 @@ async function makeIcon(size, glyphRatio, out) {
   await sharp({
     create: { width: size, height: size, channels: 4, background: BG },
   })
-    .composite([{ input: tinted, gravity: "centre" }])
+    .composite([{ input: glyph, gravity: "centre" }])
     .png()
     .toFile(outPath);
 
