@@ -48,9 +48,9 @@ export default async function Home() {
       {/* Outside the stage, so it survives a check rather than retiring with
           the radar teaser. The two are below the fold for the same reason but
           answer to different moments: "what's circulating" is context for a
-          question not yet asked, while "here are the other ways in" is most
-          useful to someone who has just had their answer and is deciding
-          whether to keep the tool to hand. */}
+          question not yet asked, while "take it with you" is most useful to
+          someone who has just had their answer and is deciding whether to keep
+          the tool to hand — which is also why this one stays after a check. */}
       <WaysTeaser />
     </main>
   );

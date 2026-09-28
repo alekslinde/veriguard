@@ -67,9 +67,9 @@ export default function ForwardPanel() {
     // level whatever this one is currently saying. The trailing note is pushed
     // to the bottom (mt-auto) so the slack lands there rather than as a gap
     // under the last box.
-    // `id` so /ways can link straight to the forwarding instructions rather
+    // `id` so anything can link straight to the forwarding instructions rather
     // than restating the address — it is configured in one place, and a second
-    // copy on another page is the one that goes stale after a change here.
+    // copy elsewhere is the one that goes stale after a change here.
     // `scroll-mt` keeps the heading clear of the sticky header on arrival.
     <aside
       id="forward"

@@ -15,10 +15,6 @@ const LINKS = [
   { href: "/radar", key: "nav.radar" },
   { href: "/calendar", key: "nav.calendar" },
   { href: "/submissions", key: "nav.reports" },
-  // Before About, because it is a way to use the tool rather than background
-  // about it. The check box is the first entry and this is where someone goes
-  // once they want the checker somewhere other than this page.
-  { href: "/ways", key: "nav.ways" },
   { href: "/about", key: "nav.about" },
 ] as const;
 
