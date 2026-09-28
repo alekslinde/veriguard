@@ -35,6 +35,7 @@ export default function CheckStage({
   forward = true,
   children,
   belowFold,
+  after,
 }: {
   /** Seeds the check box — used by the share target. */
   initialContent?: string;
@@ -56,6 +57,17 @@ export default function CheckStage({
    * everything else that belongs to the question rather than the answer.
    */
   belowFold?: ReactNode;
+  /**
+   * Rendered last, on every step — the ways-in section.
+   *
+   * Unlike `belowFold` this survives a check, because it answers a different
+   * moment: someone who has their verdict is exactly who might want the checker
+   * somewhere other than this page. It is passed through the stage rather than
+   * placed after it in the page so it shares the stage's width — the input step
+   * caps at a readable measure, and a full-width strip underneath a 760px column
+   * left the page with two different right edges.
+   */
+  after?: ReactNode;
 } = {}) {
   const { t } = useLang();
   const [step, setStep] = useState<CheckStep>("input");
@@ -101,10 +113,21 @@ export default function CheckStage({
       {/* Notices belong to the input, so they go when it does. */}
       {!done && children}
 
-      {/* Two columns while both are real options; one once the verdict exists.
-          The check box takes the wider track: it is the primary action and the
-          textarea needs the room. Forwarding is a narrow panel because it is
-          three lines and an address.
+      {/* One column, always.
+
+          This was two side-by-side tracks while the forwarding panel was a card
+          of comparable weight to the check box. It is now a single collapsed
+          row, and a one-line disclosure given half the container reads as an
+          empty column rather than an alternative — so the two stack, the box
+          takes the readable measure it wants, and the row sits under it as the
+          aside it actually is.
+
+          The cap applies on the input step only, and everything on that step
+          shares it: a full-width strip under a 760px column gives the page two
+          different right edges. The verdict that replaces the input is not
+          capped — it splits into an evidence sheet and a tactics rail, which
+          divide the width between them, so each lands at a readable measure on
+          its own and a cap only starves both.
 
           Keyed so React reconciles this by identity rather than by position.
           The strip and the notices above it are conditional, so the number of
@@ -115,32 +138,8 @@ export default function CheckStage({
           message the reader had just checked. */}
       <div
         key="stage-grid"
-        className={
-          done
-            ? "grid gap-5"
-            : forward
-              // 1fr/1fr rather than 1.15/0.85, and stretched rather than
-              // top-aligned. The panel beside the box grows and shrinks with
-              // what it has to say — the tracking-pixel warning alone wraps to
-              // a different height at each width — so a split tuned against one
-              // of those states comes apart in the others, and top-alignment
-              // left one card floating against the other's lower edge. Equal
-              // columns that stretch stay square across every combination, and
-              // the box is still a comfortable measure to paste into at half
-              // the container.
-              ? "grid gap-5 lg:grid-cols-2 lg:items-stretch"
-              // Without a forwarding panel beside it the box would otherwise
-              // stretch the full container, and a textarea spanning 1180px is
-              // worse to paste into than one at a readable width.
-              : "grid gap-5 max-w-[760px]"
-        }
+        className={done ? "grid gap-5" : "grid gap-4 max-w-[760px]"}
       >
-        {/* Not capped once the fold has collapsed. The cap existed when the
-            verdict was one column of prose — 1180px of unbroken text runs to
-            ~140 characters a line. The results now split into an evidence sheet
-            and a tactics rail, which divide the width between them, so each
-            column lands at a readable measure on its own and the old 860px cap
-            only starved both. */}
         <div className="min-w-0">
           <CheckFlow
             initialContent={initialContent}
@@ -155,7 +154,12 @@ export default function CheckStage({
         {forward && !done && <ForwardPanel />}
       </div>
 
-      {!done && belowFold}
+      {/* Both share the input step's measure, for the reason given on the grid
+          above. `after` keeps it on the result step too: the stage goes full
+          width there for the verdict, but a two-row aside stretched to 1180px
+          reads as a banner rather than a footnote. */}
+      {!done && belowFold && <div className="max-w-[760px]">{belowFold}</div>}
+      {after && <div className="max-w-[760px]">{after}</div>}
     </>
   );
 }

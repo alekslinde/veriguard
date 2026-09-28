@@ -73,23 +73,31 @@ export default function StatsBar({ initial }: { initial: Stats | null }) {
 
   const empty = !stats || (stats.checks === 0 && stats.reports === 0);
 
-  // The container always renders at full height so the hero doesn't shift
-  // when the numbers arrive (or never do).
+  // Renders inline, as the tail of the subtitle sentence rather than a row of
+  // its own.
+  //
+  // It was a separate 28px bar under the hero, which on a phone wrapped to two
+  // lines and stranded its own separator dot ("411 scams checked on this / site
+  // · 14 reports / submitted"). Two counters are a clause, not a section: they
+  // qualify the claim the subtitle just made, and reading as part of that
+  // sentence is both shorter and truer to what they are.
+  //
+  // A fragment, so nothing renders at all when there is nothing to say — the
+  // old wrapper reserved its height unconditionally to stop the hero shifting,
+  // and inline there is no shift to prevent: the subtitle occupies the line
+  // whether or not this follows it.
+  if (empty) return null;
+
   return (
-    <div className="flex items-center gap-6 text-sm text-[var(--text-dim)] pb-1 min-h-[1.75rem]">
-      {!empty && (
-        <>
-          <span>
-            <span className="text-emerald-400 font-bold">{fmt(stats.checks)}</span>
-            {" "}{t(stats.checks === 1 ? "stats.checked.one" : "stats.checked.many")}
-          </span>
-          <span className="text-gray-600" aria-hidden="true">·</span>
-          <span>
-            <span className="text-emerald-400 font-bold">{fmt(stats.reports)}</span>
-            {" "}{t(stats.reports === 1 ? "stats.reported.one" : "stats.reported.many")}
-          </span>
-        </>
-      )}
-    </div>
+    <>
+      {" "}
+      <span className="text-[var(--foreground)]">
+        <span className="font-semibold">{fmt(stats.checks)}</span>{" "}
+        {t(stats.checks === 1 ? "stats.checked.one" : "stats.checked.many")}
+        {", "}
+        <span className="font-semibold">{fmt(stats.reports)}</span>{" "}
+        {t(stats.reports === 1 ? "stats.reported.one" : "stats.reported.many")}.
+      </span>
+    </>
   );
 }

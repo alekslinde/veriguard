@@ -33,25 +33,26 @@ export default async function Home() {
     <main className="max-w-[1180px] mx-auto px-5 sm:px-8 py-8 sm:py-10 space-y-6">
       <HomeHero stats={stats} />
 
-      {/* The fold holds exactly two things: paste it here, or forward it from
-          your mail app. They are alternatives, so they sit side by side rather
-          than stacked. Once a check has run the stage collapses to one column
-          and the verdict takes the page — see CheckStage for why that lives
-          there rather than inside the flow. */}
-      {/* Below the fold on purpose: someone arriving mid-panic with a dodgy SMS
-          needs the paste field first, and background information pushing it down
-          the page would trade their urgent need for ours. Handed to the stage
-          rather than placed after it so it retires when the verdict arrives —
-          "what's circulating" is context for the question, not the answer. */}
-      <CheckStage belowFold={<RadarTeaser region={region} />} />
+      {/* The fold is the box, with forwarding collapsed beneath it as an aside.
+          Those were two side-by-side cards until the forwarding panel — six
+          elements to offer an email address — measured taller than the check box
+          itself; it is one row now, and a row does not want half the page. Once
+          a check has run the stage takes the full width, because the verdict
+          splits into an evidence sheet and a tactics rail that need it. See
+          CheckStage for why the step lives there rather than inside the flow.
 
-      {/* Outside the stage, so it survives a check rather than retiring with
-          the radar teaser. The two are below the fold for the same reason but
-          answer to different moments: "what's circulating" is context for a
-          question not yet asked, while "take it with you" is most useful to
-          someone who has just had their answer and is deciding whether to keep
-          the tool to hand — which is also why this one stays after a check. */}
-      <WaysTeaser />
+          Below the fold on purpose: someone arriving mid-panic with a dodgy SMS
+          needs the paste field first, and background information pushing it down
+          the page would trade their urgent need for ours. The radar is handed to
+          the stage rather than placed after it so it retires when the verdict
+          arrives — "what's circulating" is context for the question, not the
+          answer.
+
+          Ways sits outside the stage, so it survives a check instead: it answers
+          a different moment. "What's circulating" is context for a question not
+          yet asked, while "take it with you" is for someone who has just had
+          their answer and is deciding whether to keep the tool to hand. */}
+      <CheckStage belowFold={<RadarTeaser region={region} />} after={<WaysTeaser />} />
     </main>
   );
 }

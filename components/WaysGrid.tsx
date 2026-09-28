@@ -1,12 +1,13 @@
 "use client";
 
-// The ways to take the checker with you, as cards.
+// The ways to take the checker with you, as two rows.
 //
-// One density, one placement — the home page section. There used to be a
-// separate /ways page and a compact home-page strip of the same four cards, and
-// the strip repeated the two things already on the fold. Cutting to the two
-// surfaces a reader cannot see from here left a set small enough to state fully
-// in place, so the page it linked to had nothing left to add.
+// There used to be a /ways page and a home-page strip of the same four cards,
+// and the strip repeated the two things already on the fold — one card linked
+// to the page it sat on. Cutting to the two surfaces a reader cannot see from
+// here left a set small enough to state in place, so the page retired; cutting
+// those from cards to rows left a section that reads as the aside it is rather
+// than a second offer competing with the check box.
 
 import Link from "next/link";
 import { useLang } from "@/lib/lang";
@@ -44,48 +45,28 @@ function Card({ way }: { way: WayIn }) {
   // actually exists today.
   const pending = Boolean(way.unavailable);
 
+  // One row, not a card.
+  //
+  // These were cards of four paragraphs on a page of their own, then cards of
+  // one paragraph here. At 456px on a phone the section was still 24% of the
+  // page — a quarter of the primary surface spent on content whose own framing
+  // is "for later". A row states the same thing in a line: what it is, what it
+  // costs you to get it, and whether it is available.
   const body = (
     <>
-      <div className="flex items-center gap-2">
-        <h3 className="font-semibold text-[var(--foreground)] text-[15px]">{t(way.name)}</h3>
-        {/* Only the on-device surfaces carry this. Labelling the server-side
-            ones "server" too would read as a warning; a badge earns its place
-            by marking the exception. */}
-        {way.runs === "device" && (
-          <span className="shrink-0 rounded-md border border-[var(--clear)]/35 bg-[var(--clear)]/10 px-2 py-0.5 font-[family-name:var(--font-mono-ui)] text-[10px] uppercase tracking-[0.08em] text-[var(--clear)]">
-            {t("ways.badge.onDevice")}
-          </span>
-        )}
-        {pending && (
-          <span className="shrink-0 rounded-md border border-[var(--rule)] px-2 py-0.5 font-[family-name:var(--font-mono-ui)] text-[10px] uppercase tracking-[0.08em] text-[var(--faint)]">
-            {t("ways.badge.soon")}
-          </span>
-        )}
-      </div>
-      {/* One paragraph, not three. The old /ways page gave each card an
-          audience line, a how-it-works line and a privacy line, which is a
-          page's worth of reading; stacked two-up under the check box it made
-          the section taller than the four-card strip it replaced. The section
-          lede carries the privacy claim for both, and the badge says it again —
-          a third statement per card was the easiest thing on the page to cut. */}
-      <p className="mt-1.5 text-[13.5px] text-[var(--text-dim)] leading-relaxed">
-        {t(way.how)}
-      </p>
+      <span className="flex-1 min-w-0">
+        <span className="font-semibold text-[var(--foreground)] text-[14.5px]">
+          {t(way.name)}
+        </span>
+        <span className="text-[var(--text-dim)] text-[13.5px]"> — {t(way.how)}</span>
+      </span>
 
-      <p className="mt-2.5 text-[13.5px] font-semibold">
+      {/* Right-aligned and never wrapping: the two rows' statuses line up, so
+          "which of these can I actually get" is one glance down the edge rather
+          than a hunt through two paragraphs. */}
+      <span className="shrink-0 text-[13px] font-semibold self-start sm:self-center">
         {pending ? (
-          <>
-            <span className="text-[var(--faint)] font-normal">{t(way.unavailable!)}</span>
-            {href && way.fallbackCta && (
-              <>
-                {" "}
-                <span className="text-[var(--clear)]">
-                  {t(way.fallbackCta)}
-                  <span aria-hidden="true"> →</span>
-                </span>
-              </>
-            )}
-          </>
+          <span className="text-[var(--faint)] font-normal">{t(way.unavailable!)}</span>
         ) : href ? (
           <span className="text-[var(--clear)]">
             {t(way.cta)}
@@ -96,21 +77,29 @@ function Card({ way }: { way: WayIn }) {
           // rendering a link to nowhere.
           <span className="text-[var(--faint)] font-normal">{t("ways.ext.unavailable")}</span>
         )}
-      </p>
+      </span>
     </>
   );
 
+  // Rows in one bordered group rather than two separate cards: two of anything
+  // side by side reads as a choice between them, and these are not alternatives
+  // — most people want neither, and anyone who wants one knows which.
   const shell =
-    "block rounded-2xl border border-[var(--rule)] bg-[var(--ink-2)] p-4 sm:p-5 h-full transition-colors hover:border-[var(--clear)]/50";
+    "flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 px-4 py-3 transition-colors";
 
   if (!href) return <div className={shell}>{body}</div>;
 
   return external ? (
-    <a className={shell} href={href} target="_blank" rel="noopener noreferrer">
+    <a
+      className={`${shell} hover:bg-[var(--ink-2)]`}
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
       {body}
     </a>
   ) : (
-    <Link className={shell} href={href}>
+    <Link className={`${shell} hover:bg-[var(--ink-2)]`} href={href}>
       {body}
     </Link>
   );
@@ -118,7 +107,7 @@ function Card({ way }: { way: WayIn }) {
 
 export default function WaysGrid() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="rounded-xl border border-[var(--rule)] divide-y divide-[var(--rule)] overflow-hidden">
       {WAYS_IN.map((way) => (
         <Card key={way.id} way={way} />
       ))}

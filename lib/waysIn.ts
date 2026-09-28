@@ -21,15 +21,15 @@ export type WhereItRuns = "server" | "device";
 
 export interface WayIn {
   id: "extension" | "npm";
-  /** Message keys for the lines every card shows. */
+  /** Message keys for the parts of the row. */
   name: MessageKey;
   /**
-   * Who it is for and what happens when you use it, as one sentence.
+   * What you do with it, as a clause that follows the name after a dash.
    *
-   * These used to be three keys — audience, how, privacy — written for a page
-   * that had room for them. Two-up under the check box that read as a wall, so
-   * the card is down to the line someone actually scans for, and the privacy
-   * claim is made once for the section instead of twice per card.
+   * This used to be three keys — audience, how, privacy — written for a page of
+   * its own. The section is now two rows under the check box, so it is down to
+   * the half-line someone scans, and the privacy claim is made once in the
+   * section lede rather than twice per entry.
    */
   how: MessageKey;
   /** Call to action. */
@@ -44,15 +44,14 @@ export interface WayIn {
   /**
    * Set where the surface is built but not yet distributed.
    *
-   * The card then leads with this rather than a call to action, and `href`
-   * becomes a secondary link to whatever does exist. A CTA that reads "Read the
-   * docs" and lands on a source tree is a small lie told on the busiest page we
-   * have; saying "not published yet" costs nothing and is true. Clear the flag
-   * when the package ships, and repoint `href` at the docs.
+   * The row shows this in place of its call to action, while `href` still
+   * points at whatever does exist today — for the package, the engine source.
+   * A CTA reading "Read the docs" that lands on a source tree is a small lie
+   * told on the busiest page we have; "Coming soon" over a row that still opens
+   * the code costs nothing and is true. Clear the flag when the package ships,
+   * and repoint `href` at the docs.
    */
   unavailable?: MessageKey;
-  /** Label for the fallback link shown while `unavailable` is set. */
-  fallbackCta?: MessageKey;
 }
 
 /**
@@ -82,6 +81,5 @@ export const WAYS_IN: readonly WayIn[] = [
     href: ENGINE_SOURCE_URL,
     runs: "device",
     unavailable: "ways.npm.unavailable",
-    fallbackCta: "ways.npm.source",
   },
 ];
