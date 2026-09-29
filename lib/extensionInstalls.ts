@@ -173,7 +173,12 @@ export type InstallTarget = {
 };
 
 /**
- * Every browser the extension targets, in order of how many people use them.
+ * Every browser the extension targets, roughly by how many people use them.
+ *
+ * This is the authored order, not the rendered one: installsForBrowser groups
+ * the published ahead of the unpublished before anything is shown, and this
+ * order decides only what happens WITHIN each group. Reordering here still
+ * moves buttons; it just cannot move a "soon" one above a working one.
  *
  * Unpublished targets are kept rather than dropped. A bare list of install
  * links should hold only links you can follow — but this list is the complete
@@ -192,21 +197,35 @@ function storeUrl(store: ExtensionStore): string | null {
 }
 
 /**
- * The install targets, with the reader's own browser first.
+ * The install targets: what you can install now, then what is coming.
  *
- * `first` is a hint, not a filter: every target stays listed and in its original
- * order behind the promoted one, so a wrong guess costs the reader a glance
- * rather than a link. Passing null — the server render, or an unrecognised user
- * agent — returns the list untouched.
+ * Two rules, applied in this order.
+ *
+ * INSTALLABLE FIRST. Every published target precedes every unpublished one,
+ * whatever the authored order says. Interleaved, the "soon" buttons broke the
+ * row of real choices in half — a reader scanning for the one that fits them
+ * stepped over a dead button to reach it. Grouped, the list reads as the offer
+ * it is, with the not-yet ones trailing as a footnote. Each group keeps its
+ * authored order internally, so "roughly by reach" still decides Chrome before
+ * Firefox, and Edge before Safari.
+ *
+ * THEN THE READER'S OWN, if they can install it. `first` is a hint, not a
+ * filter: every target stays listed, so a wrong guess costs a glance rather
+ * than a link. An unpublished browser is never lifted — leading with a button
+ * that does nothing buries the ones that work — but it is still marked where it
+ * sits, at the end.
+ *
+ * Passing null (the server render, or an unrecognised agent) still groups, so
+ * the first paint is already in its final shape and hydration only promotes.
  */
 export function installsForBrowser(first: InstallTarget["id"] | null): readonly InstallTarget[] {
-  if (!first) return INSTALL_TARGETS;
-  const mine = INSTALL_TARGETS.find((t) => t.id === first);
-  // Promotion is for a browser you can install on. Lifting an unpublished one
-  // to the front — Safari today — leads with a button that does nothing and
-  // buries the three that work behind it, which is worse for that reader than
-  // leaving the order alone. Their browser is still in the list, still marked
-  // "soon", in its usual place.
-  if (!mine?.url) return INSTALL_TARGETS;
-  return [mine, ...INSTALL_TARGETS.filter((t) => t.id !== first)];
+  const available = INSTALL_TARGETS.filter((t) => t.url);
+  const pending = INSTALL_TARGETS.filter((t) => !t.url);
+
+  const mine = first ? available.find((t) => t.id === first) : undefined;
+  const promoted = mine
+    ? [mine, ...available.filter((t) => t.id !== first)]
+    : available;
+
+  return [...promoted, ...pending];
 }

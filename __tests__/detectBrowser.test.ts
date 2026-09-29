@@ -127,6 +127,12 @@ describe("install targets", () => {
 
 describe("installsForBrowser", () => {
   const authored = INSTALL_TARGETS.map((t) => t.id);
+  // What the page actually renders with no browser known: installable first,
+  // each group in authored order.
+  const grouped = [
+    ...INSTALL_TARGETS.filter((t) => t.url).map((t) => t.id),
+    ...INSTALL_TARGETS.filter((t) => !t.url).map((t) => t.id),
+  ];
 
   it("puts the reader's own browser first without dropping the others", () => {
     const ordered = installsForBrowser("firefox");
@@ -141,22 +147,47 @@ describe("installsForBrowser", () => {
   it("does not promote Edge, which has no listing yet", () => {
     // Same rule as Safari: promotion is for a browser you can install on.
     // Leading an Edge reader with a button that does nothing would bury the
-    // ones that work. Their row is still there, still marked.
-    expect(installsForBrowser("edge").map((t) => t.id)).toEqual(authored);
+    // ones that work. Their row is still there, still marked, at the end.
+    expect(installsForBrowser("edge").map((t) => t.id)).toEqual(grouped);
     expect(installsForBrowser("edge")[0].url).toBeTruthy();
   });
 
-  it("leaves the order alone when the browser is unknown", () => {
-    // The server render, and any user agent the matcher does not recognise.
-    expect(installsForBrowser(null).map((t) => t.id)).toEqual(authored);
+  it("does not promote Safari either", () => {
+    expect(installsForBrowser("safari").map((t) => t.id)).toEqual(grouped);
+    expect(installsForBrowser("safari")[0].url).toBeTruthy();
   });
 
-  it("does not promote a browser you cannot install on", () => {
-    // Safari today. Leading with a button that does nothing, and burying the
-    // three that work behind it, is worse for that reader than leaving the
-    // order alone — their browser is still listed, still marked "soon".
-    expect(installsForBrowser("safari").map((t) => t.id)).toEqual(authored);
-    expect(installsForBrowser("safari")[0].url).toBeTruthy();
+  it("groups every unpublished browser at the end", () => {
+    // Interleaved, the "soon" buttons broke the row of real choices in half.
+    // Whatever the reader is on, the list is installable-first.
+    for (const first of [...authored, null]) {
+      const urls = installsForBrowser(first).map((t) => Boolean(t.url));
+      const firstPending = urls.indexOf(false);
+      if (firstPending === -1) continue;
+      expect(
+        urls.slice(firstPending).every((u) => !u),
+        `${first}: a working button follows a pending one`,
+      ).toBe(true);
+    }
+  });
+
+  it("keeps the authored order inside each group", () => {
+    // Grouping decides which half a button lands in; the authored order still
+    // decides Chrome before Firefox, and Edge before Safari.
+    const ids = installsForBrowser(null).map((t) => t.id);
+    const available = authored.filter((id) =>
+      INSTALL_TARGETS.find((t) => t.id === id)?.url,
+    );
+    const pending = authored.filter(
+      (id) => !INSTALL_TARGETS.find((t) => t.id === id)?.url,
+    );
+    expect(ids).toEqual([...available, ...pending]);
+  });
+
+  it("groups on the server render too, so hydration only promotes", () => {
+    // Null is what getServerSnapshot returns. If grouping happened only once a
+    // browser was known, the first paint would reorder under the reader.
+    expect(installsForBrowser(null).map((t) => t.id)).toEqual(grouped);
   });
 
   it("never lists a browser twice", () => {
