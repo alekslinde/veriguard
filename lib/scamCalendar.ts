@@ -1308,7 +1308,11 @@ export function isWellFormedDate(value: string): boolean {
  * rest have aged. AU sat in exactly that state on 2026-09-29: the gate read
  * 2026-09-27 from one promoted season while twelve others were still on 08-16 or
  * 09-11. Reviewing a region means reviewing its seasons, not the date this
- * returns; a per-season staleness check is the obvious follow-up.
+ * returns.
+ *
+ * scripts/check-promotion-freshness.ts now reports per-season staleness beside
+ * the surface comparison for exactly this reason, so the masking is visible even
+ * though this function still (correctly) answers the narrower question.
  */
 export function lastReviewed(code: RegionCode): string | null {
   const seasons = calendarForRegion(code);
