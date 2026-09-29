@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import AddToHomeScreen from "@/components/AddToHomeScreen";
 import CheckStage from "@/components/CheckStage";
 import HomeHero from "@/components/HomeHero";
 import RadarTeaser from "@/components/RadarTeaser";
@@ -57,6 +58,13 @@ export default async function Home() {
           reading material goes at the bottom. */}
       <CheckStage after={
         <>
+          {/* Above the ways-in rows, and for the same reason they sit here: a
+              reader who has their answer is the one deciding whether to keep
+              the tool around. It leads that group because a home-screen icon is
+              the one option needing no store, no browser choice and no
+              developer — but it renders nothing at all on a device that already
+              has it, or cannot do it, so on a desktop this group is unchanged. */}
+          <AddToHomeScreen variant="card" />
           <WaysTeaser />
           <RadarTeaser region={region} />
         </>
