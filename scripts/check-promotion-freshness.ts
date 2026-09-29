@@ -12,6 +12,15 @@
 // flags exactly that — the newest roadmap on disk running ahead of what the
 // radar and calendar have been advanced to.
 //
+// It reports two different kinds of staleness, because there are two:
+//
+//   1. A SURFACE behind the newest sweep. Region-level, gated on AU, and the
+//      original purpose of this file.
+//   2. A SEASON nobody has reviewed in a month. Per-entry and never gated. A
+//      region's date is its newest season, so a single promoted season reports
+//      the whole region current — which is how twelve AU seasons aged to 44 days
+//      behind a green check. See the staleSeasons() note.
+//
 // It FLAGS, it does not edit the data — the same philosophy as
 // scripts/check-sources.mjs and check-calendar-sources.ts. Promotion is an
 // editorial judgement (which campaigns a member of the public can actually act
@@ -35,7 +44,12 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
 import { lastUpdated, authoredRadarRegions, type RadarRegion } from "../lib/threatRadar";
-import { lastReviewed, authoredCalendarRegions, type CalendarRegion } from "../lib/scamCalendar";
+import {
+  lastReviewed,
+  authoredCalendarRegions,
+  calendarForRegion,
+  type CalendarRegion,
+} from "../lib/scamCalendar";
 // Plain .mjs helper shared with check-sources.mjs / dependabot-triage.mjs;
 // `allowJs` resolves it and infers its shape from JSDoc.
 import { publishDigestIssue } from "./lib/digestIssue.mjs";
@@ -100,10 +114,23 @@ function surfaces(): Surface[] {
   return rows;
 }
 
+/** A season whose `reviewed` date has aged past the staleness threshold. */
+interface StaleSeason {
+  region: CalendarRegion;
+  id: string;
+  reviewed: string;
+  ageDays: number;
+}
+
 interface Report {
   newest: string;
   behind: Array<{ surface: Surface; gapDays: number }>;
   inSync: Surface[];
+  /**
+   * Seasons nobody has reviewed lately, independent of the sweep comparison
+   * above. Reported, never gating — see the staleSeasons() note.
+   */
+  staleSeasons: StaleSeason[];
 }
 
 /**
@@ -140,7 +167,74 @@ function daysBetween(from: string, to: string): number {
   return Math.round((b - a) / 86_400_000);
 }
 
-function assess(newest: string): Report {
+// ── Per-season staleness ─────────────────────────────────────────────────────
+//
+// The surface check above asks "is the region's date behind the newest sweep".
+// That question is answered by lastReviewed(), which returns the NEWEST reviewed
+// date in a region — so one freshly-reviewed season reports the whole region as
+// current. AU sat in exactly that state on 2026-09-29: the gate read 2026-09-27
+// from a single promoted season while twelve others were still on 2026-08-16 or
+// 2026-09-11, and nothing was failing.
+//
+// This closes that by measuring each season on its own. Two deliberate
+// differences from the surface check:
+//
+//   · It measures AGE AGAINST TODAY, not distance behind the newest sweep.
+//     Seasons are not per-sweep artefacts — a quiet cycle that re-confirms a
+//     season is a real review, and most sweeps say nothing about most seasons.
+//     The honest question is "has anyone looked at this lately", which is a
+//     question about elapsed time.
+//   · It is reported, never gating. Which season deserves attention is the same
+//     editorial call the rest of this file refuses to automate, and a per-season
+//     gate over 45 seasons would be permanently red — the alert fatigue the
+//     GATING_REGIONS note argues against.
+//
+// Threshold: the observed sweep cadence over the first 13 sweeps was a mean of
+// 8 days with a worst gap of 25, so 30 days sits just above a skipped cycle. A
+// region reviewed once per cycle never trips this; one left for a month does.
+// Checked against the pre-2026-09-29 data, where 22 seasons were over 30 days
+// and the oldest were 50 — a 60-day threshold would have flagged none of them.
+const SEASON_STALE_DAYS = 30;
+
+// How many stale seasons to list before collapsing the rest into a count.
+//
+// Seasons reviewed in one sitting age out together — all 45 were reviewed on
+// 2026-09-29, so without a cap the first stale week prints a 45-row wall that
+// says little more than "review the calendar". The cap keeps the oldest rows,
+// which are the ones worth acting on first, and still states the true total so
+// nothing is hidden.
+const SEASON_LIST_LIMIT = 12;
+
+/**
+ * Seasons nobody has reviewed in SEASON_STALE_DAYS, oldest first.
+ *
+ * `today` is a parameter rather than a `new Date()` call inside, so a test can
+ * state the date it is reasoning about instead of depending on when it runs —
+ * the coupling that broke the non-gating-visibility test twice.
+ */
+function staleSeasons(today: string, maxAgeDays = SEASON_STALE_DAYS): StaleSeason[] {
+  const rows: StaleSeason[] = [];
+  for (const region of authoredCalendarRegions()) {
+    for (const season of calendarForRegion(region)) {
+      const ageDays = daysBetween(season.reviewed, today);
+      if (ageDays > maxAgeDays) {
+        rows.push({ region, id: season.id, reviewed: season.reviewed, ageDays });
+      }
+    }
+  }
+  return rows.sort((a, b) => b.ageDays - a.ageDays || a.region.localeCompare(b.region));
+}
+
+/**
+ * `today` defaults to the newest sweep rather than the wall clock.
+ *
+ * That keeps assess(newest) a pure function of the repo for every existing
+ * caller and test, and it is the conservative choice: dating season ages from
+ * the sweep can only under-report staleness relative to a later real date, never
+ * invent it. The CLI passes the actual today so the report a maintainer reads is
+ * measured against now.
+ */
+function assess(newest: string, today: string = newest): Report {
   const behind: Report["behind"] = [];
   const inSync: Surface[] = [];
   for (const surface of surfaces()) {
@@ -153,12 +247,19 @@ function assess(newest: string): Report {
       inSync.push(surface);
     }
   }
-  return { newest, behind, inSync };
+  return { newest, behind, inSync, staleSeasons: staleSeasons(today) };
 }
 
 // ── Reporting ────────────────────────────────────────────────────────────────
 
-function human(report: Report): string {
+/**
+ * `limit` caps the stale-season list. The CLI passes Infinity, because a
+ * terminal can scroll and the person ran the command to see the whole picture;
+ * the digest body keeps the cap so a GitHub issue does not open on a 45-row
+ * table. The markdown note tells the reader the local run lists the rest, so
+ * that has to be true.
+ */
+function human(report: Report, limit: number = SEASON_LIST_LIMIT): string {
   const lines: string[] = [];
   lines.push(`Newest sweep on disk: ${report.newest}`);
   lines.push("");
@@ -191,6 +292,19 @@ function human(report: Report): string {
   for (const surface of report.inSync) {
     lines.push(`  · ${surface.name} [${surface.region}] up to date (as at ${surface.asAt}).`);
   }
+
+  if (report.staleSeasons.length > 0) {
+    lines.push("");
+    lines.push(
+      `Seasons not reviewed in over ${SEASON_STALE_DAYS} days (not gating — a region's`,
+    );
+    lines.push("date is its newest season, so these hide behind it):");
+    for (const s of report.staleSeasons.slice(0, limit)) {
+      lines.push(`  · ${s.region}/${s.id} — reviewed ${s.reviewed}, ${s.ageDays} day(s) ago`);
+    }
+    const rest = report.staleSeasons.length - limit;
+    if (rest > 0) lines.push(`  · … and ${rest} more (${report.staleSeasons.length} in total)`);
+  }
   return lines.join("\n");
 }
 
@@ -215,6 +329,34 @@ function markdown(report: Report): string {
     lines.push("");
   };
 
+  // Appended on BOTH paths below: a stale season is independent of whether a
+  // sweep was promoted, so a clean gate is exactly when it would otherwise go
+  // unnoticed — which is how twelve AU seasons aged behind a green check.
+  const seasonSection = () => {
+    if (report.staleSeasons.length === 0) return;
+    lines.push("");
+    lines.push(`#### Seasons not reviewed in over ${SEASON_STALE_DAYS} days`);
+    lines.push("");
+    lines.push("A region's \"as at\" date is its **newest** season, so these do not move it");
+    lines.push("and are invisible to the check above. Re-read each against its sources and");
+    lines.push("bump its `reviewed` date — or record why it stands unchanged. Reported for");
+    lines.push("visibility; this does not gate.");
+    lines.push("");
+    lines.push("| Region | Season | Reviewed | Age |");
+    lines.push("|---|---|---|---|");
+    for (const s of report.staleSeasons.slice(0, SEASON_LIST_LIMIT)) {
+      lines.push(`| ${s.region} | \`${s.id}\` | ${s.reviewed} | ${s.ageDays} day(s) |`);
+    }
+    const rest = report.staleSeasons.length - SEASON_LIST_LIMIT;
+    if (rest > 0) {
+      lines.push("");
+      lines.push(
+        `… and ${rest} more, ${report.staleSeasons.length} stale in total. ` +
+          "Oldest first — the rest are listed by re-running the check locally.",
+      );
+    }
+  };
+
   if (gate.length === 0) {
     lines.push("✅ The threat radar and scam calendar are current with the newest sweep.");
     if (informational.length > 0) {
@@ -223,6 +365,7 @@ function markdown(report: Report): string {
       lines.push("");
       table(informational);
     }
+    seasonSection();
     return lines.join("\n");
   }
   lines.push("The newest weekly sweep has landed in `docs/threat-intel/`, but a");
@@ -241,6 +384,7 @@ function markdown(report: Report): string {
     lines.push("");
     table(informational);
   }
+  seasonSection();
   return lines.join("\n");
 }
 
@@ -257,10 +401,15 @@ async function main() {
     return;
   }
 
-  const report = assess(newest);
+  // Real today for the season ages, so the report a maintainer reads measures
+  // "has anyone looked at this lately" against now rather than against the sweep.
+  // UTC: the threshold is 30 days, so a timezone's worth of hours cannot change
+  // which side of it a season falls on.
+  const today = new Date().toISOString().slice(0, 10);
+  const report = assess(newest, today);
 
   if (asMarkdown) console.log(markdown(report));
-  else console.log(human(report));
+  else console.log(human(report, Infinity));
 
   if (asIssue) {
     const repo = process.env.GITHUB_REPOSITORY;
@@ -309,4 +458,15 @@ if (invokedDirectly) {
   });
 }
 
-export { newestRoadmap, assess, human, markdown, gating, GATING_REGIONS, type Report };
+export {
+  newestRoadmap,
+  assess,
+  human,
+  markdown,
+  gating,
+  staleSeasons,
+  GATING_REGIONS,
+  SEASON_STALE_DAYS,
+  type Report,
+  type StaleSeason,
+};

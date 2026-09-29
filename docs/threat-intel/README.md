@@ -114,6 +114,14 @@ findings never reached `/radar` or `/calendar` (step 5 below). Neither decides a
 sweep is due, and two green runs say nothing about whether the research is
 current — only that nothing has visibly rotted.
 
+Promotion freshness reports two separate things, because a region can be current
+and stale at once. A **surface** falling behind the newest sweep gates the check
+(on AU). A **season** nobody has re-read in over 30 days is reported but never
+gates: a region's "as at" date is its *newest* season, so one promoted season
+makes the whole region look current — which is how twelve AU seasons aged to 44
+days behind a green check. Which stale season deserves attention is the same
+editorial call as promotion itself, so the check names them and stops there.
+
 **The sweep cadence is a habit, not a schedule.** Nothing enforces it and
 nothing will chase a missed week — the ~7-day spacing is visible in the
 filenames and that is the whole of it. Worth knowing before reading a gap in the
@@ -338,6 +346,13 @@ None of that was visible from the word lists alone.
    - `lib/scamCalendar.ts` — re-review the seasons against the fresh intel and
      bump their `reviewed` date. Only add a season for a genuinely *seasonal*
      spike; a year-round campaign belongs on the radar, not the calendar.
+
+     **Bump `reviewed` only on a season you actually re-read.** The date claims
+     someone checked that season against its sources, so stamping a region
+     wholesale is the one way to make the field lie — and the per-season
+     staleness report above is what makes an unreviewed season visible instead
+     of letting it hide behind a fresher sibling. A season that stands unchanged
+     is a real outcome: bump it and record what you confirmed.
 
    This is the step that feeds the public `/radar` and `/calendar` pages. It is
    an editorial call (what a member of the public can act on), so it stays a
