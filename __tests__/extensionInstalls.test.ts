@@ -82,12 +82,21 @@ describe("extension listings", () => {
     }
   });
 
-  it("keeps Chrome and Edge as one entry", () => {
-    // Edge installs the Chromium build from the Chrome Web Store, so there is
-    // no separate figure to report. STORE.md groups them the same way and the
-    // two must not drift apart.
+  it("holds one entry per store", () => {
+    // Chrome and Edge were one entry while nothing but branding separated them.
+    // They are two now because their availability differs — submitted to the
+    // Chrome Web Store, not to Edge Add-ons — and one entry cannot report
+    // "published" and "not published" at once. What must stay true is that a
+    // store appears once, so no dashboard is double-counted into the totals.
     const stores = EXTENSION_LISTINGS.map((l) => l.store);
-    expect(stores).not.toContain("edge");
     expect(new Set(stores).size).toBe(stores.length);
+  });
+
+  it("reports a user figure only where the extension is actually listed", () => {
+    // An unsubmitted store has no dashboard to read, so a count on one would be
+    // invented rather than observed.
+    for (const l of EXTENSION_LISTINGS) {
+      if (!l.url) expect(l.users, `${l.store} is unpublished`).toBeNull();
+    }
   });
 });
