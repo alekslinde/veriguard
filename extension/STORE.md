@@ -310,9 +310,24 @@ Do not screenshot a real person's message. Use the samples in the test suite.
 
 ### The generated one
 
-`npm run screenshot` produces `store/screenshot-verdict.png` at
-1280×800 — the headline panel, suitable as the first screenshot or as the
-marketing image on the site.
+`npm run screenshot` produces the headline panel — suitable as the first
+screenshot, or as the marketing image on the site — at each store's size:
+
+| File | Size | Store |
+| --- | --- | --- |
+| `screenshot-verdict.png` | 1280×800 | Chrome Web Store |
+| `screenshot-verdict-amo.png` | 2400×1800 | AMO (its maximum and recommended size) |
+
+The two frames are different shapes, 16:10 against 4:3, so the second is not
+the first upscaled: the wide one sets the copy beside the panel, the tall one
+stacks it above. Both are drawn from one set of measurements and rendered at a
+2× device scale factor, so the type is rasterised at full density rather than
+resampled.
+
+The tall frame drops the three feature points the wide one carries down its
+left column. Stacked, the panel needs the height, and the points restate what
+the panel is already showing — the signal rows and their weights are the
+"shows its rules" claim demonstrated rather than asserted.
 
 The panel is a mock, but its content is not written by hand. The verdict, the
 score and every signal row come from calling the engine at build time, and the
@@ -321,6 +336,12 @@ a reworded string moves the image on the next run, instead of leaving it
 claiming something the product stopped doing. It fails rather than redraws if
 the sample stops scoring `likely_scam`, or if a verdict string it needs is
 missing.
+
+It also refuses to write a frame whose content does not clear its edges: the
+page measures itself before each render, and a composition that would be
+cropped fails the run instead of being saved with its first line shaved. That
+check exists because the first version of the tall frame did exactly that, and
+a PNG of the right dimensions gives nothing away about what is inside it.
 
 The remaining four are real captures and stay manual — a mock of the
 right-click menu would be a picture of something that does not exist.
