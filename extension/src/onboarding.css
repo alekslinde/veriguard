@@ -39,8 +39,15 @@
   max-width: 620px;
 }
 
+/* Overrides popup.css, where .mark is 16px to sit beside a 15px header. This
+   page's h1 is 24px, and at 16px the mark read as a bullet rather than as the
+   product's own logo — the first thing seen after install. 32px matches the
+   two-line height of the title and subtitle it stands against. */
 .ob-head .mark {
-  margin-top: 9px;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  margin-top: 4px;
 }
 
 .ob-head h1 {
