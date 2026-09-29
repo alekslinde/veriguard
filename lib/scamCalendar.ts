@@ -146,15 +146,20 @@ const AU_SEASONS: ScamSeason[] = [
       "Fake myGov and ATO login pages",
       "\"Your myGov account has been locked — click to unlock\"",
       "\"Your TFN has been suspended\"",
+      "\"You have a new secure message in your myGov inbox\"",
     ],
-    advice: "The ATO never sends a link to log in, and never threatens arrest by SMS. Open the ATO app or type my.gov.au yourself — never follow the link in the message.",
+    advice: "The ATO never sends a link to log in, and never threatens arrest by SMS. Open the ATO app or type my.gov.au yourself — never follow the link in the message. Not every one of these threatens you: a bland note that a secure message is waiting is the same trick with the pressure taken out.",
     sources: [AU.ato, AU.scamwatch],
-    // Re-checked against the 2026-09-25 sweep: the Centrelink/Medicare
-    // "payments will be suspended" lure is a myGov/benefits variant of the
-    // same tax-time authority-impersonation pattern already described here
-    // (see the threat radar's ato-tax-debt entry for the dedicated writeup).
-    // No content change to the season itself.
-    reviewed: "2026-09-25",
+    // Re-checked against the 2026-09-27 sweep, which recorded a myGov "Secure
+    // Message" campaign using a content-free notification hook instead of any
+    // threat language — the same tax-time authority impersonation with the
+    // urgency removed, so it belongs in this season's lures rather than in a
+    // season of its own. Added above; window and confidence unchanged.
+    //
+    // The 2026-09-25 re-check stands: the Centrelink/Medicare "payments will be
+    // suspended" lure is a myGov/benefits variant of the same pattern (see the
+    // threat radar's ato-tax-debt entry for the dedicated writeup).
+    reviewed: "2026-09-27",
   },
   {
     id: "eofy-business",
