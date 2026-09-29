@@ -19,35 +19,95 @@
 // one says what it takes to use it. Nothing on the home page has to carry that
 // detail on behalf of a reader who has not asked for it.
 
-import { useState } from "react";
-import Link from "next/link";
+import { useState, useSyncExternalStore } from "react";
 import { useLang } from "@/lib/lang";
 import { bold } from "@/lib/richText";
 import { WAYS_IN, type WayIn } from "@/lib/waysIn";
-import { EXTENSION_LISTINGS } from "@/lib/extensionInstalls";
+import { installsForStore } from "@/lib/extensionInstalls";
+import { currentStore } from "@/lib/detectBrowser";
 
 const INBOUND_ENABLED = process.env.NEXT_PUBLIC_INBOUND_ENABLED === "true";
 const INBOUND_ADDRESS = process.env.NEXT_PUBLIC_INBOUND_ADDRESS ?? "check@veriguard.app";
 
 /**
- * Where the extension row points.
- *
- * Resolved here rather than stored in WAYS_IN, because it depends on which
- * listings are actually published — that is tracked in lib/extensionInstalls.ts
- * and changes when a store goes live, which must not require editing a second
- * file to keep a link working.
- *
- * Null when nothing is published anywhere. The row then states that rather than
- * offering a dead link, which is the honest rendering of "built but not
- * submitted" and avoids sending someone to a store page that 404s.
+ * Nothing changes the user agent within a page view, so there is nothing to
+ * subscribe to. Safe because `currentStore` returns a string or null —
+ * useSyncExternalStore compares snapshots with Object.is, and a fresh object
+ * each call would loop forever.
  */
-function extensionHref(): string | null {
-  return EXTENSION_LISTINGS.find((l) => l.url)?.url ?? null;
+const subscribeNever = () => () => {};
+
+/**
+ * Every store the extension is published to, the reader's own first.
+ *
+ * One link per store rather than a single "Install it" pointing at whichever
+ * listing happened to be first in the array — which was the Chrome Web Store,
+ * for everyone, including people reading in Firefox.
+ *
+ * The order is settled AFTER hydration, not during render. The page is server
+ * rendered and cached, so there is no current browser at render time, and
+ * ordering the list from a value the server cannot know is a hydration
+ * mismatch. The first paint shows every store in its authored order and the
+ * reader's moves to the front once the client says which it is — a reorder
+ * nobody sees, because this sits below the fold inside a closed row.
+ *
+ * Renders nothing when no store is published anywhere; the caller states that
+ * instead, which is the honest rendering of "built but not submitted".
+ */
+function InstallLinks() {
+  const { t } = useLang();
+
+  // useSyncExternalStore rather than an effect, the same shape ServiceNotice
+  // uses for the same problem: React 19 rejects setState called from an effect
+  // body, and the server snapshot has to differ from the client one or
+  // hydration mismatches. getServerSnapshot returns null — the server genuinely
+  // does not know which browser will receive this page — and getSnapshot reads
+  // the real value on the client. subscribe is a no-op because a user agent
+  // does not change within a page view.
+  const store = useSyncExternalStore(subscribeNever, currentStore, () => null);
+
+  const listings = installsForStore(store);
+  if (listings.length === 0) return null;
+
+  return (
+    <ul className="flex flex-wrap gap-2">
+      {listings.map((listing, i) => (
+        <li key={listing.store}>
+          <a
+            href={listing.url as string}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`inline-flex items-center rounded-lg border px-3 py-1.5 text-[13px] font-semibold transition-colors ${
+              // Only the promoted entry is emphasised, and only once a browser
+              // has actually been recognised — before that every store is
+              // equally likely to be the right one, and styling the first as
+              // "yours" would be a guess presented as a fact.
+              store && i === 0
+                ? "border-[var(--clear)]/50 bg-[var(--clear)]/10 text-[var(--clear)]"
+                : "border-[var(--rule)] text-[var(--text-dim)] hover:border-[var(--clear)] hover:text-[var(--clear)]"
+            }`}
+          >
+            {listing.name}
+            {store && i === 0 && (
+              <span className="ml-1.5 font-[family-name:var(--font-mono-ui)] text-[10px] uppercase tracking-[0.08em] text-[var(--clear)]/70">
+                {t("ways.ext.yours")}
+              </span>
+            )}
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
-function hrefFor(way: WayIn): string | null {
-  return way.id === "extension" ? extensionHref() : way.href;
-}
+/**
+ * Whether anything is published at all.
+ *
+ * Distinct from which store the reader is on: when this is false the row has no
+ * links to offer and says so, rather than sending someone to a store page that
+ * 404s.
+ */
+const HAS_ANY_LISTING = installsForStore(null).length > 0;
 
 function Chevron() {
   return (
@@ -124,33 +184,6 @@ function ForwardBody() {
   );
 }
 
-/** The link a row opens to, where its action lives somewhere else. */
-function RowLink({ way, href }: { way: WayIn; href: string }) {
-  const { t } = useLang();
-  const external = href.startsWith("http");
-  // The space is its own node rather than part of the arrow's: JSX strips a
-  // trailing space from a text line, which butted the arrow against the label.
-  const label = (
-    <>
-      {t(way.cta)}
-      {" "}
-      <span aria-hidden="true">→</span>
-    </>
-  );
-  const cls =
-    "inline-flex items-center rounded-lg border border-[var(--rule)] px-3 py-1.5 text-[13px] font-semibold text-[var(--clear)] hover:border-[var(--clear)] transition-colors";
-
-  return external ? (
-    <a className={cls} href={href} target="_blank" rel="noopener noreferrer">
-      {label}
-    </a>
-  ) : (
-    <Link className={cls} href={href}>
-      {label}
-    </Link>
-  );
-}
-
 /**
  * A surface that is built but not distributed.
  *
@@ -180,7 +213,6 @@ function PendingRow({ way }: { way: WayIn }) {
 
 function Row({ way }: { way: WayIn }) {
   const { t } = useLang();
-  const href = hrefFor(way);
 
   // Nothing to open: a row with no action behind it is a statement, not a
   // control. See PendingRow.
@@ -236,22 +268,17 @@ function Row({ way }: { way: WayIn }) {
 
         {way.id === "email" && <ForwardBody />}
 
-        {href ? (
-          <div>
-            <RowLink way={way} href={href} />
-          </div>
-        ) : (
-          // No link to give. For the extension that means no store listing is
-          // live in any browser yet, and the row must say so rather than end on
-          // nothing; for email it means the row's action is the address above,
-          // which needs no call to action after it. Keyed off the row rather
-          // than rendered unconditionally, because the extension's "not
-          // published" line otherwise printed under the forwarding
-          // instructions.
-          way.id === "extension" && (
+        {/* The extension's action is a store link per browser, so it has no
+            single call to action. Email's action is the address above it, which
+            needs nothing after it. */}
+        {way.id === "extension" &&
+          (HAS_ANY_LISTING ? (
+            <InstallLinks />
+          ) : (
+            // Built, but submitted nowhere. Says so rather than ending on
+            // nothing, and rather than linking to a store page that 404s.
             <p className="text-[13px] text-[var(--faint)]">{t("ways.ext.unavailable")}</p>
-          )
-        )}
+          ))}
       </div>
     </details>
   );

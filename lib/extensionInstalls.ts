@@ -125,3 +125,26 @@ export function reportedAsOf(): string | null {
     .sort();
   return dates[0] ?? null;
 }
+
+/**
+ * Published listings, with the reader's own store first.
+ *
+ * Unpublished stores are dropped rather than listed as unavailable: this is a
+ * list of places you can install from, and a row that cannot be installed from
+ * is not one of them. Safari's absence is reported elsewhere — the row says so
+ * when NOTHING is published, which is the case that needs explaining.
+ *
+ * `first` is a hint, not a filter. Everything published stays listed and in its
+ * original order behind the promoted entry, so a wrong guess costs the reader a
+ * glance rather than a link. Passing null (server render, or an unrecognised
+ * browser) returns the list untouched.
+ */
+export function installsForStore(first: ExtensionStore | null): readonly ExtensionListing[] {
+  const published = EXTENSION_LISTINGS.filter((l) => l.url);
+  if (!first) return published;
+  const mine = published.filter((l) => l.store === first);
+  // A store we do not publish to — Safari today — promotes nothing. Returning
+  // the list unchanged is better than an empty promotion slot.
+  if (mine.length === 0) return published;
+  return [...mine, ...published.filter((l) => l.store !== first)];
+}
