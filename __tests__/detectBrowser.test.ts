@@ -101,25 +101,27 @@ describe("browserForUserAgent", () => {
 });
 
 describe("install targets", () => {
-  it("gives Chrome and Edge a button each, backed by the same listing", () => {
-    // The split is presentational. There is one Chromium artifact on one
-    // listing with one user figure, and lib/extensionInstalls holds it that way
-    // — "Chrome & Edge" on a button just made an Edge reader hunt for
-    // themselves.
+  it("gives Chrome and Edge separate listings", () => {
+    // They shared one while only branding separated them. The extension is on
+    // the Chrome Web Store and has not been submitted to Edge Add-ons, so the
+    // two now differ in the one way a reader cares about: whether they can
+    // install it today.
     const chrome = INSTALL_TARGETS.find((t) => t.id === "chrome");
     const edge = INSTALL_TARGETS.find((t) => t.id === "edge");
-    expect(chrome?.store).toBe("chromium");
-    expect(edge?.store).toBe("chromium");
-    expect(chrome?.url).toBe(edge?.url);
+    expect(chrome?.url).toBeTruthy();
+    expect(edge?.url).toBeNull();
+    expect(edge?.store).not.toBe(chrome?.store);
   });
 
   it("keeps an unpublished browser listed", () => {
     // Opposite of dropping it: a browser missing from a list of four reads as
     // "not supported" rather than "not yet". The component renders a target
     // with no url as text, never as a link.
-    const safari = INSTALL_TARGETS.find((t) => t.id === "safari");
-    expect(safari).toBeDefined();
-    expect(safari?.url).toBeNull();
+    for (const id of ["edge", "safari"] as const) {
+      const target = INSTALL_TARGETS.find((t) => t.id === id);
+      expect(target, id).toBeDefined();
+      expect(target?.url, id).toBeNull();
+    }
   });
 });
 
@@ -132,9 +134,16 @@ describe("installsForBrowser", () => {
     expect(ordered).toHaveLength(INSTALL_TARGETS.length);
   });
 
-  it("promotes Edge over Chrome for an Edge reader", () => {
-    expect(installsForBrowser("edge")[0].id).toBe("edge");
+  it("promotes Chrome for a Chrome reader", () => {
     expect(installsForBrowser("chrome")[0].id).toBe("chrome");
+  });
+
+  it("does not promote Edge, which has no listing yet", () => {
+    // Same rule as Safari: promotion is for a browser you can install on.
+    // Leading an Edge reader with a button that does nothing would bury the
+    // ones that work. Their row is still there, still marked.
+    expect(installsForBrowser("edge").map((t) => t.id)).toEqual(authored);
+    expect(installsForBrowser("edge")[0].url).toBeTruthy();
   });
 
   it("leaves the order alone when the browser is unknown", () => {

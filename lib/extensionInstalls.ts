@@ -21,15 +21,26 @@
 // not.
 
 /**
- * A browser family, as the stores divide them.
+ * A store we submit to, which is not the same as a browser that can run the
+ * build.
  *
- * Chrome and Edge are one entry deliberately. Edge installs the Chromium build
- * from the Chrome Web Store — there is no separate artifact, no separate
- * listing and no separate figure to report, so splitting them here would invent
- * a precision the source does not have. `extension/STORE.md` groups them the
- * same way, and the two must agree.
+ * Chrome and Edge were one entry while the only thing that distinguished them
+ * was branding: same artifact, same listing, same figure. They are separate now
+ * because their AVAILABILITY differs — the extension is on the Chrome Web Store
+ * and has not been submitted to Edge Add-ons, and a single entry cannot say
+ * "published" and "not published" at once.
+ *
+ * Edge can in fact install from the Chrome Web Store, which is a first-class
+ * Edge feature. We do not offer that route: it asks the reader to turn on
+ * "allow extensions from other stores" and trust a listing their browser warns
+ * them about, which is a poor thing to ask of someone who came here about
+ * scams. So the row says "soon" and means the Edge Add-ons listing.
+ *
+ * `extension/STORE.md` still groups the two for the build, correctly — one
+ * artifact serves both. That is a statement about what we produce; this is a
+ * statement about where it is available, and the two are allowed to differ.
  */
-export type ExtensionStore = "chromium" | "firefox" | "safari";
+export type ExtensionStore = "chromium" | "edge" | "firefox" | "safari";
 
 export interface ExtensionListing {
   store: ExtensionStore;
@@ -68,11 +79,19 @@ export interface ExtensionListing {
 export const EXTENSION_LISTINGS: readonly ExtensionListing[] = [
   {
     store: "chromium",
-    name: "Chrome & Edge",
+    name: "Chrome",
     url: "https://chromewebstore.google.com/detail/veriguard-%E2%80%94-scam-check/pmhlakhnmgglfaimpdgfencgpboabpnd",
     users: null,
     asOf: null,
     note: "Newly published — the store has not reported a user count yet.",
+  },
+  {
+    store: "edge",
+    name: "Edge",
+    url: null,
+    users: null,
+    asOf: null,
+    note: "The Chrome build runs on Edge unchanged, but it has not been submitted to Edge Add-ons.",
   },
   {
     store: "firefox",
@@ -127,19 +146,20 @@ export function reportedAsOf(): string | null {
 }
 
 /**
- * A browser as the READER thinks of it, which is not how the stores divide
- * them.
+ * A browser as the READER thinks of it.
  *
- * Edge is the reason this type exists separately from ExtensionStore. There is
- * one Chromium artifact on one listing with one user figure, and the data model
- * above is right to hold it as a single entry — splitting it there would invent
- * a precision the source does not have, and `extension/STORE.md` would stop
- * agreeing with it.
+ * One per store now, and the mapping is the identity — this used to exist
+ * because Chrome and Edge shared a listing and the page still wanted a button
+ * each. They have their own entries since their availability diverged, so this
+ * type is a view with nothing left to translate.
  *
- * But "Chrome & Edge" on a button makes an Edge user scan a compound label to
- * find themselves, and reads as an afterthought when it is their browser. So
- * the split happens here, in presentation, where it costs nothing: two buttons
- * pointing at the same store, which is exactly what installing on Edge is.
+ * It stays anyway, because the two questions remain different ones.
+ * EXTENSION_LISTINGS answers "where have we submitted, and what does that
+ * dashboard report" — it is the source for the user counts on the About page,
+ * and it must not grow a field because a button needed one. This answers "what
+ * does the reader pick from". A browser we support but never submit anywhere
+ * would appear here and not there; the next store that serves two browsers
+ * would appear there once and here twice.
  */
 export type InstallTarget = {
   /** Stable key for React, and what browser detection resolves to. */
@@ -148,34 +168,27 @@ export type InstallTarget = {
   name: string;
   /** Where the listing that serves this browser lives, or null if unpublished. */
   url: string | null;
-  /** Which listing backs it — several targets may share one. */
+  /** Which listing backs it. */
   store: ExtensionStore;
 };
 
 /**
  * Every browser the extension targets, in order of how many people use them.
  *
- * Unpublished targets are kept rather than dropped, which is the opposite of
- * what this did before. A bare list of install links should hold only links you
- * can follow — but this list is now the complete set of browsers, and Safari
- * missing from it reads as "not supported" rather than "not yet". Saying
- * "coming soon" is both truer and more useful than silence, and the caller
- * renders it as text rather than as a link to nowhere.
+ * Unpublished targets are kept rather than dropped. A bare list of install
+ * links should hold only links you can follow — but this list is the complete
+ * set of browsers, and one missing from it reads as "not supported" rather than
+ * "not yet". The caller renders a target with no url as text, never a link.
  */
 export const INSTALL_TARGETS: readonly InstallTarget[] = [
-  { id: "chrome", name: "Chrome", store: "chromium", url: chromiumUrl() },
-  { id: "edge", name: "Edge", store: "chromium", url: chromiumUrl() },
+  { id: "chrome", name: "Chrome", store: "chromium", url: storeUrl("chromium") },
+  { id: "edge", name: "Edge", store: "edge", url: storeUrl("edge") },
   { id: "firefox", name: "Firefox", store: "firefox", url: storeUrl("firefox") },
   { id: "safari", name: "Safari", store: "safari", url: storeUrl("safari") },
 ];
 
 function storeUrl(store: ExtensionStore): string | null {
   return EXTENSION_LISTINGS.find((l) => l.store === store)?.url ?? null;
-}
-
-/** Chrome and Edge both install from the Chromium listing. */
-function chromiumUrl(): string | null {
-  return storeUrl("chromium");
 }
 
 /**
