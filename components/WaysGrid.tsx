@@ -151,13 +151,40 @@ function RowLink({ way, href }: { way: WayIn; href: string }) {
   );
 }
 
+/**
+ * A surface that is built but not distributed.
+ *
+ * Rendered flat rather than as a disclosure. There is nothing behind it: the
+ * body would describe an install nobody can run and end on "Coming soon", so
+ * the chevron invites a click that pays out in disappointment. A row that
+ * cannot act says so on its face and stops.
+ *
+ * It still renders, and that is deliberate — the package is real and the
+ * section would misrepresent what exists by omitting it. It is dimmed to the
+ * weight of what it is: an announcement, not an option.
+ */
+function PendingRow({ way }: { way: WayIn }) {
+  const { t } = useLang();
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <span className="flex-1 min-w-0">
+        <span className="font-semibold text-[var(--text-dim)] text-[14.5px]">{t(way.name)}</span>
+        <span className="text-[var(--faint)] text-[13.5px]"> — {t(way.how)}</span>
+      </span>
+      <span className="shrink-0 font-[family-name:var(--font-mono-ui)] text-[10px] uppercase tracking-[0.08em] text-[var(--faint)]">
+        {t(way.unavailable!)}
+      </span>
+    </div>
+  );
+}
+
 function Row({ way }: { way: WayIn }) {
   const { t } = useLang();
   const href = hrefFor(way);
 
-  // Built but not distributed. The row still renders — it is real, and saying
-  // so is the point — but it states that instead of offering a call to action.
-  const pending = Boolean(way.unavailable);
+  // Nothing to open: a row with no action behind it is a statement, not a
+  // control. See PendingRow.
+  if (way.unavailable) return <PendingRow way={way} />;
 
   return (
     <details className="group">
@@ -209,19 +236,18 @@ function Row({ way }: { way: WayIn }) {
 
         {way.id === "email" && <ForwardBody />}
 
-        {pending ? (
-          <p className="text-[13px] text-[var(--faint)]">{t(way.unavailable!)}</p>
-        ) : href ? (
+        {href ? (
           <div>
             <RowLink way={way} href={href} />
           </div>
         ) : (
           // No link to give. For the extension that means no store listing is
-          // live yet and the row must say so rather than end on nothing; for
-          // email it means the row's action is the address above, which needs
-          // no call to action after it. Keyed off the row rather than rendered
-          // unconditionally, because the extension's "not published" line
-          // otherwise printed under the forwarding instructions.
+          // live in any browser yet, and the row must say so rather than end on
+          // nothing; for email it means the row's action is the address above,
+          // which needs no call to action after it. Keyed off the row rather
+          // than rendered unconditionally, because the extension's "not
+          // published" line otherwise printed under the forwarding
+          // instructions.
           way.id === "extension" && (
             <p className="text-[13px] text-[var(--faint)]">{t("ways.ext.unavailable")}</p>
           )

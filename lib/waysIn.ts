@@ -58,12 +58,15 @@ export interface WayIn {
   /**
    * Set where the surface is built but not yet distributed.
    *
-   * The row shows this in place of its call to action, while `href` still
-   * points at whatever does exist today — for the package, the engine source.
-   * A CTA reading "Read the docs" that lands on a source tree is a small lie
-   * told on the busiest page we have; "Coming soon" over a row that still opens
-   * the code costs nothing and is true. Clear the flag when the package ships,
-   * and repoint `href` at the docs.
+   * The row renders flat when this is set — no disclosure, no link, nothing to
+   * click. There is nothing behind it to open: `detail` would describe an
+   * install nobody can run, so a chevron would only invite a click that pays
+   * out in disappointment.
+   *
+   * `detail`, `cta` and `href` stay authored on a pending entry rather than
+   * being emptied. They are what the row becomes the day it ships, and clearing
+   * this one flag is then the whole change — an entry whose copy was deleted
+   * while it waited would need writing again from nothing.
    */
   unavailable?: MessageKey;
 }
@@ -107,9 +110,9 @@ export const WAYS_IN: readonly WayIn[] = [
     how: "ways.npm.how",
     detail: "ways.npm.detail",
     cta: "ways.npm.cta",
-    // The engine source, not the registry: the package is not published, and a
-    // row offering an install that 404s is worse than one pointing at the code
-    // it would install.
+    // The engine source for now — the package has no registry page to point at,
+    // and this is where its docs will live. Unrendered while `unavailable` is
+    // set: the row is flat until the package ships. Repoint it at the docs then.
     href: ENGINE_SOURCE_URL,
     runs: "device",
     unavailable: "ways.npm.unavailable",
