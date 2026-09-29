@@ -166,7 +166,7 @@ export function roadmapUrl(entry: ThreatEntry): string {
 
 // ── Australia ───────────────────────────────────────────────────────────────
 //
-// Promoted from docs/threat-intel/2026-06-21 through 2026-08-16. Ordered
+// Promoted from docs/threat-intel/2026-06-21 through 2026-09-27. Ordered
 // roughly by how likely someone is to meet it, not by sweep date — the reader
 // wants "what should I know", not our publication history.
 
@@ -261,24 +261,30 @@ const AU_THREATS: ThreatEntry[] = [
     id: "ato-tax-debt",
     title: "ATO tax debt and refund lures",
     channel: "mixed",
-    status: "watchlist",
+    status: "active",
     coverage: "covered",
     firstSeen: "2026-06-21",
-    lastSeen: "2026-08-23",
+    // Re-confirmed by the 2026-09-27 sweep: the ATO/myGov tax-time advisory is a
+    // recurring annual alert and remains fully covered. The same cycle recorded a
+    // myGov "you have a new secure message" variant that drops threat language
+    // for a bland notification hook — noted in the lures below, though the
+    // content-free wrapper itself is not yet a shipped signal.
+    lastSeen: "2026-09-27",
     summary:
-      "The steadiest campaign on the list, and it peaks now. Both directions get used: a refund waiting for your bank details, or a debt with legal action attached. Reports rose sharply through July.",
+      "The steadiest campaign on the list. Both directions get used: a refund waiting for your bank details, or a debt with legal action attached. A September wave blends Medicare, Centrelink, JobSeeker and super into one AI-generated message so at least one benefit resonates, and threatens that payments will stop rather than just asking you to log in. The newest variant drops the threat entirely and just says a secure message is waiting.",
     lures: [
       "\"Your tax refund is waiting — confirm your bank details\"",
       "\"Outstanding tax debt — legal action will be taken\"",
       "\"Your TFN has been suspended\"",
-      "\"Your tax appointment is scheduled — open the attached PDF\"",
+      "\"Your Medicare and Centrelink payments will be suspended — confirm your identity\"",
       "\"Your myGov account has been locked — click to unlock\"",
+      "\"You have a new secure message in your myGov inbox\"",
       "Fake myGov and ATO login pages",
     ],
     advice:
-      "The ATO never sends a link to log in and never threatens arrest by SMS. Open the ATO app, or type my.gov.au yourself.",
-    detection: "ATO and myGov impersonation combined with payment or login pressure scores highly.",
-    roadmap: "2026-08-09",
+      "The ATO never sends a link to log in and never threatens arrest or payment suspension by SMS. Open the ATO or Centrelink app, or type my.gov.au yourself. A message that only says something is waiting for you is still worth opening the app to check rather than tapping.",
+    detection: "ATO and myGov impersonation combined with payment, login or payment-suspension pressure scores highly.",
+    roadmap: "2026-09-27",
   },
   {
     id: "super-rule-change",
@@ -325,23 +331,29 @@ const AU_THREATS: ThreatEntry[] = [
   {
     id: "toad-callback",
     title: "Fake subscription renewal callbacks",
-    channel: "email",
+    // Now both channels: the 2026-09-27 sweep recorded the SMS-shaped sibling of
+    // this email lure ("you didn't buy this — call to reverse the payment"), and
+    // confirmed the generic "asks you to call a number" rule plus brand and
+    // authority signals already reach `suspicious` on it. No gap, so this stays
+    // `watchlist` with the channel widened.
+    channel: "mixed",
     status: "watchlist",
     coverage: "covered",
     firstSeen: "2026-07-26",
-    lastSeen: "2026-08-09",
+    lastSeen: "2026-09-27",
     summary:
-      "An email confirms a renewal you never bought — Norton, McAfee, PayPal, Geek Squad — for a few hundred dollars, with a phone number to cancel. There is no link to check, which is the point: the number is the trap, and the call ends in remote access to your computer.",
+      "A message confirms a renewal or payment you never made — Norton, McAfee, PayPal, Geek Squad — for a few hundred dollars, with a phone number to cancel or reverse it. There is no link to check, which is the point: the number is the trap, and the call ends in remote access to your computer. It now arrives by SMS as well as email.",
     lures: [
       "\"Your Norton subscription has been renewed — $499.99\"",
       "\"To cancel this charge, call 1800 …\"",
       "An invoice as an image or PDF with no clickable link",
       "\"Your PayPal payment is being processed\"",
+      "\"You didn't buy this? Call us to reverse the payment\"",
     ],
     advice:
-      "Never ring the number in the email. Check your actual bank statement — if there's no charge, there's no problem. Reported heavily among older Australians.",
-    detection: "We flag renewal-invoice language paired with a callback number and no link.",
-    roadmap: "2026-08-09",
+      "Never ring the number in the message. Check your actual bank statement — if there's no charge, there's no problem. Reported heavily among older Australians.",
+    detection: "We flag renewal-invoice language paired with a callback number and no link, by SMS as well as email.",
+    roadmap: "2026-09-27",
   },
   {
     id: "reportcyber-cold-storage",
@@ -394,10 +406,13 @@ const AU_THREATS: ThreatEntry[] = [
     id: "stock-tips-group",
     title: "Investment \"stock tips\" group invites",
     channel: "mixed",
+    // Re-confirmed as covered by the 2026-09-27 sweep (crypto "stock tips group"
+    // recruitment, checked again that cycle). Stays `watchlist`: the re-check
+    // verified coverage rather than recording a new wave.
     status: "watchlist",
     coverage: "covered",
     firstSeen: "2026-08-16",
-    lastSeen: "2026-08-16",
+    lastSeen: "2026-09-27",
     summary:
       "An invite to a WhatsApp or Telegram \"stock tips\" group, \"investment club\" or \"exclusive trading group\" promising coordinated buys and expert picks. ASIC tied one run of these to $2.7M lost in a fortnight — the group talks a stock up, then dumps it on the members who bought in.",
     lures: [
@@ -409,7 +424,7 @@ const AU_THREATS: ThreatEntry[] = [
     advice:
       "A real broker doesn't recruit through a group chat, and a coordinated \"buy now\" signal is the scam, not a tip-off. Check any platform against ASIC's list at moneysmart.gov.au before putting in a cent.",
     detection: "We flag \"stock tips group\", \"investment club\" and \"exclusive/closed trading group\" as investment-recruitment signals.",
-    roadmap: "2026-08-16",
+    roadmap: "2026-09-27",
   },
   {
     id: "courier-collection",
@@ -436,7 +451,10 @@ const AU_THREATS: ThreatEntry[] = [
     id: "crypto-exchange-impersonation",
     title: "AU crypto exchange impersonation",
     channel: "mixed",
-    status: "active",
+    // Demoted 2026-09-27: neither the 09-25 nor the 09-27 sweep re-confirms
+    // this campaign, so `active` would fail the recency ratchet
+    // (threatRadar.test.ts).
+    status: "watchlist",
     coverage: "covered",
     firstSeen: "2026-08-02",
     lastSeen: "2026-09-13",
@@ -634,10 +652,15 @@ const AU_THREATS: ThreatEntry[] = [
     id: "food-delivery",
     title: "Food delivery platform impersonation",
     channel: "mixed",
-    status: "active",
+    // Stays `watchlist` through the 2026-09-27 promotion. That sweep re-checked
+    // the campaign against Scamwatch's current alert list and found it still
+    // covered with no gap, so `lastSeen` advances — but a re-check confirming
+    // coverage is not the same as a fresh wave, and demoting a re-confirmed
+    // campaign is an available editorial call (see the staleness test).
+    status: "watchlist",
     coverage: "covered",
     firstSeen: "2026-07-01",
-    lastSeen: "2026-09-06",
+    lastSeen: "2026-09-27",
     summary:
       "Uber Eats, DoorDash and Menulog impersonation — a refund for an order that went wrong, or a driver needing address confirmation. Now also aimed at drivers rather than customers: a message about an account problem that ends with a one-time code being read out, after which the earnings in the account are gone.",
     lures: [
@@ -650,13 +673,16 @@ const AU_THREATS: ThreatEntry[] = [
     advice:
       "Refunds happen inside the app you ordered in. Open the app and check your order history — nothing legitimate needs card details re-entered for a refund. If you drive: no platform ever needs the code it just sent you, and anyone asking for it is taking your account.",
     detection: "Delivery platform names paired with refund or confirmation pressure are flagged, as is being asked to pass on a one-time code.",
-    roadmap: "2026-09-06",
+    roadmap: "2026-09-27",
   },
   {
     id: "nbn-telco",
     title: "NBN and telco disconnection threats",
     channel: "phone",
-    status: "active",
+    // Demoted 2026-09-27: neither the 09-25 nor the 09-27 sweep re-confirms
+    // this campaign, so `active` would fail the recency ratchet
+    // (threatRadar.test.ts).
+    status: "watchlist",
     coverage: "covered",
     firstSeen: "2026-07-01",
     lastSeen: "2026-09-13",
@@ -695,6 +721,27 @@ const AU_THREATS: ThreatEntry[] = [
     roadmap: "2026-07-01",
   },
   {
+    id: "voice-clone-followup-sms",
+    title: "Follow-up text after a scam phone call",
+    channel: "sms",
+    status: "active",
+    coverage: "covered",
+    firstSeen: "2026-09-25",
+    lastSeen: "2026-09-25",
+    summary:
+      "A text or email arrives shortly after a scam call — from the ATO, AFP or a bank fraud team — referencing the call to borrow its credibility before asking you to transfer money or confirm details. The call establishes a fake identity; the text exploits your memory of it to speed up compliance.",
+    lures: [
+      "\"As per our phone call, please transfer the funds to the account below\"",
+      "\"Following our recent call, please confirm your details to complete the verification we discussed\"",
+      "\"As I mentioned on the call, your case reference is …\"",
+      "A \"case reference\" number included to make the follow-up feel official",
+    ],
+    advice:
+      "A call doesn't make the text that follows it genuine — it's often the same scam in two parts. Hang up and call the organisation back on a number you already had, not one from the text.",
+    detection: "We flag \"as per our phone call\" and similar post-call phrasing, which scores higher alongside a link, authority mention or money request.",
+    roadmap: "2026-09-25",
+  },
+  {
     id: "hi-mum",
     title: "\"Hi Mum\" messages from a new number",
     channel: "sms",
@@ -726,7 +773,10 @@ const AU_THREATS: ThreatEntry[] = [
     id: "loyalty-points",
     title: "Loyalty points expiry phishing",
     channel: "mixed",
-    status: "active",
+    // Demoted 2026-09-27: neither the 09-25 nor the 09-27 sweep re-confirms
+    // this campaign, so `active` would fail the recency ratchet
+    // (threatRadar.test.ts).
+    status: "watchlist",
     coverage: "covered",
     firstSeen: "2026-06-21",
     lastSeen: "2026-09-06",

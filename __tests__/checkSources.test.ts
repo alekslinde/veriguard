@@ -15,7 +15,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 // Plain .mjs script with no type declarations. `allowJs` lets TypeScript infer
 // its shape from the source, so the import resolves without a suppression.
-import { parseRegistry, validate, waybackFreshness, checkOne } from "../scripts/check-sources.mjs";
+import { parseRegistry, validate, waybackFreshness, checkOne, registryContentChanged } from "../scripts/check-sources.mjs";
 
 const REGISTRY_PATH = resolve(__dirname, "../docs/threat-intel/sources.yml");
 const registryText = readFileSync(REGISTRY_PATH, "utf8");
@@ -149,6 +149,48 @@ describe("registry parsing", () => {
     expect(parsed.tiers["1"] ?? []).toHaveLength(0);
     expect(parsed.errors.length).toBeGreaterThan(0);
     expect(parsed.errors[0]).toMatch(/missing space|unparseable/i);
+  });
+
+  it("flags a duplicate key on one entry instead of silently overwriting it", () => {
+    // Shipped for real: a folded note explaining a URL fix or an expect:
+    // blocked flag got added above the original one-line note, and the
+    // original was never deleted — the parser's "last key wins" behaviour
+    // then silently discarded exactly the explanation that was just written.
+    const parsed = parseRegistry(
+      [
+        "tiers:",
+        "  1:",
+        "    - domain: a.test",
+        "      url: https://a.test",
+        "      note: >-",
+        "        the new, correct note",
+        "      note: the stale note left behind",
+      ].join("\n"),
+    ) as Registry;
+
+    expect(parsed.errors.some((e) => e.includes("duplicate `note:`") && e.includes("a.test"))).toBe(true);
+  });
+
+  it("flags a duplicate key regardless of which occurrence is folded", () => {
+    const parsed = parseRegistry(
+      [
+        "tiers:",
+        "  1:",
+        "    - domain: a.test",
+        "      url: https://a.test",
+        "      note: the stale note first",
+        "      note: >-",
+        "        the new note second",
+      ].join("\n"),
+    ) as Registry;
+
+    expect(parsed.errors.some((e) => e.includes("duplicate `note:`"))).toBe(true);
+  });
+
+  it("does not flag the live registry with any duplicate key", () => {
+    // The two real instances of this bug (saps.gov.za, economie.gouv.fr) are
+    // fixed; this guards against it happening a third time.
+    expect(reg.errors.filter((e) => e.includes("duplicate"))).toEqual([]);
   });
 
   it("surfaces parse errors through the validator", () => {
@@ -323,11 +365,24 @@ describe("lookalike discipline", () => {
     // GB, NZ, CA, IE and SG: four of the new national authorities (Action
     // Fraud, Ofcom, Netsafe, An Garda Síochána) sit behind WAFs that 403
     // automated requests. Each was probed by hand and carries a note saying so.
-    // The cap exists to stop the flag being reached for casually, so it tracks
-    // the number actually justified — 7 — rather than leaving headroom that
+    //
+    // Raised from 7 to 11 on 2026-09-29 during a source-check cleanup: BSI
+    // (edge redirects every HEAD to an error page, any path), DGCCRF, the PNP
+    // Anti-Cybercrime Group and SEC Philippines (all three return a Cloudflare
+    // Turnstile challenge page to every automated request) were each probed
+    // by hand and confirmed reachable to a browser before being flagged.
+    //
+    // Raised from 11 to 12 on 2026-09-29: BSSN (Indonesia's national cyber
+    // agency) was being reported DEAD "403 to any agent". Probed by hand off-CI
+    // with a desktop browser UA — still 403, and its own /robots.txt 403s too,
+    // so every rung of the fallback ladder is walled and no probe can reach the
+    // path. Whole-origin bot protection, not rot.
+    //
+    // The cap exists to stop the flag being reached for casually, so it
+    // tracks the number actually justified rather than leaving headroom that
     // would let the next one in unexamined.
     const blocked = allSources.filter((s) => s.expect === "blocked");
-    expect(blocked.length).toBeLessThanOrEqual(7);
+    expect(blocked.length).toBeLessThanOrEqual(12);
   });
 
   it("keeps retired sources marked and explained", () => {
@@ -510,6 +565,241 @@ describe("ladder corroboration discipline", () => {
     });
     expect(r.state).toBe("BLOCKED");
     expect(r.error).toContain("expected");
+  });
+});
+
+describe("HEAD/GET status mismatch (cybercrime.gov.in / bsi.bund.de)", () => {
+  // Some hosts answer HEAD with a status that does not reflect the page: a
+  // plain 404 to HEAD while GET serves the real content (cybercrime.gov.in),
+  // or an edge redirect that resolves HEAD into a 400 error page while GET on
+  // the identical URL is fine (bsi.bund.de). The old GET-fallback trigger
+  // list (403/405/501) never retried these, so they misreported as DEAD.
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  const stubByMethod = (headStatus: number, getStatus: number, url: string) => {
+    vi.stubGlobal("fetch", async (input: string | URL, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      const status = method === "HEAD" ? headStatus : getStatus;
+      return {
+        status,
+        ok: status >= 200 && status < 300,
+        url,
+        text: async () => "",
+        json: async () => ({}),
+      } as Response;
+    });
+  };
+
+  it("confirms a HEAD 404 with GET before calling it DEAD", async () => {
+    const url = "https://cybercrime.gov.in";
+    stubByMethod(404, 200, url);
+    const r = await checkOne({ domain: "cybercrime.gov.in", url, tier: "1" });
+    expect(r.state).toBe("OK");
+  });
+
+  it("confirms a HEAD 400 with GET before calling it DEAD", async () => {
+    const url = "https://www.bsi.bund.de/x";
+    stubByMethod(400, 200, url);
+    const r = await checkOne({ domain: "bsi.bund.de", url, tier: "1" });
+    expect(r.state).toBe("OK");
+  });
+
+  it("still reports DEAD when GET repeats the same 404", async () => {
+    const url = "https://gone.example/x";
+    stubByMethod(404, 404, url);
+    const r = await checkOne({ domain: "gone.example", url, tier: "3" });
+    expect(r.state).toBe("DEAD");
+  });
+});
+
+describe("expect: blocked honoured on a 404/410 (Netsafe)", () => {
+  // Netsafe's WAF flips between 403 and 404 across requests for the same
+  // blocked page. `expect: blocked` already suppressed a false DEAD on 403;
+  // it must do the same on 404, or the flag is a coin-flip depending on which
+  // status the edge happens to answer with on a given run.
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  const stubAlways = (status: number, url: string) => {
+    vi.stubGlobal("fetch", async () => ({
+      status, ok: false, url, text: async () => "", json: async () => ({}),
+    } as Response));
+  };
+
+  it("reports BLOCKED, not DEAD, when expect: blocked and the WAF answers 404", async () => {
+    const url = "https://netsafe.org.nz/news/";
+    stubAlways(404, url);
+    const r = await checkOne({ domain: "netsafe.org.nz", url, tier: "1", expect: "blocked" });
+    expect(r.state).toBe("BLOCKED");
+  });
+
+  it("reports BLOCKED, not DEAD, when expect: blocked and the WAF answers 410", async () => {
+    const url = "https://netsafe.org.nz/news/";
+    stubAlways(410, url);
+    const r = await checkOne({ domain: "netsafe.org.nz", url, tier: "1", expect: "blocked" });
+    expect(r.state).toBe("BLOCKED");
+  });
+
+  it("still reports DEAD on a 404 when the entry is not expect: blocked", async () => {
+    const url = "https://gone.example/x";
+    stubAlways(404, url);
+    const r = await checkOne({ domain: "gone.example", url, tier: "3" });
+    expect(r.state).toBe("DEAD");
+  });
+
+  it("reports BLOCKED, not DEAD, when expect: blocked and the WAF answers 400 on GET too", async () => {
+    // bsi.bund.de's edge routes a blocked HEAD into a 400 error page; if the
+    // same happened on GET, a 400 with no dedicated branch used to fall
+    // through to the generic `!res.ok` DEAD case, which never checked
+    // `expect: blocked` at all.
+    const url = "https://www.bsi.bund.de/x";
+    stubAlways(400, url);
+    const r = await checkOne({ domain: "bsi.bund.de", url, tier: "1", expect: "blocked" });
+    expect(r.state).toBe("BLOCKED");
+  });
+
+  it("still reports DEAD on a 400 when the entry is not expect: blocked", async () => {
+    const url = "https://gone.example/x";
+    stubAlways(400, url);
+    const r = await checkOne({ domain: "gone.example", url, tier: "3" });
+    expect(r.state).toBe("DEAD");
+  });
+
+  it("honours expect: blocked on a status code with no dedicated branch (the general catch-all)", async () => {
+    // 406 is not 400/403/404/410/429/5xx — it exercises the generic
+    // `else if (!res.ok)` path, which must check the flag exactly like every
+    // other branch, or the next WAF quirk this checker hasn't been
+    // individually taught about defeats `expect: blocked` by surprise.
+    const url = "https://weird-waf.example/x";
+    stubAlways(406, url);
+    const r = await checkOne({ domain: "weird-waf.example", url, tier: "3", expect: "blocked" });
+    expect(r.state).toBe("BLOCKED");
+  });
+
+  it("still reports DEAD on that same catch-all status when not expect: blocked", async () => {
+    const url = "https://gone.example/x";
+    stubAlways(406, url);
+    const r = await checkOne({ domain: "gone.example", url, tier: "3" });
+    expect(r.state).toBe("DEAD");
+  });
+});
+
+describe("registryContentChanged (auto-bump content diff)", () => {
+  // The judgement call that used to be a human reading a PR diff: does the
+  // registry's CONTENT differ, ignoring the header fields the decision is
+  // actually about (version/updated) and the parser's own error list.
+  const base = () => parseRegistry(
+    [
+      "version: 1",
+      "updated: 2026-09-01",
+      "tiers:",
+      "  1:",
+      "    - domain: a.test",
+      "      name: A",
+      "      url: https://a.test",
+    ].join("\n"),
+  );
+
+  it("is false for byte-identical registries", () => {
+    const a = base();
+    const b = base();
+    expect(registryContentChanged(a, b)).toBe(false);
+  });
+
+  it("is false when only updated: changes", () => {
+    const a = base();
+    const b = { ...base(), updated: "2026-09-29" };
+    expect(registryContentChanged(a, b)).toBe(false);
+  });
+
+  it("is false when only version: changes", () => {
+    const a = base();
+    const b = { ...base(), version: "2" };
+    expect(registryContentChanged(a, b)).toBe(false);
+  });
+
+  it("is true when a source field changes", () => {
+    const a = base();
+    const b = parseRegistry(
+      [
+        "version: 1",
+        "updated: 2026-09-01",
+        "tiers:",
+        "  1:",
+        "    - domain: a.test",
+        "      name: A renamed",
+        "      url: https://a.test",
+      ].join("\n"),
+    );
+    expect(registryContentChanged(a, b)).toBe(true);
+  });
+
+  it("is true when a source is added", () => {
+    const a = base();
+    const b = parseRegistry(
+      [
+        "version: 1",
+        "updated: 2026-09-01",
+        "tiers:",
+        "  1:",
+        "    - domain: a.test",
+        "      name: A",
+        "      url: https://a.test",
+        "    - domain: b.test",
+        "      name: B",
+        "      url: https://b.test",
+      ].join("\n"),
+    );
+    expect(registryContentChanged(a, b)).toBe(true);
+  });
+
+  it("is true when source order changes (a re-tier or reorder is a real edit)", () => {
+    const a = parseRegistry(
+      ["tiers:", "  1:", "    - domain: a.test", "      url: https://a.test",
+        "    - domain: b.test", "      url: https://b.test"].join("\n"),
+    );
+    const b = parseRegistry(
+      ["tiers:", "  1:", "    - domain: b.test", "      url: https://b.test",
+        "    - domain: a.test", "      url: https://a.test"].join("\n"),
+    );
+    expect(registryContentChanged(a, b)).toBe(true);
+  });
+
+  it("ignores parser errors from the comparison", () => {
+    const a = { ...base(), errors: ["some transient parse note"] };
+    const b = { ...base(), errors: [] };
+    expect(registryContentChanged(a, b)).toBe(false);
+  });
+
+  it("is true when a brand is added", () => {
+    // Every existing fixture above only varies `tiers`; `strip()` deliberately
+    // keeps `brands` and `indicators` in the comparison, so a change confined
+    // to either must still be caught rather than silently passing because
+    // nothing here ever exercised that field.
+    const withBrand = (domain: string) => parseRegistry(
+      [
+        "brands:",
+        `  - domain: ${domain}`,
+        `    url: https://${domain}`,
+      ].join("\n"),
+    );
+    const a = withBrand("a.test");
+    const b = parseRegistry(
+      ["brands:", "  - domain: a.test", "    url: https://a.test",
+        "  - domain: b.test", "    url: https://b.test"].join("\n"),
+    );
+    expect(registryContentChanged(a, b)).toBe(true);
+  });
+
+  it("is true when an indicator is added", () => {
+    const a = parseRegistry(["indicators:", "  - bad.test"].join("\n"));
+    const b = parseRegistry(["indicators:", "  - bad.test", "  - worse.test"].join("\n"));
+    expect(registryContentChanged(a, b)).toBe(true);
+  });
+
+  it("is false when brands and indicators are both unchanged", () => {
+    const text = ["brands:", "  - domain: a.test", "    url: https://a.test",
+      "indicators:", "  - bad.test"].join("\n");
+    expect(registryContentChanged(parseRegistry(text), parseRegistry(text))).toBe(false);
   });
 });
 

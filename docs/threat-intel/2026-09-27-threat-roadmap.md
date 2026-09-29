@@ -438,3 +438,21 @@ not a decision itself.
 D2 and D3 are MEDIUM/LOW priority and are not auto-filed as issues per the
 workflow's HIGH-only threshold; their full detail is in this file for a human
 to triage.
+
+---
+
+## Status — as at 2026-09-29
+
+| Proposal | Issue | Shipped in | Status |
+|---|---|---|---|
+| D1 — CA: RCMP "undelivered court documents" SMS lure | #369 | PR #373 (`1fbcfa9`) | ✅ Shipped |
+| D2 — BASE: "new secure message" notification hook | — | — | ⏳ Deferred |
+| D3 — GB: DVLA "vehicle clamping" threat phrasing | — | — | ⏳ Deferred |
+
+The HIGH proposal shipped as specified. D2 and D3 remain open editorial calls
+and were never filed as issues, per the HIGH-only threshold above — D2 because a
+content-free "you have a new secure message" hook is the same shape as genuine
+bank, telco and portal notifications (the MEDIUM FP risk this file records), and
+D3 because it sharpens an existing `URGENCY_TOLL` hit rather than closing a gap.
+Neither is blocked; both await a decision, and the absence of a phrase list for
+either is deliberate rather than an oversight.

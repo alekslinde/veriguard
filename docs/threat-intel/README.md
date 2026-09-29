@@ -114,6 +114,14 @@ findings never reached `/radar` or `/calendar` (step 5 below). Neither decides a
 sweep is due, and two green runs say nothing about whether the research is
 current — only that nothing has visibly rotted.
 
+Promotion freshness reports two separate things, because a region can be current
+and stale at once. A **surface** falling behind the newest sweep gates the check
+(on AU). A **season** nobody has re-read in over 30 days is reported but never
+gates: a region's "as at" date is its *newest* season, so one promoted season
+makes the whole region look current — which is how twelve AU seasons aged to 44
+days behind a green check. Which stale season deserves attention is the same
+editorial call as promotion itself, so the check names them and stops there.
+
 **The sweep cadence is a habit, not a schedule.** Nothing enforces it and
 nothing will chase a missed week — the ~7-day spacing is visible in the
 filenames and that is the whole of it. Worth knowing before reading a gap in the
@@ -216,6 +224,7 @@ node scripts/check-sources.mjs             # human-readable report
 node scripts/check-sources.mjs --validate  # structure only, no network
 node scripts/check-sources.mjs --stale     # is the `updated:` header behind the file?
 node scripts/check-sources.mjs --markdown  # issue-body format
+node scripts/check-sources.mjs --auto-bump # bump `updated:` if content changed
 ```
 
 **The registry's `updated:` header is checked, not trusted.** Every report
@@ -227,11 +236,26 @@ commit and runs on any PR touching the registry. It warns rather than blocks,
 because whether the *content* changed is a judgement — a comment reflow
 legitimately leaves the date alone.
 
+`--auto-bump` is that judgement automated, one step later. It parses the
+registry at the previous commit and at the current one and compares
+everything except the header itself (`version`, `updated`) and the parser's
+own error list — a comment reflow parses identically and is left alone, while
+a source added, retired, re-URLed or re-tiered is not. Run on a PR, it would
+only ever confirm what `--stale` already warned about; it runs instead on a
+push to `main`, after the human judgement in review has already happened, so
+a merge that landed without the date being bumped still ends up with an
+accurate one.
+
 [`.github/workflows/source-check.yml`](../../.github/workflows/source-check.yml)
-runs it weekly (Tuesday ~07:00 AEST) and refreshes a single
-**🔗 Threat-intel source check** issue. It checks *reachability only* — whether a
-source has published anything new is research, not a cron job. It flags; it never
-edits the registry.
+runs the reachability check weekly (Tuesday ~07:00 AEST) and refreshes a
+single **🔗 Threat-intel source check** issue. That check is *reachability
+only* — whether a source has published anything new is research, not a cron
+job — and it flags rather than edits the registry. The one exception is the
+`bump-updated` job in the same workflow: on a push to `main` that touches
+`sources.yml`, it runs `--auto-bump` and commits the result directly, because
+a date bump carries none of the judgement a reachability fix would — there is
+no "is this source really dead" call to get wrong, only whether the content
+moved.
 
 Link rot is the quiet failure here. When a citation 404s, the evidence for a
 hardcoded score in the engine is gone and only the magic number is left — the
@@ -323,6 +347,13 @@ None of that was visible from the word lists alone.
      bump their `reviewed` date. Only add a season for a genuinely *seasonal*
      spike; a year-round campaign belongs on the radar, not the calendar.
 
+     **Bump `reviewed` only on a season you actually re-read.** The date claims
+     someone checked that season against its sources, so stamping a region
+     wholesale is the one way to make the field lie — and the per-season
+     staleness report above is what makes an unreviewed season visible instead
+     of letting it hide behind a fresher sibling. A season that stands unchanged
+     is a real outcome: bump it and record what you confirmed.
+
    This is the step that feeds the public `/radar` and `/calendar` pages. It is
    an editorial call (what a member of the public can act on), so it stays a
    human step rather than being auto-generated — but it is **not optional**, and
@@ -335,7 +366,7 @@ Steps 4 and 5 are the ones that get skipped. See below.
 
 ## Reviewing this file
 
-*Last reviewed: 2026-09-11.*
+*Last reviewed: 2026-09-29.*
 
 **This file describes a moving target, so it rots differently from the sweeps
 it sits beside.** A sweep is a dated snapshot and is correct forever — the
