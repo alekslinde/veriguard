@@ -29,6 +29,10 @@ const UA = {
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
 };
 
+// iPadOS 13+ Safari sends this by default — identical to a desktop Mac's, which
+// is the whole difficulty. Only maxTouchPoints separates them.
+const IPADOS_UA = UA.macSafari;
+
 describe("manualPlatformFor", () => {
   it("gives iOS Safari the share-sheet route", () => {
     expect(manualPlatformFor(UA.iosSafari)).toBe("ios-safari");
@@ -47,7 +51,16 @@ describe("manualPlatformFor", () => {
   it("offers nothing on desktop Safari", () => {
     // Add-to-Dock exists on recent macOS but the route differs by OS version,
     // and the UA cannot say which. No steps beat wrong steps.
-    expect(manualPlatformFor(UA.macSafari)).toBeNull();
+    expect(manualPlatformFor(UA.macSafari, 0)).toBeNull();
+  });
+
+  it("finds an iPad behind the Macintosh UA it now sends", () => {
+    // iPadOS 13+ requests desktop sites BY DEFAULT, so the string says
+    // Macintosh and the device was being offered nothing despite having a real
+    // Add to Home Screen route. Touch is what tells them apart: no Mac has a
+    // touchscreen.
+    expect(manualPlatformFor(IPADOS_UA, 5)).toBe("ios-safari");
+    expect(manualPlatformFor(IPADOS_UA, 0)).toBeNull();
   });
 
   it("gives Firefox on Android its menu route", () => {
@@ -58,7 +71,7 @@ describe("manualPlatformFor", () => {
 describe("resolveInstallState", () => {
   it("prefers a real prompt event over any UA guess", () => {
     expect(
-      resolveInstallState({ hasPrompt: true, installed: false, userAgent: UA.androidChrome }),
+      resolveInstallState({ hasPrompt: true, installed: false, userAgent: UA.androidChrome, isHandheldViewport: true }),
     ).toEqual({ route: "prompt" });
   });
 
@@ -66,7 +79,7 @@ describe("resolveInstallState", () => {
     // The clearest way to look broken: offering to add something already added.
     for (const ua of Object.values(UA)) {
       expect(
-        resolveInstallState({ hasPrompt: true, installed: true, userAgent: ua }),
+        resolveInstallState({ hasPrompt: true, installed: true, userAgent: ua, isHandheldViewport: true }),
         ua,
       ).toEqual({ route: "none" });
     }
@@ -74,7 +87,7 @@ describe("resolveInstallState", () => {
 
   it("teaches the manual route on iOS Safari, where no API exists", () => {
     expect(
-      resolveInstallState({ hasPrompt: false, installed: false, userAgent: UA.iosSafari }),
+      resolveInstallState({ hasPrompt: false, installed: false, userAgent: UA.iosSafari, isHandheldViewport: true }),
     ).toEqual({ route: "manual", platform: "ios-safari" });
   });
 
@@ -83,10 +96,38 @@ describe("resolveInstallState", () => {
     // something the device reading the page cannot do.
     for (const ua of [UA.iosChrome, UA.iosFirefox, UA.iosEdge]) {
       expect(
-        resolveInstallState({ hasPrompt: false, installed: false, userAgent: ua }),
+        resolveInstallState({ hasPrompt: false, installed: false, userAgent: ua, isHandheldViewport: true }),
         ua,
       ).toEqual({ route: "none" });
     }
+  });
+
+  it("offers nothing on a desktop, even holding a real prompt event", () => {
+    // Desktop Chromium fires beforeinstallprompt too, and accepting it installs
+    // a desktop app window — not the home-screen icon this copy describes. The
+    // event being genuine is exactly why this needs its own gate.
+    expect(
+      resolveInstallState({
+        hasPrompt: true,
+        installed: false,
+        userAgent: UA.androidChrome,
+        isHandheldViewport: false,
+      }),
+    ).toEqual({ route: "none" });
+  });
+
+  it("still offers an iPad at a desktop-width viewport", () => {
+    // The width gate must not swallow the one tablet that genuinely has the
+    // route; it is identified by platform rather than size.
+    expect(
+      resolveInstallState({
+        hasPrompt: false,
+        installed: false,
+        userAgent: IPADOS_UA,
+        isHandheldViewport: false,
+        touchPoints: 5,
+      }),
+    ).toEqual({ route: "manual", platform: "ios-safari" });
   });
 
   it("offers nothing on Chromium until its prompt event actually arrives", () => {
@@ -94,7 +135,7 @@ describe("resolveInstallState", () => {
     // from the UA would print generic menu steps over a browser about to offer
     // one-tap install.
     expect(
-      resolveInstallState({ hasPrompt: false, installed: false, userAgent: UA.androidChrome }),
+      resolveInstallState({ hasPrompt: false, installed: false, userAgent: UA.androidChrome, isHandheldViewport: true }),
     ).toEqual({ route: "none" });
   });
 });

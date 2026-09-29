@@ -105,10 +105,22 @@ export default function MobileTabBar() {
       <div
         id="tab-more"
         hidden={!moreOpen}
-        className="md:hidden fixed left-0 right-0 z-50 bg-[var(--ink-2)] border-t border-[var(--rule)] rounded-t-2xl px-3 pt-2.5 pb-3 shadow-[0_-18px_34px_-18px_rgba(0,0,0,0.85)] motion-safe:animate-[tabsheet-in_0.22s_cubic-bezier(0.16,1,0.3,1)_both]"
-        // Sits exactly on the bar rather than at bottom:0 behind it. Both read
-        // the same custom property, so the two can't drift apart.
-        style={{ bottom: "var(--tabbar-h)" }}
+        className="md:hidden fixed left-0 right-0 z-50 overflow-y-auto overscroll-contain bg-[var(--ink-2)] border-t border-[var(--rule)] rounded-t-2xl px-3 pt-2.5 pb-3 shadow-[0_-18px_34px_-18px_rgba(0,0,0,0.85)] motion-safe:animate-[tabsheet-in_0.22s_cubic-bezier(0.16,1,0.3,1)_both]"
+        style={{
+          // Sits exactly on the bar rather than at bottom:0 behind it. Both
+          // read the same custom property, so the two can't drift apart.
+          bottom: "var(--tabbar-h)",
+          // The sheet grows with its contents — the install steps add ~150px
+          // when expanded — while the body is scroll-locked behind it. Without
+          // a cap it runs off the top of a short viewport (a landscape phone,
+          // or a small one with the steps open) and the first rows become
+          // unreachable, because the thing that would have scrolled them into
+          // view is the page that is locked.
+          //
+          // Measured against the header rather than the full viewport, so the
+          // sheet never hides the mark and the way back out.
+          maxHeight: "calc(100dvh - var(--tabbar-h) - var(--header-h) - 12px)",
+        }}
       >
         <nav className="flex flex-col gap-0.5">
           {MORE_LINKS.map((l) => (
@@ -131,27 +143,6 @@ export default function MobileTabBar() {
               )}
             </Link>
           ))}
-
-          {/* Report a scam lives here rather than taking a tab of its own: it is
-              a deliberate errand, not somewhere you browse to, and the check
-              flow already offers it at the point a verdict makes it relevant. */}
-          <Link
-            href="/report"
-            aria-current={isCurrentPath("/report", pathname) ? "page" : undefined}
-            onClick={closeMore}
-            className={`flex items-center justify-between min-h-[46px] px-3 rounded-lg text-[15.5px] transition-colors ${
-              isCurrentPath("/report", pathname)
-                ? "text-[var(--foreground)] bg-[var(--ink-3)] font-medium"
-                : "text-[var(--text-dim)]"
-            }`}
-          >
-            {t("nav.report")}
-            {isCurrentPath("/report", pathname) && (
-              <span className="font-[family-name:var(--font-mono-ui)] text-[10px] tracking-[0.08em] uppercase text-[var(--clear)]">
-                {t("nav.here")}
-              </span>
-            )}
-          </Link>
 
           <div className="h-px bg-[var(--rule)] my-1.5 mx-3" />
 

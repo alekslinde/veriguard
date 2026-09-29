@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLang } from "@/lib/lang";
 import {
   isInstalled,
@@ -46,7 +46,13 @@ function useInstallState(): {
   // button appearing a moment after load is correct — before that, the honest
   // answer is that we do not yet know.
   const [state, setState] = useState<InstallState>({ route: "none" });
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
+
+  // The captured event lives in a ref, not state: it is not rendered, and what
+  // the UI actually needs to know about it — whether a one-tap route exists —
+  // is already carried by `state.route`. Holding it in state would make the
+  // resize effect depend on it and re-register the capture listener on every
+  // change, which is how a real event gets missed.
+  const deferredRef = useRef<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
     function resolve(hasPrompt: boolean) {
@@ -55,6 +61,12 @@ function useInstallState(): {
           hasPrompt,
           installed: isInstalled(navigator, window),
           userAgent: navigator.userAgent,
+          // Matches the md breakpoint the tab bar and header use, so the offer
+          // appears on exactly the widths that get the app shell. Desktop
+          // Chromium fires the same prompt event and would otherwise show a
+          // phone-worded card whose button installs a desktop window.
+          isHandheldViewport: window.innerWidth < 768,
+          touchPoints: navigator.maxTouchPoints ?? 0,
         }),
       );
     }
@@ -64,7 +76,7 @@ function useInstallState(): {
       // page puts it, in the reader's language, next to an explanation — rather
       // than as browser chrome that interrupts whatever they were doing.
       e.preventDefault();
-      setDeferred(e as BeforeInstallPromptEvent);
+      deferredRef.current = e as BeforeInstallPromptEvent;
       resolve(true);
     }
 
@@ -72,12 +84,22 @@ function useInstallState(): {
     // that happened through the browser's own menu rather than our button. The
     // offer must disappear either way.
     function onInstalled() {
-      setDeferred(null);
+      deferredRef.current = null;
       setState({ route: "none" });
+    }
+
+    // Rotating a phone or resizing a window crosses the breakpoint, and the
+    // offer has to follow. The held event is read from a ref rather than from
+    // state, so this effect does not re-run — and re-registering the
+    // beforeinstallprompt listener is precisely what would lose an event that
+    // fired in between.
+    function onResize() {
+      resolve(deferredRef.current !== null);
     }
 
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
     window.addEventListener("appinstalled", onInstalled);
+    window.addEventListener("resize", onResize);
 
     // The manual/none answer, settled immediately. If a prompt event arrives
     // later it overrides this — the handler above calls resolve(true) — but on
@@ -88,31 +110,44 @@ function useInstallState(): {
     return () => {
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onInstalled);
+      window.removeEventListener("resize", onResize);
     };
   }, []);
 
   const promptInstall = useCallback(async () => {
+    const deferred = deferredRef.current;
     if (!deferred) return;
-    await deferred.prompt();
-    await deferred.userChoice;
 
-    // Spent either way, whichever they chose: Chromium allows a deferred event
-    // to be prompted once, so the held reference is now inert.
+    // Cleared BEFORE awaiting, not after. `prompt()` can reject — a
+    // double-tap, or an event Chromium has already consumed — and clearing
+    // afterwards means a throw skips the reset, leaving a button that is
+    // permanently inert and, in the sheet, a sheet that never closes. Clearing
+    // first makes the failure path identical to the success path: the offer is
+    // withdrawn, and the browser re-offers on a later visit if it still
+    // considers the app installable.
+    deferredRef.current = null;
+
+    try {
+      await deferred.prompt();
+      await deferred.userChoice;
+    } catch {
+      // The dialog did not open, or the event was already spent. Nothing to
+      // report to the reader: the outcome they see — the offer going away — is
+      // the same one a dismissal produces, and it returns on the next visit.
+    }
+
+    // Withdrawn on BOTH outcomes, which looks wrong for "dismissed" and is
+    // not: a deferred event may be prompted once, so there is nothing left to
+    // fire and a button still sitting there would do nothing when pressed.
+    // Chromium fires a fresh event on a later visit if it still considers the
+    // app installable, and the capture listener is still mounted to catch it,
+    // so a reader who says no now is asked again then rather than never.
     //
-    // The offer is therefore withdrawn on BOTH outcomes, which looks wrong for
-    // "dismissed" and is not. There is nothing left to fire — a button still
-    // sitting there would do nothing when pressed, which is the one behaviour
-    // worse than not offering. Chromium fires a fresh event on a later visit if
-    // it still considers the app installable, and the listener above is still
-    // mounted to catch it, so a reader who says no now is asked again then
-    // rather than never.
-    //
-    // `appinstalled` is not relied on for the accepted path: it is fired after
-    // the install completes, which can be seconds later, and the button must
-    // stop offering the moment the dialog closes.
-    setDeferred(null);
+    // Not left to `appinstalled` on the accepted path: that fires once the
+    // install completes, which can be seconds later, and the button must stop
+    // offering the moment the dialog closes.
     setState({ route: "none" });
-  }, [deferred]);
+  }, []);
 
   return { state, promptInstall };
 }

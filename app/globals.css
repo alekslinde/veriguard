@@ -38,12 +38,26 @@
      (how much bottom padding to reserve). Above the md breakpoint the bar is
      not rendered, so the reservation collapses to zero rather than leaving a
      band of dead space under every desktop page. */
-  --tabbar-h: calc(54px + env(safe-area-inset-bottom));
+  --tabbar-h: calc(55px + env(safe-area-inset-bottom));
+
+  /* The sticky header's full occupied height: the row, the status-bar inset it
+     pads for, and its own 1px bottom border. Anything that pins itself below
+     the header measures from this — the learn page's sticky table of contents,
+     and the More sheet's height cap — so the number has one definition and
+     cannot go stale in a component that never knew the header had changed.
+
+     The border is part of the height on purpose. Omitting it leaves whatever
+     pins below overlapping the rule by a pixel, which reads as a seam where
+     two sticky surfaces meet. --tabbar-h counts its top border for the same
+     reason. */
+  --header-h: calc(53px + env(safe-area-inset-top));
 }
 
 @media (min-width: 768px) {
   :root {
     --tabbar-h: 0px;
+    /* No safe-area inset applies on a desktop, and the bar is taller. */
+    --header-h: 59px;
   }
 }
 
@@ -128,21 +142,16 @@ html {
 }
 
 /* 3. Long-press on a label or a tab selects the word, as if it were an
-      article — native chrome is not selectable. Only applied to the shell's
-      own furniture; everything the reader might legitimately want to copy (the
-      verdict, evidence, their own pasted text) is untouched. */
+      article — native chrome is not selectable. Scoped to the header and the
+      nav elements, which hold labels and nothing a reader would copy;
+      everything they might legitimately want (the verdict, the evidence, their
+      own pasted text) sits outside this and is untouched. Widening it to
+      anything holding real text would need a matching opt-in, so don't. */
 @media (max-width: 767px) {
   nav,
   [data-app-chrome] {
     -webkit-user-select: none;
     user-select: none;
-  }
-
-  /* …with the exception that proves the rule: text inside the chrome that is
-     genuinely worth copying opts back in. */
-  [data-selectable] {
-    -webkit-user-select: text;
-    user-select: text;
   }
 }
 
@@ -180,7 +189,7 @@ body:has(dialog[open]) {
 /* Keep programmatically-focused step headings (tabIndex=-1) clear of the
    52px sticky header so the content isn't obscured on step transitions */
 [data-step-heading] {
-  scroll-margin-top: 64px;
+  scroll-margin-top: calc(var(--header-h) + 12px);
 }
 
 /* Visually hidden but announced to screen readers */

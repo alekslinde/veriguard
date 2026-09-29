@@ -3,6 +3,7 @@ import {
   LINKS,
   TAB_LINKS,
   MORE_LINKS,
+  HEADER_LINKS,
   isCurrentPath,
   isMoreCurrent,
 } from "@/components/navLinks";
@@ -70,6 +71,55 @@ describe("isMoreCurrent", () => {
     // Check.
     for (const l of TAB_LINKS) {
       expect(isMoreCurrent(l.href), l.href).toBe(false);
+    }
+  });
+});
+
+/**
+ * The property that matters on a phone, asserted over every route the app
+ * serves rather than over the nav list.
+ *
+ * Iterating the list is what let `/report` ship with no tab lit at all: it was
+ * written directly into the sheet's markup instead of the shared model, so it
+ * was in neither TAB_LINKS nor MORE_LINKS and every test that walked those
+ * passed. Walking the ROUTES instead is what catches a destination the model
+ * has forgotten.
+ */
+describe("every route lights exactly one tab", () => {
+  const ROUTES = [
+    "/",
+    "/learn",
+    "/radar",
+    "/calendar",
+    "/submissions",
+    "/about",
+    "/report",
+    "/share",
+  ];
+
+  for (const route of ROUTES) {
+    it(`lights one tab on ${route}`, () => {
+      const litTabs = TAB_LINKS.filter((l) => isCurrentPath(l.href, route));
+      const litMore = isMoreCurrent(route);
+      // Exactly one, on every route with no exceptions — including "/share",
+      // which renders the same CheckFlow as home and so belongs to the Check
+      // tab despite its path.
+      expect(litTabs.length + (litMore ? 1 : 0), route).toBe(1);
+    });
+  }
+});
+
+describe("HEADER_LINKS", () => {
+  it("leaves the reporting errand out of the desktop header", () => {
+    // In the sheet, not the header: the header has six items already, and
+    // reporting is reached from a verdict rather than browsed to.
+    expect(HEADER_LINKS.some((l) => l.href === "/report")).toBe(false);
+    expect(MORE_LINKS.some((l) => l.href === "/report")).toBe(true);
+  });
+
+  it("keeps every tab destination in the header too", () => {
+    for (const l of TAB_LINKS) {
+      expect(HEADER_LINKS, l.href).toContainEqual(l);
     }
   });
 });

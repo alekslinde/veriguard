@@ -90,10 +90,23 @@ export function isInstalled(nav: Navigator, win: Window): boolean {
  * instruct and we say so rather than teaching steps that dead-end. That is the
  * same call detectBrowser.ts makes when it returns null for every iOS browser.
  */
-export function manualPlatformFor(ua: string): ManualPlatform | null {
+export function manualPlatformFor(ua: string, touchPoints = 0): ManualPlatform | null {
   const s = ua.toLowerCase();
+  const isMac = s.includes("macintosh");
+
+  // iPadOS 13 and later send a Macintosh UA by default — Apple's "request
+  // desktop site" is the iPad's default, not an opt-in — so the string alone
+  // reports a Mac. Those iPads have a real Add to Home Screen route and were
+  // being offered nothing.
+  //
+  // Multi-touch is what separates them: a desktop Mac reports
+  // maxTouchPoints 0, and no Mac ships a touchscreen. Used only to tell two
+  // Apple platforms apart, never to gate a capability, so a wrong answer costs
+  // the right steps rather than access to anything.
+  const isIpadOs = isMac && touchPoints > 1;
+
   const isIos =
-    s.includes("iphone") || s.includes("ipad") || s.includes("ipod");
+    s.includes("iphone") || s.includes("ipad") || s.includes("ipod") || isIpadOs;
 
   if (isIos) {
     // A non-Safari iOS browser identifies itself with a vendor token; real
@@ -127,13 +140,36 @@ export function resolveInstallState(args: {
   hasPrompt: boolean;
   installed: boolean;
   userAgent: string;
+  /**
+   * Whether the viewport is handheld-sized. Required, not optional: this offer
+   * is worded for a handheld device ("Keep it one tap away", a home-screen
+   * icon), and desktop Chromium fires `beforeinstallprompt` just as readily —
+   * where accepting it installs a desktop app window, not a home-screen icon.
+   * An optional flag would let a caller omit it, type-check, and ship that
+   * mismatch silently.
+   */
+  isHandheldViewport: boolean;
+  /** `navigator.maxTouchPoints`, which is how an iPadOS Safari is told from a Mac. */
+  touchPoints?: number;
 }): InstallState {
   // Already added. Nothing to offer, on any platform.
   if (args.installed) return { route: "none" };
 
-  if (args.hasPrompt) return { route: "prompt" };
+  const platform = manualPlatformFor(args.userAgent, args.touchPoints ?? 0);
 
-  const platform = manualPlatformFor(args.userAgent);
+  // An iPad is a home-screen device at any width, including the wide landscape
+  // viewport that fails the handheld check. It is identified by platform
+  // rather than size for exactly that reason — the offer is true there, and
+  // gating it on width would withhold a route the device really has.
+  const isHomeScreenDevice = args.isHandheldViewport || platform === "ios-safari";
+
+  // Not a handheld. The prompt may well be available — this is the desktop
+  // Chromium case — but what it installs is not what the copy describes, so
+  // the honest move is to say nothing rather than reword a handheld offer for
+  // a desktop that did not ask.
+  if (!isHomeScreenDevice) return { route: "none" };
+
+  if (args.hasPrompt) return { route: "prompt" };
   if (!platform) return { route: "none" };
 
   // Known to have no route. Listed explicitly rather than folded into the null

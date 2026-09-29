@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLang } from "@/lib/lang";
-import { LINKS, isCurrentPath } from "./navLinks";
+import { HEADER_LINKS, isCurrentPath } from "./navLinks";
 
 /**
  * The top bar.
@@ -53,7 +53,7 @@ export default function SiteHeader() {
         {/* Desktop: the links sit inline. Below md they are not hidden here so
             much as somewhere else — see MobileTabBar. */}
         <nav aria-label={t("a11y.mainNav")} className="hidden md:flex items-center gap-1 min-w-0">
-          {LINKS.map((l) => (
+          {HEADER_LINKS.map((l) => (
             <Link
               key={l.href}
               href={l.href}
