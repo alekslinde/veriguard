@@ -525,9 +525,16 @@ tiers:
     - domain: bssn.go.id
       name: BSSN — Badan Siber dan Sandi Negara
       url: https://bssn.go.id/berita/
+      expect: blocked
       region: ID
       check: manual
-      note: National cyber and crypto agency; publishes public security advisories.
+      note: >-
+        National cyber and crypto agency; publishes public security advisories.
+        Whole-origin bot protection: 403s a desktop browser UA off-CI as well as
+        from the runner, and 403s its own /robots.txt, so every rung of the
+        fallback ladder is walled too and no probe can confirm the path. Verified
+        by hand 2026-09-29 — reported DEAD before `expect: blocked`, which
+        claimed a live regulator had rotted.
 
     # ── NL ──────────────────────────────────────────────────────────────────
     - domain: fraudehelpdesk.nl
@@ -667,12 +674,16 @@ tiers:
         reporting destination named in the TH pack.
     - domain: sec.or.th
       name: SEC Thailand — investor alerts
-      url: https://www.sec.or.th/EN/Pages/News/PressRelease.aspx
+      url: https://market.sec.or.th/public/idisc/en/InvestorAlert
       region: TH
       check: manual
       note: >-
         Securities regulator; publishes public warnings about unauthorised
-        investment providers, named in the TH pack's flag copy.
+        investment providers, named in the TH pack's flag copy. URL updated
+        2026-09-29 to the Investor Alert list, which is the warning list the pack
+        actually leans on and answers CI directly. The former press-release path
+        sits behind whole-origin bot protection that 403s a desktop browser and
+        its own /robots.txt, so it was unverifiable rather than gone.
 
     # ── VN ──────────────────────────────────────────────────────────────────
     - domain: ncsc.gov.vn
@@ -1048,11 +1059,18 @@ tiers:
       check: manual
       trust: low
     - domain: ethicalassetsolutions.com
-      name: Ethical Asset Solutions
+      name: Ethical Asset Solutions (RETIRED)
       url: https://ethicalassetsolutions.com
       check: manual
       trust: low
-      note: Recovery-services adjacent — same caution as forteclaim.com.
+      retired: true
+      note: >-
+        Recovery-services adjacent — same caution as forteclaim.com. Retired
+        2026-09-29 — the domain no longer resolves (NXDOMAIN on both the local
+        resolver and 8.8.8.8), so this is gone rather than bot-walled. It was the
+        second of two sources on the 2026-06-21 pig-butchering entry; the other
+        is still live and the IOCs that entry justifies remain corroborated, so
+        no shipped rule is left unsourced. Last archived snapshot 2026-07-07.
     - domain: stateofsurveillance.org
       name: State of Surveillance
       url: https://stateofsurveillance.org

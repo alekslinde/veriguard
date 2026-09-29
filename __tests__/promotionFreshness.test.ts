@@ -7,6 +7,7 @@ import {
   human,
   markdown,
   newestRoadmap,
+  type Report,
 } from "../scripts/check-promotion-freshness";
 
 describe("newestRoadmap", () => {
@@ -50,9 +51,37 @@ describe("reporting", () => {
   it("still surfaces non-gating regions when the gate is clean", () => {
     // They must not simply vanish when AU is current — being invisible is the
     // state this whole change was undoing.
-    const report = assess("2026-08-15");
-    const out = human(report);
+    //
+    // Built from a synthetic report rather than from the real surfaces. Two
+    // earlier versions of this test read live data and both broke on a
+    // promotion rather than on a regression: a hardcoded sweep date assumed
+    // some non-gating region would always sit behind it, and deriving the date
+    // instead only moved the assumption, because once every region is current
+    // the scenario stops existing at all. What is being tested is how `human`
+    // reports a clean gate alongside a behind non-gating region, which is a
+    // property of the formatter and should not depend on how stale the calendar
+    // happens to be today.
+    const report: Report = {
+      newest: "2026-09-27",
+      behind: [
+        {
+          surface: {
+            name: "Scam calendar",
+            region: "GB",
+            file: "lib/scamCalendar.ts",
+            asAt: "2026-09-11",
+            derivedFrom: "newest reviewed date",
+          },
+          gapDays: 16,
+        },
+      ],
+      inSync: [],
+    };
+
     expect(gating(report)).toEqual([]);
+    const out = human(report);
     expect(out).toContain("not gating");
+    // The row itself must be present, not just the heading.
+    expect(out).toContain("GB");
   });
 });
