@@ -65,7 +65,7 @@
 # 09-09 header.
 
 version: 1
-updated: 2026-09-10
+updated: 2026-09-29
 
 tiers:
   1:
@@ -287,10 +287,13 @@ tiers:
         automated requests, hence `expect: blocked`.
     - domain: ccpc.ie
       name: CCPC — Competition and Consumer Protection Commission
-      url: https://www.ccpc.ie/consumers/
+      url: https://www.ccpc.ie/manage-your-money/scams-and-frauds/common-scams
       region: IE
       check: manual
-      note: Irish consumer protection authority; scam and unauthorised-firm alerts.
+      note: >-
+        Irish consumer protection authority; scam and unauthorised-firm
+        alerts. URL updated 2026-09-29 — `/consumers/` now redirects to the
+        homepage (rot); pointed at the specific scams page instead.
     # ── SG ──────────────────────────────────────────────────────────────────
     - domain: scamshield.gov.sg
       name: ScamShield (Singapore)
@@ -319,12 +322,18 @@ tiers:
     # "nobody read anything".
     - domain: bsi.bund.de
       name: BSI — Bundesamt für Sicherheit in der Informationstechnik
-      url: https://www.bsi.bund.de/DE/Service-Navi/Presse/Warnmeldungen/warnmeldungen_node.html
+      url: https://www.bsi.bund.de/DE/Service-Navi/Presse/Alle-Meldungen-News/alle-meldungen-news_node.html
       region: DE
+      expect: blocked
       check: manual
       note: >-
         Germany's federal information-security authority. Publishes public
         warnings ("Warn- und Informationsmeldungen") including phishing waves.
+        URL updated 2026-09-29 — the old warnings path is gone; this is the
+        current press-release archive, confirmed live to a GET with a browser
+        UA. Its edge redirects EVERY HEAD request (any path, including the
+        homepage) to an error page, which this job's HEAD-first probe reads
+        as DEAD before it ever tries GET — hence `expect: blocked`.
     - domain: verbraucherzentrale.de
       name: Verbraucherzentrale — Phishing-Radar
       url: https://www.verbraucherzentrale.de/wissen/digitale-welt/phishingradar
@@ -338,18 +347,24 @@ tiers:
     # ── ZA ──────────────────────────────────────────────────────────────────
     - domain: saps.gov.za
       name: South African Police Service — scam alerts
-      url: https://www.saps.gov.za/newsroom/alert.php
+      url: https://www.saps.gov.za/
       region: ZA
       check: manual
+      note: >-
+        National police; publishes named scam and fraud alerts. URL updated
+        2026-09-29 — the `/newsroom/alert.php` path 404s and no stable
+        successor page was confirmed; pointed at the homepage.
       note: National police; publishes named scam and fraud alerts.
     - domain: sabric.co.za
       name: SABRIC — South African Banking Risk Information Centre
-      url: https://www.sabric.co.za/media-and-news/
+      url: https://www.sabric.co.za/
       region: ZA
       check: manual
       note: >-
         Bank-sector fraud body; the closest ZA equivalent to FraudSMART in IE
-        for named vishing and smishing campaigns.
+        for named vishing and smishing campaigns. URL updated 2026-09-29 —
+        the `/media-and-news/` path 404s and no stable successor page was
+        confirmed; pointed at the homepage.
 
     # ── IN ──────────────────────────────────────────────────────────────────
     - domain: cybercrime.gov.in
@@ -359,7 +374,12 @@ tiers:
       check: manual
       note: >-
         India's national cybercrime reporting portal, run by MHA. Also the
-        reporting destination named in the IN pack.
+        reporting destination named in the IN pack. Confirmed 2026-09-29: GET
+        returns a normal 200 homepage, but HEAD returns 404 — the checker's
+        HEAD-first probe reads that as DEAD without ever trying GET, since
+        404 isn't one of the codes that triggers its GET fallback (only
+        403/405/501 are). A registry fix can't correct this; it needs
+        check-sources.mjs to retry 404 on HEAD with GET too.
     - domain: cert-in.org.in
       name: CERT-In — Indian Computer Emergency Response Team
       url: https://www.cert-in.org.in/
@@ -388,20 +408,23 @@ tiers:
     # ── BR ──────────────────────────────────────────────────────────────────
     - domain: gov.br
       name: gov.br — Ministério da Justiça, consumer protection
-      url: https://www.gov.br/mj/pt-br/assuntos/sua-protecao/consumidor
+      url: https://www.gov.br/mj/pt-br/assuntos/seus-direitos/consumidor
       region: BR
       check: manual
       note: >-
         Federal consumer-protection channel (SENACON) and the reporting
-        destination named in the BR pack.
+        destination named in the BR pack. URL updated 2026-09-29 — the site
+        reorganized this page from sua-protecao to seus-direitos.
     - domain: cert.br
       name: CERT.br
-      url: https://www.cert.br/alertas/
+      url: https://cartilha.cert.br/fasciculos/
       region: BR
       check: manual
       note: >-
-        Brazil's national CERT, run by NIC.br; publishes public alerts
-        including phishing and banking-malware campaigns.
+        Brazil's national CERT, run by NIC.br. URL updated 2026-09-29 — the
+        dedicated `/alertas/` page was discontinued; content dispersed into
+        this guides series. No longer a source of named live-campaign alerts,
+        more general phishing/fraud guidance — corroborate before citing.
 
     # ── item 4 step 5 wave 2 ───────────────────────────────────────────────
     # Two entries per region for FR, ES, IT, MX, ID, NL, SE, PH, NG, KE, KR,
@@ -412,18 +435,25 @@ tiers:
     # ── FR ─────────────────────────────────────────────────────────────────
     - domain: cybermalveillance.gouv.fr
       name: Cybermalveillance.gouv.fr
-      url: https://www.cybermalveillance.gouv.fr/tous-nos-contenus/actualites
+      url: https://www.cybermalveillance.gouv.fr/
       region: FR
       check: manual
       note: >-
         National cybersecurity awareness platform, run jointly by the state and
         industry; publishes named campaign alerts and is the reporting
-        destination named in the FR pack.
+        destination named in the FR pack. URL updated 2026-09-29 — the
+        actualites deep link is gone (410) and no stable successor page was
+        confirmed; pointed at the homepage.
     - domain: economie.gouv.fr
       name: DGCCRF — consumer fraud alerts
       url: https://www.economie.gouv.fr/dgccrf/alertes-consommation
       region: FR
+      expect: blocked
       check: manual
+      note: >-
+        Consumer-protection authority; publishes named scam and fraud
+        alerts. Confirmed 2026-09-29: 403 with a Cloudflare Turnstile
+        challenge page on every automated request, hence `expect: blocked`.
       note: Consumer-protection authority; publishes named scam and fraud alerts.
 
     # ── ES ─────────────────────────────────────────────────────────────────
@@ -437,10 +467,13 @@ tiers:
         the reporting destination named in the ES pack.
     - domain: policia.es
       name: Policía Nacional — alertas de fraude
-      url: https://www.policia.es/consejos/
+      url: https://www.policia.es/_es/colabora_participacion_consejos_estafas.php
       region: ES
       check: manual
-      note: National police; publishes fraud and scam-prevention advisories.
+      note: >-
+        National police; publishes fraud and scam-prevention advisories. URL
+        updated 2026-09-29 — the old `/consejos/` path 404s; this is the
+        current fraud-tips page under the citizen-participation section.
 
     # ── IT ─────────────────────────────────────────────────────────────────
     - domain: commissariatodips.it
@@ -453,10 +486,13 @@ tiers:
         fraud alerts and is the reporting destination named in the IT pack.
     - domain: agenziaentrate.gov.it
       name: Agenzia delle Entrate — phishing alerts
-      url: https://www.agenziaentrate.gov.it/portale/web/guest/aree-tematiche/phishing
+      url: https://www.agenziaentrate.gov.it/portale/focus-sul-phishing/segnalazioni-e-approfondimenti
       region: IT
       check: manual
-      note: Tax authority's own list of confirmed phishing campaigns impersonating it.
+      note: >-
+        Tax authority's own list of confirmed phishing campaigns impersonating
+        it. URL updated 2026-09-29 — the old path 404s; this is the current
+        phishing-alerts page.
 
     # ── MX ─────────────────────────────────────────────────────────────────
     - domain: gob.mx
@@ -468,13 +504,16 @@ tiers:
         National guard; publishes fraud and scam advisories and is the
         reporting destination named in the MX pack.
     - domain: condusef.gob.mx
-      name: CONDUSEF — alertas
+      name: CONDUSEF — alertas (RETIRED)
       url: https://www.condusef.gob.mx/?p=alertas
       region: MX
       check: manual
+      retired: true
       note: >-
-        Financial-consumer protection commission; publishes named financial
-        fraud and phishing alerts.
+        Financial-consumer protection commission; published named financial
+        fraud and phishing alerts. Retired 2026-09-29 — the domain does not
+        respond to any automated or direct probe; no reachable page found.
+        Re-source if an MX claim needs this again.
 
     # ── ID ──────────────────────────────────────────────────────────────────
     - domain: ojk.go.id
@@ -495,12 +534,13 @@ tiers:
     # ── NL ──────────────────────────────────────────────────────────────────
     - domain: fraudehelpdesk.nl
       name: Fraudehelpdesk
-      url: https://www.fraudehelpdesk.nl/actuele-fraude/
+      url: https://www.fraudehelpdesk.nl/actueel/
       region: NL
       check: manual
       note: >-
         National fraud-reporting helpline; publishes named current-scam alerts
-        and is the reporting destination named in the NL pack.
+        and is the reporting destination named in the NL pack. URL updated
+        2026-09-29 — the site restructured `/actuele-fraude/` to `/actueel/`.
     - domain: afm.nl
       name: AFM — Autoriteit Financiële Markten, investor warnings
       url: https://www.afm.nl/nl-nl/consumenten/actueel
@@ -513,56 +553,69 @@ tiers:
     # ── SE ──────────────────────────────────────────────────────────────────
     - domain: polisen.se
       name: Polisen — bedrägeri
-      url: https://polisen.se/utsatt-for-brott/olika-typer-av-brott/bedrageri/
+      url: https://polisen.se/utsatt-for-brott/polisanmalan/bedragerier/bedragerier/
       region: SE
       check: manual
       note: >-
         National police; publishes fraud-type guidance and is the reporting
-        destination named in the SE pack.
+        destination named in the SE pack. URL updated 2026-09-29 — the site
+        restructured this page under `polisanmalan/bedragerier`.
     - domain: fi.se
       name: Finansinspektionen — varningslista
-      url: https://www.fi.se/sv/vara-register/varningslista/
+      url: https://www.fi.se/sv/vara-register/fis-varningslista/
       region: SE
       check: manual
       note: >-
         Financial supervisory authority; publishes a public warning list of
         unauthorised investment providers, named in the SE pack's flag copy.
+        URL updated 2026-09-29 — the page was renamed to `fis-varningslista`.
 
     # ── PH ──────────────────────────────────────────────────────────────────
     - domain: pnp.gov.ph
       name: PNP Anti-Cybercrime Group
       url: https://acg.pnp.gov.ph/
       region: PH
+      expect: blocked
       check: manual
       note: >-
         National police cybercrime unit; publishes advisories and is the
-        reporting destination named in the PH pack.
+        reporting destination named in the PH pack. Confirmed 2026-09-29:
+        403 with a Cloudflare Turnstile challenge page on every automated
+        request, hence `expect: blocked`.
     - domain: sec.gov.ph
       name: SEC Philippines — advisories
       url: https://www.sec.gov.ph/advisories/
       region: PH
+      expect: blocked
       check: manual
       note: >-
         Securities regulator; publishes a public advisory list of unauthorised
-        investment providers, named in the PH pack's flag copy.
+        investment providers, named in the PH pack's flag copy. Confirmed
+        2026-09-29: 403 with a Cloudflare Turnstile challenge page on every
+        automated request, hence `expect: blocked`.
 
     # ── NG ──────────────────────────────────────────────────────────────────
-    - domain: efccnigeria.org
+    - domain: efcc.gov.ng
       name: EFCC — Economic and Financial Crimes Commission
-      url: https://efccnigeria.org/efcc/news
+      url: https://efcc.gov.ng/efcc/news-and-information/news-release/
       region: NG
       check: manual
       note: >-
         National financial-crimes agency; publishes named scam alerts and is
-        the reporting destination named in the NG pack.
+        the reporting destination named in the NG pack. Domain updated
+        2026-09-29 — efccnigeria.org is gone; efcc.gov.ng is the official
+        domain.
     - domain: sec.gov.ng
-      name: SEC Nigeria — investor alerts
+      name: SEC Nigeria — investor alerts (RETIRED)
       url: https://sec.gov.ng/category/press-release/
       region: NG
       check: manual
+      retired: true
       note: >-
         Securities regulator; publishes public warnings about unauthorised
-        investment providers, named in the NG pack's flag copy.
+        investment providers, named in the NG pack's flag copy. Retired
+        2026-09-29 — the press-release path 404s and no live successor page
+        was found. Re-source if an NG investment-scam claim needs this again.
 
     # ── KE ──────────────────────────────────────────────────────────────────
     - domain: dci.go.ke
@@ -575,22 +628,27 @@ tiers:
         is the reporting destination named in the KE pack.
     - domain: cma.or.ke
       name: Capital Markets Authority (Kenya) — investor alerts
-      url: https://www.cma.or.ke/index.php/media-center/press-releases
+      url: https://www.cma.or.ke/
       region: KE
       check: manual
       note: >-
         Capital markets regulator; publishes public warnings about
         unauthorised investment providers, named in the KE pack's flag copy.
+        URL updated 2026-09-29 — the old press-releases path 404s (site
+        restructured) and no stable successor page was confirmed; pointed at
+        the homepage.
 
     # ── KR ──────────────────────────────────────────────────────────────────
-    - domain: police.go.kr
-      name: National Police Agency (South Korea) — cyber safety
-      url: https://www.police.go.kr/www/security/cyber.jsp
+    - domain: cyberbureau.police.go.kr
+      name: National Police Agency (South Korea) — Cyber Investigation Bureau
+      url: https://cyberbureau.police.go.kr
       region: KR
       check: manual
       note: >-
         National police; publishes cybercrime and phishing advisories and is
-        the reporting destination named in the KR pack.
+        the reporting destination named in the KR pack. Domain and URL
+        updated 2026-09-29 — the old `cyber.jsp` page is gone; cybercrime
+        content moved to this dedicated bureau subdomain.
     - domain: fss.or.kr
       name: Financial Supervisory Service (South Korea)
       url: https://www.fss.or.kr/fss/bbs/B0000188/list.do
@@ -620,29 +678,38 @@ tiers:
 
     # ── VN ──────────────────────────────────────────────────────────────────
     - domain: ncsc.gov.vn
-      name: National Cyber Security Center (Vietnam)
+      name: National Cyber Security Center (Vietnam) (RETIRED)
       url: https://khonggianmang.vn/
       region: VN
       check: manual
+      retired: true
       note: >-
-        National cybersecurity center; runs the public scam-reporting platform
-        named in the VN pack, and publishes named phishing campaign alerts.
+        National cybersecurity center; ran the public scam-reporting platform
+        named in the VN pack. Retired 2026-09-29 — khonggianmang.vn no longer
+        resolves; no live successor domain was confirmed. Re-source if a VN
+        claim needs this again.
     - domain: mps.gov.vn
       name: Ministry of Public Security (Vietnam) — announcements
-      url: https://bocongan.gov.vn/tin-tuc-su-kien/
+      url: https://bocongan.gov.vn/
       region: VN
       check: manual
-      note: National police ministry; publishes fraud and scam advisories.
+      note: >-
+        National police ministry; publishes fraud and scam advisories. URL
+        updated 2026-09-29 — the `/tin-tuc-su-kien/` news-index path 404s
+        (including the `.html` variant); pointed at the homepage.
 
     # ── PL ──────────────────────────────────────────────────────────────────
     - domain: cert.pl
       name: CERT Polska
-      url: https://cert.pl/ostrzezenia/
+      url: https://cert.pl/
       region: PL
       check: manual
       note: >-
         National CERT, run by NASK; publishes named phishing campaign alerts
-        and is the reporting destination named in the PL pack.
+        and is the reporting destination named in the PL pack. URL updated
+        2026-09-29 — the "Lista Ostrzeżeń" warnings page was retired; current
+        alerts are posted under `/posts/`, but that path 403s automated
+        requests, so the registry points at the homepage instead.
     - domain: knf.gov.pl
       name: KNF — Komisja Nadzoru Finansowego
       url: https://www.knf.gov.pl/dla_konsumenta/ostrzezenia_publiczne
@@ -654,21 +721,26 @@ tiers:
 
     # ── AE ──────────────────────────────────────────────────────────────────
     - domain: ecrime.ae
-      name: Dubai Police — eCrime
+      name: Dubai Police — eCrime (RETIRED)
       url: https://ecrime.ae/
       region: AE
       check: manual
+      retired: true
       note: >-
-        Dubai Police's cybercrime reporting platform, named in the AE pack;
-        publishes public scam-awareness advisories.
-    - domain: sca.gov.ae
-      name: Securities and Commodities Authority (UAE) — investor alerts
-      url: https://www.sca.gov.ae/en/media-center/news.aspx
+        Dubai Police's cybercrime reporting platform, named in the AE pack.
+        Retired 2026-09-29 — the domain refuses connections outright (not a
+        WAF response, no TLS handshake completes). Re-source if an AE claim
+        needs this again.
+    - domain: uaecma.gov.ae
+      name: Central Bank/Capital Market Authority (UAE) — investor warnings
+      url: https://www.uaecma.gov.ae/en/open-data/warnings
       region: AE
       check: manual
       note: >-
         Securities regulator; publishes public warnings about unauthorised
-        investment providers, named in the AE pack's flag copy.
+        investment providers, named in the AE pack's flag copy. Domain and
+        URL updated 2026-09-29 — SCA was dissolved into this successor
+        authority; sca.gov.ae now redirects here.
 
   2:
     - domain: fraudsmart.ie

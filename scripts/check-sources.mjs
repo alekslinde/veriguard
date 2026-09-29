@@ -529,21 +529,38 @@ async function checkOne(entry) {
   for (let attempt = 0; attempt <= RETRIES; attempt++) {
     try {
       // HEAD first (cheap); many sites answer 403/405 to it, so fall back to a
-      // GET before concluding anything is wrong.
+      // GET before concluding anything is wrong. Some sites go further and
+      // answer HEAD with a 404 (India's cybercrime.gov.in) or route it into an
+      // edge error page that resolves to a 400 (bsi.bund.de) — GET on the
+      // identical URL is fine. A HEAD-only rejection is a known false-rot
+      // shape, so confirm 404/400/410 with GET too, not just 403/405/501; a
+      // GET that repeats the same status is real evidence, not a false one.
       //
       // Each probe gets its OWN timeout budget. Sharing one timer across both
       // meant a site taking 22s on HEAD left ~8s for the GET and was reported
       // TIMEOUT while alive — precisely the .gov.au slowness this budget exists
       // to absorb.
       let res = await withTimeout((signal) => probe(entry.url, "HEAD", signal));
-      if (res.status === 405 || res.status === 403 || res.status === 501) {
+      if ([400, 403, 404, 405, 410, 501].includes(res.status)) {
         res = await withTimeout((signal) => probe(entry.url, "GET", signal));
       }
 
       result.status = res.status;
       result.finalUrl = res.url;
 
-      if (res.status === 404 || res.status === 410) result.state = "DEAD";
+      if (res.status === 404 || res.status === 410) {
+        // A WAF marked `expect: blocked` does not always answer with 403 — some
+        // (Netsafe among them) flip between 403 and 404 across requests, and a
+        // 404 from the same edge protection says nothing real about the page
+        // either. Honour the flag here too, exactly as the 403/429 and 5xx
+        // paths already do, instead of trusting the status code at face value.
+        if (entry.expect === "blocked") {
+          result.state = "BLOCKED";
+          result.error = `HTTP ${res.status} (expected — bot protection)`;
+        } else {
+          result.state = "DEAD";
+        }
+      }
       else if (res.status === 403 || res.status === 429) {
         // A 403 to our UA is usually a WAF, but it can also be a page pulled
         // behind auth. Confirm the URL still serves someone — unless the entry

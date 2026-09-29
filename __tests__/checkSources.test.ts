@@ -323,11 +323,18 @@ describe("lookalike discipline", () => {
     // GB, NZ, CA, IE and SG: four of the new national authorities (Action
     // Fraud, Ofcom, Netsafe, An Garda Síochána) sit behind WAFs that 403
     // automated requests. Each was probed by hand and carries a note saying so.
-    // The cap exists to stop the flag being reached for casually, so it tracks
-    // the number actually justified — 7 — rather than leaving headroom that
+    //
+    // Raised from 7 to 11 on 2026-09-29 during a source-check cleanup: BSI
+    // (edge redirects every HEAD to an error page, any path), DGCCRF, the PNP
+    // Anti-Cybercrime Group and SEC Philippines (all three return a Cloudflare
+    // Turnstile challenge page to every automated request) were each probed
+    // by hand and confirmed reachable to a browser before being flagged.
+    //
+    // The cap exists to stop the flag being reached for casually, so it
+    // tracks the number actually justified rather than leaving headroom that
     // would let the next one in unexamined.
     const blocked = allSources.filter((s) => s.expect === "blocked");
-    expect(blocked.length).toBeLessThanOrEqual(7);
+    expect(blocked.length).toBeLessThanOrEqual(11);
   });
 
   it("keeps retired sources marked and explained", () => {
@@ -510,6 +517,85 @@ describe("ladder corroboration discipline", () => {
     });
     expect(r.state).toBe("BLOCKED");
     expect(r.error).toContain("expected");
+  });
+});
+
+describe("HEAD/GET status mismatch (cybercrime.gov.in / bsi.bund.de)", () => {
+  // Some hosts answer HEAD with a status that does not reflect the page: a
+  // plain 404 to HEAD while GET serves the real content (cybercrime.gov.in),
+  // or an edge redirect that resolves HEAD into a 400 error page while GET on
+  // the identical URL is fine (bsi.bund.de). The old GET-fallback trigger
+  // list (403/405/501) never retried these, so they misreported as DEAD.
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  const stubByMethod = (headStatus: number, getStatus: number, url: string) => {
+    vi.stubGlobal("fetch", async (input: string | URL, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      const status = method === "HEAD" ? headStatus : getStatus;
+      return {
+        status,
+        ok: status >= 200 && status < 300,
+        url,
+        text: async () => "",
+        json: async () => ({}),
+      } as Response;
+    });
+  };
+
+  it("confirms a HEAD 404 with GET before calling it DEAD", async () => {
+    const url = "https://cybercrime.gov.in";
+    stubByMethod(404, 200, url);
+    const r = await checkOne({ domain: "cybercrime.gov.in", url, tier: "1" });
+    expect(r.state).toBe("OK");
+  });
+
+  it("confirms a HEAD 400 with GET before calling it DEAD", async () => {
+    const url = "https://www.bsi.bund.de/x";
+    stubByMethod(400, 200, url);
+    const r = await checkOne({ domain: "bsi.bund.de", url, tier: "1" });
+    expect(r.state).toBe("OK");
+  });
+
+  it("still reports DEAD when GET repeats the same 404", async () => {
+    const url = "https://gone.example/x";
+    stubByMethod(404, 404, url);
+    const r = await checkOne({ domain: "gone.example", url, tier: "3" });
+    expect(r.state).toBe("DEAD");
+  });
+});
+
+describe("expect: blocked honoured on a 404/410 (Netsafe)", () => {
+  // Netsafe's WAF flips between 403 and 404 across requests for the same
+  // blocked page. `expect: blocked` already suppressed a false DEAD on 403;
+  // it must do the same on 404, or the flag is a coin-flip depending on which
+  // status the edge happens to answer with on a given run.
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  const stubAlways = (status: number, url: string) => {
+    vi.stubGlobal("fetch", async () => ({
+      status, ok: false, url, text: async () => "", json: async () => ({}),
+    } as Response));
+  };
+
+  it("reports BLOCKED, not DEAD, when expect: blocked and the WAF answers 404", async () => {
+    const url = "https://netsafe.org.nz/news/";
+    stubAlways(404, url);
+    const r = await checkOne({ domain: "netsafe.org.nz", url, tier: "1", expect: "blocked" });
+    expect(r.state).toBe("BLOCKED");
+  });
+
+  it("reports BLOCKED, not DEAD, when expect: blocked and the WAF answers 410", async () => {
+    const url = "https://netsafe.org.nz/news/";
+    stubAlways(410, url);
+    const r = await checkOne({ domain: "netsafe.org.nz", url, tier: "1", expect: "blocked" });
+    expect(r.state).toBe("BLOCKED");
+  });
+
+  it("still reports DEAD on a 404 when the entry is not expect: blocked", async () => {
+    const url = "https://gone.example/x";
+    stubAlways(404, url);
+    const r = await checkOne({ domain: "gone.example", url, tier: "3" });
+    expect(r.state).toBe("DEAD");
   });
 });
 
