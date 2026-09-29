@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { storeForUserAgent } from "@/lib/detectBrowser";
-import { installsForStore, EXTENSION_LISTINGS } from "@/lib/extensionInstalls";
+import { browserForUserAgent } from "@/lib/detectBrowser";
+import { installsForBrowser, INSTALL_TARGETS } from "@/lib/extensionInstalls";
 
 // Real user agent strings, not constructed ones. Every browser here lies about
 // being the others — Edge's contains "Chrome" and "Safari", Chrome's contains
@@ -21,81 +21,114 @@ const UA = {
   bot: "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
 } as const;
 
-describe("storeForUserAgent", () => {
-  it("reads the Chromium family, including the ones carrying other names", () => {
-    // Edge and Opera install the Chromium build from the Chrome Web Store, so
-    // they resolve to the listing that actually serves them rather than to
-    // nothing.
-    expect(storeForUserAgent(UA.chrome)).toBe("chromium");
-    expect(storeForUserAgent(UA.edge)).toBe("chromium");
-    expect(storeForUserAgent(UA.opera)).toBe("chromium");
-    expect(storeForUserAgent(UA.chromeIos)).toBe("chromium");
-    expect(storeForUserAgent(UA.edgeIos)).toBe("chromium");
+describe("browserForUserAgent", () => {
+  it("tells Edge apart from Chrome", () => {
+    // The reason this returns a browser rather than a store: both install from
+    // the same listing, but they are two buttons and an Edge reader should be
+    // promoted their own.
+    expect(browserForUserAgent(UA.chrome)).toBe("chrome");
+    expect(browserForUserAgent(UA.edge)).toBe("edge");
+    expect(browserForUserAgent(UA.chromeIos)).toBe("chrome");
+    expect(browserForUserAgent(UA.edgeIos)).toBe("edge");
+  });
+
+  it("sends Opera to Chrome, which is the listing that serves it", () => {
+    // Opera is Chromium but has no button of its own, so the honest promotion
+    // is the one its install actually comes from.
+    expect(browserForUserAgent(UA.opera)).toBe("chrome");
   });
 
   it("reads Firefox and its forks", () => {
-    expect(storeForUserAgent(UA.firefox)).toBe("firefox");
-    expect(storeForUserAgent(UA.firefoxAndroid)).toBe("firefox");
-    expect(storeForUserAgent(UA.firefoxIos)).toBe("firefox");
-    expect(storeForUserAgent(UA.librewolf)).toBe("firefox");
+    expect(browserForUserAgent(UA.firefox)).toBe("firefox");
+    expect(browserForUserAgent(UA.firefoxAndroid)).toBe("firefox");
+    expect(browserForUserAgent(UA.firefoxIos)).toBe("firefox");
+    expect(browserForUserAgent(UA.librewolf)).toBe("firefox");
   });
 
   it("reads Safari only once every Chromium browser is excluded", () => {
     // This is the check that breaks if the order is rearranged: every string
     // above except Firefox's also contains "safari".
-    expect(storeForUserAgent(UA.safari)).toBe("safari");
-    expect(storeForUserAgent(UA.safariIos)).toBe("safari");
+    expect(browserForUserAgent(UA.safari)).toBe("safari");
+    expect(browserForUserAgent(UA.safariIos)).toBe("safari");
   });
 
   it("returns null rather than guessing when nothing matches", () => {
-    expect(storeForUserAgent(UA.bot)).toBeNull();
-    expect(storeForUserAgent("")).toBeNull();
+    expect(browserForUserAgent(UA.bot)).toBeNull();
+    expect(browserForUserAgent("")).toBeNull();
   });
 
-  it("does not mistake a Chromium browser for Safari", () => {
-    // The regression this ordering exists to prevent: sending a Chrome user to
-    // a Safari listing that does not exist.
+  it("never mistakes a Chromium browser for Safari", () => {
+    // The regression this ordering exists to prevent: promoting a Safari entry
+    // that cannot be installed to someone running Chrome.
     for (const ua of [UA.chrome, UA.edge, UA.opera, UA.chromeIos, UA.edgeIos]) {
-      expect(storeForUserAgent(ua)).not.toBe("safari");
+      expect(browserForUserAgent(ua)).not.toBe("safari");
+    }
+  });
+
+  it("resolves to a browser the page actually lists", () => {
+    const ids = new Set(INSTALL_TARGETS.map((t) => t.id));
+    for (const ua of Object.values(UA)) {
+      const id = browserForUserAgent(ua);
+      if (id) expect(ids.has(id)).toBe(true);
     }
   });
 });
 
-describe("installsForStore", () => {
-  const published = EXTENSION_LISTINGS.filter((l) => l.url);
-
-  it("lists only stores that are actually published", () => {
-    // A row you cannot install from is not an install link. Safari is built but
-    // unsubmitted, and appears nowhere in this list.
-    for (const l of installsForStore(null)) expect(l.url).toBeTruthy();
-    expect(installsForStore(null)).toHaveLength(published.length);
+describe("install targets", () => {
+  it("gives Chrome and Edge a button each, backed by the same listing", () => {
+    // The split is presentational. There is one Chromium artifact on one
+    // listing with one user figure, and lib/extensionInstalls holds it that way
+    // — "Chrome & Edge" on a button just made an Edge reader hunt for
+    // themselves.
+    const chrome = INSTALL_TARGETS.find((t) => t.id === "chrome");
+    const edge = INSTALL_TARGETS.find((t) => t.id === "edge");
+    expect(chrome?.store).toBe("chromium");
+    expect(edge?.store).toBe("chromium");
+    expect(chrome?.url).toBe(edge?.url);
   });
 
-  it("puts the reader's own store first without dropping the others", () => {
-    const ordered = installsForStore("firefox");
-    expect(ordered[0].store).toBe("firefox");
-    expect(ordered).toHaveLength(published.length);
+  it("keeps an unpublished browser listed", () => {
+    // Opposite of dropping it: a browser missing from a list of four reads as
+    // "not supported" rather than "not yet". The component renders a target
+    // with no url as text, never as a link.
+    const safari = INSTALL_TARGETS.find((t) => t.id === "safari");
+    expect(safari).toBeDefined();
+    expect(safari?.url).toBeNull();
+  });
+});
+
+describe("installsForBrowser", () => {
+  const authored = INSTALL_TARGETS.map((t) => t.id);
+
+  it("puts the reader's own browser first without dropping the others", () => {
+    const ordered = installsForBrowser("firefox");
+    expect(ordered[0].id).toBe("firefox");
+    expect(ordered).toHaveLength(INSTALL_TARGETS.length);
+  });
+
+  it("promotes Edge over Chrome for an Edge reader", () => {
+    expect(installsForBrowser("edge")[0].id).toBe("edge");
+    expect(installsForBrowser("chrome")[0].id).toBe("chrome");
   });
 
   it("leaves the order alone when the browser is unknown", () => {
     // The server render, and any user agent the matcher does not recognise.
-    expect(installsForStore(null).map((l) => l.store)).toEqual(
-      published.map((l) => l.store),
-    );
+    expect(installsForBrowser(null).map((t) => t.id)).toEqual(authored);
   });
 
-  it("promotes nothing for a store we do not publish to", () => {
-    // Safari today: the reader's browser is known, but there is no listing to
-    // lift. Returning the list unchanged beats an empty promotion slot.
-    expect(installsForStore("safari").map((l) => l.store)).toEqual(
-      published.map((l) => l.store),
-    );
+  it("does not promote a browser you cannot install on", () => {
+    // Safari today. Leading with a button that does nothing, and burying the
+    // three that work behind it, is worse for that reader than leaving the
+    // order alone — their browser is still listed, still marked "soon".
+    expect(installsForBrowser("safari").map((t) => t.id)).toEqual(authored);
+    expect(installsForBrowser("safari")[0].url).toBeTruthy();
   });
 
-  it("never lists a store twice", () => {
-    for (const first of ["chromium", "firefox", "safari"] as const) {
-      const stores = installsForStore(first).map((l) => l.store);
-      expect(new Set(stores).size).toBe(stores.length);
+  it("never lists a browser twice", () => {
+    for (const first of [...authored, null]) {
+      const ids = installsForBrowser(first).map((t) => t.id);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(ids).toHaveLength(INSTALL_TARGETS.length);
     }
   });
 });

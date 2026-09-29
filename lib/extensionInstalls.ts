@@ -127,24 +127,73 @@ export function reportedAsOf(): string | null {
 }
 
 /**
- * Published listings, with the reader's own store first.
+ * A browser as the READER thinks of it, which is not how the stores divide
+ * them.
  *
- * Unpublished stores are dropped rather than listed as unavailable: this is a
- * list of places you can install from, and a row that cannot be installed from
- * is not one of them. Safari's absence is reported elsewhere — the row says so
- * when NOTHING is published, which is the case that needs explaining.
+ * Edge is the reason this type exists separately from ExtensionStore. There is
+ * one Chromium artifact on one listing with one user figure, and the data model
+ * above is right to hold it as a single entry — splitting it there would invent
+ * a precision the source does not have, and `extension/STORE.md` would stop
+ * agreeing with it.
  *
- * `first` is a hint, not a filter. Everything published stays listed and in its
- * original order behind the promoted entry, so a wrong guess costs the reader a
- * glance rather than a link. Passing null (server render, or an unrecognised
- * browser) returns the list untouched.
+ * But "Chrome & Edge" on a button makes an Edge user scan a compound label to
+ * find themselves, and reads as an afterthought when it is their browser. So
+ * the split happens here, in presentation, where it costs nothing: two buttons
+ * pointing at the same store, which is exactly what installing on Edge is.
  */
-export function installsForStore(first: ExtensionStore | null): readonly ExtensionListing[] {
-  const published = EXTENSION_LISTINGS.filter((l) => l.url);
-  if (!first) return published;
-  const mine = published.filter((l) => l.store === first);
-  // A store we do not publish to — Safari today — promotes nothing. Returning
-  // the list unchanged is better than an empty promotion slot.
-  if (mine.length === 0) return published;
-  return [...mine, ...published.filter((l) => l.store !== first)];
+export type InstallTarget = {
+  /** Stable key for React, and what browser detection resolves to. */
+  id: "chrome" | "edge" | "firefox" | "safari";
+  /** The browser's own name, not the store's. */
+  name: string;
+  /** Where the listing that serves this browser lives, or null if unpublished. */
+  url: string | null;
+  /** Which listing backs it — several targets may share one. */
+  store: ExtensionStore;
+};
+
+/**
+ * Every browser the extension targets, in order of how many people use them.
+ *
+ * Unpublished targets are kept rather than dropped, which is the opposite of
+ * what this did before. A bare list of install links should hold only links you
+ * can follow — but this list is now the complete set of browsers, and Safari
+ * missing from it reads as "not supported" rather than "not yet". Saying
+ * "coming soon" is both truer and more useful than silence, and the caller
+ * renders it as text rather than as a link to nowhere.
+ */
+export const INSTALL_TARGETS: readonly InstallTarget[] = [
+  { id: "chrome", name: "Chrome", store: "chromium", url: chromiumUrl() },
+  { id: "edge", name: "Edge", store: "chromium", url: chromiumUrl() },
+  { id: "firefox", name: "Firefox", store: "firefox", url: storeUrl("firefox") },
+  { id: "safari", name: "Safari", store: "safari", url: storeUrl("safari") },
+];
+
+function storeUrl(store: ExtensionStore): string | null {
+  return EXTENSION_LISTINGS.find((l) => l.store === store)?.url ?? null;
+}
+
+/** Chrome and Edge both install from the Chromium listing. */
+function chromiumUrl(): string | null {
+  return storeUrl("chromium");
+}
+
+/**
+ * The install targets, with the reader's own browser first.
+ *
+ * `first` is a hint, not a filter: every target stays listed and in its original
+ * order behind the promoted one, so a wrong guess costs the reader a glance
+ * rather than a link. Passing null — the server render, or an unrecognised user
+ * agent — returns the list untouched.
+ */
+export function installsForBrowser(first: InstallTarget["id"] | null): readonly InstallTarget[] {
+  if (!first) return INSTALL_TARGETS;
+  const mine = INSTALL_TARGETS.find((t) => t.id === first);
+  // Promotion is for a browser you can install on. Lifting an unpublished one
+  // to the front — Safari today — leads with a button that does nothing and
+  // buries the three that work behind it, which is worse for that reader than
+  // leaving the order alone. Their browser is still in the list, still marked
+  // "soon", in its usual place.
+  if (!mine?.url) return INSTALL_TARGETS;
+  return [mine, ...INSTALL_TARGETS.filter((t) => t.id !== first)];
 }

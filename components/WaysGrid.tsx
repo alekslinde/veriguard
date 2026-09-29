@@ -23,8 +23,8 @@ import { useState, useSyncExternalStore } from "react";
 import { useLang } from "@/lib/lang";
 import { bold } from "@/lib/richText";
 import { WAYS_IN, type WayIn } from "@/lib/waysIn";
-import { installsForStore } from "@/lib/extensionInstalls";
-import { currentStore } from "@/lib/detectBrowser";
+import { installsForBrowser, INSTALL_TARGETS } from "@/lib/extensionInstalls";
+import { currentBrowser } from "@/lib/detectBrowser";
 
 const INBOUND_ENABLED = process.env.NEXT_PUBLIC_INBOUND_ENABLED === "true";
 const INBOUND_ADDRESS = process.env.NEXT_PUBLIC_INBOUND_ADDRESS ?? "check@veriguard.app";
@@ -38,21 +38,20 @@ const INBOUND_ADDRESS = process.env.NEXT_PUBLIC_INBOUND_ADDRESS ?? "check@verigu
 const subscribeNever = () => () => {};
 
 /**
- * Every store the extension is published to, the reader's own first.
+ * Every browser the extension targets, the reader's own first.
  *
- * One link per store rather than a single "Install it" pointing at whichever
- * listing happened to be first in the array — which was the Chrome Web Store,
- * for everyone, including people reading in Firefox.
+ * One button per browser rather than a single "Install it" pointing at whichever
+ * listing came first in the array — which was the Chrome Web Store, for
+ * everyone, including people reading in Firefox. Chrome and Edge get a button
+ * each although they share one listing: see InstallTarget for why that split
+ * belongs here and not in the data.
  *
  * The order is settled AFTER hydration, not during render. The page is server
  * rendered and cached, so there is no current browser at render time, and
  * ordering the list from a value the server cannot know is a hydration
- * mismatch. The first paint shows every store in its authored order and the
- * reader's moves to the front once the client says which it is — a reorder
- * nobody sees, because this sits below the fold inside a closed row.
- *
- * Renders nothing when no store is published anywhere; the caller states that
- * instead, which is the honest rendering of "built but not submitted".
+ * mismatch. The first paint shows the authored order and the reader's browser
+ * moves to the front once the client says which it is — a reorder nobody sees,
+ * because this sits below the fold inside a closed row.
  */
 function InstallLinks() {
   const { t } = useLang();
@@ -64,38 +63,81 @@ function InstallLinks() {
   // does not know which browser will receive this page — and getSnapshot reads
   // the real value on the client. subscribe is a no-op because a user agent
   // does not change within a page view.
-  const store = useSyncExternalStore(subscribeNever, currentStore, () => null);
+  const browser = useSyncExternalStore(subscribeNever, currentBrowser, () => null);
 
-  const listings = installsForStore(store);
-  if (listings.length === 0) return null;
+  const targets = installsForBrowser(browser);
 
   return (
     <ul className="flex flex-wrap gap-2">
-      {listings.map((listing, i) => (
-        <li key={listing.store}>
-          <a
-            href={listing.url as string}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`inline-flex items-center rounded-lg border px-3 py-1.5 text-[13px] font-semibold transition-colors ${
-              // Only the promoted entry is emphasised, and only once a browser
-              // has actually been recognised — before that every store is
-              // equally likely to be the right one, and styling the first as
-              // "yours" would be a guess presented as a fact.
-              store && i === 0
-                ? "border-[var(--clear)]/50 bg-[var(--clear)]/10 text-[var(--clear)]"
-                : "border-[var(--rule)] text-[var(--text-dim)] hover:border-[var(--clear)] hover:text-[var(--clear)]"
-            }`}
-          >
-            {listing.name}
-            {store && i === 0 && (
+      {targets.map((target) => {
+        // Matched on identity, not on position. An unpublished browser is not
+        // promoted (see installsForBrowser), so on Safari the first entry is
+        // Chrome — and marking whatever landed first as "yours" would tell that
+        // reader they are running a browser they are not.
+        //
+        // Null until the client reports, which is the honest state: before that
+        // every target is equally likely to be the right one, and emphasising
+        // one would be a guess presented as a fact.
+        const isYours = target.id === browser;
+        const label = (
+          <>
+            {target.name}
+            {isYours && (
               <span className="ml-1.5 font-[family-name:var(--font-mono-ui)] text-[10px] uppercase tracking-[0.08em] text-[var(--clear)]/70">
                 {t("ways.ext.yours")}
               </span>
             )}
-          </a>
-        </li>
-      ))}
+          </>
+        );
+        const shell =
+          "inline-flex items-center rounded-lg border px-3 py-1.5 text-[13px] font-semibold";
+
+        // Not published for this browser yet. Rendered as text rather than a
+        // link, for the same reason the npm row is flat: there is nothing behind
+        // it, and a button that cannot be pressed is worse than a plain
+        // statement. It stays in the list because a browser missing from a list
+        // of four reads as "not supported" rather than "not yet".
+        if (!target.url) {
+          return (
+            <li key={target.id}>
+              <span
+                className={`${shell} border-dashed font-normal ${
+                  // Still marked when it is the reader's own browser, even
+                  // though it is the one they cannot use. That is the entry they
+                  // are looking for, and finding it greyed with "soon" answers
+                  // their question — where its absence would leave them
+                  // wondering whether they had simply missed it.
+                  isYours
+                    ? "border-[var(--caution)]/40 text-[var(--caution)]"
+                    : "border-[var(--rule)] text-[var(--faint)]"
+                }`}
+              >
+                {target.name}
+                <span className="ml-1.5 font-[family-name:var(--font-mono-ui)] text-[10px] uppercase tracking-[0.08em]">
+                  {isYours ? t("ways.ext.yoursSoon") : t("ways.ext.soon")}
+                </span>
+              </span>
+            </li>
+          );
+        }
+
+        return (
+          <li key={target.id}>
+            <a
+              href={target.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${shell} transition-colors ${
+                isYours
+                  ? "border-[var(--clear)]/50 bg-[var(--clear)]/10 text-[var(--clear)]"
+                  : "border-[var(--rule)] text-[var(--text-dim)] hover:border-[var(--clear)] hover:text-[var(--clear)]"
+              }`}
+            >
+              {label}
+            </a>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -103,11 +145,11 @@ function InstallLinks() {
 /**
  * Whether anything is published at all.
  *
- * Distinct from which store the reader is on: when this is false the row has no
- * links to offer and says so, rather than sending someone to a store page that
- * 404s.
+ * Distinct from which browser the reader is on: when this is false the row has
+ * no links to offer and says so, rather than rendering four buttons that all
+ * read "coming soon".
  */
-const HAS_ANY_LISTING = installsForStore(null).length > 0;
+const HAS_ANY_LISTING = INSTALL_TARGETS.some((t) => t.url);
 
 function Chevron() {
   return (

@@ -12,52 +12,55 @@
 // exists — and every other browser would fall through to the same default the
 // string parse already handles, for an async call and a second code path.
 
-import type { ExtensionStore } from "@/lib/extensionInstalls";
+import type { InstallTarget } from "@/lib/extensionInstalls";
 
 /**
- * Maps a user agent to the store that serves it, or null when no listed store
- * does.
+ * Maps a user agent to the browser the reader is using, or null when it is not
+ * one we list.
  *
  * ORDER IS LOAD-BEARING. Every one of these browsers lies about being the
  * others: Edge's UA contains "Chrome" and "Safari", Chrome's contains "Safari",
  * and Firefox forks keep "Firefox". So the checks run most-specific first and
  * the generic names are only reached once the impostors are ruled out.
  *
- * Edge and Opera resolve to "chromium" rather than being unknown — both install
- * the Chromium build from the Chrome Web Store, which is exactly what the
- * chromium listing offers. See the note on ExtensionStore about why Chrome and
- * Edge are one entry.
+ * Opera resolves to "chrome" rather than to a target of its own. It installs
+ * from the Chrome Web Store like Edge does, but unlike Edge it is not listed as
+ * a button — so the honest promotion is the one that actually serves it. An
+ * Opera reader sees Chrome first, which is where their install comes from.
  */
-export function storeForUserAgent(ua: string): ExtensionStore | null {
+export function browserForUserAgent(ua: string): InstallTarget["id"] | null {
   const s = ua.toLowerCase();
 
   // Firefox first: its forks (LibreWolf, Waterfox) keep the token, and nothing
   // else claims it.
   if (s.includes("firefox") || s.includes("fxios")) return "firefox";
 
-  // Chromium family, named explicitly before the generic "chrome" test below.
-  // "edg/" not "edge": the legacy EdgeHTML browser used "Edge/" and cannot run
-  // this extension, while the Chromium one uses "Edg/".
-  if (s.includes("edg/") || s.includes("edgios") || s.includes("edga")) return "chromium";
-  if (s.includes("opr/") || s.includes("opera")) return "chromium";
+  // Edge before Chrome, because its string contains both. "edg/" not "edge":
+  // the legacy EdgeHTML browser used "Edge/" and cannot run this extension,
+  // while the Chromium one uses "Edg/".
+  if (s.includes("edg/") || s.includes("edgios") || s.includes("edga")) return "edge";
+
+  // Opera is a Chromium browser with no button of its own; the Chrome listing
+  // is what serves it.
+  if (s.includes("opr/") || s.includes("opera")) return "chrome";
 
   // Real Safari is what is left once every Chromium browser is excluded — all
   // of them carry "safari" in the string.
-  if (s.includes("chrome") || s.includes("chromium") || s.includes("crios")) return "chromium";
+  if (s.includes("chrome") || s.includes("chromium") || s.includes("crios")) return "chrome";
   if (s.includes("safari")) return "safari";
 
   return null;
 }
 
 /**
- * The reader's store, or null when it cannot be determined.
+ * The reader's browser, or null when it cannot be determined.
  *
  * Returns null during server rendering, which is the correct answer rather than
  * a fallback: the page is rendered once and served to everyone, so there is no
- * "current browser" at that moment. The caller renders the unordered list and
+ * current browser at that moment. The caller renders the unordered list and
  * reorders after hydration.
  */
-export function currentStore(): ExtensionStore | null {
+export function currentBrowser(): InstallTarget["id"] | null {
   if (typeof navigator === "undefined") return null;
-  return storeForUserAgent(navigator.userAgent);
+  return browserForUserAgent(navigator.userAgent);
 }
