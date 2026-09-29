@@ -307,3 +307,47 @@ the sequence is the argument, so keep it:
    good" still carries a caveat about new scams.
 
 Do not screenshot a real person's message. Use the samples in the test suite.
+
+### The generated one
+
+`npm run screenshot` produces `store/screenshot-verdict.png` at
+1280×800 — the headline panel, suitable as the first screenshot or as the
+marketing image on the site.
+
+The panel is a mock, but its content is not written by hand. The verdict, the
+score and every signal row come from calling the engine at build time, and the
+verdict wording is read from `messages/en.normal.json`. So a retuned weight or
+a reworded string moves the image on the next run, instead of leaving it
+claiming something the product stopped doing. It fails rather than redraws if
+the sample stops scoring `likely_scam`, or if a verdict string it needs is
+missing.
+
+The remaining four are real captures and stay manual — a mock of the
+right-click menu would be a picture of something that does not exist.
+
+---
+
+## Promotional tiles
+
+Chrome only. AMO has no equivalent, and App Store Connect takes its own
+assets.
+
+Generated — run `npm run promo`, then upload from `store/`:
+
+| File | Size | Where it appears |
+| --- | --- | --- |
+| `promo-small.png` | 440×280 | Search results and category listings |
+| `promo-marquee.png` | 1400×560 | Editorial placement, if ever featured |
+
+The small tile is the one that matters: **without it the store renders the
+128px icon on a white card**, which puts an emerald-on-ink mark in the middle
+of white space and shows none of the product.
+
+They are typeset in the site's own faces, which the app loads through
+`next/font` and never installs system-wide, so the generator reads the woff2
+files out of the build and renders through a browser. It needs `.next/dev`
+present — run `npm run dev` once first, or it exits telling you so.
+
+The chip repeats the on-device claim because that is the listing's
+load-bearing promise, and a tile is read before any description. Keep it
+consistent with the short description above; if one changes, change both.

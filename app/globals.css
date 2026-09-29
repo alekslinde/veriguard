@@ -31,6 +31,34 @@
   /* #D6453D is 3.37:1 on --ink-2 — fine for a large heading, short of AA for
      the small labels in the evidence list. This is the text-safe partner. */
   --scam-text: #E86B63;
+
+  /* The mobile tab bar's full occupied height: the row itself plus the
+     home-indicator inset beneath it. One definition, three readers — the bar
+     (its own height), the More sheet (where its bottom edge sits) and the page
+     (how much bottom padding to reserve). Above the md breakpoint the bar is
+     not rendered, so the reservation collapses to zero rather than leaving a
+     band of dead space under every desktop page. */
+  --tabbar-h: calc(55px + env(safe-area-inset-bottom));
+
+  /* The sticky header's full occupied height: the row, the status-bar inset it
+     pads for, and its own 1px bottom border. Anything that pins itself below
+     the header measures from this — the learn page's sticky table of contents,
+     and the More sheet's height cap — so the number has one definition and
+     cannot go stale in a component that never knew the header had changed.
+
+     The border is part of the height on purpose. Omitting it leaves whatever
+     pins below overlapping the rule by a pixel, which reads as a seam where
+     two sticky surfaces meet. --tabbar-h counts its top border for the same
+     reason. */
+  --header-h: calc(53px + env(safe-area-inset-top));
+}
+
+@media (min-width: 768px) {
+  :root {
+    --tabbar-h: 0px;
+    /* No safe-area inset applies on a desktop, and the bar is taller. */
+    --header-h: 59px;
+  }
 }
 
 @theme inline {
@@ -83,6 +111,65 @@ body {
   line-height: 1.65;
 }
 
+/* ── app shell ───────────────────────────────────────────────────────────
+   Four browser defaults that read as "web page" on a phone, and what each
+   one gives away.
+
+   None of these touches desktop behaviour, and none removes a capability the
+   reader might want: text can still be selected everywhere it is worth
+   selecting (see the opt-in below), and nothing here disables zoom. */
+
+/* 1. The grey flash iOS paints over a tapped link. Every native control
+      responds by changing its own colour, which the tabs, buttons and links
+      here already do — the system overlay lands on top of that and is the
+      single most recognisable "this is a website" tell. */
+a,
+button,
+[role="button"],
+label[for],
+summary {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 2. Rubber-band scrolling past the end of the page, which on a fixed shell
+      drags the whole thing and exposes the ground behind it. `contain` keeps
+      the bounce inside the scroller. */
+html {
+  overscroll-behavior-y: contain;
+  /* Landscape on iOS otherwise inflates body text against the author's sizes,
+     which breaks the type scale the design is set on. */
+  -webkit-text-size-adjust: 100%;
+}
+
+/* 3. Long-press on a label or a tab selects the word, as if it were an
+      article — native chrome is not selectable. Scoped to the header and the
+      nav elements, which hold labels and nothing a reader would copy;
+      everything they might legitimately want (the verdict, the evidence, their
+      own pasted text) sits outside this and is untouched. Widening it to
+      anything holding real text would need a matching opt-in, so don't. */
+@media (max-width: 767px) {
+  nav,
+  [data-app-chrome] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* 4. The bottom tab bar is fixed, so the last row of every page would sit
+      underneath it. Reserved on <body> rather than on each <main>: a route
+      that forgets the class is a route whose footer is unreachable, and there
+      is no way to notice that from the code. */
+body {
+  padding-bottom: var(--tabbar-h);
+}
+
+/* The More sheet rises from the bar. Short and eased-out, so it reads as a
+   surface arriving rather than a panel being drawn. */
+@keyframes tabsheet-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
 
 /* Respect the user's motion preference — covers animate-pulse, animate-in, transitions */
 @media (prefers-reduced-motion: reduce) {
@@ -102,7 +189,7 @@ body:has(dialog[open]) {
 /* Keep programmatically-focused step headings (tabIndex=-1) clear of the
    52px sticky header so the content isn't obscured on step transitions */
 [data-step-heading] {
-  scroll-margin-top: 64px;
+  scroll-margin-top: calc(var(--header-h) + 12px);
 }
 
 /* Visually hidden but announced to screen readers */

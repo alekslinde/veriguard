@@ -5,6 +5,7 @@ import { BugReportProvider } from "@/components/BugReportProvider";
 import SiteHeader from "@/components/SiteHeader";
 import ServiceNotice from "@/components/ServiceNotice";
 import SiteFooter from "@/components/SiteFooter";
+import MobileTabBar from "@/components/MobileTabBar";
 import { SITE_URL } from "@/lib/siteUrl";
 import "./globals.css";
 
@@ -95,7 +96,14 @@ export default function RootLayout({
                 the first thing on the page. */}
             <ServiceNotice />
             <div className="flex-1">{children}</div>
-            <SiteFooter />
+            {/* Desktop only. On a phone the tab bar occupies the bottom edge,
+                and a footer above it would be a second strip of chrome stacked
+                on the first — its two links live in the More sheet instead, so
+                nothing here is only reachable on a desktop. */}
+            <div className="hidden md:block">
+              <SiteFooter />
+            </div>
+            <MobileTabBar />
           </BugReportProvider>
         </LangProvider>
       </body>

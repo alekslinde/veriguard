@@ -63,12 +63,28 @@ const TOC = [
 const BLOCK_EMAIL = ["gmail", "outlook", "apple", "yahoo", "any"] as const;
 const BLOCK_PHONE = ["ios", "android", "authorities", "apps"] as const;
 
-// Height of the sticky site header, in px (min-h-[58px] in SiteHeader). The TOC
-// bar's own height is measured at runtime rather than assumed: the chips wrap,
-// so the bar is one row on a wide screen and three on a narrow one, and a
-// hard-coded total would put the "you are here" hand-off in the wrong place on
-// every width but one.
-const HEADER_HEIGHT = 58;
+// Height of the sticky site header, read from the --header-h token that defines
+// it rather than restated here.
+//
+// It was the literal 58 that matched SiteHeader's old single height. The header
+// is now 52px on a phone and 58 above the md breakpoint, plus the status-bar
+// inset it pads for — so the constant was wrong by 6px on a plain phone and by
+// far more on a notched one, where this bar pinned itself UNDER the header and
+// vanished. A token both sides read cannot drift that way again.
+//
+// MEASURED, not read from the token. `getPropertyValue("--header-h")` returns
+// the unresolved text — "calc(52px + 0px)" — because a custom property is
+// substituted, not computed, so parsing it yields NaN. The rendered header is
+// the one source that is always a real number, and measuring it also picks up
+// anything the token cannot know, such as a wrapped title.
+//
+// Falls back to the desktop height when there is no header to measure (server
+// render, or a test DOM that never mounted one).
+function headerHeight(): number {
+  if (typeof document === "undefined") return 58;
+  const el = document.querySelector("header");
+  return el ? el.getBoundingClientRect().height : 58;
+}
 
 // Part header — the page is split into two distinct halves: "Spotting scams"
 // (what scams are / how to identify them) and "Getting the most from this tool"
@@ -173,7 +189,7 @@ export default function LearnContent({
       const atBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 2;
       // Measured, not assumed — the bar wraps to two or three rows as the
       // viewport narrows, and resize fires when it does.
-      const barHeight = HEADER_HEIGHT + (navRef.current?.offsetHeight ?? 0);
+      const barHeight = headerHeight() + (navRef.current?.offsetHeight ?? 0);
       const id = activeSectionId(tops, { barHeight, atBottom });
       if (id) setActiveId(id);
     };
@@ -224,7 +240,7 @@ export default function LearnContent({
         // elements rather than negative margins on the <nav>. -mx-5 made this
         // box wider than <main>, and since <main> already fills the viewport on
         // a phone, that pushed the whole page into horizontal overflow.
-        className="sticky top-[58px] z-20 border-y border-[var(--rule)] bg-[var(--ink)]/85 backdrop-blur"
+        className="sticky top-[var(--header-h)] z-20 border-y border-[var(--rule)] bg-[var(--ink)]/85 backdrop-blur"
       >
         {/* onToggle keeps React's state and the element's own `open` in step:
             the native disclosure flips `open` itself on click, and without this

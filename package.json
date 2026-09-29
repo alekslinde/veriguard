@@ -1,6 +1,6 @@
 {
   "name": "veriguard",
-  "version": "0.34.1",
+  "version": "0.35.0",
   "private": true,
   "engines": {
     "node": ">=22"
@@ -28,6 +28,8 @@
     "check-source-coverage": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/check-source-coverage.ts",
     "check-readme": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/check-readme-freshness.ts",
     "icons": "node scripts/generate-icons.mjs && node scripts/generate-favicon.mjs",
+    "promo": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/generate-promo-tiles.mts",
+    "screenshot": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/generate-store-screenshot.mts",
     "psl": "node scripts/generate-psl.mjs",
     "ocr-assets": "node scripts/copy-ocr-assets.mjs",
     "eval": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/eval.ts",
