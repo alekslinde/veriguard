@@ -1,27 +1,25 @@
 "use client";
 
-// The fold: paste it, or forward it — and what happens to both once a check runs.
+// The check box, and what happens around it once a check runs.
 //
 // Before this, the check flow swapped its input for the verdict *inside its own
 // column*, which left the verdict in the narrower of two tracks with ~470px of
-// dead space beside it, and left the forwarding panel sitting there offering an
-// alternative to something the reader had already done. The verdict is the
-// payoff of the entire product and it was rendering in half a page.
+// dead space beside it. The verdict is the payoff of the entire product and it
+// was rendering in half a page.
 //
-// So the stage owns the layout rather than the flow: two columns while there is
-// a choice to make, one column once there isn't. The input collapses to a
-// one-line record of what was checked, which is not decoration — without it the
-// reader has no way to confirm the thing on screen is a verdict about the thing
-// they pasted, and "check the right message" is precisely the anxiety this
+// So the stage owns the layout rather than the flow, and the input collapses to
+// a one-line record of what was checked. That record is not decoration — without
+// it the reader has no way to confirm the thing on screen is a verdict about the
+// thing they pasted, and "check the right message" is precisely the anxiety this
 // product exists to answer.
 //
-// Why a wrapper and not a prop on CheckFlow: the forwarding panel is CheckFlow's
-// sibling, not its child, so nothing inside the flow can hide it. Lifting just
-// the step here keeps CheckFlow owning everything else about the check.
+// Why a wrapper and not a prop on CheckFlow: the blocks the stage retires on a
+// verdict are CheckFlow's siblings, not its children, so nothing inside the flow
+// can hide them. Lifting just the step here keeps CheckFlow owning everything
+// else about the check.
 
 import { useState, type ReactNode } from "react";
 import CheckFlow, { type CheckStep } from "@/components/CheckFlow";
-import ForwardPanel from "@/components/ForwardPanel";
 import { useLang } from "@/lib/lang";
 
 /** Collapse a checked message to one line: whitespace flattened, and trimmed. */
@@ -32,30 +30,29 @@ function summarise(content: string): string {
 export default function CheckStage({
   initialContent,
   surface = "web",
-  forward = true,
   children,
-  belowFold,
+  after,
 }: {
   /** Seeds the check box — used by the share target. */
   initialContent?: string;
   surface?: "web" | "share";
-  /**
-   * Whether to offer forwarding beside the box. False on the share target,
-   * which is already the result of the reader choosing how to get content here.
-   */
-  forward?: boolean;
   /** Rendered above the box on the input step only (the share truncation notice). */
   children?: ReactNode;
   /**
-   * Rendered below the stage on the input step only — the radar teaser.
+   * Rendered last, on every step — the ways-in rows and the threat radar.
    *
-   * It lives in the page as CheckStage's sibling, so like the forwarding panel
-   * nothing inside the flow can hide it, and it was still offering "here's what
-   * is circulating" underneath a verdict about the very thing the reader had
-   * just checked. Passing it through here lets the stage retire it along with
-   * everything else that belongs to the question rather than the answer.
+   * On every step deliberately. There used to be a second slot that retired
+   * with the input, on the reasoning that background material belonged to the
+   * question rather than the answer; the radar sat in it and vanished the
+   * moment a verdict arrived, which is when someone told "this looks clean"
+   * most wants to know what is going around.
+   *
+   * Passed through the stage rather than placed after it in the page so it
+   * shares the stage's width: the input step caps at a readable measure, and a
+   * full-width strip underneath a 760px column left the page with two different
+   * right edges.
    */
-  belowFold?: ReactNode;
+  after?: ReactNode;
 } = {}) {
   const { t } = useLang();
   const [step, setStep] = useState<CheckStep>("input");
@@ -101,61 +98,51 @@ export default function CheckStage({
       {/* Notices belong to the input, so they go when it does. */}
       {!done && children}
 
-      {/* Two columns while both are real options; one once the verdict exists.
-          The check box takes the wider track: it is the primary action and the
-          textarea needs the room. Forwarding is a narrow panel because it is
-          three lines and an address.
+      {/* The cap applies on the input step only, and everything on that step
+          shares it: a full-width strip under a 760px column gives the page two
+          different right edges. The verdict that replaces the input is not
+          capped — it splits into an evidence sheet and a tactics rail, which
+          divide the width between them, so each lands at a readable measure on
+          its own and a cap only starves both.
+
+          This was a two-column grid while the forwarding panel stood beside the
+          box; that panel is one of the ways-in rows now, so there is nothing to
+          sit alongside.
 
           Keyed so React reconciles this by identity rather than by position.
           The strip and the notices above it are conditional, so the number of
           preceding siblings changes when a check runs — and matched by index
-          the grid is reconciled against a different element, tearing down
-          CheckFlow and taking its state with it. That emptied the box, so
-          "Edit & check again" returned to a blank textarea instead of the
-          message the reader had just checked. */}
-      <div
-        key="stage-grid"
-        className={
-          done
-            ? "grid gap-5"
-            : forward
-              // 1fr/1fr rather than 1.15/0.85, and stretched rather than
-              // top-aligned. The panel beside the box grows and shrinks with
-              // what it has to say — the tracking-pixel warning alone wraps to
-              // a different height at each width — so a split tuned against one
-              // of those states comes apart in the others, and top-alignment
-              // left one card floating against the other's lower edge. Equal
-              // columns that stretch stay square across every combination, and
-              // the box is still a comfortable measure to paste into at half
-              // the container.
-              ? "grid gap-5 lg:grid-cols-2 lg:items-stretch"
-              // Without a forwarding panel beside it the box would otherwise
-              // stretch the full container, and a textarea spanning 1180px is
-              // worse to paste into than one at a readable width.
-              : "grid gap-5 max-w-[760px]"
-        }
-      >
-        {/* Not capped once the fold has collapsed. The cap existed when the
-            verdict was one column of prose — 1180px of unbroken text runs to
-            ~140 characters a line. The results now split into an evidence sheet
-            and a tactics rail, which divide the width between them, so each
-            column lands at a readable measure on its own and the old 860px cap
-            only starved both. */}
-        <div className="min-w-0">
-          <CheckFlow
-            initialContent={initialContent}
-            surface={surface}
-            onStepChange={setStep}
-            onChecked={(c) => setChecked(summarise(c))}
-          />
-        </div>
-        {/* Unmounted rather than hidden once a check has run: it offers an
-            alternative route to a verdict the reader now has, and leaving it on
-            screen invites them to do the same work twice. */}
-        {forward && !done && <ForwardPanel />}
+          this is reconciled against a different element, tearing down CheckFlow
+          and taking its state with it. That emptied the box, so "Edit & check
+          again" returned to a blank textarea instead of the message the reader
+          had just checked. */}
+      <div key="stage-grid" className={done ? "min-w-0" : "min-w-0 max-w-[760px]"}>
+        <CheckFlow
+          initialContent={initialContent}
+          surface={surface}
+          onStepChange={setStep}
+          onChecked={(c) => setChecked(summarise(c))}
+        />
       </div>
 
-      {!done && belowFold}
+      {/* Capped on every step, including the one where the stage above is not:
+          the verdict wants the full width, but an aside stretched to 1180px
+          reads as a banner rather than a footnote. space-y rather than a gap on
+          the parent, because this holds two sections and they need separating
+          from each other as well as from the box.
+
+          `contents` when there is nothing to show, rather than a truthiness
+          guard on `after`. Callers pass a Fragment — always truthy, so the
+          guard never fired — and its children can still each render null (the
+          radar does outside AU), which left an empty spacer div under the
+          verdict. Display:contents removes the box from layout without the
+          caller having to know whether its own children rendered.
+
+          The wrapper is not conditional on `done`. Both sections survive a
+          check by design: see the note on `after` above. */}
+      <div className={after ? "max-w-[760px] space-y-6 empty:contents" : "contents"}>
+        {after}
+      </div>
     </>
   );
 }
