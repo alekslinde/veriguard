@@ -4,6 +4,19 @@
 
 ---
 
+## Status — as at 2026-09-27
+
+| Proposal | Issue | Shipped in | Status |
+|---|---|---|---|
+| D1 — US: FEMA impersonation | #307 | PR #309 (`2ac6a89`) | ✅ Shipped |
+| D2 — GB: DVLA vehicle tax payment-failure phrasing | #310 | PR #312 (`60ec9ef`) | ✅ Shipped |
+| D3 — BASE: "account compromised" variants | #311 | PR #313 (`d893a4b`) | ✅ Shipped |
+
+All three shipped as proposed, with test coverage added in the same PRs (`4d1f29a`,
+`fd20aa8`, `648e295`). No deviations from the filed proposals.
+
+---
+
 ## Status — 2026-09-06 proposals
 
 | ID | Proposal | Status |
