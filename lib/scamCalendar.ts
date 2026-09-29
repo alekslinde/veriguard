@@ -175,7 +175,11 @@ const AU_SEASONS: ScamSeason[] = [
     ],
     advice: "Any bank-detail change on an invoice gets a phone call to a number you already had — not the number on the invoice. This is the single most expensive scam for Australian businesses.",
     sources: [AU.scamwatch, AU.accc],
-    reviewed: "2026-08-16",
+    // Re-checked 2026-09-29: citations reachable. The 2026-09-27 sweep was a quiet
+    // AU cycle and recorded no new text-side signal — the food-delivery and
+    // OTP-forwarding campaigns re-checked that cycle stay covered. Content
+    // unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "black-friday",
@@ -193,7 +197,10 @@ const AU_SEASONS: ScamSeason[] = [
     ],
     advice: "Type the retailer's address in yourself rather than tapping the ad or the text. If a store is new to you, check how long the domain has existed before you enter card details.",
     sources: [AU.scamwatch, AU.accc],
-    reviewed: "2026-08-16",
+    // Re-checked 2026-09-29: citations reachable. The 2026-09-27 sweep was a
+    // quiet AU cycle and recorded no new text-side signal.
+    // Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "christmas-parcels",
@@ -210,7 +217,10 @@ const AU_SEASONS: ScamSeason[] = [
     ],
     advice: "Australia Post never asks for a fee by SMS link. Track parcels in the official app using the tracking number you were given at purchase.",
     sources: [AU.auspost, AU.scamwatch],
-    reviewed: "2026-09-11",
+    // Re-checked 2026-09-29: citations reachable. The 2026-09-27 sweep was a quiet
+    // AU cycle and recorded no new text-side signal — the delivery and courier
+    // lures re-checked that cycle stay covered. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "romance",
@@ -225,7 +235,10 @@ const AU_SEASONS: ScamSeason[] = [
     ],
     advice: "Anyone who won't video call, and anyone who moves the conversation to investing, is running a script. Money sent is money gone — reverse-image-search their photos.",
     sources: [AU.scamwatch, AU.moneysmart],
-    reviewed: "2026-09-11",
+    // Re-checked 2026-09-29: citations reachable. The 2026-09-27 sweep was a
+    // quiet AU cycle and recorded no new text-side signal.
+    // Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "winter-energy",
@@ -240,7 +253,10 @@ const AU_SEASONS: ScamSeason[] = [
     ],
     advice: "Log in to your energy account directly to check any balance or rebate. Real rebates are applied to your bill, not paid out after you enter your card details.",
     sources: [AU.scamwatch, AU.accc],
-    reviewed: "2026-08-16",
+    // Re-checked 2026-09-29: citations reachable. The 2026-09-27 sweep was a
+    // quiet AU cycle and recorded no new text-side signal.
+    // Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "back-to-school",
@@ -255,7 +271,10 @@ const AU_SEASONS: ScamSeason[] = [
     ],
     advice: "Confirm any school payment request through the school's published phone number before paying, especially if the bank details differ from last term.",
     sources: [AU.scamwatch, AU.accc],
-    reviewed: "2026-08-16",
+    // Re-checked 2026-09-29: citations reachable. The 2026-09-27 sweep was a
+    // quiet AU cycle and recorded no new text-side signal.
+    // Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "uni-offers",
@@ -275,7 +294,10 @@ const AU_SEASONS: ScamSeason[] = [
     ],
     advice: "Log in to your offer through the tertiary admission centre or the university's own site, never a link in a message. No genuine scholarship charges a fee to release it.",
     sources: [AU.scamwatch, AU.studyassist],
-    reviewed: "2026-08-16",
+    // Re-checked 2026-09-29: citations reachable. The 2026-09-27 sweep was a
+    // quiet AU cycle and recorded no new text-side signal.
+    // Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "disaster-recovery",
@@ -295,7 +317,10 @@ const AU_SEASONS: ScamSeason[] = [
     ],
     advice: "Donate through the charity's own website, not a link you were sent. Real disaster payments come through myGov and Services Australia — they never arrive as a text asking for your bank details.",
     sources: [AU.scamwatch, AU.servicesaustralia],
-    reviewed: "2026-08-16",
+    // Re-checked 2026-09-29: citations reachable. The 2026-09-27 sweep was a
+    // quiet AU cycle and recorded no new text-side signal.
+    // Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "winter-health",
@@ -314,7 +339,10 @@ const AU_SEASONS: ScamSeason[] = [
     ],
     advice: "Medicare lives in the myGov app or Express Plus Medicare — it never suspends your card by SMS. Open the app yourself instead of tapping any link.",
     sources: [AU.servicesaustralia, AU.scamwatch],
-    reviewed: "2026-08-16",
+    // Re-checked 2026-09-29: citations reachable. The 2026-09-27 sweep was a
+    // quiet AU cycle and recorded no new text-side signal.
+    // Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "eofy-donations",
@@ -333,7 +361,10 @@ const AU_SEASONS: ScamSeason[] = [
     ],
     advice: "Check a charity is a deductible-gift recipient on ABN Lookup, and give through its own website. A real charity is happy for you to donate next week — pressure to beat a deadline is the tell.",
     sources: [AU.accc, AU.ato],
-    reviewed: "2026-09-11",
+    // Re-checked 2026-09-29: citations reachable. The 2026-09-27 sweep was a
+    // quiet AU cycle and recorded no new text-side signal.
+    // Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "spring-racing",
@@ -352,7 +383,10 @@ const AU_SEASONS: ScamSeason[] = [
     ],
     advice: "Only bet with operators licensed in Australia — check the licence on the regulator's list. Nobody can guarantee a win, and no legitimate prize needs a fee to release it. A site that holds winnings you can already see behind a \"verification\" fee is a fake platform, not a slow payout.",
     sources: [AU.scamwatch, AU.acma],
-    reviewed: "2026-09-06",
+    // Re-checked 2026-09-29: citations reachable. The 2026-09-27 sweep was a quiet
+    // AU cycle and recorded no new text-side signal — in season now; the betting
+    // and fake-platform lures were re-checked and stay covered. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "summer-travel",
@@ -370,7 +404,10 @@ const AU_SEASONS: ScamSeason[] = [
     ],
     advice: "Book through a platform you know and pay by card, never a direct transfer to a private account. If a listing pushes you off the platform to pay, walk away.",
     sources: [AU.scamwatch, AU.accc],
-    reviewed: "2026-08-16",
+    // Re-checked 2026-09-29: citations reachable. The 2026-09-27 sweep was a
+    // quiet AU cycle and recorded no new text-side signal.
+    // Content unchanged.
+    reviewed: "2026-09-29",
   },
 ];
 
@@ -407,7 +444,11 @@ const GB_SEASONS: ScamSeason[] = [
     ],
     advice: "HMRC never texts or emails a link to claim a refund or to pay. Sign in through GOV.UK yourself, and report suspicious messages to phishing@hmrc.gov.uk.",
     sources: [GB.hmrc, GB.actionfraud],
-    reviewed: "2026-09-11",
+    // Re-checked 2026-09-29: HMRC reachable; Action Fraud still refuses every
+    // automated request and stays flagged `blocked`, re-verified in a browser as
+    // the flag's contract requires. No sweep since 2026-09-11 records a change to
+    // this season. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "black-friday",
@@ -423,7 +464,11 @@ const GB_SEASONS: ScamSeason[] = [
     ],
     advice: "Type the retailer's address in yourself rather than tapping an ad or text. Pay by card for the protection it gives, and be wary of a shop that only takes bank transfer.",
     sources: [GB.takefive, GB.actionfraud],
-    reviewed: "2026-09-11",
+    // Re-checked 2026-09-29: Take Five and Action Fraud both refuse automated
+    // requests and are handled by the checker's ladder; Action Fraud carries the
+    // `blocked` flag and was re-verified in a browser. No sweep since 2026-09-11
+    // records a change to this season. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "christmas-parcels",
@@ -439,7 +484,11 @@ const GB_SEASONS: ScamSeason[] = [
     ],
     advice: "Couriers don't ask for card details by text to release a parcel. Track it on the courier's own app or site using the reference from the sender.",
     sources: [GB.actionfraud, GB.ncsc],
-    reviewed: "2026-09-11",
+    // Re-checked 2026-09-29: NCSC reachable, Action Fraud blocked-and-flagged as
+    // above. The 2026-09-27 sweep recorded a Royal Mail customs-duty email
+    // campaign, already covered by the customs-charge lure listed above and by
+    // shipped detection, so nothing is added. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "romance",
@@ -454,7 +503,11 @@ const GB_SEASONS: ScamSeason[] = [
     ],
     advice: "Anyone who won't video call, and anyone who steers the chat towards investing, is following a script. Never send money — and reverse-image-search their photos.",
     sources: [GB.actionfraud, GB.citizensadvice],
-    reviewed: "2026-09-11",
+    // Re-checked 2026-09-29: Citizens Advice reachable, Action Fraud blocked
+    // and flagged as above. No sweep since 2026-09-11 records a change to this
+    // season.
+    // Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "winter-energy",
@@ -473,7 +526,12 @@ const GB_SEASONS: ScamSeason[] = [
     ],
     advice: "Government support is applied automatically or through GOV.UK — never a link asking for your bank details. The DWP writes by letter or through your Universal Credit journal; it doesn't text you an eligibility form. Check any bill by logging in to your supplier directly. A price-cap change in the news is not a reason to trust a text about it — that is precisely when these arrive.",
     sources: [GB.takefive, GB.citizensadvice],
-    reviewed: "2026-09-06",
+    // Re-checked 2026-09-29: Citizens Advice reachable, Take Five handled by the
+    // checker's ladder. Reviewed deliberately just before the window opens on 1
+    // October, which is also when the price-cap wave this season describes
+    // arrives. No sweep since 2026-09-06 records a change to it, and the quarterly
+    // cap change remains the documented trigger. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "summer-holiday",
@@ -489,7 +547,18 @@ const GB_SEASONS: ScamSeason[] = [
     ],
     advice: "Book with an ATOL/ABTA-protected provider and pay by card. If a listing pushes you to pay by transfer or off-platform, walk away.",
     sources: [GB.actionfraud, GB.citizensadvice],
-    reviewed: "2026-09-11",
+    // Re-checked 2026-09-29: Citizens Advice reachable, Action Fraud blocked
+    // and flagged as above. No sweep since 2026-09-11 records a change to this
+    // season.
+    // Content unchanged.
+    //
+    // The DVLA vehicle-tax and TV Licensing campaigns reported this period are
+    // deliberately absent from the GB calendar: both are year-round obligations
+    // with no seasonal window, and a season is only for a genuine seasonal
+    // spike. Both are detected — DVLA payment-failure phrasing shipped from the
+    // 2026-09-13 sweep, and TV Licensing is already an authority and
+    // no-link-sender entry — so this is a surface decision, not a coverage gap.
+    reviewed: "2026-09-29",
   },
 ];
 
@@ -606,8 +675,8 @@ const US_SEASONS: ScamSeason[] = [
     title: "Disaster relief & FEMA impersonation",
     // Hurricane season plus National Preparedness Month in September, which is
     // when the relief-payment script runs. Deliberately wide for the same reason
-    // as the AU disaster season: the trigger is a named event, not a date, and
-    // the fake-grant wave follows whenever one lands.
+    // as the AU disaster season: the trigger is a named event, not a date, and the
+    // fake-grant wave follows whenever one lands.
     window: { startMonth: 8, startDay: 1, endMonth: 11, endDay: 30 },
     confidence: "elevated",
     why: "After a hurricane, flood or wildfire, a text saying disaster assistance has been approved lands while people are genuinely waiting on relief money — and September is both peak season and the month the warnings go out.",
@@ -649,9 +718,9 @@ const US_SEASONS: ScamSeason[] = [
     // The jury-duty and veterans-benefits campaigns shipped this period are
     // deliberately absent from the US calendar: both run year-round with no
     // seasonal window, and a season is only for a genuine seasonal spike. They
-    // are detected, and the radar is AU-only, so there is currently no
-    // US surface for a year-round campaign — recorded here so the omission
-    // reads as a decision rather than a gap.
+    // are detected, and the radar is AU-only, so there is currently no US
+    // surface for a year-round campaign — recorded here so the omission reads as
+    // a decision rather than a gap.
     reviewed: "2026-09-29",
   },
 ];
@@ -683,7 +752,11 @@ const CA_SEASONS: ScamSeason[] = [
     ],
     advice: "The CRA never demands payment by e-Transfer, gift card or crypto, and never threatens arrest. Sign in to My Account by typing canada.ca yourself.",
     sources: [CA.cra, CA.cafc],
-    reviewed: "2026-08-10",
+    // Re-checked 2026-09-29: citations reachable. The Canadian sweeps since this
+    // date recorded no new text-side signal — CRA and Anti-Fraud Centre
+    // impersonation stays covered by existing authority and urgency entries.
+    // Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "black-friday",
@@ -699,7 +772,9 @@ const CA_SEASONS: ScamSeason[] = [
     ],
     advice: "Type the retailer's address in yourself rather than tapping the ad or the text. Pay by credit card for the protection it gives.",
     sources: [CA.competition, CA.cafc],
-    reviewed: "2026-09-11",
+    // Re-checked 2026-09-29: citations reachable. The Canadian sweeps since this
+    // date recorded no new text-side signal. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "holiday-parcels",
@@ -715,7 +790,9 @@ const CA_SEASONS: ScamSeason[] = [
     ],
     advice: "Canada Post doesn't text you for a fee to release a parcel. Track it on the carrier's own site using the number from the sender.",
     sources: [CA.cafc, CA.getcybersafe],
-    reviewed: "2026-08-10",
+    // Re-checked 2026-09-29: citations reachable. The Canadian sweeps since this
+    // date recorded no new text-side signal. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "romance",
@@ -730,7 +807,9 @@ const CA_SEASONS: ScamSeason[] = [
     ],
     advice: "Anyone who won't video call, and anyone who moves the chat toward investing, is running a script. Never send money — and reverse-image-search their photos.",
     sources: [CA.cafc],
-    reviewed: "2026-08-10",
+    // Re-checked 2026-09-29: citations reachable. The Canadian sweeps since this
+    // date recorded no new text-side signal. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "winter-utility",
@@ -746,7 +825,9 @@ const CA_SEASONS: ScamSeason[] = [
     ],
     advice: "Utilities give written notice and never demand gift cards or crypto. Hang up and call the number on a real bill to check your account.",
     sources: [CA.cafc, CA.competition],
-    reviewed: "2026-09-11",
+    // Re-checked 2026-09-29: citations reachable. The Canadian sweeps since this
+    // date recorded no new text-side signal. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "summer-travel",
@@ -762,7 +843,9 @@ const CA_SEASONS: ScamSeason[] = [
     ],
     advice: "Book through a platform you know and pay by credit card, never a direct transfer to a person. If a listing pushes you off-platform to pay, walk away.",
     sources: [CA.cafc, CA.competition],
-    reviewed: "2026-09-11",
+    // Re-checked 2026-09-29: citations reachable. The Canadian sweeps since this
+    // date recorded no new text-side signal. Content unchanged.
+    reviewed: "2026-09-29",
   },
 ];
 
@@ -794,7 +877,10 @@ const IE_SEASONS: ScamSeason[] = [
     ],
     advice: "Revenue never texts or emails a link to claim a refund or make a payment. Sign in through myAccount or ROS on revenue.ie yourself, and report suspicious messages to Revenue.",
     sources: [IE.revenue, IE.fraudsmart],
-    reviewed: "2026-08-10",
+    // Re-checked 2026-09-29: citations reachable. The Irish sweeps since this date
+    // recorded no new text-side signal — the reported APP-fraud rise is a volume
+    // signal, not a new lure phrasing. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "black-friday",
@@ -810,7 +896,9 @@ const IE_SEASONS: ScamSeason[] = [
     ],
     advice: "Type the retailer's address in yourself rather than tapping an ad or text. Pay by card, and be wary of a shop that only takes bank transfer.",
     sources: [IE.ccpc, IE.fraudsmart],
-    reviewed: "2026-09-11",
+    // Re-checked 2026-09-29: citations reachable. The Irish sweeps since this
+    // date recorded no new text-side signal. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "christmas-parcels",
@@ -826,7 +914,9 @@ const IE_SEASONS: ScamSeason[] = [
     ],
     advice: "An Post doesn't text you for a fee by link to release a parcel. Track it on the courier's own site using the reference from the sender.",
     sources: [IE.fraudsmart, IE.garda],
-    reviewed: "2026-09-11",
+    // Re-checked 2026-09-29: citations reachable. The Irish sweeps since this
+    // date recorded no new text-side signal. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "romance",
@@ -841,7 +931,9 @@ const IE_SEASONS: ScamSeason[] = [
     ],
     advice: "Anyone who won't video call, and anyone who steers the chat towards investing, is following a script. Never send money — and reverse-image-search their photos.",
     sources: [IE.fraudsmart, IE.garda],
-    reviewed: "2026-09-11",
+    // Re-checked 2026-09-29: citations reachable. The Irish sweeps since this
+    // date recorded no new text-side signal. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "winter-energy",
@@ -857,7 +949,9 @@ const IE_SEASONS: ScamSeason[] = [
     ],
     advice: "Government supports are applied automatically or through official channels — never a link asking for your bank details. Check any bill by logging in to your supplier directly.",
     sources: [IE.fraudsmart, IE.ccpc],
-    reviewed: "2026-09-11",
+    // Re-checked 2026-09-29: citations reachable. The Irish sweeps since this
+    // date recorded no new text-side signal. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "summer-holiday",
@@ -873,7 +967,9 @@ const IE_SEASONS: ScamSeason[] = [
     ],
     advice: "Book with a bonded, licensed travel agent and pay by card. If a listing pushes you to pay by transfer or off-platform, walk away.",
     sources: [IE.ccpc, IE.fraudsmart],
-    reviewed: "2026-09-11",
+    // Re-checked 2026-09-29: citations reachable. The Irish sweeps since this
+    // date recorded no new text-side signal. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "student-accommodation",
@@ -889,7 +985,11 @@ const IE_SEASONS: ScamSeason[] = [
     ],
     advice: "Never pay a deposit for a room you or someone you trust hasn't stood inside. A landlord who can't do a viewing and wants a transfer is the whole scam in one sentence.",
     sources: [IE.garda, IE.fraudsmart],
-    reviewed: "2026-09-11",
+    // Re-checked 2026-09-29: citations reachable. The Irish sweeps since this date
+    // recorded no new text-side signal — the recurring student-accommodation
+    // deposit and money-mule warnings are already covered by shipped rental-fraud
+    // and mule phrases. Content unchanged.
+    reviewed: "2026-09-29",
   },
 ];
 
@@ -924,7 +1024,9 @@ const NZ_SEASONS: ScamSeason[] = [
     ],
     advice: "Inland Revenue puts refunds and bills in myIR and never texts a link for your bank details. Log in to myIR by typing ird.govt.nz yourself.",
     sources: [NZ.ird, NZ.consumerprotection],
-    reviewed: "2026-08-10",
+    // Re-checked 2026-09-29: citations reachable. The New Zealand sweeps since
+    // this date recorded no new text-side signal. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "black-friday",
@@ -940,7 +1042,9 @@ const NZ_SEASONS: ScamSeason[] = [
     ],
     advice: "Type the retailer's address in yourself rather than tapping the ad or the text. Pay by credit card for the protection it gives.",
     sources: [NZ.consumerprotection, NZ.cert],
-    reviewed: "2026-09-11",
+    // Re-checked 2026-09-29: citations reachable. The New Zealand sweeps since
+    // this date recorded no new text-side signal. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "christmas-parcels",
@@ -956,7 +1060,9 @@ const NZ_SEASONS: ScamSeason[] = [
     ],
     advice: "NZ Post doesn't text you for a fee by link to release a parcel. Track it on the courier's own site using the reference from the sender.",
     sources: [NZ.netsafe, NZ.consumerprotection],
-    reviewed: "2026-08-10",
+    // Re-checked 2026-09-29: citations reachable. The New Zealand sweeps since
+    // this date recorded no new text-side signal. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "romance",
@@ -971,7 +1077,9 @@ const NZ_SEASONS: ScamSeason[] = [
     ],
     advice: "Anyone who won't video call, and anyone who moves the chat toward investing, is running a script. Never send money — and reverse-image-search their photos.",
     sources: [NZ.netsafe, NZ.consumerprotection],
-    reviewed: "2026-08-10",
+    // Re-checked 2026-09-29: citations reachable. The New Zealand sweeps since
+    // this date recorded no new text-side signal. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "winter-power",
@@ -987,7 +1095,9 @@ const NZ_SEASONS: ScamSeason[] = [
     ],
     advice: "Log in to your power account directly to check any balance or credit. Government payments like the Winter Energy Payment are applied automatically — never after you enter card details.",
     sources: [NZ.consumerprotection, NZ.cert],
-    reviewed: "2026-09-11",
+    // Re-checked 2026-09-29: citations reachable. The New Zealand sweeps since
+    // this date recorded no new text-side signal. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "summer-holiday",
@@ -1003,7 +1113,11 @@ const NZ_SEASONS: ScamSeason[] = [
     ],
     advice: "Book through a platform you know and pay by credit card, never a direct transfer to a person. If a listing pushes you off-platform to pay, walk away.",
     sources: [NZ.consumerprotection, NZ.netsafe],
-    reviewed: "2026-08-10",
+    // Re-checked 2026-09-29: citations reachable. The New Zealand sweeps since
+    // this date recorded no new text-side signal — the reported bank-impersonation
+    // rise is a volume shift; the NZ bank set is already carried in the brand and
+    // typosquat lists. Content unchanged.
+    reviewed: "2026-09-29",
   },
 ];
 
@@ -1186,6 +1300,15 @@ export function isWellFormedDate(value: string): boolean {
  * touching it, and a stale date on a page about what's current is worse than no
  * date. Returns null for a region with no calendar, where there is nothing to
  * date. String comparison is valid because isWellFormedDate is asserted in CI.
+ *
+ * NOTE: this is the NEWEST date, so one freshly-reviewed season reports the whole
+ * region as current. That is right for the "Reviewed <date>" line — it answers
+ * "has anyone looked at this lately" — but it means the promotion-freshness check
+ * built on it cannot see a region where a single season carries the date and the
+ * rest have aged. AU sat in exactly that state on 2026-09-29: the gate read
+ * 2026-09-27 from one promoted season while twelve others were still on 08-16 or
+ * 09-11. Reviewing a region means reviewing its seasons, not the date this
+ * returns; a per-season staleness check is the obvious follow-up.
  */
 export function lastReviewed(code: RegionCode): string | null {
   const seasons = calendarForRegion(code);

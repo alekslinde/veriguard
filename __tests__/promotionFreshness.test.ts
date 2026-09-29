@@ -7,6 +7,7 @@ import {
   human,
   markdown,
   newestRoadmap,
+  type Report,
 } from "../scripts/check-promotion-freshness";
 
 describe("newestRoadmap", () => {
@@ -51,31 +52,36 @@ describe("reporting", () => {
     // They must not simply vanish when AU is current — being invisible is the
     // state this whole change was undoing.
     //
-    // The sweep date is derived rather than hardcoded. A fixed date only holds
-    // while some non-gating region happens to sit behind it, so promoting the
-    // last straggler forward emptied the section and failed this test — the
-    // fixture was coupled to how stale the calendar happened to be. Instead,
-    // pick a date after every AU surface but before the furthest-behind
-    // non-gating one, which is the situation being described whatever the
-    // surfaces currently say.
-    const all = assess("2999-01-01").behind;
-    const auAsAt = all
-      .filter((r) => GATING_REGIONS.has(r.surface.region) && r.surface.asAt !== null)
-      .map((r) => r.surface.asAt as string)
-      .sort();
-    const others = all
-      .filter((r) => !GATING_REGIONS.has(r.surface.region) && r.surface.asAt !== null)
-      .map((r) => r.surface.asAt as string)
-      .sort();
-    const newestAu = auAsAt[auAsAt.length - 1];
-    const oldestOther = others[0];
-    // Guard the premise: with no non-gating region behind AU there is nothing
-    // for this test to assert, and a silent pass would hide that.
-    expect(oldestOther < newestAu).toBe(true);
+    // Built from a synthetic report rather than from the real surfaces. Two
+    // earlier versions of this test read live data and both broke on a
+    // promotion rather than on a regression: a hardcoded sweep date assumed
+    // some non-gating region would always sit behind it, and deriving the date
+    // instead only moved the assumption, because once every region is current
+    // the scenario stops existing at all. What is being tested is how `human`
+    // reports a clean gate alongside a behind non-gating region, which is a
+    // property of the formatter and should not depend on how stale the calendar
+    // happens to be today.
+    const report: Report = {
+      newest: "2026-09-27",
+      behind: [
+        {
+          surface: {
+            name: "Scam calendar",
+            region: "GB",
+            file: "lib/scamCalendar.ts",
+            asAt: "2026-09-11",
+            derivedFrom: "newest reviewed date",
+          },
+          gapDays: 16,
+        },
+      ],
+      inSync: [],
+    };
 
-    const report = assess(newestAu);
-    const out = human(report);
     expect(gating(report)).toEqual([]);
+    const out = human(report);
     expect(out).toContain("not gating");
+    // The row itself must be present, not just the heading.
+    expect(out).toContain("GB");
   });
 });
