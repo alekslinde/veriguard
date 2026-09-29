@@ -1,7 +1,7 @@
 // Generates the marketing screenshot: a headline beside a mock of the check
 // panel, showing a real verdict with its real working.
 //
-//   public/store/screenshot-verdict.png   1280×800  — Chrome's screenshot size
+//   extension/store/screenshot-verdict.png   1280×800  — Chrome's screenshot size
 //
 // The panel is a mock, but nothing in it is invented. The verdict, the score
 // and every signal row come from calling the engine at build time, and the
@@ -25,7 +25,7 @@ import { checkUrl } from "../packages/engine/src/scamDetector.ts";
 import { findFont, CHROME, TOKENS } from "./lib/brandRender.mts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
-const OUT_DIR = join(ROOT, "public/store");
+const OUT_DIR = join(ROOT, "extension/store");
 
 const { INK, INK_2, EMERALD, PAPER, TEXT_DIM, FAINT, SCAM, CAUTION } = TOKENS;
 
@@ -350,6 +350,6 @@ execFileSync(
 rmSync(tmp);
 
 console.log(
-  `✓ public/store/screenshot-verdict.png (1280×800) — ` +
+  `✓ extension/store/screenshot-verdict.png (1280×800) — ` +
     `${result.verdict} ${result.score}/100, ${result.signals.length} signals, from the engine`,
 );

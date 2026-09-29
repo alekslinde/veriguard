@@ -12,8 +12,8 @@
 // defines, and they need the brand faces — so the recipe shares nothing with
 // icon generation beyond the colour tokens.
 //
-//   public/store/promo-small.png     440×280   — required for listing
-//   public/store/promo-marquee.png   1400×560  — optional, for featuring
+//   extension/store/promo-small.png     440×280   — required for listing
+//   extension/store/promo-marquee.png   1400×560  — optional, for featuring
 //
 // Why a browser rather than sharp: the tiles are typeset in Fraunces and Inter,
 // which the project loads through next/font and never installs system-wide.
@@ -30,7 +30,7 @@ import { fileURLToPath } from "url";
 import { findFont, CHROME, TOKENS } from "./lib/brandRender.mts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
-const OUT_DIR = join(ROOT, "public/store");
+const OUT_DIR = join(ROOT, "extension/store");
 
 const { INK, INK_2, EMERALD, PAPER, TEXT_DIM } = TOKENS;
 
@@ -239,7 +239,7 @@ function render({
   );
 
   rmSync(html);
-  console.log(`✓ public/store/${out} (${width}×${height})`);
+  console.log(`✓ extension/store/${out} (${width}×${height})`);
 }
 
 if (!existsSync(CHROME)) {

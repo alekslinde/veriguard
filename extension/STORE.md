@@ -310,7 +310,7 @@ Do not screenshot a real person's message. Use the samples in the test suite.
 
 ### The generated one
 
-`npm run screenshot` produces `public/store/screenshot-verdict.png` at
+`npm run screenshot` produces `store/screenshot-verdict.png` at
 1280×800 — the headline panel, suitable as the first screenshot or as the
 marketing image on the site.
 
@@ -332,7 +332,7 @@ right-click menu would be a picture of something that does not exist.
 Chrome only. AMO has no equivalent, and App Store Connect takes its own
 assets.
 
-Generated — run `npm run promo`, then upload from `public/store/`:
+Generated — run `npm run promo`, then upload from `store/`:
 
 | File | Size | Where it appears |
 | --- | --- | --- |
