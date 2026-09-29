@@ -9,6 +9,7 @@ import PageHeader from "@/components/PageHeader";
 import EmailExportGuide from "@/components/EmailExportGuide";
 import Collapsible from "@/components/Collapsible";
 import { activeSectionId } from "@/lib/toc";
+import { useOpenOnHash } from "@/lib/useOpenOnHash";
 import {
   reportingAgencies,
   reportingFor,
@@ -128,29 +129,11 @@ export default function LearnContent({
   // `body` for this same placeholder; the linked form belongs to ReportingLink.
   const bodyVar = { body: reporting.body };
 
-  // Reveal collapsed content when its anchor is navigated to. A jump link to a
-  // closed <details> would otherwise scroll to a bare header and hide the content
-  // it promised. Two cases: the target itself is a collapsible (a table-of-
-  // contents link), or the target is a container whose collapsibles should open
-  // (the check flow deep-links to #using-this-tool for the capture guide, which
-  // is a <section> wrapping three disclosures). Runs on load and on every in-page
-  // hash change; anchors with no collapsibles (the emergency block, the calendar
-  // pointer) are left untouched.
-  useEffect(() => {
-    const openTarget = () => {
-      const id = decodeURIComponent(window.location.hash.slice(1));
-      if (!id) return;
-      const el = document.getElementById(id);
-      if (!el) return;
-      if (el instanceof HTMLDetailsElement) el.open = true;
-      el.querySelectorAll("details").forEach((d) => {
-        d.open = true;
-      });
-    };
-    openTarget();
-    window.addEventListener("hashchange", openTarget);
-    return () => window.removeEventListener("hashchange", openTarget);
-  }, []);
+  // Reveal collapsed content when its anchor is navigated to — a table-of-
+  // contents link, or the check flow deep-linking to #using-this-tool for the
+  // capture guide, which is a <section> wrapping three disclosures. Anchors with
+  // no collapsibles (the emergency block, the calendar pointer) are untouched.
+  useOpenOnHash();
 
   // Which section the reader is currently in, so the sticky TOC can highlight it
   // — turning the index from a one-shot list into a "you are here" that tracks

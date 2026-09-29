@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import CheckStage from "@/components/CheckStage";
 import HomeHero from "@/components/HomeHero";
 import RadarTeaser from "@/components/RadarTeaser";
+import WaysTeaser from "@/components/WaysTeaser";
 import { resolveRegion } from "@/lib/regionResolver";
 import { getStats } from "@/lib/reportStore";
 
@@ -32,17 +33,34 @@ export default async function Home() {
     <main className="max-w-[1180px] mx-auto px-5 sm:px-8 py-8 sm:py-10 space-y-6">
       <HomeHero stats={stats} />
 
-      {/* The fold holds exactly two things: paste it here, or forward it from
-          your mail app. They are alternatives, so they sit side by side rather
-          than stacked. Once a check has run the stage collapses to one column
-          and the verdict takes the page — see CheckStage for why that lives
-          there rather than inside the flow. */}
-      {/* Below the fold on purpose: someone arriving mid-panic with a dodgy SMS
-          needs the paste field first, and background information pushing it down
-          the page would trade their urgent need for ours. Handed to the stage
-          rather than placed after it so it retires when the verdict arrives —
-          "what's circulating" is context for the question, not the answer. */}
-      <CheckStage belowFold={<RadarTeaser region={region} />} />
+      {/* The fold is the box. Forwarding used to sit beside it as a second card,
+          then under it as a collapsed row; it is one of the ways-in rows now, so
+          nothing competes with the box for the fold. Once a check has run the
+          stage takes the full width, because the verdict splits into an evidence
+          sheet and a tactics rail that need it. See CheckStage for why the step
+          lives there rather than inside the flow.
+
+          Everything else is below the fold on purpose: someone arriving
+          mid-panic with a dodgy SMS needs the paste field first, and background
+          information pushing it down the page would trade their urgent need for
+          ours.
+
+          Both trailing sections survive a check, and that is the change from
+          before — the radar used to retire with the input, on the reasoning that
+          "what's circulating" was context for a question not yet asked. It is
+          the opposite: a reader who has just been told their message looks clean
+          is exactly who should see what is going around, and retiring it there
+          removed it at the moment it started being useful.
+
+          Ways first, radar last. Ways answers "can I keep this?", which follows
+          directly from having just used it; the radar is reading material, and
+          reading material goes at the bottom. */}
+      <CheckStage after={
+        <>
+          <WaysTeaser />
+          <RadarTeaser region={region} />
+        </>
+      } />
     </main>
   );
 }
