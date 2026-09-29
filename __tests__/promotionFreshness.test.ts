@@ -50,7 +50,30 @@ describe("reporting", () => {
   it("still surfaces non-gating regions when the gate is clean", () => {
     // They must not simply vanish when AU is current — being invisible is the
     // state this whole change was undoing.
-    const report = assess("2026-08-15");
+    //
+    // The sweep date is derived rather than hardcoded. A fixed date only holds
+    // while some non-gating region happens to sit behind it, so promoting the
+    // last straggler forward emptied the section and failed this test — the
+    // fixture was coupled to how stale the calendar happened to be. Instead,
+    // pick a date after every AU surface but before the furthest-behind
+    // non-gating one, which is the situation being described whatever the
+    // surfaces currently say.
+    const all = assess("2999-01-01").behind;
+    const auAsAt = all
+      .filter((r) => GATING_REGIONS.has(r.surface.region) && r.surface.asAt !== null)
+      .map((r) => r.surface.asAt as string)
+      .sort();
+    const others = all
+      .filter((r) => !GATING_REGIONS.has(r.surface.region) && r.surface.asAt !== null)
+      .map((r) => r.surface.asAt as string)
+      .sort();
+    const newestAu = auAsAt[auAsAt.length - 1];
+    const oldestOther = others[0];
+    // Guard the premise: with no non-gating region behind AU there is nothing
+    // for this test to assert, and a silent pass would hide that.
+    expect(oldestOther < newestAu).toBe(true);
+
+    const report = assess(newestAu);
     const out = human(report);
     expect(gating(report)).toEqual([]);
     expect(out).toContain("not gating");

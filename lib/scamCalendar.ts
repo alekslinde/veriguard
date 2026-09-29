@@ -518,10 +518,15 @@ const US_SEASONS: ScamSeason[] = [
       "\"IRS final notice: back taxes owed, arrest warrant issued\"",
       "Fake IRS and state tax login pages",
       "\"Verify your identity to release your refund\"",
+      "\"Tax Resolution Oversight Department — final notice\"",
     ],
-    advice: "The IRS makes first contact by mail, never by text or email, and never threatens arrest. Don't click — check your account at IRS.gov by typing it in yourself.",
+    advice: "The IRS makes first contact by mail, never by text or email, and never threatens arrest. Don't click — check your account at IRS.gov by typing it in yourself. An official-sounding department you've never heard of is a made-up name, not a real office.",
     sources: [US.irs, US.ftc],
-    reviewed: "2026-08-10",
+    // Re-checked 2026-09-29: both citations reachable. Adds the invented "Tax
+    // Resolution Oversight Department" letterhead shipped from the 2026-08-23
+    // sweep — a fake IRS sub-agency, so it belongs with the existing IRS lures
+    // rather than in a season of its own. Window and confidence unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "black-friday",
@@ -537,7 +542,9 @@ const US_SEASONS: ScamSeason[] = [
     ],
     advice: "Type the retailer's address in yourself rather than tapping the ad or the text. Pay by credit card for the protection it gives.",
     sources: [US.ftc, US.cisa],
-    reviewed: "2026-08-10",
+    // Re-checked 2026-09-29: both citations reachable, no sweep since 2026-08-10
+    // records a change to this season. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "holiday-parcels",
@@ -553,7 +560,9 @@ const US_SEASONS: ScamSeason[] = [
     ],
     advice: "The Postal Service doesn't text you for a fee or address unless you signed up for tracking. Check with the carrier's official site using the number from the sender.",
     sources: [US.uspis, US.ftc],
-    reviewed: "2026-08-10",
+    // Re-checked 2026-09-29: both citations reachable, no sweep since 2026-08-10
+    // records a change to this season. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "romance",
@@ -568,7 +577,9 @@ const US_SEASONS: ScamSeason[] = [
     ],
     advice: "Anyone who won't video call, and anyone who moves the chat toward investing, is running a script. Never send money — and reverse-image-search their photos.",
     sources: [US.ftc],
-    reviewed: "2026-08-10",
+    // Re-checked 2026-09-29: citation reachable, no sweep since 2026-08-10
+    // records a change to this season. Content unchanged.
+    reviewed: "2026-09-29",
   },
   {
     id: "open-enrollment",
@@ -584,7 +595,39 @@ const US_SEASONS: ScamSeason[] = [
     ],
     advice: "Enroll only through HealthCare.gov or your state marketplace, typed in yourself. Real plans don't cold-call you for payment or your Social Security number.",
     sources: [US.ftc, US.cisa],
-    reviewed: "2026-08-10",
+    // Re-checked 2026-09-29: both citations reachable. The Medicare Part D cap
+    // lure has been carried as deferred across several sweeps for want of SMS
+    // evidence, so nothing is added here — the existing Medicare verification
+    // lure already covers the shape a reader would meet.
+    reviewed: "2026-09-29",
+  },
+  {
+    id: "disaster-relief",
+    title: "Disaster relief & FEMA impersonation",
+    // Hurricane season plus National Preparedness Month in September, which is
+    // when the relief-payment script runs. Deliberately wide for the same reason
+    // as the AU disaster season: the trigger is a named event, not a date, and
+    // the fake-grant wave follows whenever one lands.
+    window: { startMonth: 8, startDay: 1, endMonth: 11, endDay: 30 },
+    confidence: "elevated",
+    why: "After a hurricane, flood or wildfire, a text saying disaster assistance has been approved lands while people are genuinely waiting on relief money — and September is both peak season and the month the warnings go out.",
+    lures: [
+      "\"Your FEMA disaster assistance has been approved — click to claim\"",
+      "\"FEMA relief payment pending — confirm your bank details\"",
+      "\"Claim your FEMA benefit before the deadline\"",
+      "Fake charity appeals for a disaster that's in the news",
+      "Upfront-payment offers for urgent clean-up or repairs",
+    ],
+    advice: "FEMA never starts contact by text and never asks for bank details to release a payment. Apply or check a claim at DisasterAssistance.gov, typed in yourself, or call FEMA directly — and donate through a charity's own site rather than a link you were sent.",
+    sources: [US.ftc, US.cisa],
+    // Added 2026-09-29 from the 2026-09-13 sweep, which shipped FEMA detection
+    // (`fema` in AUTHORITY_MENTIONS and NO_LINK_SENDERS, the relief-payment
+    // lures in URGENCY_TAX) but never reached the calendar. The engine's own
+    // note calls this the seasonal peak-September/October script, and no
+    // existing US season covered it. FEMA's own advisory page is the primary
+    // evidence but its origin refuses automated requests, so the citations are
+    // the two reachable authorities that carry the same warning.
+    reviewed: "2026-09-29",
   },
   {
     id: "back-to-school",
@@ -600,7 +643,16 @@ const US_SEASONS: ScamSeason[] = [
     ],
     advice: "Federal loan help is always free through studentaid.gov — anyone charging a fee to apply is a scam. Never share your FSA ID.",
     sources: [US.studentaid, US.ftc],
-    reviewed: "2026-08-10",
+    // Re-checked 2026-09-29: both citations reachable, no sweep since 2026-08-10
+    // records a change to this season. Content unchanged.
+    //
+    // The jury-duty and veterans-benefits campaigns shipped this period are
+    // deliberately absent from the US calendar: both run year-round with no
+    // seasonal window, and a season is only for a genuine seasonal spike. They
+    // are detected, and the radar is AU-only, so there is currently no
+    // US surface for a year-round campaign — recorded here so the omission
+    // reads as a decision rather than a gap.
+    reviewed: "2026-09-29",
   },
 ];
 
