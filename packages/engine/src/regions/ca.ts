@@ -109,6 +109,15 @@ const URGENCY_FOREIGN_AUTHORITY = [
   "arrest warrant", "detention order", "deportation notice",
   "money laundering investigation", "your visa will be cancelled",
   "involved in criminal activity", "immigration violation",
+  // RCMP "undelivered court documents" smishing (#369). RCMP-confirmed active
+  // since Jan 2025, still being re-issued through 2026 with this "court
+  // documents" wording as an evolution of the original "delivery notice"
+  // variant. Real Canadian court process is served in person or by registered
+  // mail, never rescheduled by SMS link, so this phrasing is effectively
+  // always a scam.
+  "unable to deliver your court documents", "court documents could not be delivered",
+  "reschedule your court documents delivery", "missed your court date",
+  "avoid missing your court date",
 ];
 
 // Digital-identity re-registration phishing. Canada's federal analogue is the
