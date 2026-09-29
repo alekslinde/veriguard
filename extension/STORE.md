@@ -308,6 +308,23 @@ the sequence is the argument, so keep it:
 
 Do not screenshot a real person's message. Use the samples in the test suite.
 
+### The generated one
+
+`npm run screenshot` produces `public/store/screenshot-verdict.png` at
+1280×800 — the headline panel, suitable as the first screenshot or as the
+marketing image on the site.
+
+The panel is a mock, but its content is not written by hand. The verdict, the
+score and every signal row come from calling the engine at build time, and the
+verdict wording is read from `messages/en.normal.json`. So a retuned weight or
+a reworded string moves the image on the next run, instead of leaving it
+claiming something the product stopped doing. It fails rather than redraws if
+the sample stops scoring `likely_scam`, or if a verdict string it needs is
+missing.
+
+The remaining four are real captures and stay manual — a mock of the
+right-click menu would be a picture of something that does not exist.
+
 ---
 
 ## Promotional tiles

@@ -23,65 +23,19 @@
 // files directly, so the tiles use the same faces as the site.
 //
 // Run: npm run promo  (requires a dev/prod build, for the font files)
-import {
-  readFileSync,
-  writeFileSync,
-  mkdirSync,
-  readdirSync,
-  rmSync,
-  existsSync,
-} from "fs";
+import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from "fs";
 import { execFileSync } from "child_process";
 import { join } from "path";
 import { fileURLToPath } from "url";
+import { findFont, CHROME, TOKENS } from "./lib/brandRender.mts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const OUT_DIR = join(ROOT, "public/store");
 
-// Brand tokens, from app/globals.css. Duplicated rather than parsed: this
-// script runs without the app, and three hex values are cheaper to keep in
-// step than a CSS parser is to maintain.
-const INK = "#141C2B";
-const INK_2 = "#1E2839";
-const EMERALD = "#00A676";
-const PAPER = "#FBFAF7";
-const TEXT_DIM = "#A6B0C0";
+const { INK, INK_2, EMERALD, PAPER, TEXT_DIM } = TOKENS;
 
-// Overridable because the default is the macOS install location, and a bare
-// ENOENT from execFileSync says nothing about what to do next.
-const CHROME =
-  process.env.CHROME_PATH ||
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-
-// next/font writes the fonts into the build with hashed filenames, so they are
-// found by reading the generated @font-face CSS rather than by name. The
-// `.p.` infix marks the preloaded latin subset — the only one these tiles need,
-// and the one whose absence would leave the type in a fallback face.
-function findFont(cssNeedle) {
-  const chunks = join(ROOT, ".next/dev/static/chunks");
-  let dir;
-  try {
-    dir = readdirSync(chunks);
-  } catch {
-    throw new Error(
-      ".next/dev not found — run `npm run dev` once so next/font emits the " +
-        "font files this script reads.",
-    );
-  }
-
-  const css = dir.find((f) => f.includes(cssNeedle) && f.endsWith(".css"));
-  if (!css) throw new Error(`No font CSS matching "${cssNeedle}" in ${chunks}`);
-
-  const text = readFileSync(join(chunks, css), "utf8");
-  const match = text.match(/url\("\.\.\/media\/([^"]*\.p\.[^"]*\.woff2)"\)/);
-  if (!match) throw new Error(`No latin subset in ${css}`);
-
-  const file = join(ROOT, ".next/dev/static/media", match[1]);
-  return readFileSync(file).toString("base64");
-}
-
-const fraunces = findFont("font_google_fraunces");
-const inter = findFont("font_google_inter");
+const fraunces = findFont(ROOT, "font_google_fraunces");
+const inter = findFont(ROOT, "font_google_inter");
 
 // The mark, inlined from the same source generate-icons.mjs uses, so the tiles
 // cannot drift from the icons.
@@ -112,8 +66,27 @@ const MARK = readFileSync(join(ROOT, "app/icon-dark.svg"), "utf8")
 // Two tiles, one template. `scale` multiplies every dimension off the 440×280
 // small tile, which is the size the layout was proportioned for; the marquee is
 // the same composition at 3.18× rather than a second design to keep in step.
-function page({ width, height, scale, showTagline, measure, subMeasure }) {
-  const px = (n) => `${(n * scale).toFixed(2)}px`;
+type Tile = {
+  width: number;
+  height: number;
+  /** Multiplies every dimension off the 440×280 tile the layout is drawn at. */
+  scale: number;
+  showTagline: boolean;
+  /** Headline measure, in unscaled units. */
+  measure: number;
+  /** Tagline measure, in unscaled units. */
+  subMeasure: number;
+};
+
+function page({
+  width,
+  height,
+  scale,
+  showTagline,
+  measure,
+  subMeasure,
+}: Tile) {
+  const px = (n: number) => `${(n * scale).toFixed(2)}px`;
 
   return `<!doctype html>
 <html><head><meta charset="utf-8">
@@ -240,12 +213,13 @@ function page({ width, height, scale, showTagline, measure, subMeasure }) {
 </body></html>`;
 }
 
-function render({ width, height, scale, showTagline, measure, subMeasure, out }) {
+function render({
+  out,
+  ...tile
+}: Tile & { out: string }) {
+  const { width, height } = tile;
   const html = join(OUT_DIR, `.${out}.html`);
-  writeFileSync(
-    html,
-    page({ width, height, scale, showTagline, measure, subMeasure }),
-  );
+  writeFileSync(html, page(tile));
 
   // --headless=new honours web fonts and device-scale-factor; the older
   // headless mode rasterises text differently and would undo the point of
