@@ -311,7 +311,8 @@ Do not screenshot a real person's message. Use the samples in the test suite.
 AMO takes a caption per screenshot and uses it as the alt text, so each one
 says what is on screen rather than restating the pitch:
 
-1. A scam text scored as likely a scam, with the rules that flagged it.
+1. A phishing text scored as likely a scam, with the rules that flagged it and
+   what each one added.
 2. Checking selected text from the right-click menu, without leaving the page.
 3. A verdict saying plainly what it could not check — match this one to
    whichever gap you shot.
@@ -360,8 +361,8 @@ a PNG of the right dimensions gives nothing away about what is inside it.
 
 **Caption**, for AMO's per-screenshot field:
 
-> A fake bank link scored as likely a scam, with the rules that got it there
-> and what each one added.
+> A link impersonating a bank, scored as likely a scam, with the rules that
+> got it there and what each one added.
 
 AMO shows this beneath the image and uses it as the alt text, so it describes
 what is on screen rather than selling the product — someone reading it instead
@@ -369,6 +370,11 @@ of seeing it should learn the same thing. It names no score and no individual
 rule: those are drawn from the engine at render time, and a caption repeating
 them would be a second copy to keep in step, which is the drift the generated
 image exists to avoid.
+
+It says the link impersonates a bank, not that it is a "fake" or "sample" one.
+In listing copy those words attach to the wrong noun — they read as a caveat
+about the screenshot rather than a description of the link inside it, which
+inverts the claim the image is making.
 
 The remaining four are real captures and stay manual — a mock of the
 right-click menu would be a picture of something that does not exist.
