@@ -23,12 +23,17 @@
 //   node scripts/check-sources.mjs --issue      # refresh the digest issue
 //   node scripts/check-sources.mjs --validate   # parse + validate, no network
 //   node scripts/check-sources.mjs --stale      # is `updated:` behind the file?
+//   node scripts/check-sources.mjs --auto-bump  # bump `updated:` if content changed
+//                                                # (compares against $BASE_SHA,
+//                                                # falling back to HEAD~1)
 //
 // Exit codes: 0 all reachable · 1 rot found · 2 registry invalid.
 // With --stale: 0 header current · 1 header behind the file · 2 check failed.
+// With --auto-bump: 0 bumped or nothing to do · 2 check failed. Never exits 1 —
+// it is not a reachability signal.
 
 import { execFileSync } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -246,6 +251,20 @@ function parseRegistry(text) {
     const m = line.match(/^([A-Za-z0-9_]+):\s*(.*)$/);
     if (m && current) {
       const [, key, val] = m;
+      // A repeated key on the same entry is always an editing mistake — a
+      // leftover line from before a note was rewritten, most often — and
+      // silently overwriting it hid exactly that (see sources.yml history:
+      // saps.gov.za and economie.gouv.fr both shipped a stale `note:` a
+      // rewrite left behind, one of them holding the very explanation for an
+      // `expect: blocked` flag, discarded without a parse error). Reported
+      // rather than overwritten, same discipline as the malformed-list-item
+      // case above.
+      if (Object.prototype.hasOwnProperty.call(current, key)) {
+        out.errors.push(
+          `line ${lineNo}: duplicate \`${key}:\` on ${current.domain ?? "this entry"} — ` +
+          `remove the stale one (the parser would otherwise silently keep whichever comes last)`,
+        );
+      }
       if (val === ">-" || val === ">" || val === "|" || val === "|-") {
         folding = { key, indent, parts: [] };
       } else {
@@ -529,21 +548,41 @@ async function checkOne(entry) {
   for (let attempt = 0; attempt <= RETRIES; attempt++) {
     try {
       // HEAD first (cheap); many sites answer 403/405 to it, so fall back to a
-      // GET before concluding anything is wrong.
+      // GET before concluding anything is wrong. Some sites go further and
+      // answer HEAD with a 404 (India's cybercrime.gov.in) or route it into an
+      // edge error page that resolves to a 400 (bsi.bund.de) — GET on the
+      // identical URL is fine. A HEAD-only rejection is a known false-rot
+      // shape, so confirm 404/400/410 with GET too, not just 403/405/501; a
+      // GET that repeats the same status is real evidence, not a false one.
       //
       // Each probe gets its OWN timeout budget. Sharing one timer across both
       // meant a site taking 22s on HEAD left ~8s for the GET and was reported
       // TIMEOUT while alive — precisely the .gov.au slowness this budget exists
       // to absorb.
       let res = await withTimeout((signal) => probe(entry.url, "HEAD", signal));
-      if (res.status === 405 || res.status === 403 || res.status === 501) {
+      if ([400, 403, 404, 405, 410, 501].includes(res.status)) {
         res = await withTimeout((signal) => probe(entry.url, "GET", signal));
       }
 
       result.status = res.status;
       result.finalUrl = res.url;
 
-      if (res.status === 404 || res.status === 410) result.state = "DEAD";
+      if (res.status === 404 || res.status === 410 || res.status === 400) {
+        // A WAF marked `expect: blocked` does not always answer with 403 — some
+        // (Netsafe among them) flip between 403 and 404 across requests, and a
+        // 404 from the same edge protection says nothing real about the page
+        // either. bsi.bund.de's edge goes further still and routes a blocked
+        // HEAD into a 400 error page — the same reasoning extends to it: honour
+        // the flag on 400 too, exactly as the 403/429 and 5xx paths already do,
+        // instead of leaving it to fall through to the generic DEAD case below
+        // where `expect: blocked` is never even checked.
+        if (entry.expect === "blocked") {
+          result.state = "BLOCKED";
+          result.error = `HTTP ${res.status} (expected — bot protection)`;
+        } else {
+          result.state = "DEAD";
+        }
+      }
       else if (res.status === 403 || res.status === 429) {
         // A 403 to our UA is usually a WAF, but it can also be a page pulled
         // behind auth. Confirm the URL still serves someone — unless the entry
@@ -599,7 +638,20 @@ async function checkOne(entry) {
           result.state = "SERVER_ERROR";
         }
       }
-      else if (!res.ok) result.state = "DEAD";
+      else if (!res.ok) {
+        // Catch-all for any other non-2xx (406, 421, 451, ...) not already
+        // branched on above. `expect: blocked` must be honoured here too —
+        // otherwise a WAF that happens to answer with a code this checker has
+        // not been individually taught about defeats the flag by surprise,
+        // the same gap that let a 400 slip through DEAD before 400 got its
+        // own branch above.
+        if (entry.expect === "blocked") {
+          result.state = "BLOCKED";
+          result.error = `HTTP ${res.status} (expected — bot protection)`;
+        } else {
+          result.state = "DEAD";
+        }
+      }
       else if (landedElsewhere(entry.url, res.url)) result.state = "REDIRECTED";
       else result.state = "OK";
 
@@ -767,7 +819,34 @@ function human(results, reg, retiredCount = 0) {
 }
 
 // ---------------------------------------------------------------------------
+// Content diffing — powers --auto-bump.
+//
+// A byte diff on sources.yml can't tell a re-tiered source from a reflowed
+// comment, so it can't decide on its own whether `updated:` needs to move.
+// This compares the PARSED registries instead — every field parseRegistry
+// produces, except `errors` (a parser artifact) and the header itself
+// (`version`/`updated`, which is exactly the thing being decided). Two
+// registries that parse to the same sources/tiers/brands/indicators, in the
+// same order, are content-identical regardless of what the comments around
+// them say.
+// ---------------------------------------------------------------------------
 
+/**
+ * True if two parsed registries differ in anything other than the header.
+ * Exported for unit tests — this is the judgement call that used to be a
+ * human reading a PR diff, so it needs the same scrutiny a person would give
+ * it: every source field, in order, with nothing quietly excluded.
+ */
+export function registryContentChanged(a, b) {
+  const strip = (reg) => {
+    const rest = { ...reg };
+    delete rest.version;
+    delete rest.updated;
+    delete rest.errors;
+    return rest;
+  };
+  return JSON.stringify(strip(a)) !== JSON.stringify(strip(b));
+}
 
 /**
  * Is the `updated:` header behind the file's own last change?
@@ -816,6 +895,7 @@ async function main() {
   const asIssue = args.includes("--issue");
   const validateOnly = args.includes("--validate");
   const staleOnly = args.includes("--stale");
+  const autoBump = args.includes("--auto-bump");
 
   const text = await readFile(REGISTRY, "utf8");
   const reg = parseRegistry(text);
@@ -855,6 +935,67 @@ async function main() {
       return;
     }
     console.log(`Registry header is current — updated ${st.declared}, last changed ${st.committed}.`);
+    return;
+  }
+
+  if (autoBump) {
+    // Runs on main, after merge — never on a PR. The PR-time --stale warning
+    // is the human nudge; this is the backstop for whatever lands anyway,
+    // deciding by content rather than trusting the author remembered.
+    //
+    // BASE_SHA (the push event's `before` SHA) is preferred over HEAD~1: a
+    // push can carry more than one commit — a merge commit among them — and
+    // HEAD~1 only reaches the last commit's immediate parent, not the state
+    // before the push. Falls back to HEAD~1 for a local/manual run, where
+    // there is no push event to supply it, and for the same reason on a
+    // GitHub-documented all-zero SHA (a branch's first push, or a rewritten
+    // history the runner has no record of) — `git show` on 40 zeros always
+    // fails, and treating that the same as "no BASE_SHA at all" still gives
+    // the real previous commit on disk to diff against, rather than silently
+    // skipping a bump a genuine content change earned.
+    const ZERO_SHA = "0000000000000000000000000000000000000000";
+    const baseRef = (process.env.BASE_SHA && process.env.BASE_SHA !== ZERO_SHA)
+      ? process.env.BASE_SHA
+      : "HEAD~1";
+    let previousText;
+    try {
+      previousText = execFileSync("git", ["show", `${baseRef}:docs/threat-intel/sources.yml`], {
+        cwd: HERE,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+    } catch {
+      console.log("No previous commit to diff against (first commit, or shallow clone) — nothing to bump.");
+      return;
+    }
+
+    const previous = parseRegistry(previousText);
+    if (previous.errors.length) {
+      // The prior commit's registry doesn't parse — nothing safe to diff
+      // against. Not this run's problem to fix; just skip the bump.
+      console.log("Previous registry revision does not parse — skipping the content diff.");
+      return;
+    }
+
+    if (!registryContentChanged(previous, reg)) {
+      console.log(`No content change since the last commit — leaving \`updated: ${reg.updated}\` as is.`);
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    if (reg.updated === today) {
+      console.log(`\`updated:\` is already ${today} — nothing to bump.`);
+      return;
+    }
+
+    const bumped = text.replace(/^updated:\s*.*$/m, `updated: ${today}`);
+    if (bumped === text) {
+      console.error("Could not find an `updated:` line to replace — registry header may be malformed.");
+      process.exitCode = 2;
+      return;
+    }
+    await writeFile(REGISTRY, bumped, "utf8");
+    console.log(`Content changed since the last commit — bumped \`updated:\` from ${reg.updated} to ${today}.`);
     return;
   }
 
