@@ -154,6 +154,21 @@ describe("#275 US — jury duty / bench warrant SMS", () => {
   });
 });
 
+describe("#369 CA — RCMP undelivered court documents smishing", () => {
+  it("reaches likely_scam on the acceptance-criteria fixture", () => {
+    const r = checkSms(
+      "RCMP: We were unable to deliver your court documents. Reschedule to avoid missing your court date: http://rcmp-schedule.top",
+      undefined,
+      "CA",
+    );
+    expect(r.verdict).toBe("likely_scam");
+  });
+
+  it("is scoped to the CA pack", () => {
+    expect(urgencyFlag(checkSms("avoid missing your court date", undefined, "AU"))).toBeFalsy();
+  });
+});
+
 describe("#274 US — veterans benefit lures (gated)", () => {
   it("flags a veterans lure that carries an information ask", () => {
     const r = checkSms(
