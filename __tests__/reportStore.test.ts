@@ -193,6 +193,69 @@ describe("storeReport", () => {
     );
   });
 
+  it("persists the surface that prompted the report", async () => {
+    // The end of the attribution chain. Every other link was tested in
+    // isolation — the link is built, the form parses it — while the value
+    // never reached the database, so a round-trip test passed over a feature
+    // that recorded nothing. This asserts the last hop.
+    mockExecute.mockResolvedValueOnce({ rows: [{ n: 0 }] });
+
+    await storeReport(
+      {
+        id: "RPT-SRC001",
+        type: "url",
+        content: "https://evil.com",
+        description: "",
+        contact: "",
+        submittedAt: Date.now(),
+        location: "NSW, Australia",
+        scamUrl: "https://evil.com",
+        scamPhone: "",
+        scamEmail: "",
+        scamReplyTo: "",
+        region: "AU",
+        source: "ext-firefox",
+      },
+      false,
+    );
+
+    const insert = mockExecute.mock.calls.find(
+      (c) => (c[0] as { sql: string }).sql.includes("INSERT INTO reports"),
+    )!;
+    expect(insert[0].sql).toContain("source");
+    expect(insert[0].args).toContain("ext-firefox");
+  });
+
+  it("stores an empty source for a direct arrival", async () => {
+    // Absent is the common case — someone who came to the form themselves —
+    // and it must write '' rather than undefined, which the driver would
+    // reject on a NOT NULL column.
+    mockExecute.mockResolvedValueOnce({ rows: [{ n: 0 }] });
+
+    await storeReport(
+      {
+        id: "RPT-SRC002",
+        type: "url",
+        content: "https://evil.com",
+        description: "",
+        contact: "",
+        submittedAt: Date.now(),
+        location: "NSW, Australia",
+        scamUrl: "https://evil.com",
+        scamPhone: "",
+        scamEmail: "",
+        scamReplyTo: "",
+        region: "AU",
+      },
+      false,
+    );
+
+    const insert = mockExecute.mock.calls.find(
+      (c) => (c[0] as { sql: string }).sql.includes("INSERT INTO reports"),
+    )!;
+    expect(insert[0].args).not.toContain(undefined);
+  });
+
   it("includes scam identifier fields in the INSERT args", async () => {
     // First call is the COUNT query; second is the INSERT
     mockExecute.mockResolvedValueOnce({ rows: [{ n: 0 }] }); // COUNT → 0 existing
@@ -249,11 +312,20 @@ describe("storeReport", () => {
     )!;
     expect(insertCall[0].sql).toContain("region");
     // Assert on the column's own position, not merely that "GB" appears
-    // somewhere in the args — region is the last bound parameter, and several
-    // other columns legitimately bind ''. Positional is what actually proves
-    // the value landed in `region` rather than beside it.
+    // somewhere in the args — several other columns legitimately bind ''.
+    // Positional is what actually proves the value landed in `region` rather
+    // than beside it.
+    //
+    // The index is read out of the column list rather than assumed to be last:
+    // `region` was the final parameter until `source` was appended after it,
+    // and a test anchored to "last" fails on the next column added for reasons
+    // that have nothing to do with what it is checking.
     const args = insertCall[0].args as unknown[];
-    expect(args[args.length - 1]).toBe("GB");
+    const columns = (insertCall[0].sql as string)
+      .slice(insertCall[0].sql.indexOf("(") + 1, insertCall[0].sql.indexOf(")"))
+      .split(",")
+      .map((c) => c.trim());
+    expect(args[columns.indexOf("region")]).toBe("GB");
   });
 
   // Guards the ambiguity directly: '' means "row predates the Phase 2

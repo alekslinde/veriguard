@@ -34,11 +34,19 @@ export default function HomeHero({ stats }: { stats: { checks: number; reports: 
         ))}
       </h1>
       {/* Carries the privacy promise inline — privacy is the core of this tool,
-          so it is read up front, not buried in small print on the card. */}
+          so it is read up front, not buried in small print on the card.
+
+          The counters render inside this paragraph rather than as a bar beneath
+          it: they qualify the claim the sentence just made, and as their own row
+          they wrapped to two lines on a phone and stranded a separator dot. The
+          subtitle no longer opens by listing what you can paste — the textarea's
+          own placeholder said the same four things a few hundred pixels below,
+          and saying them twice was most of the preamble between the headline and
+          the box. */}
       <p className="text-base sm:text-[17px] text-[var(--text-dim)] max-w-[58ch] leading-relaxed">
         {t("home.subtitle")}
+        <StatsBar initial={stats} />
       </p>
-      <StatsBar initial={stats} />
     </div>
   );
 }

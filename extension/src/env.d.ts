@@ -7,3 +7,11 @@
 
 /** Origin the blocklist is fetched from. No trailing slash. */
 declare const __API_BASE__: string;
+
+/**
+ * Which build this is, as a `ReportSource` from lib/reportPrefill.ts.
+ *
+ * Used only to label a report link the user clicks through to the website. It
+ * is not sent anywhere by the extension itself.
+ */
+declare const __REPORT_SOURCE__: string;

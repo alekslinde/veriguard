@@ -1597,11 +1597,16 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
 
       {/* Paste guidance for users who aren't sure how to copy on mobile. Stands
           down while the empty-submit alert is up, so an empty press shows one
-          clear message rather than two stacked hints. */}
+          clear message rather than two stacked hints.
+
+          Mobile only, now. The desktop half told people they could drag a .eml
+          file or a screenshot onto the box — a capability the two upload buttons
+          directly above already offer by name, and one that costs nothing to
+          discover by trying it. On the narrow viewport this hint is the only
+          route to it, which is why that half stays. */}
       {!content && !pipeStages && !emptyPrompt && (
-        <p className="text-xs text-[var(--faint)] px-0.5">
-          {t("check.pasteHint")}{" "}
-          <span className="hidden sm:inline">{t("check.dropHint")}</span>
+        <p className="sm:hidden text-xs text-[var(--faint)] px-0.5">
+          {t("check.pasteHint")}
         </p>
       )}
 

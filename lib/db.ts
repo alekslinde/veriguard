@@ -128,6 +128,13 @@ async function setup(): Promise<void> {
   // `location`, which is display text: this records which detection ruleset ran,
   // so coverage gaps by region are measurable. Empty for rows predating it.
   await db.execute(`ALTER TABLE reports ADD COLUMN region       TEXT    NOT NULL DEFAULT ''`).catch(() => {});
+  // Which surface prompted the report — an allowlisted label from
+  // lib/reportPrefill.ts, never free text. Empty means the reporter came to the
+  // form directly, which is the common case; rows predating this column read
+  // the same way, and that ambiguity is acceptable here because "arrived
+  // directly" and "we weren't recording yet" call for the same conclusion:
+  // nothing sent them. Operational only — the public feed never selects it.
+  await db.execute(`ALTER TABLE reports ADD COLUMN source       TEXT    NOT NULL DEFAULT ''`).catch(() => {});
 
   // Every public-feed read (getPublicReports, getPublicReportsCount,
   // getFeedStats) filters on `suspect = 0` first, then usually `type` or an

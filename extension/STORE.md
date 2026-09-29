@@ -87,7 +87,7 @@ Three, all minimal. None of them can read the pages you visit:
 
 REPORTING
 
-On a suspicious verdict you can report the scam to the public database. The extension opens the report form on veriguard.app with the link or number filled in — it never submits anything itself. You review it and send it.
+On a suspicious verdict you can report the scam to the public database. The extension opens the report form on veriguard.app with the link or number filled in, and a note of which browser's version sent you — it never submits anything itself. You review it and send it.
 
 OPEN SOURCE
 
@@ -168,6 +168,28 @@ No. All code is contained in the package. The single network request retrieves a
 identifiable information, health, financial, authentication, personal
 communications, location, web history or user activity. The single request
 carries no query and no body, so nothing about the user is transmitted.
+
+**On the report link, which is the one thing that looks like an exception.**
+The full description above says a report opens the website with "a note of
+which browser's version sent you" — a `source=ext-chromium` (or `ext-firefox`)
+parameter on a `veriguard.app/report` URL. That is not data collection, and the
+declarations here stand unchanged:
+
+- The extension transmits nothing. It opens a tab; the *browser* makes the
+  request, because the user clicked a button asking it to. A disclosure covers
+  what the add-on sends, not every navigation it can start.
+- The value names a build, never a user. It is one of three fixed strings
+  compiled in at build time — no id, no session, no timestamp, nothing derived
+  from the person or the machine. Two installs of the same build are
+  indistinguishable.
+- It is validated against a closed allowlist at both ends (`lib/reportPrefill.ts`),
+  so it cannot be made to carry anything else, and
+  `__tests__/extensionBundle.test.ts` fails if a generated id is ever added
+  beside it.
+- The user sees the URL, and the form, before anything is submitted.
+
+Stated here because the description and these declarations are read together by
+a reviewer, and the reconciling argument should not live only in the repo.
 
 ---
 
