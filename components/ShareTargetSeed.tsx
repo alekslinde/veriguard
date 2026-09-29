@@ -42,10 +42,10 @@ export default function ShareTargetSeed() {
   // CheckStage rather than CheckFlow directly: the collapsing fold and the
   // "Checked … / Edit & check again" strip are the stage's, and a share-sheet
   // reader needs the way back to the box exactly as much as a pasting one.
-  // Forwarding is off here — arriving via the share sheet is already a choice
-  // about how to get content in, so offering a second route is noise.
+  // No ways-in rows here — arriving via the share sheet is already a choice
+  // about how to get content in, so offering other routes is noise.
   return (
-    <CheckStage initialContent={seed.content} surface="share" forward={false}>
+    <CheckStage initialContent={seed.content} surface="share">
       {seed.truncated && (
         <p
           role="status"

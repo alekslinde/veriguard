@@ -1,34 +1,47 @@
 import Link from "next/link";
 
+// Matches app/error.tsx: same head shape as every content page, design tokens
+// rather than the raw Tailwind palette this used to carry, and no green
+// headline — see the colour note there for why a verdict hue is wrong on a page
+// about our own plumbing.
+//
+// A server component, unlike the error boundary, so nothing here is guarding
+// against a broken render. The copy is still hardcoded rather than read from
+// the message bundle: a 404 is reachable by definition on a URL that matched no
+// route, and keeping it independent of the language context means it renders
+// the same whatever went wrong upstream.
 export default function NotFound() {
   return (
-    <main className="max-w-[1180px] mx-auto px-5 sm:px-8 py-16">
-      {/* The container matches every other page; the message itself stays at a
-          readable width and centred within it, since a centred paragraph spanning
-          1180px is a hard thing to read. */}
-      <div className="max-w-[52ch] mx-auto text-center space-y-4">
-        <h1 className="text-2xl font-black text-emerald-400 tracking-tight">
-          Page not found
-        </h1>
-        <p className="text-gray-300 text-sm">
-          That page doesn&apos;t exist — but if a link or message sent you here,
-          that itself might be worth checking.
+    <main className="max-w-[1180px] mx-auto px-5 sm:px-8 py-8 sm:py-10">
+      <header className="max-w-[60ch]">
+        <p className="font-[family-name:var(--font-mono-ui)] text-[11px] tracking-[0.1em] uppercase text-[var(--faint)] mb-2.5">
+          Not found
         </p>
-        <div className="flex flex-wrap justify-center gap-3 pt-2">
+        <h1 className="font-[family-name:var(--font-display)] font-semibold text-[clamp(30px,4.6vw,44px)] leading-[1.07] tracking-[-0.022em] text-[var(--foreground)] text-balance">
+          That page doesn&apos;t exist
+        </h1>
+        {/* The second sentence is the useful one and belongs to this product
+            rather than to a generic 404: someone who arrived here from a link in
+            a message is holding the exact thing this site checks. */}
+        <p className="mt-3.5 text-[clamp(15px,1.6vw,17px)] text-[var(--text-dim)] leading-relaxed">
+          If a link or message sent you here, that link is worth checking.
+        </p>
+
+        <div className="mt-6 flex flex-wrap gap-3">
           <Link
             href="/"
-            className="px-4 py-2.5 min-h-[44px] flex items-center bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-lg transition-colors"
+            className="inline-flex items-center min-h-[44px] rounded-lg bg-[var(--clear)] px-4 py-2.5 text-sm font-semibold text-[var(--ink)] hover:brightness-110 transition-[filter]"
           >
-            Check a suspicious message
+            Check a message
           </Link>
           <Link
             href="/submissions"
-            className="px-4 py-2.5 min-h-[44px] flex items-center bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition-colors"
+            className="inline-flex items-center min-h-[44px] rounded-lg border border-[var(--rule)] px-4 py-2.5 text-sm font-semibold text-[var(--text-dim)] hover:border-[var(--clear)] hover:text-[var(--clear)] transition-colors"
           >
             Browse reported scams
           </Link>
         </div>
-      </div>
+      </header>
     </main>
   );
 }
