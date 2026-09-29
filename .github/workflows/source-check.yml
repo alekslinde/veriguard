@@ -123,6 +123,14 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    # A separate, non-cancelling group from the workflow-level one above. Two
+    # merges landing on main close together must queue here rather than race:
+    # the workflow-level group has `cancel-in-progress: true`, and this job
+    # commits and pushes to main — cancelling it mid-push is exactly the
+    # silent-miss this feature exists to prevent, worse than a short wait.
+    concurrency:
+      group: source-check-bump-updated-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v7
         with:

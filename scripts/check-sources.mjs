@@ -251,6 +251,20 @@ function parseRegistry(text) {
     const m = line.match(/^([A-Za-z0-9_]+):\s*(.*)$/);
     if (m && current) {
       const [, key, val] = m;
+      // A repeated key on the same entry is always an editing mistake — a
+      // leftover line from before a note was rewritten, most often — and
+      // silently overwriting it hid exactly that (see sources.yml history:
+      // saps.gov.za and economie.gouv.fr both shipped a stale `note:` a
+      // rewrite left behind, one of them holding the very explanation for an
+      // `expect: blocked` flag, discarded without a parse error). Reported
+      // rather than overwritten, same discipline as the malformed-list-item
+      // case above.
+      if (Object.prototype.hasOwnProperty.call(current, key)) {
+        out.errors.push(
+          `line ${lineNo}: duplicate \`${key}:\` on ${current.domain ?? "this entry"} — ` +
+          `remove the stale one (the parser would otherwise silently keep whichever comes last)`,
+        );
+      }
       if (val === ">-" || val === ">" || val === "|" || val === "|-") {
         folding = { key, indent, parts: [] };
       } else {
@@ -553,12 +567,15 @@ async function checkOne(entry) {
       result.status = res.status;
       result.finalUrl = res.url;
 
-      if (res.status === 404 || res.status === 410) {
+      if (res.status === 404 || res.status === 410 || res.status === 400) {
         // A WAF marked `expect: blocked` does not always answer with 403 — some
         // (Netsafe among them) flip between 403 and 404 across requests, and a
         // 404 from the same edge protection says nothing real about the page
-        // either. Honour the flag here too, exactly as the 403/429 and 5xx
-        // paths already do, instead of trusting the status code at face value.
+        // either. bsi.bund.de's edge goes further still and routes a blocked
+        // HEAD into a 400 error page — the same reasoning extends to it: honour
+        // the flag on 400 too, exactly as the 403/429 and 5xx paths already do,
+        // instead of leaving it to fall through to the generic DEAD case below
+        // where `expect: blocked` is never even checked.
         if (entry.expect === "blocked") {
           result.state = "BLOCKED";
           result.error = `HTTP ${res.status} (expected — bot protection)`;
@@ -621,7 +638,20 @@ async function checkOne(entry) {
           result.state = "SERVER_ERROR";
         }
       }
-      else if (!res.ok) result.state = "DEAD";
+      else if (!res.ok) {
+        // Catch-all for any other non-2xx (406, 421, 451, ...) not already
+        // branched on above. `expect: blocked` must be honoured here too —
+        // otherwise a WAF that happens to answer with a code this checker has
+        // not been individually taught about defeats the flag by surprise,
+        // the same gap that let a 400 slip through DEAD before 400 got its
+        // own branch above.
+        if (entry.expect === "blocked") {
+          result.state = "BLOCKED";
+          result.error = `HTTP ${res.status} (expected — bot protection)`;
+        } else {
+          result.state = "DEAD";
+        }
+      }
       else if (landedElsewhere(entry.url, res.url)) result.state = "REDIRECTED";
       else result.state = "OK";
 
@@ -917,8 +947,16 @@ async function main() {
     // push can carry more than one commit — a merge commit among them — and
     // HEAD~1 only reaches the last commit's immediate parent, not the state
     // before the push. Falls back to HEAD~1 for a local/manual run, where
-    // there is no push event to supply it.
-    const baseRef = process.env.BASE_SHA || "HEAD~1";
+    // there is no push event to supply it, and for the same reason on a
+    // GitHub-documented all-zero SHA (a branch's first push, or a rewritten
+    // history the runner has no record of) — `git show` on 40 zeros always
+    // fails, and treating that the same as "no BASE_SHA at all" still gives
+    // the real previous commit on disk to diff against, rather than silently
+    // skipping a bump a genuine content change earned.
+    const ZERO_SHA = "0000000000000000000000000000000000000000";
+    const baseRef = (process.env.BASE_SHA && process.env.BASE_SHA !== ZERO_SHA)
+      ? process.env.BASE_SHA
+      : "HEAD~1";
     let previousText;
     try {
       previousText = execFileSync("git", ["show", `${baseRef}:docs/threat-intel/sources.yml`], {

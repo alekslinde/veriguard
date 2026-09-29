@@ -354,7 +354,6 @@ tiers:
         National police; publishes named scam and fraud alerts. URL updated
         2026-09-29 — the `/newsroom/alert.php` path 404s and no stable
         successor page was confirmed; pointed at the homepage.
-      note: National police; publishes named scam and fraud alerts.
     - domain: sabric.co.za
       name: SABRIC — South African Banking Risk Information Centre
       url: https://www.sabric.co.za/
@@ -454,7 +453,6 @@ tiers:
         Consumer-protection authority; publishes named scam and fraud
         alerts. Confirmed 2026-09-29: 403 with a Cloudflare Turnstile
         challenge page on every automated request, hence `expect: blocked`.
-      note: Consumer-protection authority; publishes named scam and fraud alerts.
 
     # ── ES ─────────────────────────────────────────────────────────────────
     - domain: incibe.es
