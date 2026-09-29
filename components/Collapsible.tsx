@@ -41,7 +41,14 @@ export default function Collapsible({
     >
       {/* marker:hidden + the webkit rule drop the platform triangle so the SVG
           chevron can sit on the right where the layout wants it. */}
-      <summary className="flex items-center justify-between gap-3 px-5 py-4 cursor-pointer list-none marker:hidden [&::-webkit-details-marker]:hidden rounded-xl hover:bg-[var(--ink-3)]/50 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--clear)]">
+      {/* The hover tint is on the CLOSED state only. A summary's bottom padding
+          sits inside its tinted box, so on an open section the highlight ran to
+          16px below the heading and the body began at exactly that edge — a hard
+          colour boundary against the text it introduces. An open section does
+          not need the affordance anyway: hover says "clickable", which matters
+          while the section is a closed thing to open and reads as noise once it
+          is a heading over its own content. */}
+      <summary className="flex items-center justify-between gap-3 px-5 py-4 cursor-pointer list-none marker:hidden [&::-webkit-details-marker]:hidden rounded-xl hover:bg-[var(--ink-3)]/50 group-open:hover:bg-transparent transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--clear)]">
         {/* The display face at reading size, not a small uppercase label: these
             are section headings on a long page, and uppercase tracking is harder
             to scan the longer the string gets — several of these run to six
@@ -63,8 +70,11 @@ export default function Collapsible({
         </svg>
       </summary>
       {/* Padding lives here, not on <details>: a closed <details> renders only
-          its summary, so the body's padding never affects the collapsed height. */}
-      <div className="px-5 pb-5">{children}</div>
+          its summary, so the body's padding never affects the collapsed height.
+          pt-1 on top of the summary's own 16px — the summary's padding is inside
+          its hover box and cannot be relied on to separate anything from what
+          follows it. */}
+      <div className="px-5 pt-1 pb-5">{children}</div>
     </details>
   );
 }

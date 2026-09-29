@@ -161,7 +161,19 @@ function Row({ way }: { way: WayIn }) {
 
   return (
     <details className="group">
-      <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer list-none marker:hidden [&::-webkit-details-marker]:hidden hover:bg-[var(--ink-2)] transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--clear)]">
+      {/* The hover tint is on the CLOSED row only (`group-open:hover:bg-…`
+          resets it), and that is the fix for the gap rather than more padding.
+
+          A summary's bottom padding is inside the tinted box, so on an open row
+          the highlight ran to 12px below the title and the first line of body
+          text began at exactly that edge — a hard colour boundary with nothing
+          between it and the paragraph. Padding alone would have pushed the text
+          down while leaving the block butted against it.
+
+          An open row does not need the affordance anyway: hover says "this is
+          clickable", which matters when the row is a closed thing to open and
+          reads as noise once it is a heading over its own content. */}
+      <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer list-none marker:hidden [&::-webkit-details-marker]:hidden hover:bg-[var(--ink-2)] group-open:hover:bg-transparent transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--clear)]">
         <span className="flex-1 min-w-0">
           <span className="font-semibold text-[var(--foreground)] text-[14.5px]">
             {t(way.name)}
@@ -179,7 +191,11 @@ function Row({ way }: { way: WayIn }) {
         <Chevron />
       </summary>
 
-      <div className="px-4 pb-4 flex flex-col gap-3">
+      {/* pt-1 on top of the summary's own 12px, so the body starts ~16px below
+          the title rather than at its exact edge. The summary's padding is
+          inside its hover box and cannot be relied on to separate anything from
+          what follows it. */}
+      <div className="px-4 pt-1 pb-4 flex flex-col gap-3">
         <p className="text-[13.5px] text-[var(--text-dim)] leading-relaxed">
           {t(way.detail)}
         </p>
