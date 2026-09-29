@@ -261,24 +261,24 @@ const AU_THREATS: ThreatEntry[] = [
     id: "ato-tax-debt",
     title: "ATO tax debt and refund lures",
     channel: "mixed",
-    status: "watchlist",
+    status: "active",
     coverage: "covered",
     firstSeen: "2026-06-21",
-    lastSeen: "2026-08-23",
+    lastSeen: "2026-09-25",
     summary:
-      "The steadiest campaign on the list, and it peaks now. Both directions get used: a refund waiting for your bank details, or a debt with legal action attached. Reports rose sharply through July.",
+      "The steadiest campaign on the list. Both directions get used: a refund waiting for your bank details, or a debt with legal action attached. A September wave blends Medicare, Centrelink, JobSeeker and super into one AI-generated message so at least one benefit resonates, and threatens that payments will stop rather than just asking you to log in.",
     lures: [
       "\"Your tax refund is waiting — confirm your bank details\"",
       "\"Outstanding tax debt — legal action will be taken\"",
       "\"Your TFN has been suspended\"",
-      "\"Your tax appointment is scheduled — open the attached PDF\"",
+      "\"Your Medicare and Centrelink payments will be suspended — confirm your identity\"",
       "\"Your myGov account has been locked — click to unlock\"",
       "Fake myGov and ATO login pages",
     ],
     advice:
-      "The ATO never sends a link to log in and never threatens arrest by SMS. Open the ATO app, or type my.gov.au yourself.",
-    detection: "ATO and myGov impersonation combined with payment or login pressure scores highly.",
-    roadmap: "2026-08-09",
+      "The ATO never sends a link to log in and never threatens arrest or payment suspension by SMS. Open the ATO or Centrelink app, or type my.gov.au yourself.",
+    detection: "ATO and myGov impersonation combined with payment, login or payment-suspension pressure scores highly.",
+    roadmap: "2026-09-25",
   },
   {
     id: "super-rule-change",
@@ -436,7 +436,10 @@ const AU_THREATS: ThreatEntry[] = [
     id: "crypto-exchange-impersonation",
     title: "AU crypto exchange impersonation",
     channel: "mixed",
-    status: "active",
+    // Demoted 2026-09-27: neither the 09-25 nor the 09-27 sweep re-confirms
+    // this campaign, so `active` would fail the recency ratchet
+    // (threatRadar.test.ts).
+    status: "watchlist",
     coverage: "covered",
     firstSeen: "2026-08-02",
     lastSeen: "2026-09-13",
@@ -634,7 +637,10 @@ const AU_THREATS: ThreatEntry[] = [
     id: "food-delivery",
     title: "Food delivery platform impersonation",
     channel: "mixed",
-    status: "active",
+    // Demoted 2026-09-27: neither the 09-25 nor the 09-27 sweep re-confirms
+    // this campaign, so `active` would fail the recency ratchet
+    // (threatRadar.test.ts).
+    status: "watchlist",
     coverage: "covered",
     firstSeen: "2026-07-01",
     lastSeen: "2026-09-06",
@@ -656,7 +662,10 @@ const AU_THREATS: ThreatEntry[] = [
     id: "nbn-telco",
     title: "NBN and telco disconnection threats",
     channel: "phone",
-    status: "active",
+    // Demoted 2026-09-27: neither the 09-25 nor the 09-27 sweep re-confirms
+    // this campaign, so `active` would fail the recency ratchet
+    // (threatRadar.test.ts).
+    status: "watchlist",
     coverage: "covered",
     firstSeen: "2026-07-01",
     lastSeen: "2026-09-13",
@@ -695,6 +704,27 @@ const AU_THREATS: ThreatEntry[] = [
     roadmap: "2026-07-01",
   },
   {
+    id: "voice-clone-followup-sms",
+    title: "Follow-up text after a scam phone call",
+    channel: "sms",
+    status: "active",
+    coverage: "covered",
+    firstSeen: "2026-09-25",
+    lastSeen: "2026-09-25",
+    summary:
+      "A text or email arrives shortly after a scam call — from the ATO, AFP or a bank fraud team — referencing the call to borrow its credibility before asking you to transfer money or confirm details. The call establishes a fake identity; the text exploits your memory of it to speed up compliance.",
+    lures: [
+      "\"As per our phone call, please transfer the funds to the account below\"",
+      "\"Following our recent call, please confirm your details to complete the verification we discussed\"",
+      "\"As I mentioned on the call, your case reference is …\"",
+      "A \"case reference\" number included to make the follow-up feel official",
+    ],
+    advice:
+      "A call doesn't make the text that follows it genuine — it's often the same scam in two parts. Hang up and call the organisation back on a number you already had, not one from the text.",
+    detection: "We flag \"as per our phone call\" and similar post-call phrasing, which scores higher alongside a link, authority mention or money request.",
+    roadmap: "2026-09-25",
+  },
+  {
     id: "hi-mum",
     title: "\"Hi Mum\" messages from a new number",
     channel: "sms",
@@ -726,7 +756,10 @@ const AU_THREATS: ThreatEntry[] = [
     id: "loyalty-points",
     title: "Loyalty points expiry phishing",
     channel: "mixed",
-    status: "active",
+    // Demoted 2026-09-27: neither the 09-25 nor the 09-27 sweep re-confirms
+    // this campaign, so `active` would fail the recency ratchet
+    // (threatRadar.test.ts).
+    status: "watchlist",
     coverage: "covered",
     firstSeen: "2026-06-21",
     lastSeen: "2026-09-06",
