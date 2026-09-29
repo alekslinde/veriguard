@@ -31,6 +31,20 @@
   /* #D6453D is 3.37:1 on --ink-2 — fine for a large heading, short of AA for
      the small labels in the evidence list. This is the text-safe partner. */
   --scam-text: #E86B63;
+
+  /* The mobile tab bar's full occupied height: the row itself plus the
+     home-indicator inset beneath it. One definition, three readers — the bar
+     (its own height), the More sheet (where its bottom edge sits) and the page
+     (how much bottom padding to reserve). Above the md breakpoint the bar is
+     not rendered, so the reservation collapses to zero rather than leaving a
+     band of dead space under every desktop page. */
+  --tabbar-h: calc(54px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 768px) {
+  :root {
+    --tabbar-h: 0px;
+  }
 }
 
 @theme inline {
@@ -81,6 +95,70 @@ body {
   font-family: var(--font-body), system-ui, -apple-system, Arial, sans-serif;
   /* Improve readability — especially for elderly users */
   line-height: 1.65;
+}
+
+/* ── app shell ───────────────────────────────────────────────────────────
+   Four browser defaults that read as "web page" on a phone, and what each
+   one gives away.
+
+   None of these touches desktop behaviour, and none removes a capability the
+   reader might want: text can still be selected everywhere it is worth
+   selecting (see the opt-in below), and nothing here disables zoom. */
+
+/* 1. The grey flash iOS paints over a tapped link. Every native control
+      responds by changing its own colour, which the tabs, buttons and links
+      here already do — the system overlay lands on top of that and is the
+      single most recognisable "this is a website" tell. */
+a,
+button,
+[role="button"],
+label[for],
+summary {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 2. Rubber-band scrolling past the end of the page, which on a fixed shell
+      drags the whole thing and exposes the ground behind it. `contain` keeps
+      the bounce inside the scroller. */
+html {
+  overscroll-behavior-y: contain;
+  /* Landscape on iOS otherwise inflates body text against the author's sizes,
+     which breaks the type scale the design is set on. */
+  -webkit-text-size-adjust: 100%;
+}
+
+/* 3. Long-press on a label or a tab selects the word, as if it were an
+      article — native chrome is not selectable. Only applied to the shell's
+      own furniture; everything the reader might legitimately want to copy (the
+      verdict, evidence, their own pasted text) is untouched. */
+@media (max-width: 767px) {
+  nav,
+  [data-app-chrome] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* …with the exception that proves the rule: text inside the chrome that is
+     genuinely worth copying opts back in. */
+  [data-selectable] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
+
+/* 4. The bottom tab bar is fixed, so the last row of every page would sit
+      underneath it. Reserved on <body> rather than on each <main>: a route
+      that forgets the class is a route whose footer is unreachable, and there
+      is no way to notice that from the code. */
+body {
+  padding-bottom: var(--tabbar-h);
+}
+
+/* The More sheet rises from the bar. Short and eased-out, so it reads as a
+   surface arriving rather than a panel being drawn. */
+@keyframes tabsheet-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
 }
 
 
