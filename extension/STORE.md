@@ -308,11 +308,42 @@ the sequence is the argument, so keep it:
 
 Do not screenshot a real person's message. Use the samples in the test suite.
 
+AMO takes a caption per screenshot and uses it as the alt text, so each one
+says what is on screen rather than restating the pitch:
+
+1. A phishing text scored as likely a scam, with the rules that flagged it and
+   what each one added.
+2. Checking selected text from the right-click menu, without leaving the page.
+3. A verdict saying plainly what it could not check — match this one to
+   whichever gap you shot.
+4. A link that raised nothing, with the reminder that a new scam won't match
+   the rules either.
+
+These echo the verdict wording in `messages/en.normal.json` rather than
+inventing labels for it — "likely a scam" and the caveat in (4) are the
+product's own words. A caption promising a verdict the screen does not show is
+the kind of mismatch a reviewer opens the image to check.
+
 ### The generated one
 
-`npm run screenshot` produces `store/screenshot-verdict.png` at
-1280×800 — the headline panel, suitable as the first screenshot or as the
-marketing image on the site.
+`npm run screenshot` produces the headline panel — suitable as the first
+screenshot, or as the marketing image on the site — at each store's size:
+
+| File | Size | Store |
+| --- | --- | --- |
+| `screenshot-verdict.png` | 1280×800 | Chrome Web Store |
+| `screenshot-verdict-amo.png` | 2400×1800 | AMO (its maximum and recommended size) |
+
+The two frames are different shapes, 16:10 against 4:3, so the second is not
+the first upscaled: the wide one sets the copy beside the panel, the tall one
+stacks it above. Both are drawn from one set of measurements and rendered at a
+2× device scale factor, so the type is rasterised at full density rather than
+resampled.
+
+The tall frame drops the three feature points the wide one carries down its
+left column. Stacked, the panel needs the height, and the points restate what
+the panel is already showing — the signal rows and their weights are the
+"shows its rules" claim demonstrated rather than asserted.
 
 The panel is a mock, but its content is not written by hand. The verdict, the
 score and every signal row come from calling the engine at build time, and the
@@ -321,6 +352,29 @@ a reworded string moves the image on the next run, instead of leaving it
 claiming something the product stopped doing. It fails rather than redraws if
 the sample stops scoring `likely_scam`, or if a verdict string it needs is
 missing.
+
+It also refuses to write a frame whose content does not clear its edges: the
+page measures itself before each render, and a composition that would be
+cropped fails the run instead of being saved with its first line shaved. That
+check exists because the first version of the tall frame did exactly that, and
+a PNG of the right dimensions gives nothing away about what is inside it.
+
+**Caption**, for AMO's per-screenshot field:
+
+> A link impersonating a bank, scored as likely a scam, with the rules that
+> got it there and what each one added.
+
+AMO shows this beneath the image and uses it as the alt text, so it describes
+what is on screen rather than selling the product — someone reading it instead
+of seeing it should learn the same thing. It names no score and no individual
+rule: those are drawn from the engine at render time, and a caption repeating
+them would be a second copy to keep in step, which is the drift the generated
+image exists to avoid.
+
+It says the link impersonates a bank, not that it is a "fake" or "sample" one.
+In listing copy those words attach to the wrong noun — they read as a caveat
+about the screenshot rather than a description of the link inside it, which
+inverts the claim the image is making.
 
 The remaining four are real captures and stay manual — a mock of the
 right-click menu would be a picture of something that does not exist.
