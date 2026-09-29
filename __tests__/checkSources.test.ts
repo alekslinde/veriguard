@@ -15,7 +15,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 // Plain .mjs script with no type declarations. `allowJs` lets TypeScript infer
 // its shape from the source, so the import resolves without a suppression.
-import { parseRegistry, validate, waybackFreshness, checkOne } from "../scripts/check-sources.mjs";
+import { parseRegistry, validate, waybackFreshness, checkOne, registryContentChanged } from "../scripts/check-sources.mjs";
 
 const REGISTRY_PATH = resolve(__dirname, "../docs/threat-intel/sources.yml");
 const registryText = readFileSync(REGISTRY_PATH, "utf8");
@@ -596,6 +596,94 @@ describe("expect: blocked honoured on a 404/410 (Netsafe)", () => {
     stubAlways(404, url);
     const r = await checkOne({ domain: "gone.example", url, tier: "3" });
     expect(r.state).toBe("DEAD");
+  });
+});
+
+describe("registryContentChanged (auto-bump content diff)", () => {
+  // The judgement call that used to be a human reading a PR diff: does the
+  // registry's CONTENT differ, ignoring the header fields the decision is
+  // actually about (version/updated) and the parser's own error list.
+  const base = () => parseRegistry(
+    [
+      "version: 1",
+      "updated: 2026-09-01",
+      "tiers:",
+      "  1:",
+      "    - domain: a.test",
+      "      name: A",
+      "      url: https://a.test",
+    ].join("\n"),
+  );
+
+  it("is false for byte-identical registries", () => {
+    const a = base();
+    const b = base();
+    expect(registryContentChanged(a, b)).toBe(false);
+  });
+
+  it("is false when only updated: changes", () => {
+    const a = base();
+    const b = { ...base(), updated: "2026-09-29" };
+    expect(registryContentChanged(a, b)).toBe(false);
+  });
+
+  it("is false when only version: changes", () => {
+    const a = base();
+    const b = { ...base(), version: "2" };
+    expect(registryContentChanged(a, b)).toBe(false);
+  });
+
+  it("is true when a source field changes", () => {
+    const a = base();
+    const b = parseRegistry(
+      [
+        "version: 1",
+        "updated: 2026-09-01",
+        "tiers:",
+        "  1:",
+        "    - domain: a.test",
+        "      name: A renamed",
+        "      url: https://a.test",
+      ].join("\n"),
+    );
+    expect(registryContentChanged(a, b)).toBe(true);
+  });
+
+  it("is true when a source is added", () => {
+    const a = base();
+    const b = parseRegistry(
+      [
+        "version: 1",
+        "updated: 2026-09-01",
+        "tiers:",
+        "  1:",
+        "    - domain: a.test",
+        "      name: A",
+        "      url: https://a.test",
+        "    - domain: b.test",
+        "      name: B",
+        "      url: https://b.test",
+      ].join("\n"),
+    );
+    expect(registryContentChanged(a, b)).toBe(true);
+  });
+
+  it("is true when source order changes (a re-tier or reorder is a real edit)", () => {
+    const a = parseRegistry(
+      ["tiers:", "  1:", "    - domain: a.test", "      url: https://a.test",
+        "    - domain: b.test", "      url: https://b.test"].join("\n"),
+    );
+    const b = parseRegistry(
+      ["tiers:", "  1:", "    - domain: b.test", "      url: https://b.test",
+        "    - domain: a.test", "      url: https://a.test"].join("\n"),
+    );
+    expect(registryContentChanged(a, b)).toBe(true);
+  });
+
+  it("ignores parser errors from the comparison", () => {
+    const a = { ...base(), errors: ["some transient parse note"] };
+    const b = { ...base(), errors: [] };
+    expect(registryContentChanged(a, b)).toBe(false);
   });
 });
 

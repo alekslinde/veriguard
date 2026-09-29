@@ -23,12 +23,17 @@
 //   node scripts/check-sources.mjs --issue      # refresh the digest issue
 //   node scripts/check-sources.mjs --validate   # parse + validate, no network
 //   node scripts/check-sources.mjs --stale      # is `updated:` behind the file?
+//   node scripts/check-sources.mjs --auto-bump  # bump `updated:` if content changed
+//                                                # (compares against $BASE_SHA,
+//                                                # falling back to HEAD~1)
 //
 // Exit codes: 0 all reachable · 1 rot found · 2 registry invalid.
 // With --stale: 0 header current · 1 header behind the file · 2 check failed.
+// With --auto-bump: 0 bumped or nothing to do · 2 check failed. Never exits 1 —
+// it is not a reachability signal.
 
 import { execFileSync } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -784,7 +789,34 @@ function human(results, reg, retiredCount = 0) {
 }
 
 // ---------------------------------------------------------------------------
+// Content diffing — powers --auto-bump.
+//
+// A byte diff on sources.yml can't tell a re-tiered source from a reflowed
+// comment, so it can't decide on its own whether `updated:` needs to move.
+// This compares the PARSED registries instead — every field parseRegistry
+// produces, except `errors` (a parser artifact) and the header itself
+// (`version`/`updated`, which is exactly the thing being decided). Two
+// registries that parse to the same sources/tiers/brands/indicators, in the
+// same order, are content-identical regardless of what the comments around
+// them say.
+// ---------------------------------------------------------------------------
 
+/**
+ * True if two parsed registries differ in anything other than the header.
+ * Exported for unit tests — this is the judgement call that used to be a
+ * human reading a PR diff, so it needs the same scrutiny a person would give
+ * it: every source field, in order, with nothing quietly excluded.
+ */
+export function registryContentChanged(a, b) {
+  const strip = (reg) => {
+    const rest = { ...reg };
+    delete rest.version;
+    delete rest.updated;
+    delete rest.errors;
+    return rest;
+  };
+  return JSON.stringify(strip(a)) !== JSON.stringify(strip(b));
+}
 
 /**
  * Is the `updated:` header behind the file's own last change?
@@ -833,6 +865,7 @@ async function main() {
   const asIssue = args.includes("--issue");
   const validateOnly = args.includes("--validate");
   const staleOnly = args.includes("--stale");
+  const autoBump = args.includes("--auto-bump");
 
   const text = await readFile(REGISTRY, "utf8");
   const reg = parseRegistry(text);
@@ -872,6 +905,59 @@ async function main() {
       return;
     }
     console.log(`Registry header is current — updated ${st.declared}, last changed ${st.committed}.`);
+    return;
+  }
+
+  if (autoBump) {
+    // Runs on main, after merge — never on a PR. The PR-time --stale warning
+    // is the human nudge; this is the backstop for whatever lands anyway,
+    // deciding by content rather than trusting the author remembered.
+    //
+    // BASE_SHA (the push event's `before` SHA) is preferred over HEAD~1: a
+    // push can carry more than one commit — a merge commit among them — and
+    // HEAD~1 only reaches the last commit's immediate parent, not the state
+    // before the push. Falls back to HEAD~1 for a local/manual run, where
+    // there is no push event to supply it.
+    const baseRef = process.env.BASE_SHA || "HEAD~1";
+    let previousText;
+    try {
+      previousText = execFileSync("git", ["show", `${baseRef}:docs/threat-intel/sources.yml`], {
+        cwd: HERE,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+    } catch {
+      console.log("No previous commit to diff against (first commit, or shallow clone) — nothing to bump.");
+      return;
+    }
+
+    const previous = parseRegistry(previousText);
+    if (previous.errors.length) {
+      // The prior commit's registry doesn't parse — nothing safe to diff
+      // against. Not this run's problem to fix; just skip the bump.
+      console.log("Previous registry revision does not parse — skipping the content diff.");
+      return;
+    }
+
+    if (!registryContentChanged(previous, reg)) {
+      console.log(`No content change since the last commit — leaving \`updated: ${reg.updated}\` as is.`);
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    if (reg.updated === today) {
+      console.log(`\`updated:\` is already ${today} — nothing to bump.`);
+      return;
+    }
+
+    const bumped = text.replace(/^updated:\s*.*$/m, `updated: ${today}`);
+    if (bumped === text) {
+      console.error("Could not find an `updated:` line to replace — registry header may be malformed.");
+      process.exitCode = 2;
+      return;
+    }
+    await writeFile(REGISTRY, bumped, "utf8");
+    console.log(`Content changed since the last commit — bumped \`updated:\` from ${reg.updated} to ${today}.`);
     return;
   }
 

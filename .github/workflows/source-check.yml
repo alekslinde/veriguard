@@ -16,6 +16,15 @@ name: Threat-intel source check
 # dependabot-triage.yml. Reachability only: whether a source has published
 # anything NEW is research work, not a cron job.
 #
+# One deliberate exception: the `bump-updated` job below. `updated:` is a
+# factual claim ("the registry's content, as of this date") that a PR author
+# can only get right by remembering to set it, and the PR-time check just
+# warns — a comment reflow legitimately shouldn't need a bump, so it can't
+# block. That leaves a real gap: a forgotten bump ships silently. Auto-committing
+# the date itself carries none of the judgment a reachability edit would (there
+# is no "is this source really dead" call to get wrong), so it is automated
+# where the reachability checks deliberately are not.
+#
 # Indicator domains in the registry (scam infrastructure quoted as evidence) are
 # never fetched. The script fails the run if one is ever moved into a source
 # tier, rather than skipping it quietly.
@@ -29,6 +38,10 @@ on:
     paths:
       - "docs/threat-intel/sources.yml"
       - "scripts/check-sources.mjs"
+  push:
+    branches: [main]
+    paths:
+      - "docs/threat-intel/sources.yml"
   workflow_dispatch:
 
 permissions:
@@ -99,3 +112,44 @@ jobs:
             echo "::error::check-sources failed (exit $code) — digest may not have been published."
             exit "$code"
           fi
+
+  # Runs only on a push to main that touched the registry (never on a PR — a
+  # branch commit here would fight the author's own push). Bumps `updated:`
+  # when the CONTENT changed since the previous commit, so a PR that landed
+  # without remembering the date still ends up with an accurate one instead of
+  # every later report quietly overstating the registry's freshness.
+  bump-updated:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # --auto-bump diffs against the pre-push commit. A full checkout
+          # (not a shallow depth-2) because a push can carry more than one
+          # commit — e.g. a merge commit — and depth 2 would only reach the
+          # last commit's immediate parent, not the state before the push. A
+          # bot-authored commit must not retrigger this same job, so it's
+          # made with [skip ci] rather than relying on depth to dodge it.
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: "Bump updated: if content changed"
+        env:
+          BASE_SHA: ${{ github.event.before }}
+        run: node scripts/check-sources.mjs --auto-bump
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- docs/threat-intel/sources.yml; then
+            echo "Nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/threat-intel/sources.yml
+          git commit -m "chore(threat-intel): bump sources.yml updated: date [skip ci]"
+          git push

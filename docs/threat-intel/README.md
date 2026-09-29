@@ -216,6 +216,7 @@ node scripts/check-sources.mjs             # human-readable report
 node scripts/check-sources.mjs --validate  # structure only, no network
 node scripts/check-sources.mjs --stale     # is the `updated:` header behind the file?
 node scripts/check-sources.mjs --markdown  # issue-body format
+node scripts/check-sources.mjs --auto-bump # bump `updated:` if content changed
 ```
 
 **The registry's `updated:` header is checked, not trusted.** Every report
@@ -227,11 +228,26 @@ commit and runs on any PR touching the registry. It warns rather than blocks,
 because whether the *content* changed is a judgement — a comment reflow
 legitimately leaves the date alone.
 
+`--auto-bump` is that judgement automated, one step later. It parses the
+registry at the previous commit and at the current one and compares
+everything except the header itself (`version`, `updated`) and the parser's
+own error list — a comment reflow parses identically and is left alone, while
+a source added, retired, re-URLed or re-tiered is not. Run on a PR, it would
+only ever confirm what `--stale` already warned about; it runs instead on a
+push to `main`, after the human judgement in review has already happened, so
+a merge that landed without the date being bumped still ends up with an
+accurate one.
+
 [`.github/workflows/source-check.yml`](../../.github/workflows/source-check.yml)
-runs it weekly (Tuesday ~07:00 AEST) and refreshes a single
-**🔗 Threat-intel source check** issue. It checks *reachability only* — whether a
-source has published anything new is research, not a cron job. It flags; it never
-edits the registry.
+runs the reachability check weekly (Tuesday ~07:00 AEST) and refreshes a
+single **🔗 Threat-intel source check** issue. That check is *reachability
+only* — whether a source has published anything new is research, not a cron
+job — and it flags rather than edits the registry. The one exception is the
+`bump-updated` job in the same workflow: on a push to `main` that touches
+`sources.yml`, it runs `--auto-bump` and commits the result directly, because
+a date bump carries none of the judgement a reachability fix would — there is
+no "is this source really dead" call to get wrong, only whether the content
+moved.
 
 Link rot is the quiet failure here. When a citation 404s, the evidence for a
 hardcoded score in the engine is gone and only the magic number is left — the
@@ -335,7 +351,7 @@ Steps 4 and 5 are the ones that get skipped. See below.
 
 ## Reviewing this file
 
-*Last reviewed: 2026-09-11.*
+*Last reviewed: 2026-09-29.*
 
 **This file describes a moving target, so it rots differently from the sweeps
 it sits beside.** A sweep is a dated snapshot and is correct forever — the
