@@ -149,10 +149,12 @@ const AU_SEASONS: ScamSeason[] = [
     ],
     advice: "The ATO never sends a link to log in, and never threatens arrest by SMS. Open the ATO app or type my.gov.au yourself — never follow the link in the message.",
     sources: [AU.ato, AU.scamwatch],
-    // Re-checked against the 2026-09-13 sweep: no new tax phrasing, and every
-    // lure above still matches its au.ts group (refund/debt threats, TFN
-    // suspension, myGov/ATO authority). No content change.
-    reviewed: "2026-09-13",
+    // Re-checked against the 2026-09-25 sweep: the Centrelink/Medicare
+    // "payments will be suspended" lure is a myGov/benefits variant of the
+    // same tax-time authority-impersonation pattern already described here
+    // (see the threat radar's ato-tax-debt entry for the dedicated writeup).
+    // No content change to the season itself.
+    reviewed: "2026-09-25",
   },
   {
     id: "eofy-business",
