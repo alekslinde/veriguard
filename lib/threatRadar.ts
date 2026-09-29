@@ -951,7 +951,15 @@ export interface RadarLure {
 }
 
 /**
- * A spread of currently-circulating phrasings — one per campaign, widest first.
+ * A spread of currently-circulating phrasings, one per campaign.
+ *
+ * ORDER IS THE RADAR'S OWN, not something imposed here. The region arrays are
+ * authored "roughly by how likely someone is to meet it" (see the note above
+ * AU_THREATS), and this walks them in place — so the four quotes on the home
+ * page are the four most likely active campaigns, and re-ordering a region
+ * array deliberately changes them. That is the intended coupling rather than an
+ * accident: there is one place to decide what matters most, and it is the file
+ * the sweeps are promoted into.
  *
  * The home page shows lures rather than campaign titles because a title is a
  * category and a lure is the thing that actually arrives on someone's phone.

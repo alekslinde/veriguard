@@ -10,10 +10,9 @@ const messages = enNormal as Record<string, string>;
 describe("ways in", () => {
   it("resolves every message key it names", () => {
     for (const way of WAYS_IN) {
-      for (const key of [way.name, way.how, way.detail, way.cta]) {
-        expect(messages[key], `${way.id}: ${key}`).toBeTruthy();
+      for (const key of [way.name, way.how, way.detail, way.cta, way.unavailable]) {
+        if (key) expect(messages[key], `${way.id}: ${key}`).toBeTruthy();
       }
-      if (way.unavailable) expect(messages[way.unavailable]).toBeTruthy();
     }
   });
 
@@ -23,7 +22,7 @@ describe("ways in", () => {
     // where an entry emptied while it waited would need writing from nothing.
     for (const way of WAYS_IN.filter((w) => w.unavailable)) {
       expect(messages[way.detail]).toBeTruthy();
-      expect(messages[way.cta]).toBeTruthy();
+      expect(way.cta && messages[way.cta]).toBeTruthy();
     }
   });
 });

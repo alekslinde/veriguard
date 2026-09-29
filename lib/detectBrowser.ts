@@ -31,14 +31,36 @@ import type { InstallTarget } from "@/lib/extensionInstalls";
 export function browserForUserAgent(ua: string): InstallTarget["id"] | null {
   const s = ua.toLowerCase();
 
-  // Firefox first: its forks (LibreWolf, Waterfox) keep the token, and nothing
+  // iOS FIRST, and it resolves to nothing.
+  //
+  // Every browser on iOS is WebKit with someone else's badge, and none of them
+  // can install a WebExtension: Chrome and Firefox for iOS have no extension
+  // support at all, and the Safari build is macOS-only and unshipped
+  // (extension/STORE.md). Promoting a store link to any of them offers an
+  // install that cannot happen on the device being used to read it.
+  //
+  // Returning null leaves the list in its authored order with nothing badged
+  // "Yours", which is the same answer this module already gives for an
+  // unrecognised browser — correct, and honest about what it does not know.
+  // It is the rule installsForBrowser states for Safari ("promotion is for a
+  // browser you can install on"), applied one step earlier.
+  if (s.includes("crios") || s.includes("fxios") || s.includes("edgios") || s.includes("opios")) {
+    return null;
+  }
+  // iOS Safari, which carries no vendor token of its own — matched on the
+  // platform instead. "ipad" covers the iPadOS UA that still says iPhone-like
+  // strings; a desktop-mode iPad reports as macOS Safari and is treated as
+  // such, which is the best available answer.
+  if (s.includes("iphone") || s.includes("ipad") || s.includes("ipod")) return null;
+
+  // Firefox and its forks (LibreWolf, Waterfox) keep the token, and nothing
   // else claims it.
-  if (s.includes("firefox") || s.includes("fxios")) return "firefox";
+  if (s.includes("firefox")) return "firefox";
 
   // Edge before Chrome, because its string contains both. "edg/" not "edge":
   // the legacy EdgeHTML browser used "Edge/" and cannot run this extension,
   // while the Chromium one uses "Edg/".
-  if (s.includes("edg/") || s.includes("edgios") || s.includes("edga")) return "edge";
+  if (s.includes("edg/") || s.includes("edga")) return "edge";
 
   // Opera is a Chromium browser with no button of its own; the Chrome listing
   // is what serves it.
@@ -46,7 +68,7 @@ export function browserForUserAgent(ua: string): InstallTarget["id"] | null {
 
   // Real Safari is what is left once every Chromium browser is excluded — all
   // of them carry "safari" in the string.
-  if (s.includes("chrome") || s.includes("chromium") || s.includes("crios")) return "chrome";
+  if (s.includes("chrome") || s.includes("chromium")) return "chrome";
   if (s.includes("safari")) return "safari";
 
   return null;

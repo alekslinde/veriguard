@@ -20,10 +20,18 @@
 // holding an old link.
 
 import { useLang } from "@/lib/lang";
+import { useOpenOnHash } from "@/lib/useOpenOnHash";
 import WaysGrid from "@/components/WaysGrid";
 
 export default function WaysTeaser() {
   const { t } = useLang();
+
+  // The retired /ways route redirects here permanently, and this section is
+  // three closed <details> — so without this the redirect delivers three
+  // one-line summaries and hides everything the old page held. The hook opens
+  // the disclosures inside whatever the hash names, which is this section.
+  useOpenOnHash();
+
   return (
     // The label is for assistive technology only — it replaces the visible
     // heading that used to name this group, so the section is still announced

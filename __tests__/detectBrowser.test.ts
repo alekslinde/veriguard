@@ -28,8 +28,23 @@ describe("browserForUserAgent", () => {
     // promoted their own.
     expect(browserForUserAgent(UA.chrome)).toBe("chrome");
     expect(browserForUserAgent(UA.edge)).toBe("edge");
-    expect(browserForUserAgent(UA.chromeIos)).toBe("chrome");
-    expect(browserForUserAgent(UA.edgeIos)).toBe("edge");
+  });
+
+  it("promotes nothing on iOS, where no browser can install an extension", () => {
+    // Chrome and Firefox for iOS are WebKit with a badge and support no
+    // extensions at all; the Safari build is macOS-only and unshipped. A
+    // promoted store link would offer an install that cannot happen on the
+    // device reading the page.
+    expect(browserForUserAgent(UA.chromeIos)).toBeNull();
+    expect(browserForUserAgent(UA.edgeIos)).toBeNull();
+    expect(browserForUserAgent(UA.firefoxIos)).toBeNull();
+    expect(browserForUserAgent(UA.safariIos)).toBeNull();
+  });
+
+  it("still recognises Firefox for Android, which does ship", () => {
+    // Popup only — that runtime implements no menus API — but it is a real
+    // install from the real listing, so it is promoted like any other.
+    expect(browserForUserAgent(UA.firefoxAndroid)).toBe("firefox");
   });
 
   it("sends Opera to Chrome, which is the listing that serves it", () => {
@@ -40,16 +55,13 @@ describe("browserForUserAgent", () => {
 
   it("reads Firefox and its forks", () => {
     expect(browserForUserAgent(UA.firefox)).toBe("firefox");
-    expect(browserForUserAgent(UA.firefoxAndroid)).toBe("firefox");
-    expect(browserForUserAgent(UA.firefoxIos)).toBe("firefox");
     expect(browserForUserAgent(UA.librewolf)).toBe("firefox");
   });
 
-  it("reads Safari only once every Chromium browser is excluded", () => {
+  it("reads desktop Safari only once every Chromium browser is excluded", () => {
     // This is the check that breaks if the order is rearranged: every string
     // above except Firefox's also contains "safari".
     expect(browserForUserAgent(UA.safari)).toBe("safari");
-    expect(browserForUserAgent(UA.safariIos)).toBe("safari");
   });
 
   it("returns null rather than guessing when nothing matches", () => {
@@ -60,8 +72,22 @@ describe("browserForUserAgent", () => {
   it("never mistakes a Chromium browser for Safari", () => {
     // The regression this ordering exists to prevent: promoting a Safari entry
     // that cannot be installed to someone running Chrome.
-    for (const ua of [UA.chrome, UA.edge, UA.opera, UA.chromeIos, UA.edgeIos]) {
+    for (const ua of [UA.chrome, UA.edge, UA.opera]) {
       expect(browserForUserAgent(ua)).not.toBe("safari");
+    }
+  });
+
+  it("never promotes a browser that cannot run the extension", () => {
+    // The rule, stated once over every agent in the table: anything this
+    // resolves must be a browser the extension actually installs on.
+    const installable = new Set(["chrome", "edge", "firefox", "safari"]);
+    for (const [name, ua] of Object.entries(UA)) {
+      const id = browserForUserAgent(ua);
+      if (name.toLowerCase().includes("ios")) {
+        expect(id, `${name} must promote nothing`).toBeNull();
+      } else if (id) {
+        expect(installable.has(id), `${name} -> ${id}`).toBe(true);
+      }
     }
   });
 

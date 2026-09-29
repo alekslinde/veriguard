@@ -129,8 +129,20 @@ export default function CheckStage({
           the verdict wants the full width, but an aside stretched to 1180px
           reads as a banner rather than a footnote. space-y rather than a gap on
           the parent, because this holds two sections and they need separating
-          from each other as well as from the box. */}
-      {after && <div className="max-w-[760px] space-y-6">{after}</div>}
+          from each other as well as from the box.
+
+          `contents` when there is nothing to show, rather than a truthiness
+          guard on `after`. Callers pass a Fragment — always truthy, so the
+          guard never fired — and its children can still each render null (the
+          radar does outside AU), which left an empty spacer div under the
+          verdict. Display:contents removes the box from layout without the
+          caller having to know whether its own children rendered.
+
+          The wrapper is not conditional on `done`. Both sections survive a
+          check by design: see the note on `after` above. */}
+      <div className={after ? "max-w-[760px] space-y-6 empty:contents" : "contents"}>
+        {after}
+      </div>
     </>
   );
 }

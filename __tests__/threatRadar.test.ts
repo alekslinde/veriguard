@@ -288,6 +288,17 @@ describe("circulatingLures", () => {
     }
   });
 
+  it("follows the radar's own order rather than imposing one", () => {
+    // The region arrays are authored by how likely someone is to meet each
+    // campaign, and the home page quotes the first few actives in that order.
+    // Pinned so a reordering of RADARS is a deliberate change to what the home
+    // page says, not a silent one.
+    const active = activeThreats("AU");
+    expect(circulatingLures("AU", 4).map((l) => l.id)).toEqual(
+      active.slice(0, 4).map((t) => t.id),
+    );
+  });
+
   it("takes at most one lure per campaign", () => {
     // Entries carry four to six lures each. Printing several from one would
     // weight the section toward whichever campaign was researched hardest,

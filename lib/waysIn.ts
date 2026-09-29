@@ -43,8 +43,16 @@ export interface WayIn {
    * what running it yourself involves.
    */
   detail: MessageKey;
-  /** Call to action. */
-  cta: MessageKey;
+  /**
+   * Call to action, where the row ends in one.
+   *
+   * Optional, and currently set only on the package — which does not render it
+   * either, because it is pending. Every other row's action is something richer
+   * than a link: the extension offers a button per browser, email offers an
+   * address and a copy button. A required field that no row renders invites the
+   * next person to wire it back up and quietly duplicate one of those.
+   */
+  cta?: MessageKey;
   /**
    * Where the CTA goes, or null when there is no link to give.
    *
@@ -85,7 +93,6 @@ export const WAYS_IN: readonly WayIn[] = [
     name: "ways.email.name",
     how: "ways.email.how",
     detail: "ways.email.detail",
-    cta: "ways.email.cta",
     // Nothing to link to: this row opens to the address and a copy button. The
     // panel that used to hold them sat above this section and was linked from
     // here by anchor, which broke the moment that panel unmounted after a check.
@@ -100,7 +107,6 @@ export const WAYS_IN: readonly WayIn[] = [
     name: "ways.ext.name",
     how: "ways.ext.how",
     detail: "ways.ext.detail",
-    cta: "ways.ext.cta",
     href: null, // resolved from EXTENSION_LISTINGS
     runs: "device",
   },
