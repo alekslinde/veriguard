@@ -85,6 +85,15 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  // /ways was a page of four cards, two of which described the home page's own
+  // fold. Cutting it to the two surfaces that are somewhere else left a section
+  // small enough to live on the home page, so the route retired. Permanent
+  // rather than temporary: the content is not coming back to this path, and the
+  // page was in the sitemap long enough to have been indexed.
+  async redirects() {
+    return [{ source: "/ways", destination: "/#ways", permanent: true }];
+  },
+
   async headers() {
     return [
       {

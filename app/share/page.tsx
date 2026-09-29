@@ -28,13 +28,18 @@ export const dynamic = "force-dynamic";
 export default function SharePage() {
   return (
     <main className="max-w-[1180px] mx-auto px-5 sm:px-8 py-8 sm:py-10 space-y-5">
+      {/* Same head shape and tokens as every other page. This carried the old
+          palette — font-black, emerald headline, raw greys — left over from an
+          earlier iteration, which made the one screen someone reaches from
+          their phone's share sheet look like a different product. Smaller than
+          PageHeader's headline because the check box below is the point here,
+          not the title. */}
       <div>
-        <h1 className="text-2xl font-black text-emerald-400 tracking-tight mb-1">
+        <h1 className="font-[family-name:var(--font-display)] font-semibold text-[clamp(22px,3vw,28px)] leading-tight tracking-[-0.02em] text-[var(--foreground)]">
           Shared with Veriguard
         </h1>
-        <p className="text-sm text-gray-400">
-          Here&apos;s what you shared — have a look it&apos;s all there, then
-          check it.
+        <p className="mt-1.5 text-[15px] text-[var(--text-dim)] leading-relaxed">
+          Check that everything came through, then run it.
         </p>
       </div>
 
