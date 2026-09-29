@@ -241,6 +241,11 @@ describe("extractIdentifiers", () => {
     expect(scamUrl).toBe("https://evil.com/verify");
   });
 
+  it("strips a long run of trailing punctuation without hanging", () => {
+    const { scamUrl } = extractIdentifiers(`Visit https://evil.com/verify${"!".repeat(50_000)}`);
+    expect(scamUrl).toBe("https://evil.com/verify");
+  });
+
   it("extracts a bare email address", () => {
     const { scamEmail } = extractIdentifiers("scammer@evil.com");
     expect(scamEmail).toBe("scammer@evil.com");

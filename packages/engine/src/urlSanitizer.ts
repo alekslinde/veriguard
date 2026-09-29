@@ -400,6 +400,18 @@ export function defangPhone(phone: string): string {
 const EMAIL_IN_TEXT =
   /(?<![a-zA-Z0-9._%+\-])[.%+\-]*([a-zA-Z0-9_][a-zA-Z0-9._%+\-]*@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b)/;
 
+// Strips trailing sentence punctuation a URL match picked up from prose
+// (e.g. "check this out: http://evil.tld!!!" → no trailing "!!!"). A plain
+// index scan instead of a regex — CodeQL flags `/[.,;:!?)]+$/` as polynomial
+// on attacker-controlled length, since the trailing `+` can retry from many
+// starting offsets on a long run of punctuation.
+function stripTrailingPunctuation(url: string): string {
+  const PUNCT = new Set([".", ",", ";", ":", "!", "?", ")"]);
+  let end = url.length;
+  while (end > 0 && PUNCT.has(url[end - 1])) end--;
+  return url.slice(0, end);
+}
+
 // ── Extract scam identifiers from free text ───────────────────────────────────
 // Pulls out the first URL, the first email address, and (only if the entire
 // trimmed string is a phone number) the phone number.  Intentionally conservative
@@ -410,7 +422,7 @@ export function extractIdentifiers(text: string): { scamUrl: string; scamEmail: 
   const emailMatch = t.match(EMAIL_IN_TEXT);
   const isPhone    = /^[\+\d][\d\s\-().]{5,25}[\d]$/.test(t);
   return {
-    scamUrl:   urlMatch   ? urlMatch[0].replace(/[.,;:!?)]+$/, "") : "",
+    scamUrl:   urlMatch   ? stripTrailingPunctuation(urlMatch[0]) : "",
     scamEmail: emailMatch ? emailMatch[1] : "",
     scamPhone: isPhone    ? t : "",
   };
