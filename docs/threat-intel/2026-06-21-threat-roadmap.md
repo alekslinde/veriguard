@@ -188,6 +188,8 @@ Ranked by **impact × ease** (all are string/regex additions to existing functio
 **Sources:**
 - https://forteclaim.com/crypto-scam-crisis-escalates-in-2026-ai-fraud-pig-butchering-networks-and-billions-lost-worldwide/
 - https://ethicalassetsolutions.com/blog/pig-butchering-scam-2026-evolution/
+  — domain stopped resolving by 2026-09-29; retired in the registry. The entry's
+  other source remains live, so the IOCs above keep a working citation.
 
 ---
 
@@ -283,7 +285,7 @@ Ranked by **impact × ease** (all are string/regex additions to existing functio
 18. CNN — AI voice cloning scams: https://www.cnn.com/2026/05/29/tech/ai-voice-cloning-scams-protect-yourself
 19. Trend Micro — AI voice cloning: https://news.trendmicro.com/2026/04/16/ai-voice-cloning/
 20. ForteClaim — Crypto scam crisis 2026: https://forteclaim.com/crypto-scam-crisis-escalates-in-2026-ai-fraud-pig-butchering-networks-and-billions-lost-worldwide/
-21. Ethical Asset Solutions — Pig butchering evolution: https://ethicalassetsolutions.com/blog/pig-butchering-scam-2026-evolution/
+21. Ethical Asset Solutions — Pig butchering evolution: https://ethicalassetsolutions.com/blog/pig-butchering-scam-2026-evolution/ (dead link — domain stopped resolving by 2026-09-29; retired in the registry)
 22. Cloudflare — TLD phishing abuse: https://blog.cloudflare.com/top-level-domains-email-phishing-threats/
 23. Cybercrime Info Center — Top phishing TLDs: https://www.cybercrimeinfocenter.org/top-20-tlds-by-malicious-phishing-domains
 24. LevelBlue — IPFS phishing hotbed: https://www.levelblue.com/blogs/spiderlabs-blog/ipfs-the-new-hotbed-of-phishing/
