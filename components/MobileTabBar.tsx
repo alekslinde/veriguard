@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLang } from "@/lib/lang";
 import { useBugReport, BugIcon } from "./BugReportProvider";
+import AddToHomeScreen from "./AddToHomeScreen";
 import {
   MORE_LINKS,
   TAB_LINKS,
@@ -153,6 +154,12 @@ export default function MobileTabBar() {
           </Link>
 
           <div className="h-px bg-[var(--rule)] my-1.5 mx-3" />
+
+          {/* Renders nothing where the device has no route to a home-screen
+              icon, or already has one. The divider above still earns its place
+              in that case: it separates the destinations from the actions, and
+              the bug report below is an action either way. */}
+          <AddToHomeScreen variant="sheet" onDone={closeMore} />
 
           {/* The footer is off-screen behind the bar on a phone, so its one
               interactive item is reachable here instead. */}
