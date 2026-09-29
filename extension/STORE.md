@@ -308,6 +308,21 @@ the sequence is the argument, so keep it:
 
 Do not screenshot a real person's message. Use the samples in the test suite.
 
+AMO takes a caption per screenshot and uses it as the alt text, so each one
+says what is on screen rather than restating the pitch:
+
+1. A scam text scored as likely a scam, with the rules that flagged it.
+2. Checking selected text from the right-click menu, without leaving the page.
+3. A verdict saying plainly what it could not check — match this one to
+   whichever gap you shot.
+4. A link that raised nothing, with the reminder that a new scam won't match
+   the rules either.
+
+These echo the verdict wording in `messages/en.normal.json` rather than
+inventing labels for it — "likely a scam" and the caveat in (4) are the
+product's own words. A caption promising a verdict the screen does not show is
+the kind of mismatch a reviewer opens the image to check.
+
 ### The generated one
 
 `npm run screenshot` produces the headline panel — suitable as the first
@@ -342,6 +357,18 @@ page measures itself before each render, and a composition that would be
 cropped fails the run instead of being saved with its first line shaved. That
 check exists because the first version of the tall frame did exactly that, and
 a PNG of the right dimensions gives nothing away about what is inside it.
+
+**Caption**, for AMO's per-screenshot field:
+
+> A fake bank link scored as likely a scam, with the rules that got it there
+> and what each one added.
+
+AMO shows this beneath the image and uses it as the alt text, so it describes
+what is on screen rather than selling the product — someone reading it instead
+of seeing it should learn the same thing. It names no score and no individual
+rule: those are drawn from the engine at render time, and a caption repeating
+them would be a second copy to keep in step, which is the drift the generated
+image exists to avoid.
 
 The remaining four are real captures and stay manual — a mock of the
 right-click menu would be a picture of something that does not exist.
