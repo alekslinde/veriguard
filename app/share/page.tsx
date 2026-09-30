@@ -54,7 +54,12 @@ export default function SharePage() {
           layout decision — and the stage breaks out of it itself once a
           verdict replaces the input, which needs more room than a textarea
           does. See the note on that breakout in CheckStage. */}
-      <div className="max-w-[760px]">
+      {/* mx-auto is load-bearing, not cosmetic: CheckStage's post-verdict
+          breakout applies a symmetric negative margin sized for a CENTRED
+          column. Left-aligned, that pulls the left edge past main's padding
+          and outside the page gutter at wide widths. The home page centres
+          this same column for the same reason. */}
+      <div className="max-w-[760px] mx-auto">
         <Suspense
           fallback={
             <div

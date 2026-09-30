@@ -36,7 +36,12 @@ export type WhereItRuns = "server" | "device";
 export type WayIcon = "email" | "extension" | "package" | "chat";
 
 export interface WayIn {
-  id: "email" | "extension" | "npm" | "telegram";
+  /**
+   * Only ids with a WAYS_IN entry belong here. A member with no entry is a
+   * channel the type system says exists and the shelf never renders — and
+   * this file's job is to say which surfaces are real.
+   */
+  id: "email" | "extension" | "npm";
   /** The glyph the shelf draws. See WayIcon. */
   icon: WayIcon;
   /** Message keys for the parts of the row. */

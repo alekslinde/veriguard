@@ -50,14 +50,6 @@
      pass as the rest of the layout. */
   --subnav-h: 0px;
   --tabbar-h: calc(55px + var(--subnav-h) + env(safe-area-inset-bottom));
-}
-
-/* Raised for the routes whose section offers sub-links. `:has()` lets the
-   root respond to markup the tab bar renders deep in the tree, so the
-   reservation and the bar's real height are still one number — and it resolves
-   during layout rather than a frame late, which is the whole point. */
-:root:has(nav [data-subnav]) {
-  --subnav-h: 52px;
 
   /* The sticky header's full occupied height: the row, the status-bar inset it
      pads for, and its own 1px bottom border. Anything that pins itself below
@@ -68,8 +60,28 @@
      The border is part of the height on purpose. Omitting it leaves whatever
      pins below overlapping the rule by a pixel, which reads as a seam where
      two sticky surfaces meet. --tabbar-h counts its top border for the same
-     reason. */
+     reason.
+
+     THIS BELONGS IN THE BASE :root AND NOWHERE ELSE. It briefly lived inside
+     the conditional block below, which meant it was only defined on routes
+     whose section has sub-links — leaving it undefined on /, /share, /about
+     and /report below 768px. Everything that reads it then fell back to 0,
+     including [data-step-heading]'s scroll-margin-top, so each check-step
+     transition scrolled the focused heading flush under the sticky header:
+     exactly the defect this token exists to prevent, on the one route where
+     the check flow lives. */
   --header-h: calc(53px + env(safe-area-inset-top));
+}
+
+/* Raised for the routes whose section offers sub-links. `:has()` lets the
+   root respond to markup the tab bar renders deep in the tree, so the
+   reservation and the bar's real height are still one number — and it resolves
+   during layout rather than a frame late, which is the whole point.
+
+   This block sets --subnav-h and nothing else. Anything else declared here is
+   silently scoped to those routes only. */
+:root:has(nav [data-subnav]) {
+  --subnav-h: 52px;
 }
 
 @media (min-width: 768px) {

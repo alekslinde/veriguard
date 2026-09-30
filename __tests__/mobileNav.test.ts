@@ -228,6 +228,31 @@ describe("the section's pages are offered where the reader is", () => {
     expect(css).toMatch(/:root:has\(nav \[data-subnav\]\)/);
     expect(css).toMatch(/--tabbar-h: calc\(55px \+ var\(--subnav-h\)/);
   });
+
+  it("scopes only --subnav-h to the routes that show the row", () => {
+    // The bug this pins, which nothing else could see: the :has() block was
+    // inserted so it swallowed --header-h, leaving that token defined ONLY on
+    // routes whose section has sub-links. On /, /share, /about and /report
+    // below 768px it was undefined, so every reader of it fell back to 0 —
+    // including [data-step-heading]'s scroll-margin-top, which then scrolled
+    // each check step flush under the sticky header on the one route the
+    // check flow lives on.
+    const css = read("app/globals.css");
+    const start = css.indexOf(":root:has(nav [data-subnav])");
+    expect(start).toBeGreaterThan(-1);
+    const block = css.slice(start, css.indexOf("}", start));
+    const declared = [...block.matchAll(/^\s*(--[a-z-]+):/gm)].map((m) => m[1]);
+    expect(declared).toEqual(["--subnav-h"]);
+  });
+
+  it("defines --header-h unconditionally", () => {
+    // Everything that pins below the header reads it: the learn page's sticky
+    // index, the check flow's step headings. It must not depend on which route
+    // is rendering.
+    const css = read("app/globals.css");
+    const base = css.slice(css.indexOf(":root {"), css.indexOf("}", css.indexOf(":root {")));
+    expect(base).toMatch(/--header-h:/);
+  });
 });
 
 describe("the More sheet and its machinery are gone", () => {

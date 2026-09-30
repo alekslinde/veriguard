@@ -62,6 +62,23 @@ describe("the phone's head is short enough to keep the box above the fold", () =
   });
 });
 
+describe("every column holding a CheckStage is centred", () => {
+  // CheckStage's post-verdict breakout applies a symmetric negative margin
+  // sized for a centred column. Left-aligned, it pulls the left edge past
+  // main's padding and outside the page gutter at wide widths — which is what
+  // /share did, because it capped its column without centring it.
+  it.each(["app/page.tsx", "app/share/page.tsx"])("%s centres the column", (file) => {
+    const src = read(file);
+    expect(src).toMatch(/max-w-\[760px\] mx-auto/);
+  });
+
+  it("the breakout still assumes a centred column", () => {
+    // If this ever stops being symmetric, the rule above stops being required
+    // and this block should be revisited rather than silently kept.
+    expect(read("components/CheckStage.tsx")).toMatch(/lg:-mx-\[calc\(/);
+  });
+});
+
 describe("the counters are mounted once", () => {
   // The caption owns a StatsBar, which listens for `veriguard:check-complete`.
   // It moves across the box by `order` — under it on a phone, above it from sm
