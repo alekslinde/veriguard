@@ -313,6 +313,8 @@
   "learn.types.5.label": "QR codes",
   "learn.types.5.desc": "Malicious codes in emails & flyers",
   "learn.tactics.heading": "How scammers operate",
+  "learn.tactics.prev": "Previous tactic",
+  "learn.tactics.next": "Next tactic",
   "learn.tactics.intro": "Almost every scam leans on the same handful of psychological tricks. Recognise the tactic and the spell breaks.",
   "learn.tactics.1.title": "Urgency & fear",
   "learn.tactics.1.desc": "“Your account is suspended”, “act within 24 hours” — pressure stops you thinking clearly.",

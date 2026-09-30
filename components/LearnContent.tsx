@@ -17,6 +17,7 @@ import {
   scamTextForwarding,
 } from "@/lib/reportingResources";
 import ReportingLink from "@/components/ReportingLink";
+import TacticDeck from "@/components/TacticDeck";
 import type { RegionCode } from "@veriguard/engine/regions";
 import RegionBar from "@/components/RegionBar";
 
@@ -400,10 +401,23 @@ export default function LearnContent({
       <Collapsible id="how-to-spot" title={t("learn.tactics.heading")}>
         <div className="space-y-3">
           <p className="text-sm text-[var(--text-dim)] max-w-[62ch]">{t("learn.tactics.intro")}</p>
+
+          {/* Two shapes for one set, chosen by width rather than by preference.
+              The deck is a phone affordance: it turns ~130 words met as a block
+              into ~22 at a time, which is the difference between skimming six
+              paragraphs and reading one card. On a wide screen that trade stops
+              paying — there is room for all six at once, and a reader with room
+              for all six should be given all six rather than made to swipe
+              through them.
+
+              Each renders the same copy from the same keys, so the two cannot
+              drift, and each hides itself at the other's width. */}
+          <TacticDeck />
+
           {/* A hairline-separated row list rather than free-floating bullets:
               six named tactics are a reference set the reader comes back to, and
               the rules make each one its own object to scan for. */}
-          <ul className="grid gap-px overflow-hidden rounded-lg border border-[var(--rule)] bg-[var(--rule)] list-none">
+          <ul className="hidden sm:grid gap-px overflow-hidden rounded-lg border border-[var(--rule)] bg-[var(--rule)] list-none">
             {Array.from({ length: TACTIC_COUNT }, (_, i) => (
               <li key={i} className="bg-[var(--ink-2)] px-4 py-3.5">
                 <p className="text-sm font-semibold text-[var(--foreground)]">
