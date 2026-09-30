@@ -1,0 +1,159 @@
+"use client";
+
+import Link from "next/link";
+import { useLang, type MessageKey } from "@/lib/lang";
+import type { RegionCode } from "@veriguard/engine/regions";
+import { circulatingLures } from "@/lib/threatRadar";
+import { activeSeasons, regionToday } from "@/lib/scamCalendar";
+
+/**
+ * The entry cards at the top of Learn.
+ *
+ * Learn owns Radar, Calendar and Reports now — they all answer "what is
+ * happening now", and they used to be top-level tabs competing with the check
+ * itself. Owning them means presenting them, not linking to them in a
+ * paragraph: a reader who lands on Learn should see that the section holds live
+ * regional data before they see the first heading of an essay.
+ *
+ * WHY CARDS AND NOT THE INDEX. The page already had a nine-anchor table of
+ * contents, which is a book affordance — it presumes the reader will move
+ * through one long document and want to jump within it. These three are
+ * destinations, not anchors, so an index cannot carry them: a chip saying
+ * "Radar" tells you a word, where a card can say four campaigns are circulating
+ * in your region right now. The index stays for the essay below, which is what
+ * it is actually for.
+ *
+ * Each card carries a LIVE number, and that is the point of the component. The
+ * data is real — scraped from official sources, dated, cited — and the strongest
+ * argument for reading it is what it currently says. A card reading "4
+ * circulating now" is an invitation; one reading "Threat radar" is a menu item.
+ */
+
+interface Card {
+  href: string;
+  titleKey: MessageKey;
+  blurbKey: MessageKey;
+  /** The live figure, already resolved. Null renders the card without one. */
+  count: number | null;
+  /** Omitted on a card that has no figure to label. */
+  countKey?: MessageKey;
+}
+
+function ArrowIcon() {
+  return (
+    <svg
+      className="w-[15px] h-[15px] shrink-0 text-[var(--faint)] transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-[var(--clear)]"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+export default function LearnHub({ region }: { region: RegionCode }) {
+  const { t } = useLang();
+
+  // Resolved here rather than passed in: both are pure reads of static data
+  // keyed by region, with no clock beyond the date the page already resolves
+  // server-side for the calendar.
+  const lures = circulatingLures(region, 99);
+  const seasons = activeSeasons(region, regionToday(region));
+
+  const cards: Card[] = [
+    {
+      href: "/radar",
+      titleKey: "learn.hub.radar.title",
+      blurbKey: "learn.hub.radar.blurb",
+      // Null rather than 0 where the region has no radar authored — "0
+      // circulating" is a claim we cannot support, and it reads as reassurance.
+      // Only some regions are authored; an absent count says nothing, where a
+      // zero says something false.
+      count: lures.length || null,
+      countKey: "learn.hub.radar.count",
+    },
+    {
+      href: "/calendar",
+      titleKey: "learn.hub.calendar.title",
+      blurbKey: "learn.hub.calendar.blurb",
+      // Zero IS meaningful here: it is a real statement that nothing peaks
+      // today, and the card says so rather than hiding the figure.
+      count: seasons.length,
+      countKey: "learn.hub.calendar.count",
+    },
+    {
+      href: "/submissions",
+      titleKey: "learn.hub.reports.title",
+      blurbKey: "learn.hub.reports.blurb",
+      // No count: the figure lives behind the database and this component is
+      // rendered inside a client page. StatsBar already carries that number on
+      // the home page, and fetching it twice for a card would spend an
+      // invocation per Learn view to repeat something.
+      count: null,
+    },
+  ];
+
+  return (
+    <section aria-labelledby="learn-hub-heading" className="space-y-2.5">
+      <h2 id="learn-hub-heading" className="sr-only">
+        {t("learn.hub.heading")}
+      </h2>
+      {/* A rail on a phone, a grid from sm.
+          Three columns at 390px gives each card ~110px, which turns every
+          title into a ladder — "Scam / calendar", "4 / CIRCULATING / NOW" —
+          and makes the block 245px tall to say three short things. Stacking
+          them instead costs three screen-heights for what is meant to be a
+          glance. A rail is the third option: full-size cards, two visible at
+          a time, the third peeking to say it is there. Same affordance as the
+          tactic deck, and for the same reason. */}
+      <div className="flex gap-2.5 overflow-x-auto snap-x snap-mandatory -mx-5 px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-3 sm:overflow-visible sm:mx-0 sm:px-0 sm:pb-0">
+        {cards.map((c) => (
+          <Link
+            key={c.href}
+            href={c.href}
+            // w-[62%] on the rail: two cards fill the screen and the third
+            // shows its edge, which is what says the row continues. shrink-0
+            // stops flex compressing them back to the ladder this replaced.
+            className="group shrink-0 w-[62%] snap-start sm:w-auto sm:shrink rounded-xl border border-[var(--rule)] bg-[var(--ink-2)] p-3.5 hover:border-[var(--ink-3)] transition-colors"
+          >
+            <span className="flex items-start justify-between gap-2">
+              <span className="font-semibold text-[13.5px] sm:text-[14px] leading-snug text-[var(--foreground)]">
+                {t(c.titleKey)}
+              </span>
+              {/* Dropped on a phone, where three cards share the width and the
+                  arrow costs a fifth of each title's room. The card is a link
+                  and looks like one; the arrow is an affordance for a wider
+                  layout, not information. */}
+              <span className="hidden sm:block">
+                <ArrowIcon />
+              </span>
+            </span>
+
+            {/* The live figure, in mono because it is a value the reader is
+                meant to register as measured rather than written. Rendered
+                before the blurb: it is the reason to open the card, and the
+                blurb explains what they will find once they have decided. */}
+            {c.count !== null && c.countKey && (
+              <span className="mt-1.5 block font-[family-name:var(--font-mono-ui)] text-[11px] uppercase tracking-[0.07em] text-[var(--clear)]">
+                {t(c.countKey, { n: c.count })}
+              </span>
+            )}
+
+            {/* The blurb is what gives way at a narrow width: clamped to three
+                lines so no card can grow taller than its neighbours, and the
+                title plus the figure carry the card on their own if it is
+                truncated. */}
+            <span className="mt-1 block text-[12px] sm:text-[12.5px] leading-snug text-[var(--text-dim)] line-clamp-3">
+              {t(c.blurbKey)}
+            </span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}

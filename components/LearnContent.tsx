@@ -18,6 +18,7 @@ import {
 } from "@/lib/reportingResources";
 import ReportingLink from "@/components/ReportingLink";
 import TacticDeck from "@/components/TacticDeck";
+import LearnHub from "@/components/LearnHub";
 import type { RegionCode } from "@veriguard/engine/regions";
 import RegionBar from "@/components/RegionBar";
 
@@ -215,6 +216,15 @@ export default function LearnContent({
         title={t("learn.headline")}
         lede={t("learn.intro")}
       />
+
+      {/* Above the index, because these are destinations rather than anchors.
+          Learn owns the radar, the calendar and the reports feed now — they all
+          answer "what is happening now", and they were top-level tabs competing
+          with the check itself. Owning them means presenting them: a reader
+          landing here should see the section holds live regional data before
+          they meet the first heading of an essay. The index below is for the
+          essay, which is what an index is for. */}
+      <LearnHub region={region} />
 
       {/* Table of contents — a sticky index that also shows where you are.
           The page is long and covers several distinct needs, so the fastest
