@@ -355,6 +355,8 @@ export default function AboutPage() {
                   {listing.url ? (
                     <a href={listing.url} className={LINK} target="_blank" rel="noopener noreferrer">
                       {listing.name}
+                      <span className="sr-only"> (opens in a new tab)</span>
+                      <span aria-hidden="true"> ↗</span>
                     </a>
                   ) : (
                     listing.name

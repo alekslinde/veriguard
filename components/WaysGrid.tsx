@@ -88,6 +88,15 @@ function InstallLinks() {
                 {t("ways.ext.yours")}
               </span>
             )}
+            {/* These leave the site for a browser store, so they carry the
+                same two marks every other outbound link here does: the arrow
+                that says so visually, and the sr-only note that says so to a
+                screen reader. They were the only external links in the app
+                without either — see SiteFooter, ReportingLink, ThreatRadar. */}
+            <span className="sr-only"> ({t("a11y.newTab")})</span>
+            <span aria-hidden="true" className="ml-1 text-[11px] opacity-70">
+              ↗
+            </span>
           </>
         );
         const shell =

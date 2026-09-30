@@ -550,7 +550,13 @@ export default function LearnContent({
                   {abbrTitle ? <abbr title={abbrTitle} className="no-underline">{name}</abbr> : name}
                   <span className="sr-only"> ({t("a11y.newTab")})</span>
                 </div>
-                <div className="mt-0.5 font-[family-name:var(--font-mono-ui)] text-[12.5px] text-[var(--clear)]">{site}</div>
+                {/* The arrow sits on the domain rather than after the agency
+                    name: this is a block link, and the domain is the line that
+                    says where it goes. */}
+                <div className="mt-0.5 font-[family-name:var(--font-mono-ui)] text-[12.5px] text-[var(--clear)]">
+                  {site}
+                  <span aria-hidden="true"> ↗</span>
+                </div>
               </a>
             ))}
           </div>
