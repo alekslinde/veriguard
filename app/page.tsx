@@ -88,7 +88,7 @@ export default async function Home() {
               the one option needing no store, no browser choice and no
               developer — but it renders nothing at all on a device that already
               has it, or cannot do it, so on a desktop this group is unchanged. */}
-          <AddToHomeScreen variant="card" />
+          <AddToHomeScreen />
           <WaysTeaser />
           <RadarTeaser region={region} />
         </>

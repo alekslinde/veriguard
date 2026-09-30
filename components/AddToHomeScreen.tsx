@@ -160,17 +160,21 @@ function useInstallState(): {
  * something the device cannot do is worse than no button, and this is a tool
  * about not being misled.
  *
- * `variant` places it. "sheet" is a row in the mobile tab bar's More sheet,
- * which is where someone goes looking for app-level actions; "card" is the
- * standalone block on the home page.
+ * One shape: the card on the home page, under a finished check.
+ *
+ * There was a second, a row in the mobile tab bar's More sheet. The sheet is
+ * gone — three destinations fit three tabs, so nothing needs hiding — and the
+ * variant went with it rather than staying as a branch no caller can reach.
+ * The card is the better placement anyway: someone who has just got a verdict
+ * is the one deciding whether to keep the tool around, which is not a thought
+ * anyone has while opening a navigation menu.
+ *
+ * The `variant` prop went too. A single-member union that nothing reads does
+ * not document a choice, it just makes every call site pass a constant — and
+ * the day a second placement exists, adding the prop back is the smaller job
+ * than having carried a dead one until then.
  */
-export default function AddToHomeScreen({
-  variant,
-  onDone,
-}: {
-  variant: "sheet" | "card";
-  onDone?: () => void;
-}) {
+export default function AddToHomeScreen({ onDone }: { onDone?: () => void }) {
   const { t } = useLang();
   const { state, promptInstall } = useInstallState();
   const [showSteps, setShowSteps] = useState(false);
@@ -187,27 +191,6 @@ export default function AddToHomeScreen({
       // No API to call. The steps are the deliverable.
       setShowSteps((v) => !v);
     }
-  }
-
-  if (variant === "sheet") {
-    return (
-      <>
-        <button
-          type="button"
-          onClick={activate}
-          aria-expanded={isPrompt ? undefined : showSteps}
-          className="flex items-center gap-2 min-h-[46px] px-3 rounded-lg text-[15.5px] text-[var(--text-dim)] transition-colors text-left"
-        >
-          <InstallIcon />
-          {t("install.action")}
-        </button>
-        {showSteps && state.platform && (
-          <div className="px-3 pb-1">
-            <ManualSteps platform={state.platform} />
-          </div>
-        )}
-      </>
-    );
   }
 
   return (
