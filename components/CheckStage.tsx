@@ -31,6 +31,7 @@ export default function CheckStage({
   initialContent,
   surface = "web",
   children,
+  below,
   after,
 }: {
   /** Seeds the check box — used by the share target. */
@@ -38,6 +39,22 @@ export default function CheckStage({
   surface?: "web" | "share";
   /** Rendered above the box on the input step only (the share truncation notice). */
   children?: ReactNode;
+  /**
+   * Rendered directly under the box on the input step only — the privacy
+   * caption.
+   *
+   * Under, not above, and that is the whole point of the slot. The caption is
+   * what the homepage's headline became when the box moved to the top of the
+   * screen: it qualifies the thing the reader is about to use, so it reads
+   * after it rather than delaying it. Anything placed above the card pushes the
+   * product's one job further down the phone screen, which is the regression
+   * this arrangement exists to prevent.
+   *
+   * Input step only, because once a verdict is on screen the caption is
+   * answering a question nobody is asking any more — and the verdict carries
+   * its own provenance line.
+   */
+  below?: ReactNode;
   /**
    * Rendered last, on every step — the ways-in rows and the threat radar.
    *
@@ -54,6 +71,7 @@ export default function CheckStage({
    */
   after?: ReactNode;
 } = {}) {
+
   const { t } = useLang();
   const [step, setStep] = useState<CheckStep>("input");
   // What the last check was run against. Held here rather than read from
@@ -123,6 +141,11 @@ export default function CheckStage({
           onStepChange={setStep}
           onChecked={(c) => setChecked(summarise(c))}
         />
+        {/* Inside the capped wrapper, so the caption tracks the card's right
+            edge instead of running to the full 1180px container. It sits in the
+            same element as the card rather than after it because it is the
+            card's own footnote — see the `below` prop. */}
+        {!done && below && <div className="mt-2.5">{below}</div>}
       </div>
 
       {/* Capped on every step, including the one where the stage above is not:
