@@ -23,6 +23,7 @@ import { useState, useSyncExternalStore } from "react";
 import { useLang } from "@/lib/lang";
 import { bold } from "@/lib/richText";
 import { WAYS_IN, type WayIn } from "@/lib/waysIn";
+import WayIcon from "@/components/WayIcon";
 import { installsForBrowser, INSTALL_TARGETS } from "@/lib/extensionInstalls";
 import { currentBrowser } from "@/lib/detectBrowser";
 
@@ -227,101 +228,101 @@ function ForwardBody() {
 }
 
 /**
- * A surface that is built but not distributed.
+ * One channel, as a tile.
  *
- * Rendered flat rather than as a disclosure. There is nothing behind it: the
- * body would describe an install nobody can run and end on "Coming soon", so
- * the chevron invites a click that pays out in disappointment. A row that
- * cannot act says so on its face and stops.
+ * The closed state is a glyph, a name and a half-line — enough to scan a shelf
+ * of them without reading any. Opening one reveals the same body the stacked
+ * rows used to show; nothing is lost, it is just no longer all on screen at
+ * once.
  *
- * It still renders, and that is deliberate — the package is real and the
- * section would misrepresent what exists by omitting it. It is dimmed to the
- * weight of what it is: an announcement, not an option.
+ * Still a <details>, deliberately. The disclosure is free, keyboard-operable
+ * and open-by-default-printable, and replacing it with React state would mean
+ * re-implementing all three. What changed is the SHAPE it presents when closed,
+ * not the mechanism.
  */
-function PendingRow({ way }: { way: WayIn }) {
+function Tile({ way }: { way: WayIn }) {
   const { t } = useLang();
-  return (
-    <div className="flex items-center gap-3 px-4 py-3">
-      <span className="flex-1 min-w-0">
-        <span className="font-semibold text-[var(--text-dim)] text-[14.5px]">{t(way.name)}</span>
-        <span className="text-[var(--faint)] text-[13.5px]"> — {t(way.how)}</span>
-      </span>
-      <span className="shrink-0 font-[family-name:var(--font-mono-ui)] text-[10px] uppercase tracking-[0.08em] text-[var(--faint)]">
-        {t(way.unavailable!)}
-      </span>
-    </div>
-  );
-}
-
-function Row({ way }: { way: WayIn }) {
-  const { t } = useLang();
-
-  // Nothing to open: a row with no action behind it is a statement, not a
-  // control. See PendingRow.
-  if (way.unavailable) return <PendingRow way={way} />;
+  const pending = Boolean(way.unavailable);
 
   return (
-    <details className="group">
-      {/* The hover tint is on the CLOSED row only (`group-open:hover:bg-…`
-          resets it), and that is the fix for the gap rather than more padding.
+    <details
+      // An OPEN tile takes the whole row; a closed one takes its cell.
+      //
+      // The bodies here are a paragraph plus a control group — the forwarding
+      // address with its copy button, four browser install buttons — and none
+      // of that fits a half-width cell on a phone without the buttons wrapping
+      // one per line. Spanning on open keeps the shelf compact while it is
+      // being scanned and gives the one tile being READ the width it needs.
+      className={`group rounded-xl border bg-[var(--ink-2)] overflow-hidden transition-colors open:col-span-full ${
+        pending
+          ? "border-[var(--rule)] opacity-70"
+          : "border-[var(--rule)] hover:border-[var(--ink-3)]"
+      }`}
+      // A pending channel has nothing behind it — the body would describe an
+      // install nobody can run. Rendering it as an inert tile rather than
+      // omitting it is the same call PendingRow made: the surface is real, and
+      // a shelf that hides it misrepresents what exists.
+      {...(pending ? { open: false, onClick: (e: React.MouseEvent) => e.preventDefault() } : {})}
+    >
+      <summary
+        className={`flex items-start gap-3 p-3.5 list-none marker:hidden [&::-webkit-details-marker]:hidden focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--clear)] ${
+          pending ? "cursor-default" : "cursor-pointer"
+        }`}
+      >
+        <span
+          className={`shrink-0 mt-px ${pending ? "text-[var(--faint)]" : "text-[var(--clear)]"}`}
+        >
+          <WayIcon name={way.icon} />
+        </span>
 
-          A summary's bottom padding is inside the tinted box, so on an open row
-          the highlight ran to 12px below the title and the first line of body
-          text began at exactly that edge — a hard colour boundary with nothing
-          between it and the paragraph. Padding alone would have pushed the text
-          down while leaving the block butted against it.
-
-          An open row does not need the affordance anyway: hover says "this is
-          clickable", which matters when the row is a closed thing to open and
-          reads as noise once it is a heading over its own content. */}
-      <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer list-none marker:hidden [&::-webkit-details-marker]:hidden hover:bg-[var(--ink-2)] group-open:hover:bg-transparent transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--clear)]">
         <span className="flex-1 min-w-0">
-          <span className="font-semibold text-[var(--foreground)] text-[14.5px]">
-            {t(way.name)}
+          <span className="flex items-center gap-2 flex-wrap">
+            <span
+              className={`font-semibold text-[14px] ${
+                pending ? "text-[var(--text-dim)]" : "text-[var(--foreground)]"
+              }`}
+            >
+              {t(way.name)}
+            </span>
+            {pending && (
+              <span className="font-[family-name:var(--font-mono-ui)] text-[9.5px] uppercase tracking-[0.08em] text-[var(--faint)]">
+                {t(way.unavailable!)}
+              </span>
+            )}
           </span>
-          <span className="text-[var(--text-dim)] text-[13.5px]"> — {t(way.how)}</span>
+          {/* The half-line someone scans to decide whether to open the tile.
+              Clamped to two lines so an unusually long one cannot make its
+              tile taller than its neighbours and break the shelf's grid. */}
+          <span className="mt-0.5 block text-[12.5px] leading-snug text-[var(--text-dim)] line-clamp-2">
+            {t(way.how)}
+          </span>
         </span>
-        {/* Where it runs, per row rather than once above them. The section used
-            to carry a lede saying everything here scored on your own machine,
-            which was true while the rows were the extension and the package.
-            Forwarding runs through mail servers, so the blanket claim would be
-            false for exactly the entry most people would use. */}
-        <span className="hidden sm:inline shrink-0 font-[family-name:var(--font-mono-ui)] text-[10px] uppercase tracking-[0.08em] text-[var(--faint)]">
-          {t(way.runs === "device" ? "ways.runs.device" : "ways.runs.server")}
-        </span>
-        <Chevron />
+
+        {!pending && <Chevron />}
       </summary>
 
-      {/* pt-1 on top of the summary's own 12px, so the body starts ~16px below
-          the title rather than at its exact edge. The summary's padding is
-          inside its hover box and cannot be relied on to separate anything from
-          what follows it. */}
-      <div className="px-4 pt-1 pb-4 flex flex-col gap-3">
-        <p className="text-[13.5px] text-[var(--text-dim)] leading-relaxed">
-          {t(way.detail)}
-        </p>
+      {!pending && (
+        <div className="px-3.5 pb-3.5 pt-0.5 flex flex-col gap-3">
+          <p className="text-[13px] text-[var(--text-dim)] leading-relaxed">{t(way.detail)}</p>
 
-        {/* The runs marker is dropped from the summary on a phone, where the row
-            has no width for it. Restated here so it is never the case that a
-            reader cannot find out where their message goes. */}
-        <p className="sm:hidden font-[family-name:var(--font-mono-ui)] text-[10px] uppercase tracking-[0.08em] text-[var(--faint)]">
-          {t(way.runs === "device" ? "ways.runs.device" : "ways.runs.server")}
-        </p>
+          {/* Where it runs. On the tile this is always in the body rather than
+              the header — a tile has no spare horizontal room for it, and the
+              claim differs per channel (forwarding goes through mail servers),
+              so it cannot be stated once above the shelf. */}
+          <p className="font-[family-name:var(--font-mono-ui)] text-[10px] uppercase tracking-[0.08em] text-[var(--faint)]">
+            {t(way.runs === "device" ? "ways.runs.device" : "ways.runs.server")}
+          </p>
 
-        {way.id === "email" && <ForwardBody />}
+          {way.id === "email" && <ForwardBody />}
 
-        {/* The extension's action is a store link per browser, so it has no
-            single call to action. Email's action is the address above it, which
-            needs nothing after it. */}
-        {way.id === "extension" &&
-          (HAS_ANY_LISTING ? (
-            <InstallLinks />
-          ) : (
-            // Built, but submitted nowhere. Says so rather than ending on
-            // nothing, and rather than linking to a store page that 404s.
-            <p className="text-[13px] text-[var(--faint)]">{t("ways.ext.unavailable")}</p>
-          ))}
-      </div>
+          {way.id === "extension" &&
+            (HAS_ANY_LISTING ? (
+              <InstallLinks />
+            ) : (
+              <p className="text-[13px] text-[var(--faint)]">{t("ways.ext.unavailable")}</p>
+            ))}
+        </div>
+      )}
     </details>
   );
 }
@@ -331,10 +332,29 @@ export default function WaysGrid() {
   // off — the same condition that used to return null from ForwardPanel.
   const rows = INBOUND_ENABLED ? WAYS_IN : WAYS_IN.filter((w) => w.id !== "email");
 
+  // A shelf, not a stack.
+  //
+  // These were full-width rows in one bordered card, which worked at three and
+  // does not survive the channels being added: Edge and Safari listings, the
+  // package docs, a Telegram bot. Seven stacked rows at the bottom of the home
+  // page is a footer link farm, and each one costs a full screen-width line
+  // whether or not the reader wants it.
+  //
+  // Two columns at every width, three from md.
+  //
+  // Two even on the narrowest phone, rather than stacking below xs: a tile is a
+  // glyph, a name and a clamped half-line, which fits ~165px comfortably. The
+  // point of the shelf is that N channels cost a shelf rather than N
+  // screen-heights, and one column on the width where that matters most gives
+  // back exactly what the change was for.
+  //
+  // `items-start` keeps a tile from stretching to its row's height — an open
+  // tile grows, and without this its closed neighbour would grow with it and
+  // leave a tall empty box.
   return (
-    <div className="rounded-xl border border-[var(--rule)] divide-y divide-[var(--rule)] overflow-hidden">
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 items-start">
       {rows.map((way) => (
-        <Row key={way.id} way={way} />
+        <Tile key={way.id} way={way} />
       ))}
     </div>
   );
