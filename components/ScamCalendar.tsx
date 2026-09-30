@@ -186,6 +186,7 @@ function SeasonRow({
             >
               {source.label}
               <span className="sr-only"> ({t("a11y.newTab")})</span>
+              <span aria-hidden="true"> ↗</span>
             </a>
           </span>
         ))}

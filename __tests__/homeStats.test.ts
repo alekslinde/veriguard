@@ -24,6 +24,9 @@ describe("homepage resolves stats server-side", () => {
   it("fetches the counters in the page render", () => {
     const page = read("app/page.tsx");
     expect(page).toContain("getStats");
+    // HomeHero is passed through CheckStage's `below` slot now — the counters
+    // render under the check card rather than above it — so the assertion is on
+    // the prop, not on where in the tree it appears.
     expect(page).toContain("stats={stats}");
   });
 

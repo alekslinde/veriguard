@@ -25,8 +25,25 @@ export const ENGINE_SOURCE_URL =
  */
 export type WhereItRuns = "server" | "device";
 
+/**
+ * Which glyph the shelf draws for a surface.
+ *
+ * A name, not a path: the SVG lives with the component that draws it, because
+ * this module is importable by the extension and must stay free of JSX. Adding
+ * a channel means adding a member here and a case there, and the compiler names
+ * the second half if you forget it.
+ */
+export type WayIcon = "email" | "extension" | "package" | "chat";
+
 export interface WayIn {
+  /**
+   * Only ids with a WAYS_IN entry belong here. A member with no entry is a
+   * channel the type system says exists and the shelf never renders — and
+   * this file's job is to say which surfaces are real.
+   */
   id: "email" | "extension" | "npm";
+  /** The glyph the shelf draws. See WayIcon. */
+  icon: WayIcon;
   /** Message keys for the parts of the row. */
   name: MessageKey;
   /**
@@ -90,6 +107,7 @@ export interface WayIn {
 export const WAYS_IN: readonly WayIn[] = [
   {
     id: "email",
+    icon: "email",
     name: "ways.email.name",
     how: "ways.email.how",
     detail: "ways.email.detail",
@@ -104,6 +122,7 @@ export const WAYS_IN: readonly WayIn[] = [
   },
   {
     id: "extension",
+    icon: "extension",
     name: "ways.ext.name",
     how: "ways.ext.how",
     detail: "ways.ext.detail",
@@ -112,6 +131,7 @@ export const WAYS_IN: readonly WayIn[] = [
   },
   {
     id: "npm",
+    icon: "package",
     name: "ways.npm.name",
     how: "ways.npm.how",
     detail: "ways.npm.detail",

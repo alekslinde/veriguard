@@ -109,10 +109,20 @@ describe("the retired standing privacy badge", () => {
     expect(translate(NORMAL, "check.onDevice" as MessageKey)).toBe("check.onDevice");
   });
 
-  it("leaves the promises with the hero copy, which still keeps both", () => {
+  it("leaves the promises with the home caption, which still keeps both", () => {
     // The two promises the product actually keeps on every route.
-    expect(translate(NORMAL, "home.subtitle")).toMatch(/isn't stored/i);
-    expect(translate(NORMAL, "home.subtitle")).toMatch(/never open/i);
+    //
+    // These lived on `home.subtitle` while the home page opened with a hero.
+    // The hero retired so the check box could open above the fold on a phone,
+    // and the promises moved WITH the copy rather than being dropped: they are
+    // the caption under the card now. The point of this assertion is unchanged
+    // — one standing claim, in one place, and that place still makes it.
+    //
+    // Matched on the claim rather than one phrasing of it: "what you paste
+    // isn't stored" and "nothing you paste is stored" are the same promise, and
+    // a guard that only accepts the first fails on a copy edit that keeps it.
+    expect(translate(NORMAL, "home.privacy")).toMatch(/\b(isn't|not|nothing[^.]*\bis)\s+stored\b/i);
+    expect(translate(NORMAL, "home.privacy")).toMatch(/never open/i);
   });
 });
 
