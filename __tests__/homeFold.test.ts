@@ -23,41 +23,68 @@ import enNormal from "@/messages/en.normal.json";
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 const messages = enNormal as Record<string, string>;
 
-describe("the check box is the first thing on the home page", () => {
-  it("renders no heading element above the card", () => {
-    // An <h1> here is what the 50px hero was. The page's accessible name comes
-    // from the document title; CheckFlow renders its own sr-only step heading.
-    //
-    // Comments are stripped before matching: this file's own doc comment
-    // explains what it no longer renders, and naming a tag is not rendering it.
-    const src = read("components/HomeHero.tsx")
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/^\s*\/\/.*$/gm, "");
-    expect(src).not.toMatch(/<h[1-6][\s>]/);
+describe("the phone's head is short enough to keep the box above the fold", () => {
+  // The page HAS a title again — removing it left the desktop opening on an
+  // unlabelled textarea with 500px of empty space beside it, which reads as a
+  // broken page rather than a focused one. What must not come back is the
+  // 50px headline ON A PHONE: at clamp(28px,5vw,50px) it put the paste box
+  // ~300px down, below the fold, on the device most likely to need it first.
+  //
+  // So the guard is on the SIZE at each width, not on the presence of a
+  // heading. Comments are stripped: this file explains the size it rejects,
+  // and naming a value is not setting it.
+  const hero = read("components/HomeHero.tsx")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+
+  it("gives the page exactly one h1 at each width", () => {
+    // Two <h1> elements, one hidden per breakpoint — never both visible.
+    expect(hero).toMatch(/<h1[^>]*sm:hidden/);
+    expect(hero).toMatch(/<h1[^>]*hidden sm:block/);
   });
 
-  it("puts CheckStage first in the main element", () => {
-    const page = read("app/page.tsx");
-    const main = page.indexOf("<main");
-    const stage = page.indexOf("<CheckStage");
-    const hero = page.indexOf("<HomeHero");
-    expect(main).toBeGreaterThan(-1);
-    expect(stage).toBeGreaterThan(main);
-    // HomeHero still renders — as the card's footnote, through `below` — so it
-    // must appear AFTER CheckStage opens rather than before it.
-    expect(hero).toBeGreaterThan(stage);
+  it("keeps the phone title to a single small line", () => {
+    const phone = hero.slice(hero.indexOf("sm:hidden font-"), hero.indexOf("hidden sm:block font-"));
+    expect(phone).toMatch(/text-\[20px\]/);
+    // The clamp that pushed the box below the fold must not apply here.
+    expect(phone).not.toMatch(/clamp\(/);
   });
 
-  it("passes the hero through the input-step slot, not the page body", () => {
-    expect(read("app/page.tsx")).toMatch(/below=\{<HomeHero/);
+  it("lets the desktop headline be a headline", () => {
+    expect(hero).toMatch(/hidden sm:block[^"]*clamp\(30px/);
   });
 
   it("keeps the phone's top padding tight", () => {
-    // pt-8 (32px) was sized to separate a headline from the header. With the
-    // card first, this number is how far down the screen the product starts.
+    // This is how far down the screen the product starts on a phone.
     const page = read("app/page.tsx");
     expect(page).toMatch(/pt-3\b/);
     expect(page).not.toMatch(/className="[^"]*\bpy-8\b/);
+  });
+});
+
+describe("the counters are mounted once", () => {
+  // The caption owns a StatsBar, which listens for `veriguard:check-complete`.
+  // It moves across the box by `order` — under it on a phone, above it from sm
+  // — rather than being rendered twice with one copy hidden, which would mount
+  // two listeners and paint the same number twice, once invisibly.
+  it("renders a single HomeCaption", () => {
+    const page = read("app/page.tsx");
+    expect(page.match(/<HomeCaption/g) ?? []).toHaveLength(1);
+  });
+
+  it("moves it with order rather than a hidden duplicate", () => {
+    expect(read("app/page.tsx")).toMatch(/order-last sm:order-none/);
+  });
+
+  it("keeps StatsBar out of the title component", () => {
+    // HomeHero renders both titles; only one is visible. If StatsBar lived
+    // there it would be mounted twice by that same duplication.
+    const hero = read("components/HomeHero.tsx");
+    const titleFn = hero.slice(
+      hero.indexOf("export default function HomeHero"),
+      hero.indexOf("export function HomeCaption"),
+    );
+    expect(titleFn).not.toContain("<StatsBar");
   });
 });
 
@@ -118,11 +145,19 @@ describe("the positioning copy moved rather than being deleted", () => {
     expect(page).toMatch(/Check before you click/);
   });
 
-  it("no longer exists as a rendered message key", () => {
-    // Both keys were the hero. Leaving either in the bundle invites a future
-    // copy pass to render it back above the box.
-    expect(messages["home.title"]).toBeUndefined();
-    expect(messages["home.subtitle"]).toBeUndefined();
+  it("is rendered as the page's own title again", () => {
+    // The headline came back for desktop, where there is room above the fold
+    // and an unlabelled textarea reads as a broken page. The phone gets the
+    // short variant instead — see the fold block above.
+    expect(messages["home.title"]).toBeTruthy();
+    expect(messages["home.title.short"]).toBeTruthy();
+  });
+
+  it("keeps the short title short enough to sit on one line", () => {
+    // The whole point of the phone variant. A second clause here and the box
+    // starts sliding back down the screen.
+    expect(messages["home.title.short"]).not.toContain("\n");
+    expect(messages["home.title.short"].replace(/\*\*/g, "").length).toBeLessThanOrEqual(34);
   });
 });
 

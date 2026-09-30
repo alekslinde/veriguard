@@ -49,12 +49,12 @@ export default function SharePage() {
           would run CheckFlow's history/popstate effects twice across the swap.
           An inert placeholder of roughly the right height avoids both, and
           keeps the layout from jumping. */}
-      {/* No width cap here: CheckStage caps itself, and it needs to cap the
-          input and the verdict differently — a textarea spanning 1180px is
-          worse to paste into than one at a readable width, but the verdict
-          wants more room than the box does. A cap on this wrapper would sit
-          outside that decision and clamp both to the narrower of the two. */}
-      <div>
+      {/* The column the box sits in, matching the home page's.
+          The cap lives here rather than inside CheckStage because it is a page
+          layout decision — and the stage breaks out of it itself once a
+          verdict replaces the input, which needs more room than a textarea
+          does. See the note on that breakout in CheckStage. */}
+      <div className="max-w-[760px]">
         <Suspense
           fallback={
             <div

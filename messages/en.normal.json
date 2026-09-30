@@ -6,6 +6,8 @@
   "service.inboundDelayed": "**Emailed replies are delayed.** We're fixing a problem with our mail provider. Everything you forward is still checked — but the reply may not arrive, so paste the message on the Check page for an instant answer.",
   "nav.learn": "Learn",
   "nav.about": "About",
+  "home.title": "Check before you click.\nSee **exactly** what we found.",
+  "home.title.short": "Check before you **click**",
   "home.privacy": "Scored against open-source rules. Nothing you paste is stored, and we never open its links.",
   "stats.checked.one": "check run on this site",
   "stats.checked.many": "checks run on this site",
@@ -576,5 +578,6 @@
   "ways.npm.unavailable": "Coming soon",
   "ways.runs.device": "On your device",
   "ways.runs.server": "Via email",
-  "home.ways.label": "Other ways to check"
+  "home.ways.heading": "Other ways to check",
+  "home.ways.lede": "The same engine, wherever you meet a suspicious message."
 }

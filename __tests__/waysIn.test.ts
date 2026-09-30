@@ -32,26 +32,36 @@ describe("the shelf scales to the channels still being added", () => {
   // rows this replaced cost a full screen-width line each, so seven of them at
   // the bottom of the home page was a footer link farm. A grid costs a shelf.
   const grid = read("components/WaysGrid.tsx");
+  // Comments stripped for the "absence" assertions: the component explains
+  // the class it no longer uses, and naming one is not applying it.
+  const gridCode = grid.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
-  it("lays the channels out as a grid, not a stack", () => {
-    expect(grid).toMatch(/grid grid-cols-2 md:grid-cols-3/);
+  it("lays the channels out as rows in one column", () => {
+    // Columns were the wrong answer to a real problem. The problem was that
+    // the channels used to be full-width rows across the WHOLE page, so seven
+    // of them would be a footer link farm. A 2-then-3 column grid fixed the
+    // width and broke everything else: at 165px a tile's name wrapped and its
+    // half-line clamped to nothing useful.
+    //
+    // The PAGE solves the width now — this sits in one column of a two-column
+    // control centre, so a row is ~420px. Ten channels cost ten short rows in
+    // a side column, which is the compactness the grid was reaching for.
+    expect(grid).toMatch(/<div className="space-y-2\.5">/);
+    expect(gridCode).not.toMatch(/grid-cols-2 md:grid-cols-3/);
   });
 
-  it("keeps two columns on the narrowest phone", () => {
-    // One column on the width where compactness matters most would give back
-    // exactly what the shelf was for. A closed tile is a glyph, a name and a
-    // clamped half-line — it fits.
-    expect(grid).not.toMatch(/grid-cols-1 (xs|sm):grid-cols-2/);
+  it("does not resize a tile when it opens", () => {
+    // `open:col-span-full` made an open tile jump to full width while its
+    // neighbours stayed narrow, reflowing the rest around it and leaving a
+    // ragged block of three different widths. Rows are already full width, so
+    // opening one moves nothing sideways.
+    expect(gridCode).not.toMatch(/open:col-span-full/);
   });
 
-  it("gives an open tile the full row", () => {
-    // The bodies hold control groups — a copy button, four install buttons —
-    // that wrap one per line in a half-width cell on a phone.
-    expect(grid).toMatch(/open:col-span-full/);
-  });
-
-  it("does not stretch a closed tile to its row's height", () => {
-    expect(grid).toMatch(/items-start/);
+  it("sits inside a column the page gives it", () => {
+    // The control centre. If the shelf goes back to spanning the page, a row
+    // is 1180px again and the link-farm problem returns.
+    expect(read("app/page.tsx")).toMatch(/lg:grid-cols-\[minmax\(0,1\.35fr\)_minmax\(0,1fr\)\]/);
   });
 
   it("draws every channel's glyph from the shared set", () => {

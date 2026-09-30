@@ -316,14 +316,16 @@ function Tile({ way }: { way: WayIn }) {
 
   return (
     <details
-      // An OPEN tile takes the whole row; a closed one takes its cell.
+      // A tile keeps its place in the list whether open or closed.
       //
-      // The bodies here are a paragraph plus a control group — the forwarding
-      // address with its copy button, four browser install buttons — and none
-      // of that fits a half-width cell on a phone without the buttons wrapping
-      // one per line. Spanning on open keeps the shelf compact while it is
-      // being scanned and gives the one tile being READ the width it needs.
-      className="group rounded-xl border border-[var(--rule)] bg-[var(--ink-2)] overflow-hidden transition-colors hover:border-[var(--ink-3)] open:col-span-full"
+      // It used to take the whole row on open (`open:col-span-full`) so its
+      // body had room for the install buttons. In a grid that looked broken:
+      // the open tile jumped to full width while its neighbours stayed narrow,
+      // reflowing the rest around it and leaving a ragged block of three
+      // different widths. The fix is the container, not the tile — the shelf
+      // is a single column of full-width rows now, so every body already has
+      // the room, and opening one moves nothing else sideways.
+      className="group rounded-xl border border-[var(--rule)] bg-[var(--ink-2)] overflow-hidden transition-colors hover:border-[var(--ink-3)]"
     >
       <summary className="flex items-start gap-3 p-3.5 list-none marker:hidden [&::-webkit-details-marker]:hidden cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--clear)]">
         <TileFace way={way} pending={false} />
@@ -359,27 +361,25 @@ export default function WaysGrid() {
   // off — the same condition that used to return null from ForwardPanel.
   const rows = INBOUND_ENABLED ? WAYS_IN : WAYS_IN.filter((w) => w.id !== "email");
 
-  // A shelf, not a stack.
+  // One column of rows, inside whatever column the page gives this.
   //
-  // These were full-width rows in one bordered card, which worked at three and
-  // does not survive the channels being added: Edge and Safari listings, the
-  // package docs, a Telegram bot. Seven stacked rows at the bottom of the home
-  // page is a footer link farm, and each one costs a full screen-width line
-  // whether or not the reader wants it.
+  // This was a 2-then-3 column grid, which was the wrong answer to a real
+  // problem. The problem was that the channels used to be full-width rows
+  // across the WHOLE page, so each one cost a screen-width line and seven of
+  // them — Edge and Safari listings, the package docs, a Telegram bot — would
+  // have been a footer link farm. Columns fixed the width and broke
+  // everything else: at 165px a tile's name wrapped, its half-line clamped to
+  // nothing useful, and an open tile had to jump to full width to fit its
+  // install buttons, which reflowed the other two and left a ragged block of
+  // three different widths.
   //
-  // Two columns at every width, three from md.
-  //
-  // Two even on the narrowest phone, rather than stacking below xs: a tile is a
-  // glyph, a name and a clamped half-line, which fits ~165px comfortably. The
-  // point of the shelf is that N channels cost a shelf rather than N
-  // screen-heights, and one column on the width where that matters most gives
-  // back exactly what the change was for.
-  //
-  // `items-start` keeps a tile from stretching to its row's height — an open
-  // tile grows, and without this its closed neighbour would grow with it and
-  // leave a tall empty box.
+  // The page solves the width now. This sits in one column of a two-column
+  // control centre, so a row is ~420px rather than 1180 — a readable line,
+  // with room for a name, a half-line and the buttons a body opens to, and
+  // nothing moves sideways when one opens. Ten channels cost ten short rows
+  // in a side column, which is the compactness the grid was reaching for.
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 items-start">
+    <div className="space-y-2.5">
       {rows.map((way) => (
         <Tile key={way.id} way={way} />
       ))}

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import AddToHomeScreen from "@/components/AddToHomeScreen";
 import CheckStage from "@/components/CheckStage";
-import HomeHero from "@/components/HomeHero";
+import HomeHero, { HomeCaption } from "@/components/HomeHero";
 import RadarTeaser from "@/components/RadarTeaser";
 import WaysTeaser from "@/components/WaysTeaser";
 import { resolveRegion } from "@/lib/regionResolver";
@@ -50,50 +50,80 @@ export default async function Home() {
   }
 
   return (
-    // Top padding is deliberately small on a phone and only opens up from sm.
-    // The check card is the first thing in the layout now, so this number is
-    // literally how far down the screen the product starts — py-8 (32px) was
-    // sized for a page that had a headline to separate from the header, and
-    // there is nothing above the card left to separate it from.
-    <main className="max-w-[1180px] mx-auto px-5 sm:px-8 pt-3 pb-8 sm:pt-8 sm:pb-10 space-y-6">
-      {/* The fold is the box. Forwarding used to sit beside it as a second card,
-          then under it as a collapsed row; it is one of the ways-in rows now, so
-          nothing competes with the box for the fold. Once a check has run the
-          stage takes the full width, because the verdict splits into an evidence
-          sheet and a tactics rail that need it. See CheckStage for why the step
-          lives there rather than inside the flow.
+    // Top padding stays tight on a phone, where the short title plus the box
+    // has to clear the fold, and opens up from sm where there is room.
+    <main className="max-w-[1180px] mx-auto px-5 sm:px-8 pt-3 pb-8 sm:pt-10 sm:pb-12">
+      {/* ── The tool ────────────────────────────────────────────────────────
+          One centred column, and the only thing on its row.
 
-          Everything else is below the fold on purpose: someone arriving
-          mid-panic with a dodgy SMS needs the paste field first, and background
-          information pushing it down the page would trade their urgent need for
-          ours.
+          It was left-aligned in a 760px column inside a 1180px page, which
+          left ~500px of empty space beside the single most important control
+          on the site — a layout that reads as unfinished rather than focused.
+          Centred, the box is the page's axis and the width either side is
+          margin rather than a gap where something is missing.
 
-          Both trailing sections survive a check, and that is the change from
-          before — the radar used to retire with the input, on the reasoning that
-          "what's circulating" was context for a question not yet asked. It is
-          the opposite: a reader who has just been told their message looks clean
-          is exactly who should see what is going around, and retiring it there
-          removed it at the moment it started being useful.
+          Once a check has run the stage releases the cap itself: the verdict
+          splits into an evidence sheet and a tactics rail that need the room.
+          See CheckStage. */}
+      <div className="max-w-[760px] mx-auto">
+        {/* The head goes in the stage's slot, not the page, because the stage
+            owns the step: both the title and the caption retire when a verdict
+            replaces the input, and only the stage knows when that happened.
 
-          Ways first, radar last. Ways answers "can I keep this?", which follows
-          directly from having just used it; the radar is reading material, and
-          reading material goes at the bottom. */}
-      <CheckStage
-        below={<HomeHero stats={stats} />}
-        after={
-        <>
-          {/* Above the ways-in rows, and for the same reason they sit here: a
-              reader who has their answer is the one deciding whether to keep
-              the tool around. It leads that group because a home-screen icon is
-              the one option needing no store, no browser choice and no
-              developer — but it renders nothing at all on a device that already
-              has it, or cannot do it, so on a desktop this group is unchanged. */}
+            The caption is ONE instance, moved by `order` rather than
+            duplicated — it owns a StatsBar, and two copies would mount two
+            `veriguard:check-complete` listeners and paint the same counter
+            twice, once invisibly. `order-last` drops it under the box on a
+            phone, where three lines above would eat most of the distance to
+            the fold; from sm it sits between the headline and the card. The
+            stage renders this slot as a flex column for exactly that. */}
+        <CheckStage
+          above={
+            <>
+              <HomeHero />
+              {/* The bottom margin is what separates it from the card on a
+                  desktop, where it sits above. On a phone `order-last` puts it
+                  after the card, so the same gap has to come off the top
+                  instead — hence both, each width-scoped. */}
+              <HomeCaption
+                stats={stats}
+                className="order-last sm:order-none mt-3 sm:mt-3 sm:mb-6 sm:max-w-[62ch] sm:mx-auto"
+              />
+            </>
+          }
+        />
+      </div>
+
+      {/* ── The control centre ──────────────────────────────────────────────
+          Everything that is not the tool, in columns under it.
+
+          These were a single stacked column: the ways-in shelf, then the
+          radar, each capped at 760px and running down the left of the page.
+          Stacked, they pushed the radar most of a screen below the fold and
+          left the same dead margin as the box. Side by side they are what a
+          reader scans once they have their answer — what else can do this,
+          and what is going around — and they fill the width the page already
+          has.
+
+          Radar first on a wide screen and it takes the wider column: it is
+          the one with real content rather than links. Below lg they stack,
+          and the order flips so the channels — the shorter, more actionable
+          block — come first rather than after four quotes.
+
+          `items-start` so neither column stretches to the other's height. */}
+      <div className="mt-8 sm:mt-12 grid gap-6 lg:gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] items-start">
+        <div className="order-2 lg:order-1 min-w-0">
+          <RadarTeaser region={region} />
+        </div>
+
+        <div className="order-1 lg:order-2 min-w-0 space-y-6">
+          {/* Renders nothing at all on a device that already has the app, or
+              cannot install it — so on most desktops this column is just the
+              channels. */}
           <AddToHomeScreen />
           <WaysTeaser />
-          <RadarTeaser region={region} />
-        </>
-        }
-      />
+        </div>
+      </div>
     </main>
   );
 }
