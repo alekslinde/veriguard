@@ -127,7 +127,17 @@ export default function LearnHub({
           glance. A rail is the third option: full-size cards, two visible at
           a time, the third peeking to say it is there. Same affordance as the
           tactic deck, and for the same reason. */}
-      <div className="flex gap-2.5 overflow-x-auto snap-x snap-mandatory -mx-5 px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-3 sm:overflow-visible sm:mx-0 sm:px-0 sm:pb-0">
+      {/* `scroll-pl-5` is not decoration — without it the rail lands scrolled
+          20px in and the first card sits hard against the screen edge, outside
+          the gutter every other element on the page respects.
+
+          The cause: `snap-start` snaps a card to the scrollport's SNAP edge,
+          which defaults to the padding box. The `px-5` that restores the
+          bleed is therefore an offset the browser scrolls away to satisfy the
+          snap. scroll-padding moves the snap edge back to where the content
+          starts, so resting position is scrollLeft 0 and the first card lines
+          up with the heading above it. */}
+      <div className="flex gap-2.5 overflow-x-auto snap-x snap-mandatory scroll-pl-5 -mx-5 px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-3 sm:overflow-visible sm:mx-0 sm:px-0 sm:pb-0 sm:scroll-pl-0">
         {cards.map((c) => (
           <Link
             key={c.href}

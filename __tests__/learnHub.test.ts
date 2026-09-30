@@ -117,6 +117,19 @@ describe("the cards stay legible on a phone", () => {
     expect(hub).toMatch(/sm:grid sm:grid-cols-3/);
   });
 
+  it("keeps the first card inside the page gutter", () => {
+    // The bug: `snap-start` snaps a card to the scrollport's snap edge, which
+    // defaults to the padding box — so the `px-5` that restores the rail's
+    // negative margin is an offset the browser scrolls away to satisfy the
+    // snap. The rail landed at scrollLeft 20 and the first card sat hard
+    // against the screen edge while every other element on the page began at
+    // the 20px gutter. scroll-padding moves the snap edge back to the content.
+    expect(hub).toMatch(/scroll-pl-5/);
+    // And it must not survive into the grid, where there is no scrolling and
+    // no bleed to restore.
+    expect(hub).toMatch(/sm:scroll-pl-0/);
+  });
+
   it("sizes a rail card so the next one shows its edge", () => {
     // What says the row continues. A card at full width hides the rest.
     expect(hub).toMatch(/w-\[62%\]/);

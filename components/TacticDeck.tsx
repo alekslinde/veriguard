@@ -111,12 +111,22 @@ export default function TacticDeck() {
    *
    * Measuring also means the padding, the gap and the card width can change in
    * the class list without a constant here silently going stale.
+   *
+   * RELATIVE TO CARD 0, not to the rail. The rail carries left padding (the
+   * `px-5` that restores its negative margin), so every card's offsetLeft
+   * includes it — while `scroll-pl-5` moves the snap edge past that same
+   * padding, making the resting scrollLeft of the first card 0, not 20. Taking
+   * the difference between two cards cancels the padding out of both terms, so
+   * this returns the scroll distance rather than a layout position and the two
+   * cannot disagree again when either value changes.
    */
   const offsetOf = useCallback((i: number) => {
     const rail = railRef.current;
     if (!rail) return 0;
-    const card = rail.querySelectorAll("article")[i] as HTMLElement | undefined;
-    return card ? card.offsetLeft - rail.offsetLeft : 0;
+    const cards = rail.querySelectorAll("article");
+    const card = cards[i] as HTMLElement | undefined;
+    const first = cards[0] as HTMLElement | undefined;
+    return card && first ? card.offsetLeft - first.offsetLeft : 0;
   }, []);
 
   // Which card is under the rail's left edge. Derived from scrollLeft rather
@@ -248,7 +258,16 @@ export default function TacticDeck() {
         role="group"
         aria-label={t("learn.tactics.heading")}
         onScroll={syncActive}
-        className="flex gap-3 overflow-x-auto snap-x snap-mandatory scroll-smooth motion-reduce:scroll-auto -mx-5 px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--clear)] rounded-sm"
+        // scroll-pl-5 matches the px-5 that restores the bleed.
+        //
+        // Without it `snap-start` snaps to the padding box, so the rail comes
+        // to rest 20px scrolled in and the first card sits flush against the
+        // edge it bled to, outside the inset everything around it respects.
+        // LearnHub had the same defect and it was visible there, because that
+        // rail bleeds to the SCREEN edge; this one bleeds only to the edge of
+        // the collapsible card it sits in, which made the same 20px read as a
+        // slightly tight card rather than a broken gutter.
+        className="flex gap-3 overflow-x-auto snap-x snap-mandatory scroll-pl-5 scroll-smooth motion-reduce:scroll-auto -mx-5 px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--clear)] rounded-sm"
       >
         {TACTIC_IDS.map((id: TacticId, i) => (
           <article

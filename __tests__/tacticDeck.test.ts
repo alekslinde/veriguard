@@ -31,7 +31,21 @@ describe("the deck positions cards by measurement, not arithmetic", () => {
   // because the rail's maximum scrollLeft is below the computed target. The
   // deck could not be read to the end and nothing said so.
   it("reads each card's real offset from the DOM", () => {
-    expect(deck).toMatch(/card\.offsetLeft - rail\.offsetLeft/);
+    // Measured against CARD 0, not the rail. The rail carries the left padding
+    // that restores its negative margin, so every card's offsetLeft includes
+    // it — while `scroll-pl-5` moves the snap edge past that same padding,
+    // making the first card's resting scrollLeft 0 rather than 20. Measuring
+    // from the rail mixed the two origins and every scripted scroll landed
+    // 20px short; the difference between two cards cancels the padding out.
+    expect(deckCode).toMatch(/card\.offsetLeft - first\.offsetLeft/);
+    expect(deckCode).not.toMatch(/card\.offsetLeft - rail\.offsetLeft/);
+  });
+
+  it("moves the snap edge past the padding that restores its bleed", () => {
+    // Without scroll-pl the rail rests scrolled in by its own padding and the
+    // first card sits outside the gutter everything around it respects. It was
+    // visible on the Learn hub, whose rail bleeds to the screen edge.
+    expect(deckCode).toMatch(/scroll-pl-5/);
   });
 
   it("does not compute a card's position from a stride", () => {
