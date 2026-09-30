@@ -75,36 +75,51 @@ describe("an undistributed surface is not interactive", () => {
   // homeStats.test.ts: this suite runs under environment "node" with no DOM.
   // Brittle to renaming, but the regression is otherwise silent.
   //
-  // The rows became tiles in a shelf, so a pending entry is no longer a
-  // separate component — it is a tile that refuses to open. The property is
-  // unchanged and so are these assertions; only where they look has moved.
+  // The rows became tiles in a shelf. A pending entry is its own component
+  // again, as PendingRow was, and for the reason that shape existed: it must
+  // not be a <details> at all.
   const grid = read("components/WaysGrid.tsx");
-  const tile = grid.slice(grid.indexOf("function Tile("), grid.indexOf("export default function"));
+  const pending = grid.slice(
+    grid.indexOf("function PendingTile("),
+    grid.indexOf("function Tile("),
+  );
 
-  it("finds the tile body to assert against", () => {
-    // The two assertions below slice the source, and a failed indexOf returns
-    // -1 — which slices from the END of the file and yields a string that
-    // trivially satisfies every `not.toContain` after it. This guard is what
-    // stops a rename turning the rest of this block into a silent pass.
+  it("finds the pending tile to assert against", () => {
+    // The assertions below slice the source, and a failed indexOf returns -1 —
+    // which slices from the END of the file and yields a string that trivially
+    // satisfies every `not.toContain` after it. This guard is what stops a
+    // rename turning the rest of this block into a silent pass.
+    expect(grid).toContain("function PendingTile(");
     expect(grid).toContain("function Tile(");
-    expect(tile.length).toBeGreaterThan(200);
+    expect(pending.length).toBeGreaterThan(200);
   });
 
-  it("marks a pending entry so the tile can refuse to open", () => {
-    expect(tile).toMatch(/const pending = Boolean\(way\.unavailable\)/);
+  it("routes a pending entry away from the disclosure entirely", () => {
+    expect(grid).toMatch(/if \(way\.unavailable\) return <PendingTile/);
   });
 
-  it("gives a pending tile no body and no way to open it", () => {
-    // The disclosure body and the chevron are both behind `!pending`, and the
-    // summary's click is prevented — so there is no focus stop that pays out in
-    // a paragraph about an install nobody can run.
-    expect(tile).toMatch(/\{!pending && <Chevron \/>\}/);
-    expect(tile).toMatch(/\{!pending && \(/);
-    expect(tile).toMatch(/e\.preventDefault\(\)/);
+  it("is not a disclosure, so it is not a dead focus stop", () => {
+    // A <summary> is focusable whatever you do to it. An earlier pass rendered
+    // a <details> that prevented its own click, which stopped the mouse and
+    // nothing else: a keyboard reader still tabbed to it, still got a focus
+    // ring, and Enter still toggled an element whose body renders nothing —
+    // offered to the reader least able to guess why it did nothing.
+    expect(pending).not.toContain("<details");
+    expect(pending).not.toContain("<summary");
+    expect(pending).not.toContain("<a ");
+    expect(pending).not.toContain("<button");
+    expect(pending).not.toContain("onClick");
+    // `open` as a React prop with no onToggle can also desync from the DOM's
+    // own state.
+    expect(pending).not.toMatch(/\bopen[:=]/);
   });
 
   it("states the status in place of a call to action", () => {
-    expect(tile).toContain("way.unavailable");
-    expect(tile).not.toContain("way.cta");
+    expect(pending).toContain("pending");
+    expect(pending).not.toContain("way.cta");
+    // The status itself is rendered by the shared face, which is where the
+    // interactive tile gets its name and half-line too — so the two shapes
+    // cannot drift apart.
+    expect(grid).toMatch(/\{t\(way\.unavailable!\)\}/);
   });
 });

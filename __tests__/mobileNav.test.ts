@@ -106,6 +106,37 @@ describe("every route lights exactly one tab", () => {
   }
 });
 
+describe("the root's exact match does not depend on data edited elsewhere", () => {
+  // "/" is matched exactly precisely because startsWith("/") is true of every
+  // path. That guard used to run AFTER the owned-route check, so its
+  // correctness rested on a list in another part of the file happening not to
+  // contain "/". Adding it there — a natural edit, given the list holds the
+  // routes a section borrows — would have lit Check on every page of the site,
+  // with nothing throwing and every list-walking test still passing.
+  const src = read("components/navLinks.ts");
+
+  it("decides the root before consulting any section list", () => {
+    const rootGuard = src.indexOf('if (href === "/")');
+    const ownedCheck = src.indexOf("if (isOwnedBy(href, pathname)) return true;");
+    expect(rootGuard).toBeGreaterThan(-1);
+    expect(ownedCheck).toBeGreaterThan(-1);
+    expect(rootGuard).toBeLessThan(ownedCheck);
+  });
+
+  it("filters the root out of the owned set in any case", () => {
+    expect(src).toMatch(/\.filter\(\(p\) => p !== "\/"\)/);
+  });
+
+  it("still lights exactly one tab if someone adds the root to a section", () => {
+    // The behavioural version of the above: whatever the list says, no route
+    // may light two tabs.
+    for (const route of ["/", "/learn", "/about", "/radar", "/report"]) {
+      const lit = TAB_LINKS.filter((l) => isCurrentPath(l.href, route));
+      expect(lit.length, route).toBe(1);
+    }
+  });
+});
+
 describe("the More sheet and its machinery are gone", () => {
   // The sheet needed a scrim, a scroll lock, a focus return, a resize guard and
   // an open-state-as-pathname trick to close on a back navigation. None of that

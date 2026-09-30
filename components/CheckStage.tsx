@@ -144,8 +144,28 @@ export default function CheckStage({
         {/* Inside the capped wrapper, so the caption tracks the card's right
             edge instead of running to the full 1180px container. It sits in the
             same element as the card rather than after it because it is the
-            card's own footnote — see the `below` prop. */}
-        {!done && below && <div className="mt-2.5">{below}</div>}
+            card's own footnote — see the `below` prop.
+
+            HIDDEN, NOT UNMOUNTED, and that distinction is load-bearing. This
+            slot holds the home page's StatsBar, which listens for
+            `veriguard:check-complete` to refresh the counter the reader just
+            moved. Unmounting on `done` tore that listener down at exactly the
+            moment the event fires, so the one person guaranteed to notice a
+            stale number — the one who just changed it — was the one guaranteed
+            to see it. Measured: 413 before a check, still 413 after, and 414
+            only after a remount re-read the server.
+
+            Same reasoning as CheckFlow's textarea, which is hidden rather than
+            unmounted across the swap for its own state's sake.
+
+            aria-hidden with it, so the caption is not announced while a verdict
+            is on screen: it is a footnote on the input, and the verdict carries
+            its own provenance line. */}
+        {below && (
+          <div className={done ? "hidden" : "mt-2.5"} aria-hidden={done || undefined}>
+            {below}
+          </div>
+        )}
       </div>
 
       {/* Capped on every step, including the one where the stage above is not:

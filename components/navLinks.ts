@@ -71,6 +71,25 @@ const SECTION_PATHS: Record<string, readonly string[]> = {
   "/": ["/share", "/report"],
 };
 
+/**
+ * Every owned route, as a flat set.
+ *
+ * "/" must never appear in a section's list. It is the home page, matched
+ * exactly by isCurrentPath precisely because `startsWith("/")` is true of every
+ * path — so listing it as a section's owned route would make that section's tab
+ * light on every page of the site. The lists hold routes a section BORROWS,
+ * and no section borrows the root.
+ *
+ * Filtered here rather than trusted, because the failure is silent: nothing
+ * throws, every unit test that walks the nav list still passes, and the bar
+ * simply lights two tabs at once. A test asserts this stays empty of "/".
+ */
+const OWNED = new Set(
+  Object.values(SECTION_PATHS)
+    .flat()
+    .filter((p) => p !== "/"),
+);
+
 /** Every destination gets a tab. Nothing is hidden behind a More sheet. */
 export const TAB_LINKS = LINKS.filter((l) => l.icon);
 
@@ -86,8 +105,21 @@ export const HEADER_LINKS = LINKS.filter((l) => l.inHeader !== false);
  * SECTION_PATHS: /radar lights Learn, /share lights Check.
  */
 export function isCurrentPath(href: string, pathname: string): boolean {
-  const owned = SECTION_PATHS[href];
-  if (owned?.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return true;
-  if (href === "/") return pathname === "/";
+  // The root's exact match runs FIRST and unconditionally. Ordering was what
+  // protected it before — the owned-route check came first and happened not to
+  // contain "/" — which made a correct result depend on the contents of a data
+  // structure edited elsewhere. Now the root is decided before any list is
+  // consulted, and OWNED cannot contain "/" in any case.
+  if (href === "/") return pathname === "/" || isOwnedBy("/", pathname);
+  if (isOwnedBy(href, pathname)) return true;
   return pathname.startsWith(href);
+}
+
+/** Whether `pathname` is one of the routes `href`'s section borrows. */
+function isOwnedBy(href: string, pathname: string): boolean {
+  const owned = SECTION_PATHS[href];
+  if (!owned) return false;
+  return owned.some(
+    (p) => OWNED.has(p) && (pathname === p || pathname.startsWith(`${p}/`)),
+  );
 }

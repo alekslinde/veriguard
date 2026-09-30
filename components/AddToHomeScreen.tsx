@@ -174,7 +174,7 @@ function useInstallState(): {
  * the day a second placement exists, adding the prop back is the smaller job
  * than having carried a dead one until then.
  */
-export default function AddToHomeScreen({ onDone }: { onDone?: () => void }) {
+export default function AddToHomeScreen() {
   const { t } = useLang();
   const { state, promptInstall } = useInstallState();
   const [showSteps, setShowSteps] = useState(false);
@@ -185,8 +185,11 @@ export default function AddToHomeScreen({ onDone }: { onDone?: () => void }) {
 
   async function activate() {
     if (isPrompt) {
+      // `onDone` went with the sheet, for the same reason `variant` did: its
+      // only job was closing the sheet after a successful install prompt, and
+      // there is no sheet to close. The card stays where it is and the browser
+      // shows its own confirmation.
       await promptInstall();
-      onDone?.();
     } else {
       // No API to call. The steps are the deliverable.
       setShowSteps((v) => !v);

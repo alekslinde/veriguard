@@ -240,9 +240,79 @@ function ForwardBody() {
  * re-implementing all three. What changed is the SHAPE it presents when closed,
  * not the mechanism.
  */
+/**
+ * The shared face of a tile — glyph, name, half-line — so the pending and
+ * interactive shapes cannot drift apart while being two different elements.
+ */
+function TileFace({ way, pending }: { way: WayIn; pending: boolean }) {
+  const { t } = useLang();
+  return (
+    <>
+      <span className={`shrink-0 mt-px ${pending ? "text-[var(--faint)]" : "text-[var(--clear)]"}`}>
+        <WayIcon name={way.icon} />
+      </span>
+
+      <span className="flex-1 min-w-0">
+        <span className="flex items-center gap-2 flex-wrap">
+          <span
+            className={`font-semibold text-[14px] ${
+              pending ? "text-[var(--text-dim)]" : "text-[var(--foreground)]"
+            }`}
+          >
+            {t(way.name)}
+          </span>
+          {pending && (
+            <span className="font-[family-name:var(--font-mono-ui)] text-[9.5px] uppercase tracking-[0.08em] text-[var(--faint)]">
+              {t(way.unavailable!)}
+            </span>
+          )}
+        </span>
+        {/* The half-line someone scans to decide whether to open the tile.
+            Clamped to two lines so an unusually long one cannot make its tile
+            taller than its neighbours and break the shelf's grid. */}
+        <span className="mt-0.5 block text-[12.5px] leading-snug text-[var(--text-dim)] line-clamp-2">
+          {t(way.how)}
+        </span>
+      </span>
+    </>
+  );
+}
+
+/**
+ * A surface that is built but not distributed.
+ *
+ * A plain <div>, NOT a <details> that refuses to open — which is what this was
+ * and why it is being written out again. A `<summary>` is focusable whatever
+ * you do to it, so preventing the click only stopped the mouse: a keyboard
+ * reader still tabbed to it, still got a focus ring, and pressing Enter or
+ * Space toggled an element whose body renders nothing. That is a dead stop in
+ * the tab order, offered to the reader least able to guess why it did nothing.
+ * `open: false` as a prop with no onToggle could also desync from the DOM's own
+ * state, which is the bug CheckStage's keyed wrapper exists to avoid elsewhere.
+ *
+ * The original PendingRow was a <div> for exactly this reason, and turning the
+ * rows into tiles lost the reason along with the shape. Restored: a row that
+ * cannot act says so on its face and is not a control.
+ *
+ * It still renders, deliberately — the package is real and the shelf would
+ * misrepresent what exists by omitting it. Dimmed to the weight of what it is:
+ * an announcement, not an option.
+ */
+function PendingTile({ way }: { way: WayIn }) {
+  return (
+    <div className="rounded-xl border border-[var(--rule)] bg-[var(--ink-2)] opacity-70 overflow-hidden">
+      <div className="flex items-start gap-3 p-3.5">
+        <TileFace way={way} pending />
+      </div>
+    </div>
+  );
+}
+
 function Tile({ way }: { way: WayIn }) {
   const { t } = useLang();
-  const pending = Boolean(way.unavailable);
+
+  // Nothing to open: see PendingTile.
+  if (way.unavailable) return <PendingTile way={way} />;
 
   return (
     <details
@@ -253,76 +323,33 @@ function Tile({ way }: { way: WayIn }) {
       // of that fits a half-width cell on a phone without the buttons wrapping
       // one per line. Spanning on open keeps the shelf compact while it is
       // being scanned and gives the one tile being READ the width it needs.
-      className={`group rounded-xl border bg-[var(--ink-2)] overflow-hidden transition-colors open:col-span-full ${
-        pending
-          ? "border-[var(--rule)] opacity-70"
-          : "border-[var(--rule)] hover:border-[var(--ink-3)]"
-      }`}
-      // A pending channel has nothing behind it — the body would describe an
-      // install nobody can run. Rendering it as an inert tile rather than
-      // omitting it is the same call PendingRow made: the surface is real, and
-      // a shelf that hides it misrepresents what exists.
-      {...(pending ? { open: false, onClick: (e: React.MouseEvent) => e.preventDefault() } : {})}
+      className="group rounded-xl border border-[var(--rule)] bg-[var(--ink-2)] overflow-hidden transition-colors hover:border-[var(--ink-3)] open:col-span-full"
     >
-      <summary
-        className={`flex items-start gap-3 p-3.5 list-none marker:hidden [&::-webkit-details-marker]:hidden focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--clear)] ${
-          pending ? "cursor-default" : "cursor-pointer"
-        }`}
-      >
-        <span
-          className={`shrink-0 mt-px ${pending ? "text-[var(--faint)]" : "text-[var(--clear)]"}`}
-        >
-          <WayIcon name={way.icon} />
-        </span>
-
-        <span className="flex-1 min-w-0">
-          <span className="flex items-center gap-2 flex-wrap">
-            <span
-              className={`font-semibold text-[14px] ${
-                pending ? "text-[var(--text-dim)]" : "text-[var(--foreground)]"
-              }`}
-            >
-              {t(way.name)}
-            </span>
-            {pending && (
-              <span className="font-[family-name:var(--font-mono-ui)] text-[9.5px] uppercase tracking-[0.08em] text-[var(--faint)]">
-                {t(way.unavailable!)}
-              </span>
-            )}
-          </span>
-          {/* The half-line someone scans to decide whether to open the tile.
-              Clamped to two lines so an unusually long one cannot make its
-              tile taller than its neighbours and break the shelf's grid. */}
-          <span className="mt-0.5 block text-[12.5px] leading-snug text-[var(--text-dim)] line-clamp-2">
-            {t(way.how)}
-          </span>
-        </span>
-
-        {!pending && <Chevron />}
+      <summary className="flex items-start gap-3 p-3.5 list-none marker:hidden [&::-webkit-details-marker]:hidden cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--clear)]">
+        <TileFace way={way} pending={false} />
+        <Chevron />
       </summary>
 
-      {!pending && (
-        <div className="px-3.5 pb-3.5 pt-0.5 flex flex-col gap-3">
-          <p className="text-[13px] text-[var(--text-dim)] leading-relaxed">{t(way.detail)}</p>
+      <div className="px-3.5 pb-3.5 pt-0.5 flex flex-col gap-3">
+        <p className="text-[13px] text-[var(--text-dim)] leading-relaxed">{t(way.detail)}</p>
 
-          {/* Where it runs. On the tile this is always in the body rather than
-              the header — a tile has no spare horizontal room for it, and the
-              claim differs per channel (forwarding goes through mail servers),
-              so it cannot be stated once above the shelf. */}
-          <p className="font-[family-name:var(--font-mono-ui)] text-[10px] uppercase tracking-[0.08em] text-[var(--faint)]">
-            {t(way.runs === "device" ? "ways.runs.device" : "ways.runs.server")}
-          </p>
+        {/* Where it runs. On the tile this is always in the body rather than
+            the header — a tile has no spare horizontal room for it, and the
+            claim differs per channel (forwarding goes through mail servers),
+            so it cannot be stated once above the shelf. */}
+        <p className="font-[family-name:var(--font-mono-ui)] text-[10px] uppercase tracking-[0.08em] text-[var(--faint)]">
+          {t(way.runs === "device" ? "ways.runs.device" : "ways.runs.server")}
+        </p>
 
-          {way.id === "email" && <ForwardBody />}
+        {way.id === "email" && <ForwardBody />}
 
-          {way.id === "extension" &&
-            (HAS_ANY_LISTING ? (
-              <InstallLinks />
-            ) : (
-              <p className="text-[13px] text-[var(--faint)]">{t("ways.ext.unavailable")}</p>
-            ))}
-        </div>
-      )}
+        {way.id === "extension" &&
+          (HAS_ANY_LISTING ? (
+            <InstallLinks />
+          ) : (
+            <p className="text-[13px] text-[var(--faint)]">{t("ways.ext.unavailable")}</p>
+          ))}
+      </div>
     </details>
   );
 }

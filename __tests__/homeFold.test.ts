@@ -61,6 +61,25 @@ describe("the check box is the first thing on the home page", () => {
   });
 });
 
+describe("the caption is hidden on a verdict, not unmounted", () => {
+  // The slot holds StatsBar, which listens for `veriguard:check-complete` to
+  // refresh the counter the reader just moved. Unmounting it on `done` tore
+  // that listener down at exactly the moment the event fires — so the one
+  // person guaranteed to notice a stale number was the one guaranteed to see
+  // it. Measured before the fix: 413 before a check, still 413 after.
+  const stage = read("components/CheckStage.tsx");
+
+  it("keeps the slot mounted across the swap", () => {
+    expect(stage).not.toMatch(/\{!done && below/);
+    expect(stage).toMatch(/done \? "hidden"/);
+  });
+
+  it("hides it from assistive technology while a verdict is up", () => {
+    // It is a footnote on the input; the verdict carries its own provenance.
+    expect(stage).toMatch(/aria-hidden=\{done \|\| undefined\}/);
+  });
+});
+
 describe("the service notice cannot retake the fold", () => {
   // The notice is four lines of body copy — ~190px of standing chrome directly
   // above the check card on a phone, which is enough on its own to undo the

@@ -47,6 +47,53 @@ describe("the deck positions cards by measurement, not arithmetic", () => {
   });
 });
 
+describe("rapid presses accumulate", () => {
+  // `active` is derived from scrollLeft and only catches up once a smooth
+  // scroll has travelled far enough, so stepping from it made two quick
+  // presses advance ONE card — the second read the same stale value as the
+  // first and re-targeted the card already being scrolled to. Measured before
+  // the fix: two rapid Next taps landed at 300 (card 1) instead of 580.
+  it("steps from the card last asked for, not the one on screen", () => {
+    expect(deckCode).toMatch(/targetRef/);
+    expect(deckCode).toMatch(/scrollTo\(targetRef\.current \+ delta\)/);
+  });
+
+  it("does not step from the rendered position", () => {
+    expect(deckCode).not.toMatch(/scrollTo\(active [+-]/);
+  });
+
+  it("lets a swipe re-anchor the next press", () => {
+    // A swipe sets no intent, so the reader's real position has to become the
+    // point the next press steps from.
+    expect(deckCode).toMatch(/targetRef\.current = nearest/);
+  });
+
+  it("ignores the frames a scripted scroll produces", () => {
+    // The first attempt at this fix wrote `nearest` back to the target on
+    // EVERY scroll event. A smooth scrollTo fires one per animation frame, so
+    // that walked the target back to wherever the animation currently was —
+    // reintroducing the stale read one line below the ref meant to prevent it.
+    // The source-text test passed; two rapid presses still advanced one card.
+    // Only a browser caught it, which is why the guard is on the mechanism.
+    expect(deckCode).toMatch(/if \(pendingRef\.current === null\)/);
+    expect(deckCode).toMatch(/pendingRef\.current = clamped/);
+  });
+
+  it("cannot strand a pending target", () => {
+    // A scroll interrupted mid-flight would otherwise leave pendingRef set
+    // forever, and a stuck pending target means later swipes stop re-anchoring
+    // — presses would keep stepping from a card the reader left long ago.
+    expect(deckCode).toMatch(/settleRef/);
+    expect(deckCode).toMatch(/clearTimeout\(settleRef\.current\)/);
+  });
+
+  it("does not rebind the key listener on every scroll frame", () => {
+    // The handler closed over `active`, so the effect re-ran throughout every
+    // animation. Depending on the stable `step` alone fixes that too.
+    expect(deckCode).toMatch(/\}, \[step\]\);/);
+  });
+});
+
 describe("the deck is operable without a touchscreen", () => {
   it("is a scroll container rather than a transform carousel", () => {
     // Works with no JS, with a trackpad, and with the browser's own keyboard

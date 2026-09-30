@@ -37,7 +37,14 @@ import { TACTIC_IDS, type TacticId } from "@/lib/signalTactics";
  * all six.
  */
 
-/** Card width. The rail's CSS sets the same number; see `offsetOf`. */
+/**
+ * Card width, applied inline on each card.
+ *
+ * It is not paired with a CSS rule and nothing derives a scroll position from
+ * it — `offsetOf` measures the rendered cards instead, for the reason recorded
+ * there. This is the single place the width is set, so changing it here is the
+ * whole change.
+ */
 const CARD_W = 268;
 
 function Arrow({ dir }: { dir: "prev" | "next" }) {
@@ -61,6 +68,33 @@ export default function TacticDeck() {
   const { t } = useLang();
   const railRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
+  /**
+   * The card the reader has asked for, which is not always the one on screen.
+   *
+   * `active` is derived from scrollLeft and only catches up once a smooth
+   * scroll has travelled far enough — so stepping from it made two quick
+   * presses advance ONE card: the second read the same stale value as the
+   * first and re-targeted the card already being scrolled to. Measured: two
+   * rapid Next taps landed at 300 (card 1) instead of 580 (card 2).
+   *
+   * A ref rather than state because it must be correct for the very next
+   * event, not the next render — and because nothing renders from it. The
+   * scroll handler writes it back so a swipe, which sets no intent, still
+   * leaves the next press stepping from where the reader actually is.
+   */
+  const targetRef = useRef(0);
+  /**
+   * The card a scripted scroll is currently travelling to, or null when the
+   * rail is at rest or being scrolled by the reader.
+   *
+   * This is what tells the scroll handler whose frames it is looking at. A
+   * smooth scrollTo fires `onScroll` continuously, and those frames must not
+   * be mistaken for the reader repositioning the rail — otherwise the handler
+   * overwrites the intent it is meant to preserve.
+   */
+  const pendingRef = useRef<number | null>(null);
+  /** Timer that clears a pending target the arrival check never resolved. */
+  const settleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
    * Where card `i` sits, MEASURED rather than computed from the constants.
@@ -107,12 +141,51 @@ export default function TacticDeck() {
       }
     }
     setActive(nearest);
+
+    // Re-anchor the intent ONLY for a scroll the reader drove themselves.
+    //
+    // A scripted scroll fires this on every animation frame, so writing
+    // `nearest` back unconditionally walked the target back to wherever the
+    // animation currently was — which is precisely the stale read the ref
+    // exists to prevent, reintroduced one line later. Two rapid presses still
+    // advanced one card.
+    //
+    // `pendingRef` is cleared when a scripted scroll arrives, and until then
+    // every frame it produces is ignored here. A swipe or a trackpad sets no
+    // pending target, so it re-anchors immediately and the next press steps
+    // from where the reader actually is.
+    if (pendingRef.current === null) {
+      targetRef.current = nearest;
+    } else if (nearest === pendingRef.current) {
+      // Arrived. Hand control back to the reader's own scrolling.
+      pendingRef.current = null;
+    }
+
+    // A safety net for the case where the arrival above never fires.
+    //
+    // The last card rests at the rail's maximum scrollLeft, which is short of
+    // its own offset — `nearest` still resolves to it, so that case is fine.
+    // But a scroll interrupted mid-flight (the reader grabs the rail, or the
+    // rail is resized) can leave `pendingRef` set forever, and a stuck pending
+    // target means every later swipe stops re-anchoring: presses would keep
+    // stepping from a card the reader left long ago.
+    //
+    // Clearing it once the rail has been still briefly costs nothing when the
+    // arrival check already fired, and bounds the damage when it did not.
+    if (settleRef.current) clearTimeout(settleRef.current);
+    settleRef.current = setTimeout(() => {
+      pendingRef.current = null;
+      settleRef.current = null;
+    }, 220);
   }, [offsetOf]);
 
+  /** Scroll to an absolute card index. */
   const scrollTo = useCallback((i: number) => {
     const rail = railRef.current;
     if (!rail) return;
     const clamped = Math.max(0, Math.min(TACTIC_IDS.length - 1, i));
+    targetRef.current = clamped;
+    pendingRef.current = clamped;
     rail.scrollTo({
       left: offsetOf(clamped),
       // Honours the reader's motion preference. matchMedia rather than a CSS
@@ -124,20 +197,41 @@ export default function TacticDeck() {
     });
   }, [offsetOf]);
 
+  /**
+   * Move `delta` cards from the last card ASKED for, not the one on screen.
+   *
+   * This is what makes rapid presses accumulate: each one steps from the
+   * pending target, so two Next taps in the same animation land two cards on.
+   */
+  const step = useCallback(
+    (delta: number) => scrollTo(targetRef.current + delta),
+    [scrollTo],
+  );
+
+  // The settle timer outlives the component if the reader navigates away
+  // mid-scroll.
+  useEffect(() => () => {
+    if (settleRef.current) clearTimeout(settleRef.current);
+  }, []);
+
   // Keyboard: left/right move a card at a time. Bound to the rail rather than
   // the document, so it only applies while the deck has focus and never steals
   // arrow keys from the page.
+  //
+  // Depends on `step` alone, which is stable — the handler no longer closes
+  // over `active`, so the listener is not torn down and rebound on every
+  // scroll frame.
   useEffect(() => {
     const rail = railRef.current;
     if (!rail) return;
     function onKey(e: KeyboardEvent) {
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
       e.preventDefault();
-      scrollTo(active + (e.key === "ArrowRight" ? 1 : -1));
+      step(e.key === "ArrowRight" ? 1 : -1);
     }
     rail.addEventListener("keydown", onKey);
     return () => rail.removeEventListener("keydown", onKey);
-  }, [active, scrollTo]);
+  }, [step]);
 
   const atStart = active <= 0;
   const atEnd = active >= TACTIC_IDS.length - 1;
@@ -181,7 +275,7 @@ export default function TacticDeck() {
       <div className="mt-3 flex items-center gap-3">
         <button
           type="button"
-          onClick={() => scrollTo(active - 1)}
+          onClick={() => step(-1)}
           disabled={atStart}
           aria-label={t("learn.tactics.prev")}
           className="shrink-0 rounded-lg border border-[var(--rule)] p-1.5 text-[var(--text-dim)] enabled:hover:border-[var(--clear)] enabled:hover:text-[var(--clear)] disabled:opacity-35 transition-colors"
@@ -190,7 +284,7 @@ export default function TacticDeck() {
         </button>
         <button
           type="button"
-          onClick={() => scrollTo(active + 1)}
+          onClick={() => step(1)}
           disabled={atEnd}
           aria-label={t("learn.tactics.next")}
           className="shrink-0 rounded-lg border border-[var(--rule)] p-1.5 text-[var(--text-dim)] enabled:hover:border-[var(--clear)] enabled:hover:text-[var(--clear)] disabled:opacity-35 transition-colors"

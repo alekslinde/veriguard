@@ -15,6 +15,9 @@ import { activeSeasons, regionToday } from "@/lib/scamCalendar";
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 const hub = read("components/LearnHub.tsx");
+// Comments stripped: the component explains the clock it must NOT read, and
+// naming a function is not calling it.
+const hubCode = hub.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 const messages = enNormal as Record<string, string>;
 
 describe("the hub leads the page", () => {
@@ -61,9 +64,24 @@ describe("the cards carry live figures", () => {
     expect(messages["learn.hub.calendar.count"]).toContain("{n}");
   });
 
-  it("reads the counts from the same data the pages render", () => {
+  it("reads the radar count from the same data the page renders", () => {
+    // Static data keyed by region, with no clock involved — safe to read in a
+    // client component.
     expect(hub).toMatch(/circulatingLures\(/);
-    expect(hub).toMatch(/activeSeasons\(/);
+  });
+
+  it("takes the calendar count from the server rather than the browser clock", () => {
+    // This is a client component, so regionToday() here would read the
+    // DEVICE's timezone rather than the region the page is served for. The
+    // page already resolves it correctly for LearnContent; recomputing would
+    // duplicate the work and disagree on a device whose zone straddles a date
+    // boundary from its region — the server renders one count and the client
+    // hydrates to another, so the number visibly flips.
+    expect(hubCode).not.toMatch(/regionToday\(/);
+    expect(hub).toMatch(/activeSeasonCount: number/);
+    expect(read("components/LearnContent.tsx")).toMatch(
+      /activeSeasonCount=\{activeSeasons\.length\}/,
+    );
   });
 
   it("has something to count for the authored region", () => {
@@ -85,8 +103,9 @@ describe("an absent count is not reported as zero", () => {
 
   it("keeps a real zero on the calendar, where it means something", () => {
     // Nothing peaking today IS a true statement about today, unlike an
-    // unauthored radar. The card says it rather than hiding the figure.
-    expect(hub).toMatch(/count: seasons\.length,/);
+    // unauthored radar. The card says it rather than hiding the figure — so
+    // the count is passed straight through, with no `|| null` softening it.
+    expect(hub).toMatch(/count: activeSeasonCount,/);
   });
 });
 

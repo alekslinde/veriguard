@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useLang, type MessageKey } from "@/lib/lang";
 import type { RegionCode } from "@veriguard/engine/regions";
 import { circulatingLures } from "@/lib/threatRadar";
-import { activeSeasons, regionToday } from "@/lib/scamCalendar";
 
 /**
  * The entry cards at the top of Learn.
@@ -56,14 +55,31 @@ function ArrowIcon() {
   );
 }
 
-export default function LearnHub({ region }: { region: RegionCode }) {
+export default function LearnHub({
+  region,
+  activeSeasonCount,
+}: {
+  region: RegionCode;
+  /**
+   * How many calendar windows are open today, RESOLVED SERVER-SIDE.
+   *
+   * Passed in rather than computed here, and that is not a preference. This is
+   * a client component, so calling regionToday() in it reads the browser's
+   * clock — which reflects the device's timezone, not the region the page is
+   * being served for. The page already resolves this correctly for
+   * LearnContent (see app/learn/page.tsx, which says exactly this), so
+   * recomputing it here would both duplicate the work and get a different
+   * answer on a device whose zone straddles a date boundary from its region:
+   * the server renders one count, the client hydrates to another, and the
+   * number visibly flips.
+   */
+  activeSeasonCount: number;
+}) {
   const { t } = useLang();
 
-  // Resolved here rather than passed in: both are pure reads of static data
-  // keyed by region, with no clock beyond the date the page already resolves
-  // server-side for the calendar.
+  // Safe to read here: the radar is static data keyed by region, with no clock
+  // involved. It is the DATE that cannot be read on the client, not the data.
   const lures = circulatingLures(region, 99);
-  const seasons = activeSeasons(region, regionToday(region));
 
   const cards: Card[] = [
     {
@@ -83,7 +99,7 @@ export default function LearnHub({ region }: { region: RegionCode }) {
       blurbKey: "learn.hub.calendar.blurb",
       // Zero IS meaningful here: it is a real statement that nothing peaks
       // today, and the card says so rather than hiding the figure.
-      count: seasons.length,
+      count: activeSeasonCount,
       countKey: "learn.hub.calendar.count",
     },
     {

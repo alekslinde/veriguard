@@ -224,7 +224,7 @@ export default function LearnContent({
           landing here should see the section holds live regional data before
           they meet the first heading of an essay. The index below is for the
           essay, which is what an index is for. */}
-      <LearnHub region={region} />
+      <LearnHub region={region} activeSeasonCount={activeSeasons.length} />
 
       {/* Table of contents — a sticky index that also shows where you are.
           The page is long and covers several distinct needs, so the fastest
