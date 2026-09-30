@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLang } from "@/lib/lang";
-import { HEADER_LINKS, isCurrentPath } from "./navLinks";
+import { HEADER_LINKS, isCurrentPath, isChildCurrent } from "./navLinks";
 
 /**
  * The top bar.
@@ -51,22 +51,61 @@ export default function SiteHeader() {
         </Link>
 
         {/* Desktop: the links sit inline. Below md they are not hidden here so
-            much as somewhere else — see MobileTabBar. */}
+            much as somewhere else — see MobileTabBar.
+
+            A section's children render inline beside it rather than in a hover
+            dropdown. A dropdown would put Radar and Calendar back behind an
+            interaction someone has to discover, which is the problem folding
+            them into Learn created in the first place; it also needs keyboard
+            and touch handling to not be a trap. Six flat links fit this bar
+            with room to spare, and the only cost is that the children are
+            smaller and dimmer than their parent — which is the information,
+            not a compromise. */}
         <nav aria-label={t("a11y.mainNav")} className="hidden md:flex items-center gap-1 min-w-0">
-          {HEADER_LINKS.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              aria-current={isCurrentPath(l.href, pathname) ? "page" : undefined}
-              className={`min-h-[44px] flex items-center px-2.5 text-sm rounded-[7px] transition-colors ${
-                isCurrentPath(l.href, pathname)
-                  ? "text-[var(--foreground)] bg-[var(--ink-2)] font-medium"
-                  : "text-[var(--text-dim)] hover:text-[var(--foreground)] hover:bg-[var(--ink-2)]"
-              }`}
-            >
-              {t(l.key)}
-            </Link>
-          ))}
+          {HEADER_LINKS.map((l) => {
+            const current = isCurrentPath(l.href, pathname);
+            const onChild = isChildCurrent(l, pathname);
+            return (
+              <div key={l.href} className="flex items-center">
+                <Link
+                  href={l.href}
+                  aria-current={current && !onChild ? "page" : undefined}
+                  // The filled pill marks the page you are ON, so it moves to
+                  // the child when you are on one — two filled pills side by
+                  // side read as a single blob and stop saying which is which.
+                  // The parent keeps the brighter text, which is what says
+                  // "you are still in this section".
+                  className={`min-h-[44px] flex items-center px-2.5 text-sm rounded-[7px] transition-colors ${
+                    current && !onChild
+                      ? "text-[var(--foreground)] bg-[var(--ink-2)] font-medium"
+                      : current
+                        ? "text-[var(--foreground)] font-medium hover:bg-[var(--ink-2)]"
+                        : "text-[var(--text-dim)] hover:text-[var(--foreground)] hover:bg-[var(--ink-2)]"
+                  }`}
+                >
+                  {t(l.key)}
+                </Link>
+
+                {l.children?.map((c) => {
+                  const childCurrent = isCurrentPath(c.href, pathname);
+                  return (
+                    <Link
+                      key={c.href}
+                      href={c.href}
+                      aria-current={childCurrent ? "page" : undefined}
+                      className={`min-h-[44px] flex items-center px-2 text-[13px] rounded-[7px] transition-colors ${
+                        childCurrent
+                          ? "text-[var(--foreground)] bg-[var(--ink-2)] font-medium"
+                          : "text-[var(--faint)] hover:text-[var(--foreground)] hover:bg-[var(--ink-2)]"
+                      }`}
+                    >
+                      {t(c.key)}
+                    </Link>
+                  );
+                })}
+              </div>
+            );
+          })}
         </nav>
       </div>
     </header>

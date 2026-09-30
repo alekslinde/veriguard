@@ -150,6 +150,7 @@ function ThreatCard({ threat }: { threat: ThreatEntry }) {
         >
           {t("radar.source", { date: formatRadarDate(threat.lastSeen) })}
           <span className="sr-only"> ({t("a11y.newTab")})</span>
+          <span aria-hidden="true"> ↗</span>
         </a>
       </p>
     </li>

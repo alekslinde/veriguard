@@ -63,7 +63,20 @@ export default function AboutPage() {
       <PageHeader
         eyebrow="About & privacy"
         title="What we store, and what we **never** store"
-        lede="Every verdict here comes from hardcoded pattern logic — no AI anywhere in the scoring, and nothing about your message leaves your device to be judged."
+        /* "Analysed and discarded", NOT "never leaves your device".
+
+           On this website a check POSTs its content to /api/check, so the
+           device claim is false here — it is the EXTENSION's property, which
+           bundles the engine and scores locally, and the extension section
+           below states it there, where it is true. A claim that holds for one
+           surface, restated as a claim about the product, is exactly the error
+           this page exists not to make: it is the canonical record of what we
+           store, and an over-claim in its opening sentence discredits the
+           accurate ones beneath it.
+
+           What IS true everywhere is the pair that follows: the scoring is
+           hardcoded rules with no AI, and nothing you paste is kept. */
+        lede="Every verdict here comes from hardcoded pattern logic — no AI anywhere in the scoring. What you paste is analysed and discarded, never stored, and we never open its links."
       />
 
       <div className="space-y-10">
@@ -342,6 +355,8 @@ export default function AboutPage() {
                   {listing.url ? (
                     <a href={listing.url} className={LINK} target="_blank" rel="noopener noreferrer">
                       {listing.name}
+                      <span className="sr-only"> (opens in a new tab)</span>
+                      <span aria-hidden="true"> ↗</span>
                     </a>
                   ) : (
                     listing.name

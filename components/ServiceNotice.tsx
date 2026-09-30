@@ -116,6 +116,19 @@ export default function ServiceNotice() {
     () => true,
   );
   const [dismissedNow, setDismissedNow] = useState(false);
+  // Phone-only: the strip opens clamped to one line and expands on tap.
+  //
+  // The notice is four lines of body copy, which on a 390px screen is ~190px of
+  // standing chrome directly above the check card — enough to push the paste
+  // box back below the fold and undo the reason the hero was retired. It is
+  // also genuinely important (it tells someone their forwarded email may get no
+  // reply), so suppressing it on a phone is not an option.
+  //
+  // Clamping keeps both: the first line names the condition, the tap gives the
+  // detail, and nothing is hidden from anyone who wants it. Above sm there is
+  // room for the whole thing and it renders unclamped, so this state is inert
+  // on a desktop.
+  const [expanded, setExpanded] = useState(false);
 
   if (!ENABLED || dismissed || dismissedNow) return null;
 
@@ -149,9 +162,46 @@ export default function ServiceNotice() {
           aria-hidden="true"
           className="mt-[0.35rem] h-2 w-2 shrink-0 rounded-full bg-[var(--faint)]"
         />
-        <p className="flex-1 min-w-0 text-xs leading-relaxed text-[var(--text-dim)]">
-          {bold(body)}
-        </p>
+        {/* The clamp is a button below sm and a plain paragraph above it.
+            `line-clamp-1 sm:line-clamp-none` does the work; the wrapper is a
+            <button> only where there is something to toggle, so a desktop
+            reader is not handed a control that does nothing.
+
+            aria-expanded is on the same element that clamps, and the full text
+            is always in the DOM — a screen reader reads the whole notice
+            regardless of the visual clamp, which is what keeps this a display
+            affordance rather than a content one. */}
+        {/* The toggle is a separate control on its own line rather than the
+            paragraph itself. Making the text a <button> would cost text
+            selection at every width, and an inline control cannot sit beside a
+            line-clamped span — the clamp owns the line it truncates, so the
+            button would be pushed to a second line and defeat the clamp.
+
+            The full text is always in the DOM. The clamp is a visual
+            affordance, so a screen reader reads the whole notice at any width
+            and the control below is supplementary rather than load-bearing. */}
+        <div className="flex-1 min-w-0">
+          <p
+            className={`text-xs leading-relaxed text-[var(--text-dim)] ${
+              expanded ? "" : "line-clamp-1 sm:line-clamp-none"
+            }`}
+          >
+            {bold(body)}
+          </p>
+          {/* Hidden from sm up, where the notice renders unclamped and there is
+              nothing to expand. Hidden once expanded too: the strip is
+              dismissible, so re-collapsing is a state nobody needs on the way
+              to closing it. */}
+          {!expanded && (
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              className="sm:hidden mt-0.5 text-xs text-[var(--foreground)] underline underline-offset-2 decoration-[var(--rule)]"
+            >
+              {t("service.more")}
+            </button>
+          )}
+        </div>
         <button
           type="button"
           onClick={dismiss}

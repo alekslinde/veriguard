@@ -31,7 +31,7 @@ export default function CheckStage({
   initialContent,
   surface = "web",
   children,
-  after,
+  above,
 }: {
   /** Seeds the check box — used by the share target. */
   initialContent?: string;
@@ -39,21 +39,26 @@ export default function CheckStage({
   /** Rendered above the box on the input step only (the share truncation notice). */
   children?: ReactNode;
   /**
-   * Rendered last, on every step — the ways-in rows and the threat radar.
+   * The page's own head — title, privacy line, counters — on the input step.
    *
-   * On every step deliberately. There used to be a second slot that retired
-   * with the input, on the reasoning that background material belonged to the
-   * question rather than the answer; the radar sat in it and vanished the
-   * moment a verdict arrived, which is when someone told "this looks clean"
-   * most wants to know what is going around.
+   * It is a slot rather than markup in the page so the stage can retire it
+   * when a verdict arrives: a headline saying "check before you click" over a
+   * finished verdict is answering a question nobody is still asking, and the
+   * verdict carries its own provenance line.
    *
-   * Passed through the stage rather than placed after it in the page so it
-   * shares the stage's width: the input step caps at a readable measure, and a
-   * full-width strip underneath a 760px column left the page with two different
-   * right edges.
+   * HIDDEN, NOT UNMOUNTED, and that distinction is load-bearing. This slot
+   * holds StatsBar, which listens for `veriguard:check-complete` to refresh
+   * the counter the reader just moved. Unmounting on `done` tore that listener
+   * down at exactly the moment the event fires, so the one person guaranteed
+   * to notice a stale number — the one who just changed it — was the one
+   * guaranteed to see it. Measured: 413 before a check, still 413 after.
+   *
+   * Same reasoning as CheckFlow's textarea, which is hidden rather than
+   * unmounted across the swap for its own state's sake.
    */
-  after?: ReactNode;
+  above?: ReactNode;
 } = {}) {
+
   const { t } = useLang();
   const [step, setStep] = useState<CheckStep>("input");
   // What the last check was run against. Held here rather than read from
@@ -64,7 +69,20 @@ export default function CheckStage({
   const done = step !== "input";
 
   return (
-    <>
+    // The breakout lives here, on everything the stage renders, rather than on
+    // the card alone — otherwise the "Checked:" strip stays at the input's
+    // 760px while the verdict beneath it spans the page, which reads as two
+    // columns that failed to line up.
+    //
+    // The page centres the stage at 760px, the right measure for a paste box
+    // and too narrow for what replaces it: the verdict splits into an evidence
+    // sheet and a tactics rail that divide the width between them, so a cap
+    // starves both. A negative margin rather than the page widening itself,
+    // because the page cannot know which step the stage is on — that state
+    // belongs to the flow. It expands toward 1180px (the page's own container)
+    // and stops, so the verdict never runs wider than the rest of the site,
+    // and is bounded by the viewport on a phone where the margins clamp to 0.
+    <div className={done ? "lg:-mx-[calc((min(1180px,100vw-4rem)-760px)/2)]" : ""}>
       {/* The record of what was checked. Shown only once there is something to
           record, and it sits above the results because it is the question the
           verdict below is answering. */}
@@ -98,25 +116,32 @@ export default function CheckStage({
       {/* Notices belong to the input, so they go when it does. */}
       {!done && children}
 
-      {/* The cap applies on the input step only, and everything on that step
-          shares it: a full-width strip under a 760px column gives the page two
-          different right edges. The verdict that replaces the input is not
-          capped — it splits into an evidence sheet and a tactics rail, which
-          divide the width between them, so each lands at a readable measure on
-          its own and a cap only starves both.
-
-          This was a two-column grid while the forwarding panel stood beside the
-          box; that panel is one of the ways-in rows now, so there is nothing to
-          sit alongside.
-
-          Keyed so React reconciles this by identity rather than by position.
+      {/* Keyed so React reconciles this by identity rather than by position.
           The strip and the notices above it are conditional, so the number of
           preceding siblings changes when a check runs — and matched by index
           this is reconciled against a different element, tearing down CheckFlow
           and taking its state with it. That emptied the box, so "Edit & check
           again" returned to a blank textarea instead of the message the reader
           had just checked. */}
-      <div key="stage-grid" className={done ? "min-w-0" : "min-w-0 max-w-[760px]"}>
+      {/* A flex column holding the head and the card as SIBLINGS, which is what
+          lets the caption inside `above` move below the box with `order-last`
+          on a phone. Nested in a wrapper of its own they could not reorder
+          across each other. */}
+      <div key="stage-grid" className="min-w-0 flex flex-col">
+        {/* The page head. `display: contents` so its children join THIS flex
+            column rather than forming a row of their own — that is what puts
+            the title and the caption in the same ordering context as the card.
+
+            Hidden rather than unmounted on a verdict, because this slot holds
+            StatsBar and unmounting would tear down its refresh listener at
+            exactly the moment the check-complete event fires. aria-hidden with
+            it, so a title about checking is not announced over a result. */}
+        {above && (
+          <div className={done ? "hidden" : "contents"} aria-hidden={done || undefined}>
+            {above}
+          </div>
+        )}
+
         <CheckFlow
           initialContent={initialContent}
           surface={surface}
@@ -125,24 +150,6 @@ export default function CheckStage({
         />
       </div>
 
-      {/* Capped on every step, including the one where the stage above is not:
-          the verdict wants the full width, but an aside stretched to 1180px
-          reads as a banner rather than a footnote. space-y rather than a gap on
-          the parent, because this holds two sections and they need separating
-          from each other as well as from the box.
-
-          `contents` when there is nothing to show, rather than a truthiness
-          guard on `after`. Callers pass a Fragment — always truthy, so the
-          guard never fired — and its children can still each render null (the
-          radar does outside AU), which left an empty spacer div under the
-          verdict. Display:contents removes the box from layout without the
-          caller having to know whether its own children rendered.
-
-          The wrapper is not conditional on `done`. Both sections survive a
-          check by design: see the note on `after` above. */}
-      <div className={after ? "max-w-[760px] space-y-6 empty:contents" : "contents"}>
-        {after}
-      </div>
-    </>
+    </div>
   );
 }

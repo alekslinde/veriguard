@@ -33,10 +33,32 @@ export default function WaysTeaser() {
   useOpenOnHash();
 
   return (
-    // The label is for assistive technology only — it replaces the visible
-    // heading that used to name this group, so the section is still announced
-    // and navigable rather than being an unlabelled run of links.
-    <section id="ways" aria-label={t("home.ways.label")} className="scroll-mt-24">
+    <section id="ways" aria-labelledby="ways-heading" className="scroll-mt-24">
+      {/* The heading is visible again.
+          It was dropped when this was the last block on a single-column page,
+          where the rows were self-describing and a label over them read as a
+          second offer competing with the check box. It is a column of a
+          control centre now, sitting beside the radar's own heading — and an
+          unlabelled column next to a labelled one reads as a fragment of the
+          section above it rather than a thing in its own right.
+
+          Matched to the radar's heading so the two columns are visibly peers.
+          The dot is neutral rather than the radar's amber: that colour says
+          "something is happening", which is true of circulating scams and not
+          of a list of ways to install. */}
+      <h2
+        id="ways-heading"
+        className="flex items-center gap-2 text-[15px] font-semibold text-[var(--foreground)]"
+      >
+        <span
+          aria-hidden="true"
+          className="w-[7px] h-[7px] rounded-full bg-[var(--faint)] shrink-0"
+        />
+        {t("home.ways.heading")}
+      </h2>
+      <p className="mt-1 mb-3 text-[13.5px] text-[var(--text-dim)] leading-relaxed">
+        {t("home.ways.lede")}
+      </p>
       <WaysGrid />
     </section>
   );
