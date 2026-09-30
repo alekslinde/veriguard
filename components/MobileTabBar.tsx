@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLang } from "@/lib/lang";
-import { TAB_LINKS, isCurrentPath, type TabIcon } from "./navLinks";
+import { TAB_LINKS, isCurrentPath, isChildCurrent, type TabIcon } from "./navLinks";
 
 /**
  * The mobile navigation, as a bottom tab bar.
@@ -32,11 +32,59 @@ export default function MobileTabBar() {
   const { t } = useLang();
   const pathname = usePathname();
 
+  // The children of whichever tab the reader is currently in, if it has any.
+  //
+  // Radar and Calendar belong to Learn, and folding them in took them out of
+  // every menu — reachable only by scrolling Learn or typing the URL. A fourth
+  // and fifth tab is not the answer: five targets is where the labels start
+  // truncating at 390px, and it is the crowding that forced the More sheet.
+  //
+  // So they appear as a row above the bar, and ONLY while the reader is in the
+  // section that owns them. On Check or About the bar is exactly as it was;
+  // enter Learn and the section's own pages appear with it, which is also the
+  // moment they are worth offering.
+  const section = TAB_LINKS.find((l) => isCurrentPath(l.href, pathname));
+  const children = section?.children ?? [];
+
   return (
     <nav
       aria-label={t("a11y.mainNav")}
       className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--rule)] bg-[var(--ink)] pb-[env(safe-area-inset-bottom)]"
     >
+      {children.length > 0 && (
+        // Scrolls rather than wraps: three labels fit a 390px screen, but a
+        // fourth child would wrap the row and change the bar's height under
+        // the reader. A horizontal scroller keeps the bar one known height
+        // whatever the section holds.
+        // data-subnav is what tells the page to reserve room for this row:
+        // globals.css raises --subnav-h via :has(), so --tabbar-h and the
+        // bar's real height stay one number. Without it the footer renders
+        // under the bar — measured at 52px of overlap.
+        <ul
+          data-subnav
+          className="flex items-center gap-1.5 overflow-x-auto px-3 py-2 border-b border-[var(--rule)] bg-[var(--ink-2)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {children.map((c) => {
+            const current = isCurrentPath(c.href, pathname);
+            return (
+              <li key={c.href} className="shrink-0">
+                <Link
+                  href={c.href}
+                  aria-current={current ? "page" : undefined}
+                  className={`block rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
+                    current
+                      ? "border-[var(--clear)] bg-[var(--clear)]/12 text-[var(--clear)]"
+                      : "border-[var(--rule)] text-[var(--text-dim)]"
+                  }`}
+                >
+                  {t(c.key)}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
       <ul className="flex items-stretch">
         {TAB_LINKS.map((l) => {
           const current = isCurrentPath(l.href, pathname);
@@ -44,7 +92,10 @@ export default function MobileTabBar() {
             <li key={l.href} className="flex-1">
               <Link
                 href={l.href}
-                aria-current={current ? "page" : undefined}
+                // The tab stays lit on a child's page — the reader IS in that
+                // section — but only one element may claim to BE the page, and
+                // on /radar that is the Radar chip above, not the Learn tab.
+                aria-current={current && !isChildCurrent(l, pathname) ? "page" : undefined}
                 className={`flex flex-col items-center justify-center gap-[3px] min-h-[54px] px-1 pt-1.5 pb-1 transition-colors ${
                   current ? "text-[var(--clear)]" : "text-[var(--faint)]"
                 }`}

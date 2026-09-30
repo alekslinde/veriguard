@@ -39,15 +39,41 @@ export interface NavLink {
    * than an extra one.
    */
   inHeader?: boolean;
+  /**
+   * Destinations this one owns, shown as its sub-links in both menus.
+   *
+   * Radar and Calendar belong to Learn, and folding them in gave them a home
+   * — but it also took them out of every menu, leaving them reachable only by
+   * scrolling Learn or typing the URL. A section that owns pages has to offer
+   * them, or owning them is just hiding them.
+   *
+   * They are children rather than top-level entries because they are not peers
+   * of Check: they are two views of the same "what is happening now" material
+   * that Learn already holds. Four top-level tabs is what forced the More
+   * sheet, and that is the arrangement being avoided here.
+   */
+  children?: readonly NavLink[];
 }
 
 export type TabIcon = "check" | "learn" | "about";
 
 export const LINKS: readonly NavLink[] = [
   { href: "/", key: "nav.check", icon: "check" },
-  { href: "/learn", key: "nav.learn", icon: "learn" },
+  {
+    href: "/learn",
+    key: "nav.learn",
+    icon: "learn",
+    children: [
+      { href: "/radar", key: "nav.radar" },
+      { href: "/calendar", key: "nav.calendar" },
+      { href: "/submissions", key: "nav.reports" },
+    ],
+  },
   { href: "/about", key: "nav.about", icon: "about" },
 ] as const;
+
+/** Every child of every entry, flattened — for tests and for the menus. */
+export const CHILD_LINKS = LINKS.flatMap((l) => l.children ?? []);
 
 /**
  * The sections each destination owns.
@@ -64,10 +90,20 @@ export const LINKS: readonly NavLink[] = [
  * happens. The test that catches it walks the ROUTES.
  */
 const SECTION_PATHS: Record<string, readonly string[]> = {
-  "/learn": ["/radar", "/calendar", "/submissions"],
-  // The reporting errand. Never a tab — it is reached from a verdict, not
-  // browsed to — but a reader who is on it is in the Check flow they started,
-  // and a bar with nothing lit reads as broken.
+  // DERIVED from the children above rather than restated. These were two
+  // lists saying the same thing, and the day they disagreed a page would be
+  // in a menu while lighting no tab — the exact failure the /report bug was,
+  // which every test walking the nav list passed through.
+  ...Object.fromEntries(
+    LINKS.filter((l) => l.children?.length).map((l) => [
+      l.href,
+      l.children!.map((c) => c.href),
+    ]),
+  ),
+  // The reporting errand. Never a tab and not in a menu — it is reached from
+  // a verdict, not browsed to — but a reader who is on it is in the Check flow
+  // they started, and a bar with nothing lit reads as broken. So it is owned
+  // without being offered, which is why this one stays written out.
   "/": ["/share", "/report"],
 };
 
@@ -113,6 +149,18 @@ export function isCurrentPath(href: string, pathname: string): boolean {
   if (href === "/") return pathname === "/" || isOwnedBy("/", pathname);
   if (isOwnedBy(href, pathname)) return true;
   return pathname.startsWith(href);
+}
+
+/**
+ * Whether the reader is on one of `link`'s own children.
+ *
+ * The menus use this to decide which entry carries `aria-current="page"`. A
+ * parent stays visually current on a child's page — the reader IS in that
+ * section — but only one element may claim to be the page itself, and on
+ * /radar that element is Radar, not Learn.
+ */
+export function isChildCurrent(link: NavLink, pathname: string): boolean {
+  return (link.children ?? []).some((c) => isCurrentPath(c.href, pathname));
 }
 
 /** Whether `pathname` is one of the routes `href`'s section borrows. */

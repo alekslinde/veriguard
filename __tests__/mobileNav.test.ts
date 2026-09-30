@@ -1,7 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { LINKS, TAB_LINKS, HEADER_LINKS, isCurrentPath } from "@/components/navLinks";
+import {
+  LINKS,
+  TAB_LINKS,
+  HEADER_LINKS,
+  CHILD_LINKS,
+  isCurrentPath,
+  isChildCurrent,
+} from "@/components/navLinks";
 import { translate, type LangMode } from "@/lib/i18n";
 
 const NORMAL: LangMode = { locale: "en", tone: "normal" };
@@ -21,6 +28,38 @@ describe("navigation model", () => {
     // a reader has to open something to discover.
     expect(TAB_LINKS).toHaveLength(LINKS.length);
     expect(new Set(LINKS.map((l) => l.href)).size).toBe(LINKS.length);
+  });
+
+  it("offers every route the app serves from a menu", () => {
+    // THE BLIND SPOT THIS BLOCK USED TO HAVE. Everything above walks LINKS,
+    // so folding Radar and Calendar into Learn left them in no menu at all —
+    // reachable only by scrolling Learn or typing the URL — while every
+    // assertion here still passed. Walking the ROUTES is what notices.
+    //
+    // /report and /share are deliberately absent: one is an errand reached
+    // from a verdict, the other is where a share-sheet lands. Neither is
+    // browsed to, and listing them would pad the menu with places nobody
+    // navigates to on purpose.
+    const offered = new Set([...LINKS, ...CHILD_LINKS].map((l) => l.href));
+    for (const route of ["/", "/learn", "/about", "/radar", "/calendar", "/submissions"]) {
+      expect(offered.has(route), `${route} is in no menu`).toBe(true);
+    }
+  });
+
+  it("keeps a child out of the top level", () => {
+    // Radar and Calendar are views of what Learn already holds, not peers of
+    // Check. Promoting one is how the tab bar gets back to five targets and
+    // re-grows a More sheet.
+    for (const child of CHILD_LINKS) {
+      expect(LINKS.some((l) => l.href === child.href), child.href).toBe(false);
+      expect(child.icon, `${child.href} must not claim a tab slot`).toBeUndefined();
+    }
+  });
+
+  it("resolves every child's label", () => {
+    for (const c of CHILD_LINKS) {
+      expect(translate(NORMAL, c.key), c.href).toBeTruthy();
+    }
   });
 
   it("stays within what a narrow phone can label", () => {
@@ -134,6 +173,60 @@ describe("the root's exact match does not depend on data edited elsewhere", () =
       const lit = TAB_LINKS.filter((l) => isCurrentPath(l.href, route));
       expect(lit.length, route).toBe(1);
     }
+  });
+});
+
+describe("exactly one element claims to be the page", () => {
+  // A parent stays visually lit on a child's page — the reader IS in that
+  // section — but aria-current="page" is a claim about the page itself, and
+  // two of them is a contradiction a screen reader reads out twice. Both menus
+  // gate the parent's on isChildCurrent; without it /radar lit Learn AND
+  // Radar, which the browser confirmed before this test existed.
+  it("hands the claim to the child on a child's page", () => {
+    const learn = LINKS.find((l) => l.href === "/learn")!;
+    for (const child of learn.children ?? []) {
+      expect(isChildCurrent(learn, child.href), child.href).toBe(true);
+    }
+  });
+
+  it("leaves it with the parent on the parent's own page", () => {
+    const learn = LINKS.find((l) => l.href === "/learn")!;
+    expect(isChildCurrent(learn, "/learn")).toBe(false);
+  });
+
+  it("is false for a section with no children", () => {
+    for (const l of LINKS.filter((x) => !x.children)) {
+      expect(isChildCurrent(l, l.href), l.href).toBe(false);
+    }
+  });
+
+  it("gates the claim in both menus", () => {
+    for (const file of ["components/SiteHeader.tsx", "components/MobileTabBar.tsx"]) {
+      expect(read(file), file).toMatch(/aria-current=\{[^}]*!\s*(isChildCurrent|onChild)/);
+    }
+  });
+});
+
+describe("the section's pages are offered where the reader is", () => {
+  it("renders the sub-links in the header", () => {
+    expect(read("components/SiteHeader.tsx")).toMatch(/l\.children\?\.map/);
+  });
+
+  it("renders them above the tab bar too", () => {
+    const bar = read("components/MobileTabBar.tsx");
+    expect(bar).toMatch(/section\?\.children/);
+    // A fourth and fifth tab is what forced the More sheet; the children are a
+    // row above the bar instead, shown only inside the section that owns them.
+    expect(bar).toMatch(/data-subnav/);
+  });
+
+  it("reserves room for that row so it cannot cover the footer", () => {
+    // Measured at 52px of overlap before this existed: --tabbar-h is what the
+    // page reserves as bottom padding, and the bar got taller without it.
+    const css = read("app/globals.css");
+    expect(css).toMatch(/--subnav-h/);
+    expect(css).toMatch(/:root:has\(nav \[data-subnav\]\)/);
+    expect(css).toMatch(/--tabbar-h: calc\(55px \+ var\(--subnav-h\)/);
   });
 });
 

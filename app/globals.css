@@ -38,7 +38,26 @@
      (how much bottom padding to reserve). Above the md breakpoint the bar is
      not rendered, so the reservation collapses to zero rather than leaving a
      band of dead space under every desktop page. */
-  --tabbar-h: calc(55px + env(safe-area-inset-bottom));
+  /* The section sub-nav row, when the bar is showing one.
+     Zero by default. MobileTabBar renders a `data-subnav` attribute on its own
+     wrapper for routes whose section has children (Learn's Radar / Calendar /
+     Reports), and the rule below raises this for exactly those pages.
+
+     A CSS variable driven by an attribute rather than a measured height,
+     because --tabbar-h is what the page reserves as bottom padding: a JS
+     measurement lands a frame after first paint, which is long enough for the
+     footer to render under the bar and then jump. This resolves in the same
+     pass as the rest of the layout. */
+  --subnav-h: 0px;
+  --tabbar-h: calc(55px + var(--subnav-h) + env(safe-area-inset-bottom));
+}
+
+/* Raised for the routes whose section offers sub-links. `:has()` lets the
+   root respond to markup the tab bar renders deep in the tree, so the
+   reservation and the bar's real height are still one number — and it resolves
+   during layout rather than a frame late, which is the whole point. */
+:root:has(nav [data-subnav]) {
+  --subnav-h: 52px;
 
   /* The sticky header's full occupied height: the row, the status-bar inset it
      pads for, and its own 1px bottom border. Anything that pins itself below
