@@ -81,13 +81,20 @@ export default async function Home() {
           above={
             <>
               <HomeHero />
-              {/* The bottom margin is what separates it from the card on a
-                  desktop, where it sits above. On a phone `order-last` puts it
-                  after the card, so the same gap has to come off the top
-                  instead — hence both, each width-scoped. */}
+              {/* Centred from sm, with the headline it follows — `mx-auto`
+                  centres the paragraph's box, `text-center` centres the lines
+                  inside it, and without the second the text ranges left
+                  against a centred title.
+
+                  Left-aligned on a phone, where it sits under the card as its
+                  footnote and there is no axis to centre on.
+
+                  The bottom margin separates it from the card on a desktop,
+                  where it sits above; on a phone `order-last` puts it after
+                  the card, so that gap comes off the top instead. */}
               <HomeCaption
                 stats={stats}
-                className="order-last sm:order-none mt-3 sm:mt-3 sm:mb-6 sm:max-w-[62ch] sm:mx-auto"
+                className="order-last sm:order-none mt-3 sm:mb-6 sm:max-w-[62ch] sm:mx-auto sm:text-center"
               />
             </>
           }
