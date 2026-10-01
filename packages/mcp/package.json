@@ -48,7 +48,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.31.0",
-    "@veriguard/detect": "^0.12.1",
+    "@veriguard/detect": "^0.1.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

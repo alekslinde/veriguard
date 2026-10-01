@@ -6,9 +6,9 @@ name: Publish engine
 # replaced, and unpublishing is restricted after 72 hours. Publishing needs to
 # be something somebody does on purpose, with a tag naming which version.
 #
-# The tag carries the package prefix (engine-v0.13.0) because this repo also
+# The tag carries the package prefix (engine-v0.1.0) because this repo also
 # releases the app and the extension, each on its own version line. A bare
-# "v0.13.0" would not say which one it meant.
+# "v0.1.0" would not say which one it meant.
 
 on:
   push:
@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing tag to publish from, e.g. engine-v0.13.0. Leave blank to verify only."
+        description: "Existing tag to publish from, e.g. engine-v0.1.0. Leave blank to verify only."
         type: string
         required: false
       dry_run:
