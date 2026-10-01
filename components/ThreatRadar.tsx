@@ -17,6 +17,7 @@
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { useLang, type MessageKey } from "@/lib/lang";
+import ExternalLink from "@/components/ExternalLink";
 import {
   radarForRegion,
   threatsByStatus,
@@ -32,7 +33,7 @@ import {
   type RadarChannel,
   type ChannelFilterValue,
 } from "@/lib/threatRadar";
-import { resolveRegionPack, type RegionCode } from "@veriguard/engine/regions";
+import { resolveRegionPack, type RegionCode } from "@veriguard/detect/regions";
 import FreshnessStamp from "./FreshnessStamp";
 import PageHeader from "./PageHeader";
 import RegionBar from "./RegionBar";
@@ -142,16 +143,12 @@ function ThreatCard({ threat }: { threat: ThreatEntry }) {
         {threat.detection ??
           t(threat.coverage === "n/a" ? "radar.coverage.na.body" : "radar.coverage.none.body")}
         {" · "}
-        <a
-          href={roadmapUrl(threat)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline underline-offset-2 hover:text-[var(--clear)] transition-colors"
-        >
+        {/* Arrowed, like every other outbound link — see the note in
+            ScamCalendar for why main's reasoning beat my "arrow after a date
+            reads as part of the date". */}
+        <ExternalLink href={roadmapUrl(threat)}>
           {t("radar.source", { date: formatRadarDate(threat.lastSeen) })}
-          <span className="sr-only"> ({t("a11y.newTab")})</span>
-          <span aria-hidden="true"> ↗</span>
-        </a>
+        </ExternalLink>
       </p>
     </li>
   );

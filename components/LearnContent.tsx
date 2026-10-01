@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useLang, MessageKey } from "@/lib/lang";
+import ExternalLink from "@/components/ExternalLink";
 import { bold } from "@/lib/richText";
 import { AUTH_LEGEND, StaticAuthPill } from "@/components/AuthBadges";
 import PageHeader from "@/components/PageHeader";
@@ -19,7 +20,7 @@ import {
 import ReportingLink from "@/components/ReportingLink";
 import TacticDeck from "@/components/TacticDeck";
 import LearnHub from "@/components/LearnHub";
-import type { RegionCode } from "@veriguard/engine/regions";
+import type { RegionCode } from "@veriguard/detect/regions";
 import RegionBar from "@/components/RegionBar";
 
 // Type icons mirror the input/report type pickers used across the app, so they
@@ -544,20 +545,25 @@ export default function LearnContent({
           ) : (
           <div className="grid sm:grid-cols-2 gap-2 pt-1">
             {agencies.map(({ name, abbr: abbrTitle, site, href }) => (
-              <a key={site} href={href} target="_blank" rel="noopener noreferrer"
+              /* A whole card is the link, so its border reacts rather than an
+                 underline, and the arrow would sit oddly after an agency name
+                 — the domain beneath it already says this goes elsewhere. */
+              <ExternalLink key={site} href={href} variant="bare" arrow={false}
                 className="rounded-lg border border-[var(--rule)] bg-[var(--ink-2)] px-3.5 py-2.5 hover:border-[var(--clear)]/50 transition-colors block">
                 <div className="text-sm text-[var(--foreground)] font-semibold">
                   {abbrTitle ? <abbr title={abbrTitle} className="no-underline">{name}</abbr> : name}
-                  <span className="sr-only"> ({t("a11y.newTab")})</span>
                 </div>
                 {/* The arrow sits on the domain rather than after the agency
                     name: this is a block link, and the domain is the line that
-                    says where it goes. */}
+                    says where it goes. Hence `arrow={false}` above — the
+                    component's trailing arrow is suppressed so this one can be
+                    placed, not so the link goes unmarked. The component still
+                    supplies the new-tab note, the rel and the focus ring. */}
                 <div className="mt-0.5 font-[family-name:var(--font-mono-ui)] text-[12.5px] text-[var(--clear)]">
                   {site}
                   <span aria-hidden="true"> ↗</span>
                 </div>
-              </a>
+              </ExternalLink>
             ))}
           </div>
           )}

@@ -1,0 +1,51 @@
+{
+  // Build-only config. The repo root tsconfig type-checks with `noEmit` and
+  // `allowImportingTsExtensions`, neither of which can produce output — so the
+  // published build needs its own, rather than a flag override on the root.
+  //
+  // Not extending the root: it carries `paths`, the Next plugin and a DOM lib
+  // the engine must not depend on. Inheriting those would let an app-side
+  // assumption compile here and fail in a consumer's Node process, which is
+  // exactly the coupling this package exists to avoid.
+  "compilerOptions": {
+    // The floor a consumer can rely on. Node 18+ and every current browser
+    // clear this comfortably; going higher buys nothing the engine uses, and
+    // going lower would down-level syntax the source does not need.
+    "target": "ES2022",
+    // No "dom". The engine never touches a browser global, and omitting the
+    // lib is what makes that a compile error rather than a convention — a
+    // future `document` or `window` reference fails the build here even though
+    // the root config, which includes dom for the app, would accept it.
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    // Declarations are emitted with whatever specifiers the source wrote, so
+    // "Bundler" here produced `.d.ts` files full of extensionless relative
+    // imports. A consumer on `moduleResolution: "nodenext"` then gets TS2835
+    // on every one of them — nine errors from the barrel alone, before any of
+    // their own code is checked. The `.js` rewrite in tsup.config.ts does not
+    // reach declarations.
+    //
+    // "Bundler" also cannot be tightened into correctness, because it is the
+    // mode that PERMITS the omission; the extensions have to be added after
+    // emit, which is what rewriteRelativeSpecifiers in scripts/ does for both
+    // outputs. This stays "Bundler" to match how the source is written, and
+    // the rewrite is what makes the output resolvable.
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "declaration": true,
+    // No declarationMap. The maps point at `../src/*.ts`, and `files` ships
+    // dist/ without src/ — so every one of them dangles in the tarball, sending
+    // a consumer's go-to-definition at a path that is not there. Inlining the
+    // sources instead would ship the whole engine a second time.
+    "declarationMap": false,
+    "sourceMap": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

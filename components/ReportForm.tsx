@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { ScamType } from "@veriguard/engine/scamDetector";
-import { summariseAuth } from "@veriguard/engine/emailHeaders";
+import { ScamType } from "@veriguard/detect/scamDetector";
+import { summariseAuth } from "@veriguard/detect/emailHeaders";
 import { EmailTrackingReport } from "@/lib/emailTracking";
 import { analyseEmailSource } from "@/lib/emailSource";
 import { useLang, MessageKey } from "@/lib/lang";

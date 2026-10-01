@@ -23,7 +23,7 @@ import {
   type ScamSeason,
   type SeasonBand,
 } from "@/lib/scamCalendar";
-import { supportedRegions } from "@veriguard/engine/regions";
+import { supportedRegions } from "@veriguard/detect/regions";
 
 // Local dates throughout: isActiveOn reads getMonth/getDate, so constructing
 // with new Date(y, m, d) keeps the test independent of the runner's timezone.

@@ -1,0 +1,69 @@
+{
+  "name": "@veriguard/detect",
+  "version": "0.1.0",
+  "description": "Rule-based scam, phishing and impersonation detection. Runs offline — no API key, no model, nothing sent anywhere.",
+  "keywords": [
+    "scam",
+    "phishing",
+    "fraud-detection",
+    "smishing",
+    "url-analysis",
+    "email-security",
+    "offline"
+  ],
+  "license": "Apache-2.0",
+  "author": "Aleks Linde",
+  "homepage": "https://github.com/alekslinde/veriguard/tree/main/packages/detect#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alekslinde/veriguard.git",
+    "directory": "packages/detect"
+  },
+  "bugs": "https://github.com/alekslinde/veriguard/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./detectType": "./src/detectType.ts",
+    "./emailHeaders": "./src/emailHeaders.ts",
+    "./engineTypes": "./src/engineTypes.ts",
+    "./hostHash": "./src/hostHash.ts",
+    "./keyboardAdjacency": "./src/keyboardAdjacency.ts",
+    "./phoneIntel": "./src/phoneIntel.ts",
+    "./publicSuffix": "./src/publicSuffix.ts",
+    "./regions": "./src/regions/index.ts",
+    "./regions/*": "./src/regions/*.ts",
+    "./scamDetector": "./src/scamDetector.ts",
+    "./urlExpander": "./src/urlExpander.ts",
+    "./urlSanitizer": "./src/urlSanitizer.ts",
+    "./verdictRank": "./src/verdictRank.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "npm run build:js && npm run build:types && npm run build:finish",
+    "build:js": "tsup",
+    "build:types": "tsc -p tsconfig.build.json --emitDeclarationOnly",
+    "build:finish": "node scripts/finish-build.mjs",
+    "prepublishOnly": "npm run build",
+    "prepack": "node scripts/prepare-publish.mjs",
+    "postpack": "node scripts/restore-publish.mjs"
+  },
+  "dependencies": {
+    "libphonenumber-js": "^1.13.14"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.0",
+    "typescript": "^5"
+  }
+}

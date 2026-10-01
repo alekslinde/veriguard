@@ -46,6 +46,32 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      # The engine is published to npm, and nothing above this line looks at
+      # the form it is published in: the workspace resolves its TypeScript
+      # source, so the whole suite can be green while the built artifact is
+      # unloadable. enginePublish.test.ts is the suite that checks it, and it
+      # skips when dist/ is absent — which, without this step, is always.
+      #
+      # Three ways the build shipped broken while reporting success: emitted JS
+      # kept extensionless imports (ERR_MODULE_NOT_FOUND on first import),
+      # declarations kept them too (TS2835 for any consumer on nodenext), and
+      # the region packs emitted declarations with no JavaScript behind them.
+      - name: Build the published engine
+        run: npm run build:engine
+      - name: Publish-surface tests
+        run: npx vitest run __tests__/enginePublish.test.ts
+
+      # The MCP server is published too, and mcpPublish.test.ts skips without a
+      # build on the same terms. Its exposure differs from the engine's because
+      # it bundles: what can break silently is an inlined dependency that should
+      # have stayed external (freezing detection rules at our build time), a bin
+      # entry that is not executable, or an import left pointing outside the
+      # package root — none of which the source-level suite can see.
+      - name: Build the published MCP server
+        run: npm run build:mcp
+      - name: MCP publish-surface tests
+        run: npx vitest run __tests__/mcpPublish.test.ts
+
       # The Worker is outside the npm workspaces and vitest excludes workers/**,
       # so the root `npm test` above does not reach it — its suite would only
       # ever run if someone remembered to by hand. That is how the email()
@@ -57,3 +83,47 @@ jobs:
       - name: Inbound worker tests
         working-directory: workers/inbound-email
         run: npm test
+
+  # The published packages, on every Node version they claim to support.
+  #
+  # `engines.node` is a support claim, and publishing one that nothing tests is
+  # worse than publishing a narrow one: the install succeeds, and the failure
+  # arrives later as somebody else's bug report. So this matrix IS the claim —
+  # both manifests say ">=22" because these are the versions that run here.
+  #
+  # The claim was ">=18" until it was checked against the calendar: Node 18
+  # reached end of life in April 2025 and Node 20 in April 2026, so the
+  # manifests were promising support for two dead versions, one of them for
+  # over a year. Narrowed rather than back-filled with tests nobody would act
+  # on. `engines` is advisory — npm warns rather than refusing — so a reader on
+  # an older runtime is informed, not blocked.
+  #
+  # Separate job rather than a matrix over the one above: that one builds the
+  # Next app and runs the worker suite, neither of which is published and
+  # neither of which needs running twice. This installs, builds both packages,
+  # and loads them through Node's real resolver — the part that can actually
+  # differ between versions.
+  packages:
+    name: Packages on Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      # One version failing is a fact worth having about the other, so the
+      # matrix runs to completion rather than cancelling its sibling.
+      fail-fast: false
+      matrix:
+        node: ["22", "24"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: Build both published packages
+        run: |
+          npm run build:engine
+          npm run build:mcp
+      # The publish-surface suites, which load the built artifacts through
+      # Node's real resolver rather than the workspace's source mapping.
+      - name: Publish-surface tests
+        run: npx vitest run __tests__/enginePublish.test.ts __tests__/mcpPublish.test.ts

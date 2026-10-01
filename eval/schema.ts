@@ -9,8 +9,8 @@
 //
 // Nothing here imports the scoring engine. Types and pure mapping only.
 
-import type { CheckResult } from "@veriguard/engine/engineTypes";
-import type { RegionCode } from "@veriguard/engine/regions";
+import type { CheckResult } from "@veriguard/detect/engineTypes";
+import type { RegionCode } from "@veriguard/detect/regions";
 import { REPORT_TYPES, type ReportType } from "@/lib/reportTypes";
 
 /**

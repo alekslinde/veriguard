@@ -24,7 +24,7 @@
 
 import { scoreContent, type Scored } from "./runner";
 import type { EvalCase, SuspiciousPolicy } from "./schema";
-import { supportedRegions, resolveRegionPack, type RegionCode } from "@veriguard/engine/regions";
+import { supportedRegions, resolveRegionPack, type RegionCode } from "@veriguard/detect/regions";
 
 /** Verdict severity, ordered. Same scale the content runner compares on. */
 const RANK: Record<string, number> = { safe: 0, unknown: 1, suspicious: 2, likely_scam: 3 };

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkSms } from "@veriguard/engine/scamDetector";
+import { checkSms } from "@veriguard/detect/scamDetector";
 
 // "claim" is a prize verb in "claim your prize" and an ordinary administrative
 // noun in benefits, insurance and healthcare correspondence. The engine already

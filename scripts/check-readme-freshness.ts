@@ -5,7 +5,7 @@
 // refactor. Nothing fails when one goes stale — the file still renders, CI
 // stays green, and the drift is only found when someone follows an instruction
 // that no longer works. docs/threat-intel/README.md described detection as
-// living in `lib/` for weeks after the engine moved to packages/engine/.
+// living in `lib/` for weeks after the engine moved to packages/detect/.
 //
 // This is deliberately NOT a timer. "Review the docs every N weeks" fires
 // whether or not anything changed, so it is ignored on the quiet weeks and
@@ -57,7 +57,11 @@ export const SUBJECTS: ReadmeSubject[] = [
   { readme: "docs/threat-intel/README.md", subject: ["docs/threat-intel", "scripts/check-sources.mjs", "scripts/check-source-coverage.ts"] },
   { readme: "docs/scam-calendar/README.md", subject: ["docs/scam-calendar", "lib/scamCalendar.ts"] },
   { readme: "eval/README.md", subject: ["eval", "scripts/eval.ts", "scripts/eval-metamorphic.ts"] },
-  { readme: "packages/engine/README.md", subject: ["packages/engine/src"] },
+  { readme: "packages/detect/README.md", subject: ["packages/detect/src"] },
+  // The tool descriptions ARE the documentation a caller reads, so the server
+  // source is a subject alongside the README; and the build config decides what
+  // ships, which the README describes.
+  { readme: "packages/mcp/README.md", subject: ["packages/mcp/src", "packages/mcp/tsup.config.ts"] },
   { readme: "workers/inbound-email/README.md", subject: ["workers/inbound-email"] },
   // The manifest and build config carry as many present-tense claims as the
   // source does — permissions, output paths, env vars — so both are subjects.

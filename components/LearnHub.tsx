@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useLang, type MessageKey } from "@/lib/lang";
-import type { RegionCode } from "@veriguard/engine/regions";
+import type { RegionCode } from "@veriguard/detect/regions";
 import { circulatingLures } from "@/lib/threatRadar";
 
 /**

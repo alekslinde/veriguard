@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { publicSuffix, registrableDomain, registrableLabel, isNationalCommercialSuffix } from "@veriguard/engine/publicSuffix";
-import { checkUrl } from "@veriguard/engine/scamDetector";
-import { resolveRegionPack, supportedRegions } from "@veriguard/engine/regions";
+import { publicSuffix, registrableDomain, registrableLabel, isNationalCommercialSuffix } from "@veriguard/detect/publicSuffix";
+import { checkUrl } from "@veriguard/detect/scamDetector";
+import { resolveRegionPack, supportedRegions } from "@veriguard/detect/regions";
 
 // The PSL replaced a hand-kept set of two-part suffixes that was explicitly
 // "scoped to the ccTLDs the packs actually cover" — a rule with an expiry date.

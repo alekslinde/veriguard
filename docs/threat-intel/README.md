@@ -2,7 +2,7 @@
 
 Periodic research briefs for Veriguard. Each roadmap surveys new and evolving
 scam tactics, then proposes concrete detection changes to the engine
-(`packages/engine/`).
+(`packages/detect/`).
 
 **Roadmaps are research-and-proposals only. They never modify detection code.**
 That ships separately, via numbered issues, in its own PR with tests.
@@ -270,7 +270,7 @@ an issue.** Same before/after discipline a probe uses — a sweep looks outward
 for threats, but a proposal is a claim about *our code*, and that claim is
 checked the same way either direction.
 
-The region word lists are not the whole detector. `packages/engine/src/scamDetector.ts`
+The region word lists are not the whole detector. `packages/detect/src/scamDetector.ts`
 carries composite signals — `jobSignals`, `investmentGroupSignals`, the quishing
 regex — that already cover patterns a word-list grep reports as missing. Grep
 both, or the proposal describes a gap that isn't there.
@@ -286,7 +286,7 @@ For each candidate phrase, record the current verdict and score, then:
   and can move a verdict on its own. The engine records three prior instances of
   exactly this bug: `mygovid` and `new bsb` (`regions/au.ts`), and `updated bank
   details` (`regions/base.ts`, with the fix in `scamDetector.ts`) — all under
-  `packages/engine/src/`.
+  `packages/detect/src/`.
 - **Covered by a composite** — propose extending the composite, not the word
   list. A phrase bolted onto a list to catch something a composite nearly
   catches will usually double-score against the composite's own regex.

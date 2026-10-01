@@ -37,14 +37,14 @@ on:
     # engine, the packs, the corpus and the harness itself; not app or UI code,
     # which cannot affect a score.
     paths:
-      - "packages/engine/**"
+      - "packages/detect/**"
       - "eval/**"
       - "scripts/eval-metamorphic.ts"
       - ".github/workflows/metamorphic.yml"
   push:
     branches: [main]
     paths:
-      - "packages/engine/**"
+      - "packages/detect/**"
       - "eval/**"
       - "scripts/eval-metamorphic.ts"
   schedule:

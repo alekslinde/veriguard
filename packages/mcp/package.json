@@ -1,0 +1,58 @@
+{
+  "name": "@veriguard/mcp",
+  "version": "0.1.0",
+  "description": "MCP server for rule-based scam, phishing and impersonation checks. Scoring runs locally — the content you check is never sent anywhere.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "scam",
+    "phishing",
+    "fraud-detection",
+    "smishing",
+    "security"
+  ],
+  "license": "Apache-2.0",
+  "author": "Aleks Linde",
+  "homepage": "https://github.com/alekslinde/veriguard/tree/main/packages/mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alekslinde/veriguard.git",
+    "directory": "packages/mcp"
+  },
+  "bugs": "https://github.com/alekslinde/veriguard/issues",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "veriguard-mcp": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.31.0",
+    "@veriguard/detect": "^0.1.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.0",
+    "typescript": "^5"
+  }
+}

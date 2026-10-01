@@ -8,8 +8,12 @@
 
 Australian scam / phishing / impersonation detector. Users paste a dodgy link,
 SMS, phishing email, or phone number and get an instant rule-based verdict.
-Detection is **hardcoded pattern/heuristic logic, not an LLM** — no ML, no
-external analysis APIs, nothing sent off-device for scoring.
+Detection today is **hardcoded pattern/heuristic logic — no model in the
+scoring path**, no external analysis APIs, nothing sent off-device for scoring.
+A model may only enter that path if it clears the same privacy bar: it runs
+locally, it is opt-in, and no user content leaves the device. Absent that, the
+answer is no. See *Detection is rule-based* below for what this means in
+practice.
 
 **Stack:** Next.js 16.3 (App Router) + React 19, Tailwind CSS v4
 **Package manager:** npm (npm workspaces — `packages/*`)
@@ -28,8 +32,8 @@ app/            ← Routes (App Router): page.tsx, about/, learn/, radar/,
                   stats, feed-stats
 components/     ← UI components (check here first) — CheckFlow, ReportForm,
                   VerdictBadge, SubmissionsBrowser, etc.
-packages/engine ← The detection engine, as its own workspace package
-                  (@veriguard/engine). src/: scamDetector.ts,
+packages/detect ← The detection engine, as its own workspace package
+                  (@veriguard/detect). src/: scamDetector.ts,
                   phoneIntel.ts, urlSanitizer.ts, urlExpander.ts,
                   detectType.ts, emailHeaders.ts, engineTypes.ts,
                   regions/ (au, gb, us, ca, ie, nz, rest-of-world).
@@ -60,7 +64,7 @@ docs/           ← threat-intel/ — PUBLIC sweep research only, one file per
 ```
 
 **Import detection from the package, not `lib/`:**
-`import { analyzeContent } from "@veriguard/engine/scamDetector"`.
+`import { analyzeContent } from "@veriguard/detect/scamDetector"`.
 Top-level entry points are `checkUrl`, `checkSms`, `checkEmail`, `checkPhone`,
 `checkCustom` and `analyzeContent` — the last returns an **array**, one result
 per identifier found in the input.
@@ -70,7 +74,7 @@ per identifier found in the input.
 ## Component & Code Reuse
 
 - Check `components/` before building anything new; extend before creating
-- Scoring logic lives in `packages/engine/src/` — check there before writing
+- Scoring logic lives in `packages/detect/src/` — check there before writing
   any detection or URL/phone parsing helper
 - App-side logic lives in `lib/` — check there before writing presentation,
   email, data or safety helpers
@@ -89,8 +93,19 @@ per identifier found in the input.
 
 ## Stack Conventions
 
-- **Detection is rule-based only** — keyword lists, domain allow/denylists,
-  regex, weighted scoring. Never introduce an LLM or external analysis API.
+- **Detection is rule-based** — keyword lists, domain allow/denylists, regex,
+  weighted scoring. **Never** an LLM in the scoring path, and never an external
+  analysis API: sending user content to a third party to be scored is the thing
+  this project exists not to do, whatever the service promises.
+  - A **local, opt-in** model is the one exception on the table, and it is not
+    a default: it must run on-device, download only on explicit opt-in with its
+    size stated, and reach the scorer the way every other outside capability
+    does — as an argument, producing named and capped signals, so that with no
+    model present results are identical to today's.
+  - Shipping one means changing what the app claims. `README.md` is already
+    worded for this; `app/about/page.tsx` says "no AI anywhere in the scoring",
+    which would stop being true. That copy changes in the **same commit** as
+    the model, never after.
 - Styling via **Tailwind CSS v4** (utility classes; `app/globals.css`)
 - App Router route handlers under `app/api/*/route.ts`
 - i18n strings go in `messages/` — don't hardcode user-facing copy
@@ -104,7 +119,7 @@ per identifier found in the input.
 
 Use these scopes in commit messages:
 
-- `(detector)` — Detection logic in `packages/engine/` (scamDetector,
+- `(detector)` — Detection logic in `packages/detect/` (scamDetector,
   phoneIntel, region packs, etc.)
 - `(ui)` — Components and screens
 - `(api)` — Route handlers under `app/api/`

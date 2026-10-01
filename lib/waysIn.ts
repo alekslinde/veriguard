@@ -12,8 +12,10 @@
 
 import type { MessageKey } from "@/lib/i18n";
 
-export const ENGINE_SOURCE_URL =
-  "https://github.com/alekslinde/veriguard/tree/main/packages/engine";
+// The package source URL used to be declared here as well as in
+// lib/npmPackage.ts. Two copies of the same path is how a rename gets applied
+// to one of them — npmPackage.ts is the single place both are named now, and
+// this module no longer needs it: the npm row points at the on-site docs.
 
 /**
  * Where scoring happens, which is the distinction users actually care about.
@@ -63,11 +65,14 @@ export interface WayIn {
   /**
    * Call to action, where the row ends in one.
    *
-   * Optional, and currently set only on the package — which does not render it
-   * either, because it is pending. Every other row's action is something richer
-   * than a link: the extension offers a button per browser, email offers an
-   * address and a copy button. A required field that no row renders invites the
-   * next person to wire it back up and quietly duplicate one of those.
+   * Optional, and set only on the packages row, whose action really is a single
+   * link. Every other row's action is something richer: the extension offers a
+   * button per browser, email offers an address and a copy button. Making this
+   * required would invite the next person to give one of those a redundant
+   * link beside the thing it already has.
+   *
+   * Rendered only with `href`, since a label with nowhere to go is not an
+   * action.
    */
   cta?: MessageKey;
   /**
@@ -83,10 +88,18 @@ export interface WayIn {
   /**
    * Set where the surface is built but not yet distributed.
    *
-   * The row renders flat when this is set — no disclosure, no link, nothing to
-   * click. There is nothing behind it to open: `detail` would describe an
-   * install nobody can run, so a chevron would only invite a click that pays
-   * out in disappointment.
+   * NO ROW SETS THIS TODAY, and that is deliberate rather than an oversight —
+   * the packages row used it until they were published, and clearing the one
+   * flag was the whole change, as the note below predicted. It is kept because
+   * "built but not distributed" recurs: a second extension listing, a new
+   * package, a region pack with no data yet.
+   *
+   * The row renders flat when this is set — no disclosure, nothing to expand.
+   * There is nothing behind it to open: `detail` would describe an install
+   * nobody can run, so a chevron would only invite a click that pays out in
+   * disappointment. It still links to on-site documentation when `href` is a
+   * path, because docs exist whether or not the thing they document ships; see
+   * PendingRow.
    *
    * `detail`, `cta` and `href` stay authored on a pending entry rather than
    * being emptied. They are what the row becomes the day it ships, and clearing
@@ -136,11 +149,12 @@ export const WAYS_IN: readonly WayIn[] = [
     how: "ways.npm.how",
     detail: "ways.npm.detail",
     cta: "ways.npm.cta",
-    // The engine source for now — the package has no registry page to point at,
-    // and this is where its docs will live. Unrendered while `unavailable` is
-    // set: the row is flat until the package ships. Repoint it at the docs then.
-    href: ENGINE_SOURCE_URL,
+    // The on-site docs, which cover both packages — the library and the MCP
+    // server. Points here rather than at the GitHub source or at a registry
+    // page: a reader following "read the docs" wants prose with copyable
+    // samples, and the page links out to both packages' registry entries and
+    // READMEs itself.
+    href: "/packages",
     runs: "device",
-    unavailable: "ways.npm.unavailable",
   },
 ];

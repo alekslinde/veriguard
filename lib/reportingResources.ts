@@ -10,7 +10,7 @@
 // pack with no URL (rest-of-world) renders its generic body as plain text
 // rather than linking nowhere.
 
-import { resolveRegionPack, type RegionInput } from "@veriguard/engine/regions";
+import { resolveRegionPack, type RegionInput } from "@veriguard/detect/regions";
 
 export interface ReportingLink {
   /** Pack's reporting body, e.g. "Scamwatch". */

@@ -1,0 +1,138 @@
+name: Publish engine
+
+# Publishes @veriguard/detect to npm when a tag names a version of it.
+#
+# Tagged rather than run on every push to main: a version on npm cannot be
+# replaced, and unpublishing is restricted after 72 hours. Publishing needs to
+# be something somebody does on purpose, with a tag naming which version.
+#
+# The tag carries the package prefix (engine-v0.1.0) because this repo also
+# releases the app and the extension, each on its own version line. A bare
+# "v0.1.0" would not say which one it meant.
+
+on:
+  push:
+    tags:
+      - "engine-v*"
+  # Publishing is irreversible, so it is also available by hand — for a retry
+  # after a transient registry failure, without moving a tag that is already
+  # pointing at the right commit.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to publish from, e.g. engine-v0.1.0. Leave blank to verify only."
+        type: string
+        required: false
+      dry_run:
+        description: "Pack and verify, but do not publish"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build, verify and publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required for npm provenance: the signed statement linking this tarball
+      # to the commit and workflow that produced it is minted from this token.
+      id-token: write
+    steps:
+      # A manual run checks out the tag it was given rather than the branch it
+      # was dispatched from, so a retry publishes the same commit the tag names
+      # rather than whatever main has moved on to. Blank means verify-only, and
+      # the default checkout is fine for that.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-node@v7
+        with:
+          # 24, not 22. Trusted publishing exchanges the Actions OIDC token for
+          # a short-lived registry credential, which needs npm >= 11.5.1 — and
+          # Node 22 bundles npm 10.x. On an old npm no exchange happens, the
+          # PUT goes out unauthenticated, and the registry answers 404. That
+          # reads as "package missing" rather than "credential missing", which
+          # sends you debugging the wrong thing.
+          node-version: "24"
+          cache: npm
+          # The registry the OIDC exchange targets. Needed even though no token
+          # is written: setup-node uses it to scope the .npmrc it creates.
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci
+
+      - name: Build the engine
+        run: npm run build:engine
+
+      # The whole suite, not just the engine's own tests. The package is
+      # consumed by the app and the extension in this same tree, so a break in
+      # either is a break in what is about to be published.
+      - name: Typecheck, lint and test
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+
+      # The tag must agree with the version being published. Without this, a
+      # mistyped tag publishes whatever package.json happens to say — under a
+      # version number nothing in the history points at, and it cannot be taken
+      # back.
+      #
+      # Only meaningful on a tag run. A manual run has a branch ref, so there is
+      # no tag to agree with; the publish step below is what refuses to run.
+      - name: Check the tag matches the package version
+        if: github.event_name == 'push'
+        run: |
+          tag_version="${GITHUB_REF_NAME#engine-v}"
+          pkg_version="$(node -p "require('./packages/detect/package.json').version")"
+          if [ "$tag_version" != "$pkg_version" ]; then
+            echo "tag ${GITHUB_REF_NAME} does not match package version ${pkg_version}" >&2
+            exit 1
+          fi
+
+      # What npm would actually ship, printed before it ships. `files` is easy
+      # to get wrong in the direction that matters least visibly — omitting
+      # something the package needs, or including something it should not.
+      - name: Show the tarball contents
+        run: npm pack --dry-run --workspace @veriguard/detect
+
+      # Packing edits package.json and postpack restores it. If a pack died
+      # between the two, the tree still holds a dist/-pointing map — publishing
+      # from that state would ship a package whose `exports` was rewritten
+      # twice. Cheap to check, and the failure is otherwise silent.
+      - name: Check packing left the tree clean
+        run: git diff --exit-code -- packages/detect/package.json
+
+      # STAGES rather than publishes. The tarball is uploaded and held; it
+      # reaches no installer until a maintainer approves it with 2FA
+      # (`npm stage list`, then `npm stage approve <id>`, or the Staged
+      # Packages tab on npmjs.com).
+      #
+      # That is the point of the arrangement: a version on npm cannot be
+      # replaced and unpublishing is restricted after 72 hours, so no workflow
+      # run — including one started by a mistyped tag — should be able to put
+      # code in front of users by itself. Merging reviews the change; approving
+      # the stage reviews the artifact.
+      #
+      # Auth is OIDC, so there is deliberately no NODE_AUTH_TOKEN here, not
+      # even an empty one: an empty value reads as absent while implying a
+      # token signs these releases. The trusted publisher is configured on
+      # npmjs.com instead — owner, repo, `publish-engine.yml` as the workflow
+      # filename, environment left empty, and "Allow npm publish" UNCHECKED so
+      # the staging gate cannot be bypassed.
+      #
+      # --provenance is passed explicitly rather than left to
+      # publishConfig.provenance, so the attestation is visible at the call
+      # site and a manifest edit cannot silently drop it.
+      #
+      # Runs on a tag push, or on a manual run that named a tag and turned
+      # dry_run off. The manual path previously could not publish at all: it
+      # was gated on `refs/tags/`, which a workflow_dispatch ref never matches,
+      # so the retry it existed for reported green and uploaded nothing.
+      - name: Stage the release
+        if: |
+          (github.event_name == 'push' || inputs.tag != '') && inputs.dry_run != true
+        run: npm stage publish --workspace @veriguard/detect --provenance

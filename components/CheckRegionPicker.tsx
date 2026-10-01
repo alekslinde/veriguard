@@ -2,7 +2,7 @@
 
 import { useLang } from "@/lib/lang";
 import type { CheckFeedback } from "@/lib/checkFeedback";
-import { REGION_OPTIONS } from "@veriguard/engine/regions";
+import { REGION_OPTIONS } from "@veriguard/detect/regions";
 
 /**
  * Explicit region choice for a scam check.

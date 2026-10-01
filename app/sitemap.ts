@@ -5,7 +5,7 @@ import { SITE_URL } from "@/lib/siteUrl";
 // indexable content belongs here so Google can discover it without relying on
 // internal-link crawling alone. API routes and the not-found page are excluded
 // (the latter is noindex by design).
-const ROUTES = ["", "about", "learn", "calendar", "radar", "submissions"] as const;
+const ROUTES = ["", "about", "learn", "calendar", "radar", "submissions", "packages"] as const;
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();

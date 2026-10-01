@@ -10,7 +10,7 @@ Edge, Firefox and Safari from one source.
 | Firefox | `npm run ext:firefox` | `dist/firefox`; differs only in the background form and the `browser_specific_settings` block (gecko id, data declaration, version floors). Desktop 140+, Android 142+ — on Android the toolbar popup is the only entry point, as that runtime has no `menus` API |
 | Safari | `npm run ext:safari` | Wraps `dist/chrome` in an Xcode project. Builds; needs a signing identity to run |
 
-*Last reviewed: 2026-09-25.*
+*Last reviewed: 2026-09-26.*
 
 ## What it does, and what it deliberately does not
 
@@ -63,7 +63,7 @@ Consequences worth understanding before changing anything here:
 - **The evidence rows add up to the score above them.** The verdict is the worst
   identifier's; the number is the sum of the rows shown, capped at 100 with a
   clamp row when the cap bites. Both come from
-  `@veriguard/engine/verdictRank`, shared with the website — composing either
+  `@veriguard/detect/verdictRank`, shared with the website — composing either
   half separately is what breaks the invariant, and it has broken before.
 - **No host permissions, no content scripts.** Nothing reads the page. The
   context menu hands over the text the user selected, and that is the entire
@@ -262,7 +262,7 @@ silently rather than loudly:
   text that quotes it. A test fails if a markup-execution sink reaches the
   bundle.
 - **Verdict collapse *and* evidence composition come from
-  `@veriguard/engine/verdictRank`,** shared with the website, so the two
+  `@veriguard/detect/verdictRank`,** shared with the website, so the two
   surfaces cannot disagree about which identifier wins or about what the rows
   under the score add up to. `check.ts` returns the composed `signals`; the
   popup renders them as given. Re-deriving them from `results` is the specific

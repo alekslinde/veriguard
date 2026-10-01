@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { checkSms, checkUrl, checkEmail, checkPhone } from "@veriguard/engine/scamDetector";
-import { analysePhone } from "@veriguard/engine/phoneIntel";
-import { resolveRegionPack } from "@veriguard/engine/regions";
-import { GB } from "@veriguard/engine/regions/gb";
-import { AU } from "@veriguard/engine/regions/au";
+import { checkSms, checkUrl, checkEmail, checkPhone } from "@veriguard/detect/scamDetector";
+import { analysePhone } from "@veriguard/detect/phoneIntel";
+import { resolveRegionPack } from "@veriguard/detect/regions";
+import { GB } from "@veriguard/detect/regions/gb";
+import { AU } from "@veriguard/detect/regions/au";
 
 // Phase 5 — the UK pack. Two jobs here:
 //

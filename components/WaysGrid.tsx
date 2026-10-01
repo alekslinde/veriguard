@@ -20,7 +20,9 @@
 // detail on behalf of a reader who has not asked for it.
 
 import { useState, useSyncExternalStore } from "react";
+import Link from "next/link";
 import { useLang } from "@/lib/lang";
+import ExternalLink from "@/components/ExternalLink";
 import { bold } from "@/lib/richText";
 import { WAYS_IN, type WayIn } from "@/lib/waysIn";
 import WayIcon from "@/components/WayIcon";
@@ -88,15 +90,17 @@ function InstallLinks() {
                 {t("ways.ext.yours")}
               </span>
             )}
-            {/* These leave the site for a browser store, so they carry the
-                same two marks every other outbound link here does: the arrow
-                that says so visually, and the sr-only note that says so to a
-                screen reader. They were the only external links in the app
-                without either — see SiteFooter, ReportingLink, ThreatRadar. */}
-            <span className="sr-only"> ({t("a11y.newTab")})</span>
-            <span aria-hidden="true" className="ml-1 text-[11px] opacity-70">
-              ↗
-            </span>
+            {/* No outbound marks here.
+
+                `label` is shared with the unpublished-browser branch below,
+                which renders plain text and must stay unmarked — nothing
+                navigates, so an arrow would promise a click that does nothing.
+                The published branch wraps this in ExternalLink, which supplies
+                the arrow, the sr-only note, the rel and the focus ring.
+
+                Both were written here once, before the component existed, and
+                the merge left the pair doubled: two arrows on every store
+                button and the new-tab note announced twice. */}
           </>
         );
         const shell =
@@ -133,10 +137,9 @@ function InstallLinks() {
 
         return (
           <li key={target.id}>
-            <a
+            <ExternalLink
               href={target.url}
-              target="_blank"
-              rel="noopener noreferrer"
+              variant="bare"
               className={`${shell} transition-colors ${
                 isYours
                   ? "border-[var(--clear)]/50 bg-[var(--clear)]/10 text-[var(--clear)]"
@@ -144,7 +147,7 @@ function InstallLinks() {
               }`}
             >
               {label}
-            </a>
+            </ExternalLink>
           </li>
         );
       })}
@@ -360,6 +363,24 @@ function Tile({ way }: { way: WayIn }) {
           ) : (
             <p className="text-[13px] text-[var(--faint)]">{t("ways.ext.unavailable")}</p>
           ))}
+
+        {/* A plain link, for the tile whose action is one. Internal, so Link
+            rather than ExternalLink — the ↗ would say "this leaves the site",
+            which it does not.
+
+            Both `cta` and `href` are required: a label with nowhere to go is
+            not an action, and an href with no label has nothing to click. */}
+        {way.cta && way.href && (
+          <p>
+            <Link
+              href={way.href}
+              className="text-[13px] font-semibold text-[var(--clear)] hover:underline underline-offset-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--clear)] rounded-sm"
+            >
+              {t(way.cta)}
+              <span aria-hidden="true"> →</span>
+            </Link>
+          </p>
+        )}
       </div>
     </details>
   );

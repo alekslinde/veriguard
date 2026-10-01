@@ -64,7 +64,7 @@ be merged regardless of how good it otherwise is.
    (honeypot, rate limit, timing checks, dedupe) protects the report flow.
    Changes here need explicit maintainer sign-off.
 4. **The engine stays framework-free.** Code in
-   [`packages/engine/`](packages/engine/) imports no React and no `next/*`, and
+   [`packages/detect/`](packages/detect/) imports no React and no `next/*`, and
    makes no network calls of its own. A teaching or presentation layer over a
    signal belongs in [`lib/`](lib/), not the engine.
 
@@ -117,7 +117,7 @@ Use a scope prefix so history stays scannable (these match the scopes in
 
 | Scope | For changes in |
 | --- | --- |
-| `detector` | Detection logic in `packages/engine/` (scamDetector, phoneIntel, region packs, …) |
+| `detector` | Detection logic in `packages/detect/` (scamDetector, phoneIntel, region packs, …) |
 | `ui` | Components and screens |
 | `api` | Route handlers under `app/api/` |
 | `email` | Email parsing / inbound / distiller |
@@ -153,7 +153,7 @@ Detection is the heart of the project, so it carries the highest bar.
   much as missing a real one. New signals should be weighted, not absolute, and
   a plausible legitimate case should be tested.
 - **Region packs are data, not logic.** A country pack in
-  [`packages/engine/src/regions/`](packages/engine/src/regions/) layers national
+  [`packages/detect/src/regions/`](packages/detect/src/regions/) layers national
   signals (agencies, banks, brands, number-plan semantics, allowlists) on top of
   the shared base set. Add signals to the pack; don't fork the scoring engine.
 - **State coverage honestly.** Where a region's rules are incomplete, a clean

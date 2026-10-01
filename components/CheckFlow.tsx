@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
-import { AnalyzedIdentifier, ScamType } from "@veriguard/engine/scamDetector";
-import { detectType } from "@veriguard/engine/detectType";
-import { extractIdentifiers, defangEmail } from "@veriguard/engine/urlSanitizer";
-import { parseEmailHeaders, summariseAuth } from "@veriguard/engine/emailHeaders";
+import { AnalyzedIdentifier, ScamType } from "@veriguard/detect/scamDetector";
+import { detectType } from "@veriguard/detect/detectType";
+import { extractIdentifiers, defangEmail } from "@veriguard/detect/urlSanitizer";
+import { parseEmailHeaders, summariseAuth } from "@veriguard/detect/emailHeaders";
 import { analyseEmailSource, EmailSourceAnalysis } from "@/lib/emailSource";
 import { distillEmailContent } from "@/lib/emailDistiller";
 import { analysePressureTactics } from "@/lib/pressureTactics";
 import { defangValue, defangFlag, composeVerdictWithEvidence, isClean, overallCoverage, pooledSignals } from "@/lib/verdictSummary";
-import { worstBy } from "@veriguard/engine/verdictRank";
+import { worstBy } from "@veriguard/detect/verdictRank";
 import { useLang, MessageKey } from "@/lib/lang";
 // Capability probe only — the OCR engine itself is imported dynamically so the
 // WASM core is never downloaded by someone who does not upload an image.

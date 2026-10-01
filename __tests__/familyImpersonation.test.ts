@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkEmail, checkSms, stripForwardingPrefix } from "@veriguard/engine/scamDetector";
+import { checkEmail, checkSms, stripForwardingPrefix } from "@veriguard/detect/scamDetector";
 
 // The "Hi Mum" script (D2 / #251). Before this rule every message below scored
 // zero and rendered as "Looks pretty right to us" — the worst possible answer

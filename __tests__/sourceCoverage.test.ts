@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 // Plain .mjs helper; allowJs resolves it.
 import { parseRegistry } from "../scripts/check-sources.mjs";
 import { coverageByRegion, uncovered, human, markdown } from "../scripts/check-source-coverage";
-import { supportedRegions } from "@veriguard/engine/regions";
+import { supportedRegions } from "@veriguard/detect/regions";
 
 const registry = parseRegistry(
   readFileSync(resolve(__dirname, "../docs/threat-intel/sources.yml"), "utf8"),

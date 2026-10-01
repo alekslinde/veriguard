@@ -6,7 +6,7 @@ import {
   CHECK_REGION_STORAGE_KEY,
   LEGACY_CHECK_REGION_STORAGE_KEY,
 } from "@/lib/checkRegion";
-import { supportedRegions } from "@veriguard/engine/regions";
+import { supportedRegions } from "@veriguard/detect/regions";
 
 describe("normaliseCheckRegion", () => {
   it("accepts every supported region code, case-insensitively", () => {

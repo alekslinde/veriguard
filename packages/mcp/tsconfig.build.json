@@ -1,0 +1,39 @@
+{
+  // Build-only config, for the same reason the engine has one: the repo root
+  // tsconfig carries `incremental`, `noEmit`, `paths`, the Next plugin and a
+  // DOM lib, none of which belong in a published Node package. tsup picks up
+  // the nearest tsconfig unless told otherwise, and inheriting the root's made
+  // the declaration build fail outright (TS5074 on --incremental).
+  "compilerOptions": {
+    // Matches the engine's floor, so a consumer who can install one can install
+    // both. Node 18+ clears it comfortably.
+    "target": "ES2022",
+    // No "dom". This runs in Node, and omitting the lib makes a stray browser
+    // global a compile error here rather than a runtime failure in someone's
+    // MCP client.
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    // "Bundler" matches how the source is written and is correct here in a way
+    // it is not for the engine: this package is bundled, so the emitted entry
+    // has no relative specifiers left to resolve. The engine needs a post-emit
+    // rewrite precisely because it is file-per-module; nothing equivalent is
+    // needed here.
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "declaration": true,
+    "declarationMap": false,
+    "sourceMap": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": false,
+    "outDir": "dist",
+    // lib/signalTactics.ts is inlined by the bundler, so it has to be in the
+    // program for the declaration build to see it. rootDir is left unset for
+    // the same reason — the input spans two directories.
+    "resolveJsonModule": true
+  },
+  "include": ["src/**/*.ts", "../../lib/signalTactics.ts"],
+  "exclude": ["node_modules", "dist"]
+}

@@ -13,7 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { supportedRegions, FALLBACK_REGION } from "@veriguard/engine/regions";
+import { supportedRegions, FALLBACK_REGION } from "@veriguard/detect/regions";
 import { buildManifest } from "../extension/src/manifest";
 
 const ROOT = process.cwd();

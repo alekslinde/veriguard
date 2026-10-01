@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { checkUrl, checkSms, checkEmail, checkCustom, checkPhone, analyzeContent } from "@veriguard/engine/scamDetector";
-import { DEFAULT_REGION } from "@veriguard/engine/regions";
-import { normaliseForAnalysis } from "@veriguard/engine/urlSanitizer";
+import { checkUrl, checkSms, checkEmail, checkCustom, checkPhone, analyzeContent } from "@veriguard/detect/scamDetector";
+import { DEFAULT_REGION } from "@veriguard/detect/regions";
+import { normaliseForAnalysis } from "@veriguard/detect/urlSanitizer";
 
 // Phase 2 threads an optional region through every checker. These assert the
 // plumbing: omitting it must be identical to today's behaviour, and an

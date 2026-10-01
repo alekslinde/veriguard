@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 //
-// Regenerates packages/engine/src/publicSuffixList.ts from publicsuffix.org.
+// Regenerates packages/detect/src/publicSuffixList.ts from publicsuffix.org.
 //
 //   npm run psl
 //
@@ -36,7 +36,7 @@ import { fileURLToPath } from "node:url";
 const SOURCE = "https://publicsuffix.org/list/public_suffix_list.dat";
 const OUT = join(
   dirname(fileURLToPath(import.meta.url)),
-  "../packages/engine/src/publicSuffixList.ts",
+  "../packages/detect/src/publicSuffixList.ts",
 );
 
 const res = await fetch(SOURCE);

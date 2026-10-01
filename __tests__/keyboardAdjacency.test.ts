@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { isKeyboardTypo, findKeyboardTypo } from "@veriguard/engine/keyboardAdjacency";
-import { checkUrl } from "@veriguard/engine/scamDetector";
-import { resolveRegionPack, supportedRegions } from "@veriguard/engine/regions";
+import { isKeyboardTypo, findKeyboardTypo } from "@veriguard/detect/keyboardAdjacency";
+import { checkUrl } from "@veriguard/detect/scamDetector";
+import { resolveRegionPack, supportedRegions } from "@veriguard/detect/regions";
 
 describe("isKeyboardTypo — the three squat shapes", () => {
   it("catches an adjacent-key substitution", () => {

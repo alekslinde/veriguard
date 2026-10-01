@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkSms, checkEmail } from "@veriguard/engine/scamDetector";
+import { checkSms, checkEmail } from "@veriguard/detect/scamDetector";
 
 // A message whose links all point at the agency's OWN allowlisted domain must
 // not be told to "verify directly via official channels" — the link already is

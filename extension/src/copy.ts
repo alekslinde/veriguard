@@ -10,7 +10,7 @@
 // every string on every page — a few hundred entries — and the popup needs
 // eight. The test is what keeps the copy honest without the bundle.
 
-import type { Verdict } from "@veriguard/engine/verdictRank";
+import type { Verdict } from "@veriguard/detect/verdictRank";
 
 export const VERDICT_COPY: Record<Verdict, { label: string; sub: string }> = {
   safe: {

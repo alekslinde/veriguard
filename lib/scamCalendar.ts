@@ -22,7 +22,7 @@
 // (Christmas parcel scams run late November into early January) — isActiveOn
 // handles that case explicitly rather than assuming start <= end.
 
-import type { RegionCode } from "@veriguard/engine/regions";
+import type { RegionCode } from "@veriguard/detect/regions";
 
 /** A recurring annual window. Month is 1-12 to match how people write dates. */
 export interface SeasonWindow {

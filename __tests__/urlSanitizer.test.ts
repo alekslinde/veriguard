@@ -8,7 +8,7 @@ import {
   defangEmail,
   defangPhone,
   extractIdentifiers,
-} from "@veriguard/engine/urlSanitizer";
+} from "@veriguard/detect/urlSanitizer";
 
 describe("defang", () => {
   it("converts https to hxxps", () => {

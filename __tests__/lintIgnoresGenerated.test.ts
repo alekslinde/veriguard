@@ -120,7 +120,7 @@ describe("eslint ignores generated output", () => {
     for (const file of [
       "lib/verdictSummary.ts",
       "app/api/blocklist/route.ts",
-      "packages/engine/src/verdictRank.ts",
+      "packages/detect/src/verdictRank.ts",
       "extension/src/browser.ts",
       "components/CheckFlow.tsx",
     ]) {

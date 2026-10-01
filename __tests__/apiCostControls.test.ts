@@ -248,7 +248,7 @@ describe("analysis cost is bounded by input length", () => {
 
   it("analyses a hostile display name in linear time", async () => {
     const { analyseEmailIdentities, parseEmailHeaders } = await import(
-      "@veriguard/engine/emailHeaders"
+      "@veriguard/detect/emailHeaders"
     );
 
     // An address-shaped display name that never completes a match. Against the

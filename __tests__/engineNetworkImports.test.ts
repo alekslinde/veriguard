@@ -170,7 +170,7 @@ describe("the rule explains itself and does not over-reach", () => {
 //
 // Everything above re-declares the rules against a bare path, which proves the
 // rule *bodies* behave but says nothing about whether the project config still
-// points them at the engine. Extracting the engine to packages/engine broke
+// points them at the engine. Extracting the engine to packages/detect broke
 // exactly that: the `files` globs listed lib/, app/ and components/, so the
 // rules silently stopped covering the one module they exist for, and lint went
 // on passing. A scope that no longer matches the code is indistinguishable from
@@ -181,7 +181,7 @@ describe("the rule explains itself and does not over-reach", () => {
 // "the rule works somewhere". The path need not exist: lintText resolves config
 // for a virtual filePath, which is what makes probing the true location safe.
 describe("the project config covers the engine's real location", () => {
-  const ENGINE_PROBE = "packages/engine/src/__privacy_probe__.ts";
+  const ENGINE_PROBE = "packages/detect/src/__privacy_probe__.ts";
 
   it("covers the glob that covers the engine", () => {
     const config = readFileSync(path.join(process.cwd(), "eslint.config.mjs"), "utf8");

@@ -22,6 +22,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { useLang, type MessageKey } from "@/lib/lang";
+import ExternalLink from "@/components/ExternalLink";
 import SeasonGantt from "@/components/SeasonGantt";
 import FreshnessStamp from "@/components/FreshnessStamp";
 import PageHeader from "@/components/PageHeader";
@@ -38,7 +39,7 @@ import {
   type ScamSeason,
   type CivilDate,
 } from "@/lib/scamCalendar";
-import type { RegionCode } from "@veriguard/engine/regions";
+import type { RegionCode } from "@veriguard/detect/regions";
 
 // Matches the card styling used across Learn, About and the radar.
 const CARD = "bg-[var(--ink-2)] border border-[var(--rule)] rounded-2xl p-6 space-y-6";
@@ -178,16 +179,14 @@ function SeasonRow({
         {season.sources.map((source, i) => (
           <span key={source.url}>
             {i > 0 && " · "}
-            <a
-              href={source.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2 hover:text-[var(--clear)] transition-colors"
-            >
+            {/* Arrowed, like every other outbound link. I had suppressed it
+                here as noise in a middot-separated run; main's reasoning is
+                better and wins — this product's whole subject is noticing
+                where a link goes, so a citation that opens a tab silently
+                teaches the opposite of what the page teaches. */}
+            <ExternalLink href={source.url}>
               {source.label}
-              <span className="sr-only"> ({t("a11y.newTab")})</span>
-              <span aria-hidden="true"> ↗</span>
-            </a>
+            </ExternalLink>
           </span>
         ))}
       </p>

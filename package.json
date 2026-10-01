@@ -1,6 +1,6 @@
 {
   "name": "veriguard",
-  "version": "0.36.0",
+  "version": "0.37.0",
   "private": true,
   "engines": {
     "node": ">=22"
@@ -17,6 +17,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "build:engine": "npm run build --workspace @veriguard/detect",
+    "build:mcp": "npm run build --workspace @veriguard/mcp",
     "test": "NODE_OPTIONS=--disable-warning=DEP0205 vitest run",
     "test:watch": "NODE_OPTIONS=--disable-warning=DEP0205 vitest",
     "seed": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/seed-db.ts",
@@ -44,8 +46,9 @@
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
-    "@veriguard/engine": "*",
+    "@veriguard/detect": "*",
     "jsqr": "^1.4.0",
+    "libphonenumber-js": "^1.13.14",
     "next": "^16.3.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",

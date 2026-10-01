@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { resolveRegion } from "@/lib/regionResolver";
-import { DEFAULT_REGION, FALLBACK_REGION, supportedRegions } from "@veriguard/engine/regions";
+import { DEFAULT_REGION, FALLBACK_REGION, supportedRegions } from "@veriguard/detect/regions";
 
 const headers = (map: Record<string, string> = {}) => new Headers(map);
 const geo = (country: string) => headers({ "x-vercel-ip-country": country });

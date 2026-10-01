@@ -1,111 +1,237 @@
+// Every link that leaves the site goes through one component.
+//
+// They did not, and the drift is what this suite exists to stop recurring:
+// five hover treatments, two arrow glyphs (→ and ↗) used interchangeably, one
+// hardcoded English "(opens in a new tab)" where everything else reads the
+// message bundle, two links with no new-tab note at all, and no focus ring on
+// any of them — while every other interactive surface in the app had one.
+//
+// None of that fails a build, and none of it is visible in review unless the
+// reviewer happens to compare two files. So it is asserted here.
+//
+// Read as source text rather than rendered: this suite runs under environment
+// "node" with no DOM, the same approach as waysIn.test.ts and homeStats
+// .test.ts. Brittle to renaming, which is the trade — the regression is
+// otherwise silent.
+
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
-import enNormal from "@/messages/en.normal.json";
+import { readFileSync, readdirSync } from "node:fs";
+import path from "node:path";
+
+const ROOT = process.cwd();
+
+/** Every .tsx under components/ and app/, which is where links live. */
+function tsxFiles(): string[] {
+  const out: string[] = [];
+  for (const dir of ["components", "app"]) {
+    const walk = (rel: string) => {
+      for (const entry of readdirSync(path.join(ROOT, rel), { withFileTypes: true })) {
+        const next = path.join(rel, entry.name);
+        if (entry.isDirectory()) walk(next);
+        else if (entry.name.endsWith(".tsx")) out.push(next);
+      }
+    };
+    walk(dir);
+  }
+  return out;
+}
+
+const FILES = tsxFiles();
+const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
 
 /**
- * Every link that leaves the site says so, the same way.
+ * Files allowed to set target="_blank" by hand.
  *
- * The convention is two marks, and both are load-bearing for a different
- * reader: a `↗` glyph, which tells a sighted reader the tab is about to
- * change, and an sr-only "(opens in a new tab)", which tells everyone else.
- * SiteFooter's "Built by Aleks Linde" is the reference implementation.
- *
- * This matters more here than on a typical site. The product's whole subject
- * is noticing where a link actually goes — a tool that opens new tabs without
- * saying so is teaching the opposite of what it exists to teach.
- *
- * The browser-store install buttons were the one place missing both: they
- * looked like in-page buttons and silently opened a store.
- *
- * Asserted on source text, with the limitation the other UI tests record: the
- * suite runs under environment "node" with no DOM, so nothing can be mounted.
- * Brittle to renaming, but the regression is otherwise silent — a new outbound
- * link simply renders, and nothing says it is inconsistent.
+ * ExternalLink is the component itself. CheckFlow's reporting link is
+ * conditionally external — it is a mailto: for some providers and a URL for
+ * others — so it sets the attribute from a ternary and cannot use a component
+ * that always opens a new tab. It already carries the arrow and the note.
  */
+const ALLOWED_RAW = ["components/ExternalLink.tsx", "components/CheckFlow.tsx"];
 
-const ROOTS = ["components", "app"];
-const messages = enNormal as Record<string, string>;
-
-function tsxFiles(dir: string): string[] {
-  const out: string[] = [];
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) out.push(...tsxFiles(full));
-    else if (entry.endsWith(".tsx")) out.push(full);
-  }
-  return out;
-}
-
-/** Each `target="_blank"` anchor, as the slice of source that opens it. */
-function outboundAnchors(src: string): string[] {
-  const out: string[] = [];
-  // Anchors are written across several lines here, so match the tag and take
-  // the element text after it up to the closing </a>.
-  const re = /<a\b[^>]*target="_blank"[^>]*>([\s\S]*?)<\/a>/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(src)) !== null) out.push(m[0]);
-  return out;
-}
-
-describe("the external-link convention", () => {
-  it("has the string every outbound link announces", () => {
-    expect(messages["a11y.newTab"]).toBeTruthy();
+describe("external links go through ExternalLink", () => {
+  it("finds the files to check", () => {
+    // Guards against the walk silently returning nothing.
+    expect(FILES.length).toBeGreaterThan(20);
+    expect(FILES).toContain("components/ExternalLink.tsx");
   });
 
-  const files = ROOTS.flatMap((r) => tsxFiles(join(process.cwd(), r)));
-
-  it("finds files to check", () => {
-    // Guards against a moved directory turning this whole suite into a pass
-    // over an empty list.
-    expect(files.length).toBeGreaterThan(20);
+  it("has no hand-rolled target=_blank outside the allowed files", () => {
+    const offenders = FILES.filter(
+      (f) => !ALLOWED_RAW.includes(f) && read(f).includes('target="_blank"'),
+    );
+    expect(
+      offenders,
+      `these set target="_blank" directly instead of using ExternalLink: ${offenders.join(", ")}`,
+    ).toEqual([]);
   });
 
-  for (const file of files) {
-    const src = readFileSync(file, "utf8");
-    const anchors = outboundAnchors(src);
-    if (anchors.length === 0) continue;
-    const rel = file.slice(process.cwd().length + 1);
-
-    it(`${rel} marks every outbound link`, () => {
-      for (const anchor of anchors) {
-        // Some anchors render a shared label component rather than inlining
-        // the marks; accept the marks appearing anywhere in the file for
-        // those, since the anchor itself is only a few lines of it.
-        // The note may be the message key or, on the pages that carry no
-        // message keys by design (About is the canonical privacy record and
-        // has one wording), the literal string.
-        const note = messages["a11y.newTab"];
-        const announced =
-          anchor.includes("a11y.newTab") ||
-          anchor.includes(note) ||
-          src.includes("a11y.newTab");
-        const marked = announced && (anchor.includes("↗") || src.includes("↗"));
-        expect(marked, `${rel}: ${anchor.slice(0, 90).replace(/\s+/g, " ")}`).toBe(true);
-      }
+  it("never uses → inside an external link", () => {
+    // → means "this continues"; ↗ means "this leaves". The two were mixed, so
+    // the glyph told the reader nothing.
+    //
+    // → on an INTERNAL link is correct and stays: the packages CTA in WaysGrid
+    // uses it, because that navigation does not leave the site. So this looks
+    // for → in an external link specifically, rather than anywhere in a file —
+    // the broader check flagged that CTA, which was the test being wrong rather
+    // than the code.
+    const offenders = FILES.filter((f) => {
+      const source = read(f);
+      // Each <ExternalLink …>…</ExternalLink> and each raw <a target="_blank">.
+      const externals = [
+        ...source.matchAll(/<ExternalLink[\s\S]*?<\/ExternalLink>/g),
+        ...source.matchAll(/<a\s[^>]*target="_blank"[\s\S]*?<\/a>/g),
+      ].map((m) => m[0]);
+      return externals.some((block) => block.includes("→"));
     });
-  }
+    expect(offenders, `these mark an external link with → instead of ↗: ${offenders.join(", ")}`)
+      .toEqual([]);
+  });
+
+  it("marks each outbound link exactly once", () => {
+    // The merge doubled these: main added the arrow and the note inline while
+    // this branch was wrapping the same buttons in ExternalLink, so every store
+    // button rendered two arrows and announced the new tab twice. Both suites
+    // passed throughout — each asserted the marks were PRESENT, and neither
+    // counted them.
+    //
+    // Checked on the children a component is given, because that is where the
+    // duplicate lived: ExternalLink always supplies one of each, so a mark in
+    // its children is a second one.
+    // Counted per FILE, not per ExternalLink block. The duplicate that
+    // prompted this lived in a `label` variable built several lines above the
+    // component and passed in as children — so a check that scanned only
+    // between <ExternalLink> and </ExternalLink> saw nothing, and a mutation
+    // reinstating the bug passed. Marks are rare enough that a file-level
+    // count is the measure that actually binds.
+    for (const file of FILES) {
+      // Comments stripped first: they discuss the glyph (" the ↗ would say
+      // 'this leaves the site' "), and counting prose made this fail on a file
+      // whose markup was correct.
+      const source = read(file)
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+      const uses = [...source.matchAll(/<ExternalLink/g)].length;
+      if (!uses) continue;
+
+      // Each `arrow={false}` is a deliberate opt-out that places its own arrow
+      // (the agency cards put it on the domain line), so it licenses one.
+      const optOuts = [...source.matchAll(/arrow=\{false\}/g)].length;
+
+      // Arrows written by hand in a file that also uses the component. Any
+      // beyond the opt-outs is a second mark on a link already marked.
+      const handWritten = [...source.matchAll(/↗/g)].length;
+      expect(
+        handWritten,
+        `${file}: ${handWritten} hand-written ↗ with ${optOuts} arrow={false} — ` +
+          "ExternalLink already supplies one per link",
+      ).toBeLessThanOrEqual(optOuts);
+
+      // The note is never placed by hand in a file using the component: unlike
+      // the arrow it has no positioning reason to exist, so any occurrence is
+      // a duplicate announcement.
+      const handNotes = [...source.matchAll(/sr-only[^>]*>\s*\(\{t\("a11y\.newTab"\)\}\)/g)].length;
+      expect(
+        handNotes,
+        `${file}: announces the new tab by hand while using ExternalLink, which already does`,
+      ).toBe(0);
+    }
+  });
+
+  it("never hardcodes the new-tab wording", () => {
+    // app/about/page.tsx carried the English string inline, so it stayed
+    // English in every other language.
+    const offenders = FILES.filter((f) => /\(opens in a new tab\)/.test(read(f)));
+    expect(
+      offenders,
+      `these hardcode the a11y string instead of t("a11y.newTab"): ${offenders.join(", ")}`,
+    ).toEqual([]);
+  });
 });
 
-describe("the install buttons follow it", () => {
-  // The specific regression: these opened a browser store with no arrow and
-  // no screen-reader note, in the one section of the app whose subject is
-  // where a link really goes.
-  const grid = readFileSync(join(process.cwd(), "components/WaysGrid.tsx"), "utf8");
+describe("the ExternalLink contract", () => {
+  const source = read("components/ExternalLink.tsx");
 
-  it("announces the new tab", () => {
-    expect(grid).toMatch(/sr-only[^>]*>\s*\(\{t\("a11y\.newTab"\)\}\)/);
+  it("always pairs target=_blank with rel=noopener noreferrer", () => {
+    // Without noopener the opened page gets a handle on this one. Centralising
+    // it is the point: it was correct in seven places and missing nowhere only
+    // by luck.
+    expect(source).toContain('target="_blank"');
+    expect(source).toContain('rel="noopener noreferrer"');
   });
 
-  it("shows the arrow", () => {
-    expect(grid).toMatch(/aria-hidden="true"[^>]*>\s*↗/);
+  it("announces the destination to a screen reader", () => {
+    // The glyph is aria-hidden, so the information has to arrive as text.
+    expect(source).toContain('className="sr-only"');
+    expect(source).toContain('t("a11y.newTab")');
   });
+
+  it("hides the arrow from assistive tech", () => {
+    // "north east arrow" read aloud after every link is noise.
+    expect(source).toMatch(/aria-hidden="true">\s*↗/);
+  });
+
+  it("gives every variant the app's focus ring", () => {
+    // The gap that prompted this: no external link had a focus-visible style,
+    // so keyboard users got the browser default while buttons and summaries
+    // had an explicit one.
+    expect(source).toContain("focus-visible:outline-[var(--clear)]");
+
+    const variants = source.slice(source.indexOf("const VARIANTS"), source.indexOf("} as const"));
+    const entries = [...variants.matchAll(/^\s{2}(\w+):/gm)].map((m) => m[1]);
+    expect(entries.length, "no variants parsed").toBeGreaterThan(2);
+    // Each either names FOCUS or interpolates it.
+    for (const name of entries) {
+      const line = variants.slice(variants.indexOf(`${name}:`));
+      expect(line.slice(0, line.indexOf("\n")), `variant "${name}" has no focus ring`)
+        .toMatch(/FOCUS/);
+    }
+  });
+
+  it("can omit the arrow without omitting the note", () => {
+    // Citation runs and store-button rows turn the arrow off because one per
+    // item is noise. The note must not be optional with it — that is the part
+    // a reader cannot see.
+    const body = source.slice(source.indexOf("return ("));
+    expect(body).toMatch(/\{arrow && /);
+    const noteIndex = body.indexOf('className="sr-only"');
+    const arrowGuard = body.indexOf("{arrow &&");
+    expect(noteIndex, "the note is inside the arrow guard").toBeLessThan(arrowGuard);
+  });
+});
+
+// ── Cases carried over from main's independent version of this suite ─────────
+//
+// main fixed the same five link sites while this branch was open and wrote its
+// own externalLinks.test.ts, per-file and matching raw <a target="_blank">.
+// Those assertions go vacuous here, because the anchors are ExternalLink now
+// and its regex finds nothing — which is the trap in a suite that iterates
+// whatever it happens to find.
+//
+// This case is the one main had that this file did not, and it survives the
+// merge on its own merits.
+
+describe("the install buttons", () => {
+  const grid = read("components/WaysGrid.tsx");
 
   it("does not mark the browsers that are not links", () => {
     // Edge and Safari render as plain text while unpublished — nothing
-    // navigates, so an arrow there would promise a click that does nothing.
-    const pendingBranch = grid.slice(grid.indexOf("if (!target.url)"), grid.indexOf("return (\n          <li"));
+    // navigates, so an arrow or a new-tab note there would promise a click
+    // that does nothing.
+    const start = grid.indexOf("if (!target.url)");
+    expect(start, "the unpublished-browser branch is gone").toBeGreaterThan(-1);
+    const pendingBranch = grid.slice(start, grid.indexOf("</li>", start));
     expect(pendingBranch).not.toContain("↗");
     expect(pendingBranch).not.toContain("a11y.newTab");
+    expect(pendingBranch).not.toContain("ExternalLink");
+  });
+
+  it("routes the real store links through the shared component", () => {
+    // The regression main's suite was written for: these opened a browser
+    // store with no arrow and no note, in the one section of the app whose
+    // subject is where a link really goes. They now get all of it, plus the
+    // focus ring main's version did not cover, from ExternalLink.
+    expect(grid).toContain("<ExternalLink");
+    expect(grid).not.toMatch(/<a\b[^>]*target="_blank"/);
   });
 });
