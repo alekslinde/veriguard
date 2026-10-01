@@ -126,7 +126,7 @@ export const WAYS_IN: readonly WayIn[] = [
     // Still unrendered while `unavailable` is set: the row stays flat until the
     // packages are on npm, because the install line is the one instruction on
     // that page that would not yet work.
-    href: "/ways/packages",
+    href: "/packages",
     runs: "device",
     unavailable: "ways.npm.unavailable",
   },

@@ -43,7 +43,7 @@ export default function SiteFooter() {
             one line a reader scrolls past — it was the only route to this page
             and the page was effectively unreachable. */}
         <Link
-          href="/ways/packages"
+          href="/packages"
           className="underline underline-offset-2 hover:text-[var(--foreground)] transition-colors"
         >
           {t("footer.packages")}

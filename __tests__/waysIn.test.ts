@@ -33,10 +33,10 @@ describe("an undistributed surface is not interactive", () => {
   // instructions that do not work yet pays out in disappointment.
   //
   // It DOES link to its documentation, which is the one thing that exists
-  // whether or not the package is published. That changed when
-  // /ways/packages was added: this row is the only place on the home page that
-  // names the package, so suppressing its link left the docs reachable from
-  // nowhere. The rule is about what is behind the link, not about linking:
+  // whether or not the package is published. That changed when /packages was
+  // added: this row is the only place on the home page that names the package,
+  // so suppressing its link left the docs reachable from nowhere. The rule is
+  // about what is behind the link, not about linking:
   //
   //   · an on-site path is documentation — link it;
   //   · an external URL is the listing that does not exist yet — do not.
