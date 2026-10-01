@@ -598,12 +598,46 @@ describe("threat-intel roadmap — URL rules", () => {
     const result = checkUrl("https://example.com/click?url=https://evil.example/login");
     expect(result.flags.some((f) => f.includes("redirect"))).toBe(true);
   });
+
+  // The host test is an exact match or a dot-prefixed suffix, not a bare
+  // "ends with". A plain suffix test also accepts "notlinkedin.com", which is
+  // a lookalike a scammer registers rather than the trusted service this rule
+  // is about — so the redirect reason must not be the one attached to it.
+  it("reads the LinkedIn redirect path on the real host and its subdomains (D16)", () => {
+    for (const host of ["linkedin.com", "www.linkedin.com"]) {
+      const result = checkUrl(`https://${host}/slink?code=abc`);
+      expect(result.flags.some((f) => f.includes("redirect"))).toBe(true);
+    }
+  });
+
+  it("does not read a LinkedIn lookalike host as the trusted service (D16)", () => {
+    for (const host of ["notlinkedin.com", "evil-linkedin.com"]) {
+      const result = checkUrl(`https://${host}/slink?code=abc`);
+      expect(result.flags.some((f) => f.includes("Trusted service"))).toBe(false);
+    }
+  });
 });
 
 describe("threat-intel roadmap — SMS rules", () => {
   it("detects the 'Reply Y to activate' bypass (D3 / #54)", () => {
     const result = checkSms("Reply Y to activate your link and claim your Qantas points");
     expect(result.flags.some((f) => f.includes("Reply Y"))).toBe(true);
+  });
+
+  // The quote around the Y is optional and used to sit between two separate
+  // space runs; it now carries its own trailing space. The quoted forms are the
+  // ones a narrower rewrite drops, so they are pinned here alongside the bare
+  // ones rather than left to the single case above.
+  it.each([
+    "Reply Y to activate your link",
+    "Reply 'Y' to access your parcel",
+    'Reply "Yes" to activate your account',
+    "Reply yes to proceed to the link",
+    "Reply  Y  to activate",
+    "Reply 'Yes' to view your delivery",
+    "ReplyY to access the link",
+  ])("reads %j as the reply-to-activate bypass (D3 / #54)", (text) => {
+    expect(checkSms(text).flags.some((f) => f.includes("Reply Y"))).toBe(true);
   });
 
   it("detects the 'copy link into your browser' variant (D3 / #54)", () => {
@@ -837,6 +871,23 @@ describe("threat-intel roadmap 2026-07-05 (#73-#78)", () => {
   it("detects ClickFix instructions in free-text / pasted page content (D3 / #74)", () => {
     const result = checkCustom("To confirm you're human, press Windows+R and paste the following command.");
     expect(result.flags.some((f) => f.includes("Press Win+R"))).toBe(true);
+  });
+
+  // The "+" and the spaces around it were a single ambiguous run; they are now
+  // one alternation of "+ with optional spaces" or "spaces alone". Both scoring
+  // paths use the same pattern, so both are checked.
+  it.each([
+    "press Win+R",
+    "press Win + R",
+    "press Win R",
+    "press  Windows  +  R",
+    "press windows+r",
+    "press Win +R",
+    "press Win+ R",
+  ])("reads %j as a ClickFix instruction however it is spaced (D3 / #74)", (text) => {
+    const framed = `Verify you are human: ${text}, then paste this command.`;
+    expect(checkSms(framed).flags.some((f) => f.includes("Press Win+R"))).toBe(true);
+    expect(checkCustom(framed).flags.some((f) => f.includes("Press Win+R"))).toBe(true);
   });
 
   // ── ClickFix macOS variant (D3 / #143 / ACSC ASC-2026-0809) ────────────────
@@ -1429,6 +1480,22 @@ describe("threat-intel roadmap 2026-07-12 (#80-#85)", () => {
     // checkEmail inherits the signal via its checkSms delegation.
     const email = checkEmail("You have a new voicemail message waiting. Listen: https://vm-portal.xyz");
     expect(email.flags.some((f) => f.includes("Fake voicemail"))).toBe(true);
+  });
+
+  // The quantity and adjective words are each optional, and the pattern was
+  // rewritten so that each carries its own trailing space rather than floating
+  // between separate space runs. These are the phrasings that rewrite has to
+  // keep: every combination of present and absent, and a doubled separator.
+  it.each([
+    "You have a new voicemail waiting",
+    "You have an urgent voicemail",
+    "You have 3 unheard voicemail messages",
+    "You have two missed voicemail alerts",
+    "You have voicemail waiting",
+    "You have new voicemail",
+    "You  have  a  new  voicemail",
+  ])("reads %j as a voicemail lure whatever the optional words (D5 / #122)", (text) => {
+    expect(checkSms(text).flags.some((f) => f.includes("Fake voicemail"))).toBe(true);
   });
 
   it("does not flag conversational voicemail mentions (#122 FP guard)", () => {

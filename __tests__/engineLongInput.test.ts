@@ -56,4 +56,26 @@ describe("engine on long, unbroken input", () => {
   it("folds accented text once, not once per pack entry", async () => {
     expect(await timed(fill("ã"))).toBeLessThan(BOUND_MS / 4);
   });
+
+  // A different shape from the ones above, and a worse one. These patterns put
+  // two or more `\s`-matching groups next to each other with nothing between
+  // them that must match, so a run of spaces that never reaches the keyword can
+  // be divided among the groups in exponentially many ways and the engine tries
+  // each. Cost grew about fourfold per doubling rather than fourfold per
+  // quadrupling: the voicemail prefix below took 20 seconds at 5,000 spaces,
+  // where the quadratic shapes above needed 100,000 characters to reach
+  // seconds. Each group now owns its own separator, leaving one way to match.
+  //
+  // Held well under the general bound because the fixed forms run in under a
+  // millisecond; anything approaching BOUND_MS here means the ambiguity is back.
+  describe.each([
+    ["a quantity-word voicemail lure", "you have "],
+    ["a counted voicemail lure", "0"],
+    ["a reply-to-activate lure", "reply"],
+    ["a ClickFix run-command lure", "press win"],
+  ])("%s followed by spaces that never reach the keyword", (_label, prefix) => {
+    it("does not backtrack over the run", async () => {
+      expect(await timed(prefix + " ".repeat(20_000))).toBeLessThan(BOUND_MS / 4);
+    });
+  });
 });

@@ -731,7 +731,7 @@ export function checkUrl(
   const REDIRECT_HOSTS = ["lnkd.in", "cdn.ampproject.org"];
   const carriesNestedUrl = /[?&](url|u|redirect|dest|destination|target|continue|next)=https?(:|%3a)/i.test(urlObj.search);
   if (REDIRECT_HOSTS.some((h) => hostname === h || hostname.endsWith("." + h)) ||
-      hostname.endsWith("linkedin.com") && urlObj.pathname.includes("/slink") ||
+      (hostname === "linkedin.com" || hostname.endsWith(".linkedin.com")) && urlObj.pathname.includes("/slink") ||
       carriesNestedUrl) {
     sig.add("link", "Trusted service used as a redirect — the real destination is hidden in the link and may be malicious", 15);
   }
@@ -1990,7 +1990,7 @@ export function checkSms(
   // and bypassing built-in phishing filters. The last clause catches the
   // "copy the link into your browser" variant used to dodge link scanners.
   const replyBypass =
-    /reply\s*['"]?\s*[Yy](es)?\b.{0,40}(link|activat|access|proceed|view)/i.test(text) ||
+    /reply\s*(?:['"]\s*)?[Yy](es)?\b.{0,40}(link|activat|access|proceed|view)/i.test(text) ||
     /type\s+[Yy](es)?\s+to\s+(proceed|activat|access|get\s+the)/i.test(text) ||
     /send\s+[Yy](es)?\s+to\s+(get|receive|access|activat)/i.test(text) ||
     /copy\s+(the\s+|this\s+|that\s+)?(link|url)\s+(into|to)\s+your\s+browser/i.test(text);
@@ -2026,8 +2026,16 @@ export function checkSms(
   // conversational use ("I left you a voicemail", "your voicemail box is full")
   // stays clean. Scored +20 to match the QR-quishing prompt above: both are
   // click-lures that need a URL, brand or urgency signal to escalate.
-  if (/you\s+have\s+(?:a|an|\d+|one|two|three)?\s*(?:new|unheard|missed|pending|urgent)?\s*voicemail/i.test(text) ||
-      /\d+\s+(?:new\s+|unheard\s+|pending\s+)?voicemail/i.test(text) ||
+  //
+  // Each optional group carries its own trailing separator rather than sitting
+  // between bare `\s*` runs. Written the latter way, a space run that never
+  // reaches "voicemail" can be split between the groups in exponentially many
+  // ways and the engine tries all of them: "you have " plus 5,000 spaces cost
+  // 20 seconds of CPU, reachable from any caller that passes in message text.
+  // Owning the separator leaves exactly one way to match, so there is nothing
+  // to backtrack through. See the timing guard in the engine tests.
+  if (/you\s+have\s+(?:(?:a|an|\d+|one|two|three)\s+)?(?:(?:new|unheard|missed|pending|urgent)\s+)?voicemail/i.test(text) ||
+      /\d+\s+(?:(?:new|unheard|pending)\s+)?voicemail/i.test(text) ||
       /listen\s+(?:to\s+)?(?:your\s+)?(?:new\s+)?voicemail/i.test(text) ||
       /voicemail\s+(?:notification|alert|waiting|received|pending)/i.test(text) ||
       /missed\s+call\s+(?:notification|alert)[\s\S]{0,30}(?:click|tap|visit|listen)/i.test(text)) {
@@ -2038,7 +2046,7 @@ export function checkSms(
   // 2026). A fake CAPTCHA overlay tells the user to press Win+R and paste a
   // PowerShell command, running malware themselves. No legitimate entity asks
   // this, so the fuzzy match scores near-certain.
-  if (/press\s+(win|windows)\s*\+?\s*r\b/i.test(text) ||
+  if (/press\s+(win|windows)(?:\s*\+\s*|\s+)r\b/i.test(text) ||
       /powershell\s+-[ec]/i.test(text)) {
     sig.add("message", WIN_CLICKFIX_FLAG, 50);
   } else if (isMacClickFix(text)) {
@@ -2865,7 +2873,7 @@ export function checkCustom(text: string, blocklist?: HostLookup, region?: Regio
   // ClickFix "run a command" social engineering (D3 / #74). Pasted fake-CAPTCHA
   // page text is the most likely input path for this here, so mirror the SMS
   // fuzzy match. No legitimate site tells you to press Win+R and paste a command.
-  if (/press\s+(win|windows)\s*\+?\s*r\b/i.test(text) ||
+  if (/press\s+(win|windows)(?:\s*\+\s*|\s+)r\b/i.test(text) ||
       /powershell\s+-[ec]/i.test(text)) {
     sig.add("message", WIN_CLICKFIX_FLAG, 50);
   } else if (isMacClickFix(text)) {
