@@ -75,6 +75,11 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   // Single theme, so a single colour — and it must be the real page ground.
   themeColor: "#141C2B",
+  // The software keyboard shrinks the layout viewport rather than sliding the
+  // page up under it. Android Chrome's default is to overlay, which leaves the
+  // check box's own Check button behind the keyboard the reader just opened to
+  // fill it; iOS already resizes, so this closes the gap between the two.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({

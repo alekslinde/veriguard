@@ -1451,6 +1451,15 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
               placeholder={t("check.placeholder")}
               rows={4}
               aria-describedby={emptyPrompt ? "check-empty-hint" : undefined}
+              // What gets pasted here is a URL, a sender address or the raw text
+              // of a scam message — never prose. iOS capitalises the first
+              // letter and "corrects" what it reads as typos, which on a
+              // lookalike domain is the one input where a silent edit changes
+              // the verdict: the homoglyph or padded subdomain that made it
+              // worth checking is exactly what autocorrect rewrites.
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               className="w-full min-h-[118px] px-4 py-4 bg-transparent text-[var(--ink)] placeholder-[#8A93A1] border-0 resize-y text-base leading-relaxed focus:outline-none block"
             />
 

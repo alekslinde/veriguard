@@ -250,7 +250,10 @@ function BugModal({
                 placeholder={t("bug.what.placeholder")}
                 rows={3}
                 maxLength={1000}
-                className="w-full bg-[var(--ink)] border border-[var(--rule)] rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-emerald-500 resize-y"
+                // 16px up to sm, or iOS zooms the viewport on focus and does not
+                // undo it — inside a dialog that leaves the reader unable to see
+                // the Send button they were heading for.
+                className="w-full bg-[var(--ink)] border border-[var(--rule)] rounded-lg px-3 py-2 text-[16px] sm:text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-emerald-500 resize-y"
               />
             </div>
 
@@ -265,7 +268,11 @@ function BugModal({
                 onChange={(e) => setContact(e.target.value)}
                 placeholder="you@example.com.au"
                 maxLength={200}
-                className="w-full bg-[var(--ink)] border border-[var(--rule)] rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-emerald-500"
+                inputMode="email"
+                enterKeyHint="done"
+                autoCapitalize="none"
+                autoCorrect="off"
+                className="w-full bg-[var(--ink)] border border-[var(--rule)] rounded-lg px-3 py-2 text-[16px] sm:text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-emerald-500"
               />
             </div>
 

@@ -160,6 +160,59 @@ button,
 label[for],
 summary {
   -webkit-tap-highlight-color: transparent;
+
+  /* The browser's 300ms wait to see whether a second tap is coming, so it can
+     double-tap-zoom. None of these elements is a zoom target, so the wait is
+     pure latency — and it is latency the reader reads as the app thinking,
+     which is the wrong thing to suggest about a control that has not started
+     working yet. */
+  touch-action: manipulation;
+}
+
+/* 1b. Press feedback, which the rule above makes mandatory rather than
+       optional: removing the system highlight removed the only response a
+       touch reader was getting, and the 79 hover styles in this codebase
+       compile to `@media (hover: hover)` under Tailwind v4 — so on a phone
+       they never run. Without this, every control on every page would be
+       visually inert from the moment a finger lands to the moment the next
+       screen paints.
+
+       Scale rather than a colour change, because it is one rule that works on
+       all of them: these controls sit on the dark ground, on --ink-2 cards and
+       on the light --paper check card, and no single colour reads as "pressed"
+       against all three. 0.97 is small enough to feel like the surface giving
+       way under the finger rather than the element resizing.
+
+       On :active, not on click: native controls respond when the finger lands.
+       Waiting for the tap to complete reads as lag even when the handler is
+       instant, because the feedback arrives after the reader has already let
+       go.
+
+       Excluded: the tab bar's links, which own their own pressed treatment and
+       whose labels would shift against a fixed bar; and disabled controls,
+       which must not suggest they did something. */
+@media (hover: none) {
+  a:active,
+  button:not(:disabled):active,
+  [role="button"]:not([aria-disabled="true"]):active,
+  label[for]:active,
+  summary:active {
+    transform: scale(0.97);
+  }
+
+  nav a:active {
+    transform: none;
+  }
+}
+
+@media (hover: none) and (prefers-reduced-motion: no-preference) {
+  a,
+  button,
+  [role="button"],
+  label[for],
+  summary {
+    transition: transform 0.1s ease-out;
+  }
 }
 
 /* 2. Rubber-band scrolling past the end of the page, which on a fixed shell
