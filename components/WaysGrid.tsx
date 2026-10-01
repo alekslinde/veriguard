@@ -90,15 +90,17 @@ function InstallLinks() {
                 {t("ways.ext.yours")}
               </span>
             )}
-            {/* These leave the site for a browser store, so they carry the
-                same two marks every other outbound link here does: the arrow
-                that says so visually, and the sr-only note that says so to a
-                screen reader. They were the only external links in the app
-                without either — see SiteFooter, ReportingLink, ThreatRadar. */}
-            <span className="sr-only"> ({t("a11y.newTab")})</span>
-            <span aria-hidden="true" className="ml-1 text-[11px] opacity-70">
-              ↗
-            </span>
+            {/* No outbound marks here.
+
+                `label` is shared with the unpublished-browser branch below,
+                which renders plain text and must stay unmarked — nothing
+                navigates, so an arrow would promise a click that does nothing.
+                The published branch wraps this in ExternalLink, which supplies
+                the arrow, the sr-only note, the rel and the focus ring.
+
+                Both were written here once, before the component existed, and
+                the merge left the pair doubled: two arrows on every store
+                button and the new-tab note announced twice. */}
           </>
         );
         const shell =

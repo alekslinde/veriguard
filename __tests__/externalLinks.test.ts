@@ -88,6 +88,56 @@ describe("external links go through ExternalLink", () => {
       .toEqual([]);
   });
 
+  it("marks each outbound link exactly once", () => {
+    // The merge doubled these: main added the arrow and the note inline while
+    // this branch was wrapping the same buttons in ExternalLink, so every store
+    // button rendered two arrows and announced the new tab twice. Both suites
+    // passed throughout — each asserted the marks were PRESENT, and neither
+    // counted them.
+    //
+    // Checked on the children a component is given, because that is where the
+    // duplicate lived: ExternalLink always supplies one of each, so a mark in
+    // its children is a second one.
+    // Counted per FILE, not per ExternalLink block. The duplicate that
+    // prompted this lived in a `label` variable built several lines above the
+    // component and passed in as children — so a check that scanned only
+    // between <ExternalLink> and </ExternalLink> saw nothing, and a mutation
+    // reinstating the bug passed. Marks are rare enough that a file-level
+    // count is the measure that actually binds.
+    for (const file of FILES) {
+      // Comments stripped first: they discuss the glyph (" the ↗ would say
+      // 'this leaves the site' "), and counting prose made this fail on a file
+      // whose markup was correct.
+      const source = read(file)
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+      const uses = [...source.matchAll(/<ExternalLink/g)].length;
+      if (!uses) continue;
+
+      // Each `arrow={false}` is a deliberate opt-out that places its own arrow
+      // (the agency cards put it on the domain line), so it licenses one.
+      const optOuts = [...source.matchAll(/arrow=\{false\}/g)].length;
+
+      // Arrows written by hand in a file that also uses the component. Any
+      // beyond the opt-outs is a second mark on a link already marked.
+      const handWritten = [...source.matchAll(/↗/g)].length;
+      expect(
+        handWritten,
+        `${file}: ${handWritten} hand-written ↗ with ${optOuts} arrow={false} — ` +
+          "ExternalLink already supplies one per link",
+      ).toBeLessThanOrEqual(optOuts);
+
+      // The note is never placed by hand in a file using the component: unlike
+      // the arrow it has no positioning reason to exist, so any occurrence is
+      // a duplicate announcement.
+      const handNotes = [...source.matchAll(/sr-only[^>]*>\s*\(\{t\("a11y\.newTab"\)\}\)/g)].length;
+      expect(
+        handNotes,
+        `${file}: announces the new tab by hand while using ExternalLink, which already does`,
+      ).toBe(0);
+    }
+  });
+
   it("never hardcodes the new-tab wording", () => {
     // app/about/page.tsx carried the English string inline, so it stayed
     // English in every other language.
