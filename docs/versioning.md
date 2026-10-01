@@ -1,9 +1,12 @@
 # Versioning
 
 The app version lives in `package.json` and is bumped **in the PR that makes
-the change**, not in a separate release step. There is no build artefact and no
-package on npm — the version exists so a person reading an issue, a verdict
+the change**, not in a separate release step. The app itself is not packaged or
+published — its version exists so a person reading an issue, a verdict
 screenshot, or a bug report can tell which behaviour they were looking at.
+
+The packages under `packages/` *are* published, and their versions carry a
+consumer's install. See *Parts versioned on their own*, below.
 
 Format is [semantic versioning](https://semver.org): `MAJOR.MINOR.PATCH`.
 
@@ -68,15 +71,21 @@ fix, or a revert that restores the previous version.
 
 ## Parts versioned on their own
 
-Three parts ship on their own schedule, so each carries its own version in its
+Four parts ship on their own schedule, so each carries its own version in its
 own `package.json`. The app's version never moves because of them, and they
 never move because of the app.
 
 | Part | File | Bump it when |
 |---|---|---|
 | Detection engine | `packages/detect/package.json` | Anything in `packages/detect/src` changes. The app bumps too, since it serves the engine. |
+| MCP server | `packages/mcp/package.json` | Anything in `packages/mcp/src` changes. Its `@veriguard/detect` range moves with the engine — a range naming a version that was never cut publishes a server nobody can install, which `publishReadiness.test.ts` guards. |
 | Browser extension | `extension/package.json` | Anything in the extension build changes. Every store submission needs a number higher than the last one shipped, and a shipped number can never be reused. |
 | Inbound email worker | `workers/inbound-email/package.json` | Anything in `workers/inbound-email/src` changes. |
+
+The two packages were set to a matched version for their first release, so that
+one number names what shipped together. That is a one-off, not a policy: they
+ship on their own schedules, so an engine fix the server does not need will
+separate them, and nothing tries to hold them level.
 
 The same table of PATCH, MINOR and MAJOR applies to each, judged by what that
 part's own users would notice. For the worker, that means the reply someone
