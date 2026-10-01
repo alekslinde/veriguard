@@ -18,6 +18,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "build:engine": "npm run build --workspace @veriguard/scam-detect",
+    "build:mcp": "npm run build --workspace @veriguard/mcp",
     "test": "NODE_OPTIONS=--disable-warning=DEP0205 vitest run",
     "test:watch": "NODE_OPTIONS=--disable-warning=DEP0205 vitest",
     "seed": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/seed-db.ts",

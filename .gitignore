@@ -74,6 +74,11 @@ yarn-error.log*
 # every detection rule in the diff of any change to one.
 /packages/engine/dist/
 
+# the MCP server build — reproducible via `npm run build:mcp`. It bundles, so
+# committing it would put an inlined copy of lib/signalTactics.ts in the diff of
+# any change to the original.
+/packages/mcp/dist/
+
 # package.json as it was before `prepack` rewrote its exports for the tarball.
 # postpack restores it and deletes this; it exists on disk only for the moment
 # between the two, and a pack killed outright leaves it behind.

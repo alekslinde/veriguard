@@ -1,0 +1,121 @@
+name: Publish MCP server
+
+# Publishes @veriguard/mcp to npm when a tag names a version of it.
+#
+# Same shape as publish-engine.yml and for the same reasons: a version on npm
+# cannot be replaced and unpublishing is restricted after 72 hours, so this is
+# something somebody does on purpose, with a tag naming which version. The tag
+# carries the package prefix (mcp-v0.2.0) because this repo also releases the
+# app, the extension and the engine, each on its own version line.
+#
+# One difference from the engine's: this package depends on @veriguard/scam-
+# detect by version range, so the version it names must already be ON npm
+# before this runs. Publishing the MCP server against an unpublished engine
+# produces a package that installs and then fails to resolve. The check below
+# enforces that rather than trusting the order of two manual steps.
+
+on:
+  push:
+    tags:
+      - "mcp-v*"
+  # Publishing is irreversible, so it is also available by hand — for a retry
+  # after a transient registry failure, without moving a tag that is already
+  # pointing at the right commit.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to publish from, e.g. mcp-v0.2.0. Leave blank to verify only."
+        type: string
+        required: false
+      dry_run:
+        description: "Pack and verify, but do not publish"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build, verify and publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required for npm provenance: the signed statement linking this tarball
+      # to the commit and workflow that produced it is minted from this token.
+      id-token: write
+    steps:
+      # A manual run checks out the tag it was given rather than the branch it
+      # was dispatched from, so a retry publishes the same commit the tag names
+      # rather than whatever main has moved on to.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci
+
+      # The engine first: this package's tests import it from source, and the
+      # publish-surface suite needs a built engine behind the installed form.
+      - name: Build the engine and the MCP server
+        run: |
+          npm run build:engine
+          npm run build:mcp
+
+      # The whole suite, not just this package's tests. It shares the engine
+      # with the app and the extension in this same tree, so a break in either
+      # is a break in what is about to be published.
+      - name: Typecheck, lint and test
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+
+      # The tag must agree with the version being published. Without this, a
+      # mistyped tag publishes whatever package.json happens to say — under a
+      # version number nothing in the history points at, and it cannot be taken
+      # back.
+      - name: Check the tag matches the package version
+        if: github.event_name == 'push'
+        run: |
+          tag_version="${GITHUB_REF_NAME#mcp-v}"
+          pkg_version="$(node -p "require('./packages/mcp/package.json').version")"
+          if [ "$tag_version" != "$pkg_version" ]; then
+            echo "tag ${GITHUB_REF_NAME} does not match package version ${pkg_version}" >&2
+            exit 1
+          fi
+
+      # The engine version this package depends on has to exist on npm, or the
+      # published tarball installs and then fails to resolve its own scorer.
+      # `npm view` on the exact range is the cheapest way to ask the registry.
+      - name: Check the engine dependency is published
+        run: |
+          range="$(node -p "require('./packages/mcp/package.json').dependencies['@veriguard/scam-detect']")"
+          if ! npm view "@veriguard/scam-detect@${range}" version >/dev/null 2>&1; then
+            echo "no published @veriguard/scam-detect matching ${range} — publish the engine first" >&2
+            exit 1
+          fi
+          echo "engine range ${range} resolves to: $(npm view "@veriguard/scam-detect@${range}" version | tail -1)"
+
+      # What npm would actually ship, printed before it ships. `files` is easy
+      # to get wrong in the direction that matters least visibly — omitting
+      # something the package needs, or including something it should not.
+      - name: Show the tarball contents
+        run: npm pack --dry-run --workspace @veriguard/mcp
+
+      # This package has no prepack/postpack rewrite (its exports already point
+      # at dist/), so packing should leave the tree untouched. Asserted anyway:
+      # if that ever changes, the failure is otherwise silent.
+      - name: Check packing left the tree clean
+        run: git diff --exit-code -- packages/mcp/package.json
+
+      - name: Publish
+        if: |
+          (github.event_name == 'push' || inputs.tag != '') && inputs.dry_run != true
+        run: npm publish --workspace @veriguard/mcp
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

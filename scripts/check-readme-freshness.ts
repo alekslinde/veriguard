@@ -58,6 +58,10 @@ export const SUBJECTS: ReadmeSubject[] = [
   { readme: "docs/scam-calendar/README.md", subject: ["docs/scam-calendar", "lib/scamCalendar.ts"] },
   { readme: "eval/README.md", subject: ["eval", "scripts/eval.ts", "scripts/eval-metamorphic.ts"] },
   { readme: "packages/engine/README.md", subject: ["packages/engine/src"] },
+  // The tool descriptions ARE the documentation a caller reads, so the server
+  // source is a subject alongside the README; and the build config decides what
+  // ships, which the README describes.
+  { readme: "packages/mcp/README.md", subject: ["packages/mcp/src", "packages/mcp/tsup.config.ts"] },
   { readme: "workers/inbound-email/README.md", subject: ["workers/inbound-email"] },
   // The manifest and build config carry as many present-tense claims as the
   // source does — permissions, output paths, env vars — so both are subjects.

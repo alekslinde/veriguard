@@ -40,6 +40,11 @@ const eslintConfig = defineConfig([
     // packages/engine/src, which is linted at source. Linting both would report
     // every finding twice and attribute the transpiler's output to us.
     "packages/engine/dist/**",
+    // The published MCP server build (`npm run build:mcp`) — a bundled copy of
+    // packages/mcp/src plus the inlined lib/signalTactics.ts, both linted at
+    // source. Linting the bundle would report every finding twice and attribute
+    // the bundler's output to us.
+    "packages/mcp/dist/**",
   ]),
   // ── Privacy invariant: no low-level network access in the detector ─────────
   //

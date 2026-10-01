@@ -61,6 +61,17 @@ jobs:
       - name: Publish-surface tests
         run: npx vitest run __tests__/enginePublish.test.ts
 
+      # The MCP server is published too, and mcpPublish.test.ts skips without a
+      # build on the same terms. Its exposure differs from the engine's because
+      # it bundles: what can break silently is an inlined dependency that should
+      # have stayed external (freezing detection rules at our build time), a bin
+      # entry that is not executable, or an import left pointing outside the
+      # package root — none of which the source-level suite can see.
+      - name: Build the published MCP server
+        run: npm run build:mcp
+      - name: MCP publish-surface tests
+        run: npx vitest run __tests__/mcpPublish.test.ts
+
       # The Worker is outside the npm workspaces and vitest excludes workers/**,
       # so the root `npm test` above does not reach it — its suite would only
       # ever run if someone remembered to by hand. That is how the email()
