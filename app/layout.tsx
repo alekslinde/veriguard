@@ -96,13 +96,16 @@ export default function RootLayout({
                 the first thing on the page. */}
             <ServiceNotice />
             <div className="flex-1">{children}</div>
-            {/* Desktop only. On a phone the tab bar occupies the bottom edge,
-                and a footer above it would be a second strip of chrome stacked
-                on the first — its two links live in the More sheet instead, so
-                nothing here is only reachable on a desktop. */}
-            <div className="hidden md:block">
-              <SiteFooter />
-            </div>
+            {/* Rendered at every width now.
+                It was desktop-only, because the tab bar owns the bottom edge
+                and a footer above it would have been a second strip of chrome
+                stacked on the first. Its two items lived in the More sheet
+                instead — and the More sheet is gone, so without this the bug
+                report would be unreachable on a phone.
+                The page reserves --tabbar-h at the bottom (see globals.css), so
+                the footer scrolls into view above the bar rather than under it,
+                and on a desktop that reservation is 0px. */}
+            <SiteFooter />
             <MobileTabBar />
           </BugReportProvider>
         </LangProvider>

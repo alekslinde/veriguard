@@ -149,3 +149,39 @@ describe("the ExternalLink contract", () => {
     expect(noteIndex, "the note is inside the arrow guard").toBeLessThan(arrowGuard);
   });
 });
+
+// ── Cases carried over from main's independent version of this suite ─────────
+//
+// main fixed the same five link sites while this branch was open and wrote its
+// own externalLinks.test.ts, per-file and matching raw <a target="_blank">.
+// Those assertions go vacuous here, because the anchors are ExternalLink now
+// and its regex finds nothing — which is the trap in a suite that iterates
+// whatever it happens to find.
+//
+// This case is the one main had that this file did not, and it survives the
+// merge on its own merits.
+
+describe("the install buttons", () => {
+  const grid = read("components/WaysGrid.tsx");
+
+  it("does not mark the browsers that are not links", () => {
+    // Edge and Safari render as plain text while unpublished — nothing
+    // navigates, so an arrow or a new-tab note there would promise a click
+    // that does nothing.
+    const start = grid.indexOf("if (!target.url)");
+    expect(start, "the unpublished-browser branch is gone").toBeGreaterThan(-1);
+    const pendingBranch = grid.slice(start, grid.indexOf("</li>", start));
+    expect(pendingBranch).not.toContain("↗");
+    expect(pendingBranch).not.toContain("a11y.newTab");
+    expect(pendingBranch).not.toContain("ExternalLink");
+  });
+
+  it("routes the real store links through the shared component", () => {
+    // The regression main's suite was written for: these opened a browser
+    // store with no arrow and no note, in the one section of the app whose
+    // subject is where a link really goes. They now get all of it, plus the
+    // focus ring main's version did not cover, from ExternalLink.
+    expect(grid).toContain("<ExternalLink");
+    expect(grid).not.toMatch(/<a\b[^>]*target="_blank"/);
+  });
+});

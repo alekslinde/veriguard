@@ -18,6 +18,8 @@ import {
   scamTextForwarding,
 } from "@/lib/reportingResources";
 import ReportingLink from "@/components/ReportingLink";
+import TacticDeck from "@/components/TacticDeck";
+import LearnHub from "@/components/LearnHub";
 import type { RegionCode } from "@veriguard/detect/regions";
 import RegionBar from "@/components/RegionBar";
 
@@ -216,6 +218,15 @@ export default function LearnContent({
         lede={t("learn.intro")}
       />
 
+      {/* Above the index, because these are destinations rather than anchors.
+          Learn owns the radar, the calendar and the reports feed now — they all
+          answer "what is happening now", and they were top-level tabs competing
+          with the check itself. Owning them means presenting them: a reader
+          landing here should see the section holds live regional data before
+          they meet the first heading of an essay. The index below is for the
+          essay, which is what an index is for. */}
+      <LearnHub region={region} activeSeasonCount={activeSeasons.length} />
+
       {/* Table of contents — a sticky index that also shows where you are.
           The page is long and covers several distinct needs, so the fastest
           route to any one is a persistent bar, not a one-shot list scrolled
@@ -401,10 +412,23 @@ export default function LearnContent({
       <Collapsible id="how-to-spot" title={t("learn.tactics.heading")}>
         <div className="space-y-3">
           <p className="text-sm text-[var(--text-dim)] max-w-[62ch]">{t("learn.tactics.intro")}</p>
+
+          {/* Two shapes for one set, chosen by width rather than by preference.
+              The deck is a phone affordance: it turns ~130 words met as a block
+              into ~22 at a time, which is the difference between skimming six
+              paragraphs and reading one card. On a wide screen that trade stops
+              paying — there is room for all six at once, and a reader with room
+              for all six should be given all six rather than made to swipe
+              through them.
+
+              Each renders the same copy from the same keys, so the two cannot
+              drift, and each hides itself at the other's width. */}
+          <TacticDeck />
+
           {/* A hairline-separated row list rather than free-floating bullets:
               six named tactics are a reference set the reader comes back to, and
               the rules make each one its own object to scan for. */}
-          <ul className="grid gap-px overflow-hidden rounded-lg border border-[var(--rule)] bg-[var(--rule)] list-none">
+          <ul className="hidden sm:grid gap-px overflow-hidden rounded-lg border border-[var(--rule)] bg-[var(--rule)] list-none">
             {Array.from({ length: TACTIC_COUNT }, (_, i) => (
               <li key={i} className="bg-[var(--ink-2)] px-4 py-3.5">
                 <p className="text-sm font-semibold text-[var(--foreground)]">
@@ -529,7 +553,16 @@ export default function LearnContent({
                 <div className="text-sm text-[var(--foreground)] font-semibold">
                   {abbrTitle ? <abbr title={abbrTitle} className="no-underline">{name}</abbr> : name}
                 </div>
-                <div className="mt-0.5 font-[family-name:var(--font-mono-ui)] text-[12.5px] text-[var(--clear)]">{site}</div>
+                {/* The arrow sits on the domain rather than after the agency
+                    name: this is a block link, and the domain is the line that
+                    says where it goes. Hence `arrow={false}` above — the
+                    component's trailing arrow is suppressed so this one can be
+                    placed, not so the link goes unmarked. The component still
+                    supplies the new-tab note, the rel and the focus ring. */}
+                <div className="mt-0.5 font-[family-name:var(--font-mono-ui)] text-[12.5px] text-[var(--clear)]">
+                  {site}
+                  <span aria-hidden="true"> ↗</span>
+                </div>
               </ExternalLink>
             ))}
           </div>

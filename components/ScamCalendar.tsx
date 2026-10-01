@@ -179,10 +179,12 @@ function SeasonRow({
         {season.sources.map((source, i) => (
           <span key={source.url}>
             {i > 0 && " · "}
-            {/* No arrow: this is an inline run of citations separated by
-                middots, and one ↗ per source turned a source line into a row
-                of arrows. The new-tab note is still announced. */}
-            <ExternalLink href={source.url} arrow={false}>
+            {/* Arrowed, like every other outbound link. I had suppressed it
+                here as noise in a middot-separated run; main's reasoning is
+                better and wins — this product's whole subject is noticing
+                where a link goes, so a citation that opens a tab silently
+                teaches the opposite of what the page teaches. */}
+            <ExternalLink href={source.url}>
               {source.label}
             </ExternalLink>
           </span>

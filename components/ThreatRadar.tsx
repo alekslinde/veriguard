@@ -143,9 +143,10 @@ function ThreatCard({ threat }: { threat: ThreatEntry }) {
         {threat.detection ??
           t(threat.coverage === "n/a" ? "radar.coverage.na.body" : "radar.coverage.none.body")}
         {" · "}
-        {/* No arrow: the label already reads as a citation ("source, 27 Sep")
-            and an arrow after a date reads as part of the date. */}
-        <ExternalLink href={roadmapUrl(threat)} arrow={false}>
+        {/* Arrowed, like every other outbound link — see the note in
+            ScamCalendar for why main's reasoning beat my "arrow after a date
+            reads as part of the date". */}
+        <ExternalLink href={roadmapUrl(threat)}>
           {t("radar.source", { date: formatRadarDate(threat.lastSeen) })}
         </ExternalLink>
       </p>
