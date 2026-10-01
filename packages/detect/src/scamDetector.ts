@@ -2035,7 +2035,12 @@ export function checkSms(
   // Owning the separator leaves exactly one way to match, so there is nothing
   // to backtrack through. See the timing guard in the engine tests.
   if (/you\s+have\s+(?:(?:a|an|\d+|one|two|three)\s+)?(?:(?:new|unheard|missed|pending|urgent)\s+)?voicemail/i.test(text) ||
-      /\d+\s+(?:(?:new|unheard|pending)\s+)?voicemail/i.test(text) ||
+      // The leading `\d+` is anchored so a long run of digits is attempted
+      // once rather than from each position in turn, each attempt rescanning
+      // the rest of the run: 100,000 digits cost 3.5 seconds without it. That
+      // is a separate cause from the ambiguity described above, and the group
+      // rewrite alone did not address it.
+      /(?<!\d)\d+\s+(?:(?:new|unheard|pending)\s+)?voicemail/i.test(text) ||
       /listen\s+(?:to\s+)?(?:your\s+)?(?:new\s+)?voicemail/i.test(text) ||
       /voicemail\s+(?:notification|alert|waiting|received|pending)/i.test(text) ||
       /missed\s+call\s+(?:notification|alert)[\s\S]{0,30}(?:click|tap|visit|listen)/i.test(text)) {
