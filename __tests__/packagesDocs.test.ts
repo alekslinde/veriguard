@@ -3,15 +3,15 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { checkUrl, checkSms, analyzeContent } from "@veriguard/detect";
 import {
-  INSTALL,
   QUICKSTART,
   ANALYZE,
   REGIONS,
-  MCP_CLAUDE,
-  MCP_CONFIG,
-  MCP_OFFLINE,
+  mcpClaudeCommand,
+  mcpConfig,
+  mcpOfflineCommand,
   DOCUMENTED_TOOLS,
 } from "@/components/PackagesDocs";
+import { MANAGERS, installCommand, execCommand } from "@/components/InstallTabs";
 import { NPM_PACKAGE, MCP_PACKAGE } from "@/lib/npmPackage";
 import { createServer, DEFAULT_OPTIONS } from "../packages/mcp/src/server";
 import { parseArgs } from "../packages/mcp/src/cli";
@@ -33,7 +33,7 @@ describe("npm docs samples match the engine", () => {
   it("installs the package the rest of the site names", () => {
     // One source for the package name, so a rename cannot leave the install
     // line pointing at something that no longer exists.
-    expect(INSTALL).toBe(`npm install ${NPM_PACKAGE}`);
+    expect(installCommand("npm", NPM_PACKAGE)).toBe(`npm install ${NPM_PACKAGE}`);
     expect(QUICKSTART).toContain(`from "${NPM_PACKAGE}"`);
   });
 
@@ -96,10 +96,12 @@ describe("npm docs samples match the engine", () => {
 // renamed tool or a changed flag fails here rather than in someone's config.
 
 describe("MCP docs samples match the server", () => {
-  it("names the package the rest of the site names", () => {
-    expect(MCP_CLAUDE).toContain(MCP_PACKAGE);
-    expect(MCP_CONFIG).toContain(MCP_PACKAGE);
-    expect(MCP_OFFLINE).toContain(MCP_PACKAGE);
+  it("names the package in every runtime's command", () => {
+    for (const manager of MANAGERS) {
+      expect(mcpClaudeCommand(manager)).toContain(MCP_PACKAGE);
+      expect(mcpConfig(manager)).toContain(MCP_PACKAGE);
+      expect(mcpOfflineCommand(manager)).toContain(MCP_PACKAGE);
+    }
   });
 
   it("documents exactly the tools the server registers", () => {
@@ -114,42 +116,105 @@ describe("MCP docs samples match the server", () => {
     expect(DOCUMENTED_TOOLS.slice().sort()).toEqual(registered);
   });
 
-  it("shows a config whose command the CLI actually accepts", () => {
+  it("emits a parseable, spawnable config for every runtime", () => {
     // The JSON is what a reader pastes into their client, so it has to parse,
-    // and its args have to be ones the binary tolerates. A `-y` that npx
-    // consumes is not passed through, so the server sees no arguments at all.
-    const parsed = JSON.parse(MCP_CONFIG) as {
-      mcpServers: Record<string, { command: string; args: string[] }>;
-    };
-    const entry = Object.values(parsed.mcpServers)[0];
+    // and `command`/`args` have to be split the way a process spawn expects
+    // rather than left as a shell string.
+    for (const manager of MANAGERS) {
+      const parsed = JSON.parse(mcpConfig(manager)) as {
+        mcpServers: Record<string, { command: string; args: string[] }>;
+      };
+      const entry = Object.values(parsed.mcpServers)[0];
 
-    expect(entry.command).toBe("npx");
-    expect(entry.args).toContain(MCP_PACKAGE);
-    // Everything after the package name is the server's own; nothing here yet,
-    // and parseArgs must accept that.
-    const serverArgs = entry.args.slice(entry.args.indexOf(MCP_PACKAGE) + 1);
-    expect(() => parseArgs(serverArgs)).not.toThrow();
+      expect(entry.command, `${manager}: command contains a space`).not.toMatch(/\s/);
+      expect(entry.args, `${manager}: package missing from args`).toContain(
+        manager === "deno" ? `npm:${MCP_PACKAGE}` : MCP_PACKAGE,
+      );
+    }
   });
 
-  it("shows offline flags the CLI really has", () => {
+  it("passes the CLI only arguments it accepts", () => {
+    // Everything after the package name is the server's own. A runner flag
+    // leaking through (npx's -y, deno's --allow-*) would make the server exit 2
+    // on an unknown option, and the client would report a server that will not
+    // start.
+    for (const manager of MANAGERS) {
+      const spec = manager === "deno" ? `npm:${MCP_PACKAGE}` : MCP_PACKAGE;
+      const { args } = Object.values(
+        (JSON.parse(mcpConfig(manager)) as {
+          mcpServers: Record<string, { command: string; args: string[] }>;
+        }).mcpServers,
+      )[0];
+
+      const serverArgs = args.slice(args.indexOf(spec) + 1);
+      expect(() => parseArgs(serverArgs), `${manager}: ${serverArgs.join(" ")}`).not.toThrow();
+    }
+  });
+
+  it("shows offline flags the CLI really has, in every runtime", () => {
     // The page claims these two flags leave the server with no network access.
     // If either were renamed, the sample would teach a command that exits 2.
-    const flags = MCP_OFFLINE.split(/\s+/).filter((a) => a.startsWith("--"));
-    expect(flags).toEqual(["--no-blocklist", "--no-expand"]);
+    for (const manager of MANAGERS) {
+      const flags = mcpOfflineCommand(manager)
+        .split(/\s+/)
+        .filter((a) => a === "--no-blocklist" || a === "--no-expand");
+      expect(flags, `${manager} is missing a flag`).toEqual(["--no-blocklist", "--no-expand"]);
 
-    const options = parseArgs(flags);
-    expect(options).not.toBe("help");
-    if (options === "help") return;
-    expect(options.blocklist, "the sample does not actually disable the blocklist").toBe(false);
-    expect(options.expandLinks, "the sample does not actually disable expansion").toBe(false);
+      const options = parseArgs(flags);
+      expect(options).not.toBe("help");
+      if (options === "help") return;
+      expect(options.blocklist, `${manager}: blocklist not disabled`).toBe(false);
+      expect(options.expandLinks, `${manager}: expansion not disabled`).toBe(false);
+    }
   });
 
-  it("gives the Claude Code command the package name as its server argument", () => {
+  it("gives the Claude Code command a runner after the -- separator", () => {
     // `claude mcp add <name> -- <command>`: everything after `--` is what gets
     // run, so the package has to appear there rather than only in the label.
-    const [, command] = MCP_CLAUDE.split(" -- ");
-    expect(command, "nothing follows the -- separator").toBeTruthy();
-    expect(command).toContain(MCP_PACKAGE);
+    for (const manager of MANAGERS) {
+      const [, command] = mcpClaudeCommand(manager).split(" -- ");
+      expect(command, `${manager}: nothing follows --`).toBeTruthy();
+      expect(command).toContain(MCP_PACKAGE);
+    }
+  });
+
+  it("uses each runtime's own runner rather than npx everywhere", () => {
+    // The point of the tabs: a bun user told to type npx is being handed
+    // somebody else's docs.
+    expect(mcpConfig("npm")).toContain('"command": "npx"');
+    expect(mcpConfig("pnpm")).toContain('"command": "pnpm"');
+    expect(mcpConfig("bun")).toContain('"command": "bunx"');
+    expect(mcpConfig("deno")).toContain('"command": "deno"');
+  });
+});
+
+describe("install commands", () => {
+  it("offers the four runtimes the page claims to support", () => {
+    expect(MANAGERS).toEqual(["npm", "pnpm", "bun", "deno"]);
+  });
+
+  it("names the package in every install command", () => {
+    for (const manager of MANAGERS) {
+      const command = installCommand(manager, NPM_PACKAGE);
+      expect(command, `${manager} omits the package`).toContain(NPM_PACKAGE);
+      // The runner has to lead, or the line is not a command.
+      expect(command.startsWith(manager), `${manager}: "${command}"`).toBe(true);
+    }
+  });
+
+  it("gives Deno the npm: specifier it needs", () => {
+    // Without it, `deno add @veriguard/detect` looks for a JSR package that
+    // does not exist — the one runtime where copying the npm spelling fails
+    // rather than just looking foreign.
+    expect(installCommand("deno", NPM_PACKAGE)).toContain(`npm:${NPM_PACKAGE}`);
+    expect(execCommand("deno", MCP_PACKAGE)).toContain(`npm:${MCP_PACKAGE}`);
+  });
+
+  it("does not put an npm: specifier in a non-Deno command", () => {
+    for (const manager of MANAGERS.filter((m) => m !== "deno")) {
+      expect(installCommand(manager, NPM_PACKAGE)).not.toContain("npm:");
+      expect(execCommand(manager, MCP_PACKAGE)).not.toContain("npm:");
+    }
   });
 });
 

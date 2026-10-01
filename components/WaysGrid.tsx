@@ -20,6 +20,7 @@
 // detail on behalf of a reader who has not asked for it.
 
 import { useState, useSyncExternalStore } from "react";
+import Link from "next/link";
 import { useLang } from "@/lib/lang";
 import { bold } from "@/lib/richText";
 import { WAYS_IN, type WayIn } from "@/lib/waysIn";
@@ -240,8 +241,19 @@ function ForwardBody() {
  */
 function PendingRow({ way }: { way: WayIn }) {
   const { t } = useLang();
-  return (
-    <div className="flex items-center gap-3 px-4 py-3">
+
+  // An on-site href is documentation, which exists whether or not the package
+  // is published — so a pending row still links to it. Suppressing the link
+  // made the docs unreachable from anywhere on the site: this row was the only
+  // thing naming the package, and it named it without pointing at anything.
+  //
+  // An external href (a store page, a registry listing) is NOT linked here,
+  // because that is the thing that does not exist yet and is what `unavailable`
+  // is reporting.
+  const docs = way.href?.startsWith("/") ? way.href : null;
+
+  const body = (
+    <>
       <span className="flex-1 min-w-0">
         <span className="font-semibold text-[var(--text-dim)] text-[14.5px]">{t(way.name)}</span>
         <span className="text-[var(--faint)] text-[13.5px]"> — {t(way.how)}</span>
@@ -249,7 +261,20 @@ function PendingRow({ way }: { way: WayIn }) {
       <span className="shrink-0 font-[family-name:var(--font-mono-ui)] text-[10px] uppercase tracking-[0.08em] text-[var(--faint)]">
         {t(way.unavailable!)}
       </span>
-    </div>
+    </>
+  );
+
+  if (!docs) {
+    return <div className="flex items-center gap-3 px-4 py-3">{body}</div>;
+  }
+
+  return (
+    <Link
+      href={docs}
+      className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--ink-2)]/40 transition-colors"
+    >
+      {body}
+    </Link>
   );
 }
 

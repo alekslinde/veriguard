@@ -29,6 +29,12 @@ import { useLang } from "@/lib/lang";
 import PageHeader from "@/components/PageHeader";
 import CodeBlock from "@/components/CodeBlock";
 import AnchorHeading from "@/components/AnchorHeading";
+import InstallTabs, {
+  ManagerTabs,
+  useManager,
+  execCommand,
+  type Manager,
+} from "@/components/InstallTabs";
 import {
   NPM_PACKAGE,
   NPM_URL,
@@ -41,8 +47,6 @@ import {
 } from "@/lib/npmPackage";
 
 // ── The library ──────────────────────────────────────────────────────────────
-
-export const INSTALL = `npm install ${NPM_PACKAGE}`;
 
 export const QUICKSTART = `import { checkUrl } from "${NPM_PACKAGE}";
 
@@ -76,18 +80,33 @@ checkSms("Your parcel is held", undefined, "gb");`;
  * The one-liner for Claude Code, which takes a command rather than a config
  * file. Kept separate from the JSON below because it is the shortest path for
  * the client most likely to be reading this.
+ *
+ * Built from execCommand so the runner matches whichever tab the reader picked:
+ * telling a bun user to type `npx` is the small wrongness that makes docs feel
+ * like they were written for somebody else.
  */
-export const MCP_CLAUDE = `claude mcp add veriguard -- npx -y ${MCP_PACKAGE}`;
+export const mcpClaudeCommand = (manager: Manager) =>
+  `claude mcp add veriguard -- ${execCommand(manager, MCP_PACKAGE)}`;
 
-/** The config shape nearly every other MCP client accepts. */
-export const MCP_CONFIG = `{
+/**
+ * The config shape nearly every other MCP client accepts.
+ *
+ * The client spawns this itself, so `command` and `args` have to be split the
+ * way a process spawn expects — not a shell string. Derived from the same
+ * execCommand as above and then split on whitespace, so the two samples cannot
+ * drift apart and neither can drift from the CLI.
+ */
+export function mcpConfig(manager: Manager): string {
+  const [command, ...args] = execCommand(manager, MCP_PACKAGE).split(" ");
+  return `{
   "mcpServers": {
     "veriguard": {
-      "command": "npx",
-      "args": ["-y", "${MCP_PACKAGE}"]
+      "command": "${command}",
+      "args": ${JSON.stringify(args)}
     }
   }
 }`;
+}
 
 /**
  * The flags, shown as the form that makes the strongest claim.
@@ -96,7 +115,8 @@ export const MCP_CONFIG = `{
  * property worth putting in front of someone who cares — so the sample is the
  * offline invocation rather than a list of options.
  */
-export const MCP_OFFLINE = `npx ${MCP_PACKAGE} --no-blocklist --no-expand`;
+export const mcpOfflineCommand = (manager: Manager) =>
+  `${execCommand(manager, MCP_PACKAGE)} --no-blocklist --no-expand`;
 
 /** The four tools, with the name exactly as a client sees it. */
 const TOOLS: { name: string; key: Parameters<ReturnType<typeof useLang>["t"]>[0] }[] = [
@@ -178,6 +198,9 @@ const TOC: { id: string; key: Parameters<ReturnType<typeof useLang>["t"]>[0] }[]
 
 export default function PackagesDocs() {
   const { t } = useLang();
+  // Shared with the install tabs above, so a choice made in either place holds
+  // for every sample on the page.
+  const [manager, setManager] = useManager();
 
   return (
     <>
@@ -225,7 +248,7 @@ export default function PackagesDocs() {
           {t("npm.install.heading")}
         </AnchorHeading>
         <div className="mt-3 max-w-[68ch]">
-          <CodeBlock code={INSTALL} label="install command" />
+          <InstallTabs pkg={NPM_PACKAGE} label="install command" />
         </div>
       </section>
 
@@ -310,11 +333,18 @@ export default function PackagesDocs() {
           {t("packages.mcp.install.heading")}
         </AnchorHeading>
 
+        {/* One strip for the whole section: the three samples below are all
+            runtime-dependent and have to change together, or a reader sets bun
+            here and copies an npx config two blocks down. */}
+        <div className="mt-3 max-w-[68ch]">
+          <ManagerTabs active={manager} onChange={setManager} label="runtime" />
+        </div>
+
         <h4 className="mt-4 text-[13px] font-semibold text-[var(--text-dim)]">
           {t("packages.mcp.claude.heading")}
         </h4>
         <div className="mt-2 max-w-[68ch]">
-          <CodeBlock code={MCP_CLAUDE} label="Claude Code command" />
+          <CodeBlock code={mcpClaudeCommand(manager)} label="Claude Code command" />
         </div>
 
         <h4 className="mt-5 text-[13px] font-semibold text-[var(--text-dim)]">
@@ -322,7 +352,7 @@ export default function PackagesDocs() {
         </h4>
         <p className={BODY}>{t("packages.mcp.config.body")}</p>
         <div className="mt-2 max-w-[68ch]">
-          <CodeBlock code={MCP_CONFIG} label="MCP client config" />
+          <CodeBlock code={mcpConfig(manager)} label="MCP client config" />
         </div>
       </section>
 
@@ -352,7 +382,7 @@ export default function PackagesDocs() {
           {t("packages.mcp.network.offline")}
         </p>
         <div className="mt-2 max-w-[68ch]">
-          <CodeBlock code={MCP_OFFLINE} label="offline invocation" />
+          <CodeBlock code={mcpOfflineCommand(manager)} label="offline invocation" />
         </div>
       </section>
 

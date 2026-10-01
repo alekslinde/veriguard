@@ -43,6 +43,19 @@ export default function SiteFooter() {
         <span aria-hidden="true" className="text-[var(--ink-3)]">
           ·
         </span>
+        {/* The developer docs. In the footer because that is where someone
+            looks for them, and because the WaysGrid row on the home page is
+            one line a reader scrolls past — it was the only route to this page
+            and the page was effectively unreachable. */}
+        <Link
+          href="/ways/packages"
+          className="underline underline-offset-2 hover:text-[var(--foreground)] transition-colors"
+        >
+          {t("footer.packages")}
+        </Link>
+        <span aria-hidden="true" className="text-[var(--ink-3)]">
+          ·
+        </span>
         {/* Bug reporting is an inline footer item now, not a floating chip that
             sat over the check input on a phone. Same modal, reached through the
             shared context's openManual. */}

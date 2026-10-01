@@ -13,6 +13,7 @@
   "stats.reported.one": "scam reported here",
   "stats.reported.many": "scams reported here",
   "footer.about": "What we store",
+  "footer.packages": "For developers",
   "kind.url": "Link",
   "kind.email": "Sender",
   "kind.phone": "Phone number",
