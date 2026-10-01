@@ -1,11 +1,8 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import AddToHomeScreen from "@/components/AddToHomeScreen";
 import CheckStage from "@/components/CheckStage";
 import HomeHero, { HomeCaption } from "@/components/HomeHero";
-import RadarTeaser from "@/components/RadarTeaser";
 import WaysTeaser from "@/components/WaysTeaser";
-import { resolveRegion } from "@/lib/regionResolver";
 import { getStats } from "@/lib/reportStore";
 
 // The positioning line the page used to render as an <h1>.
@@ -26,14 +23,13 @@ export const metadata: Metadata = {
     "Paste a suspicious link, text, email or phone number and see exactly what we found. Scored against open-source rules; nothing you paste is stored.",
 };
 
-// Region comes from request headers, so this page is per-request regardless.
-// The check flow is client-side, so little is served statically here in any
-// case.
+// Per-request for the counters below, which are read on this render rather
+// than fetched on mount. Nothing else here needs it — the check flow is
+// client-side, and the region lookup this also used to carry left with the
+// radar section.
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const region = resolveRegion(await headers());
-
   // Resolved here rather than fetched by StatsBar on mount. This render is
   // already happening per visit, so reading two counter rows inside it costs
   // nothing extra — while the client fetch it replaces was a second serverless
@@ -101,35 +97,24 @@ export default async function Home() {
         />
       </div>
 
-      {/* ── The control centre ──────────────────────────────────────────────
-          Everything that is not the tool, in columns under it.
+      {/* ── Under the tool ──────────────────────────────────────────────────
+          What a reader scans once they have their answer: the other ways in,
+          and the install prompt.
 
-          These were a single stacked column: the ways-in shelf, then the
-          radar, each capped at 760px and running down the left of the page.
-          Stacked, they pushed the radar most of a screen below the fold and
-          left the same dead margin as the box. Side by side they are what a
-          reader scans once they have their answer — what else can do this,
-          and what is going around — and they fill the width the page already
-          has.
+          This was two columns, the radar's four quoted lures beside these.
+          The radar is gone from the home page — it is a browsing surface, and
+          this screen has one job. It stays a destination (the Learn tab's
+          sub-nav, the Learn hub and the about page all reach /radar), so
+          nothing was removed from the product, only from the screen that
+          should open on the paste box and little else.
 
-          Radar first on a wide screen and it takes the wider column: it is
-          the one with real content rather than links. Below lg they stack,
-          and the order flips so the channels — the shorter, more actionable
-          block — come first rather than after four quotes.
-
-          `items-start` so neither column stretches to the other's height. */}
-      <div className="mt-8 sm:mt-12 grid gap-6 lg:gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] items-start">
-        <div className="order-2 lg:order-1 min-w-0">
-          <RadarTeaser region={region} />
-        </div>
-
-        <div className="order-1 lg:order-2 min-w-0 space-y-6">
-          {/* Renders nothing at all on a device that already has the app, or
-              cannot install it — so on most desktops this column is just the
-              channels. */}
-          <AddToHomeScreen />
-          <WaysTeaser />
-        </div>
+          One column at the tool's own width, so the page reads as a single
+          axis rather than a tool with a sidebar of things to read. */}
+      <div className="mt-8 sm:mt-12 max-w-[760px] mx-auto space-y-6">
+        {/* Renders nothing at all on a device that already has the app, or
+            cannot install it — so on most desktops this is just the channels. */}
+        <AddToHomeScreen />
+        <WaysTeaser />
       </div>
     </main>
   );

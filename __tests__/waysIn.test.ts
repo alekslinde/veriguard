@@ -79,10 +79,27 @@ describe("the shelf scales to the channels still being added", () => {
     expect(gridCode).not.toMatch(/open:col-span-full/);
   });
 
-  it("sits inside a column the page gives it", () => {
-    // The control centre. If the shelf goes back to spanning the page, a row
-    // is 1180px again and the link-farm problem returns.
-    expect(read("app/page.tsx")).toMatch(/lg:grid-cols-\[minmax\(0,1\.35fr\)_minmax\(0,1fr\)\]/);
+  it("sits inside a width the page caps", () => {
+    // The shelf's rows are full width, so the PAGE has to be what bounds them.
+    // Unbounded, a row is the full 1180px and seven of them read as a footer
+    // link farm — the problem the shelf was reshaped to escape.
+    //
+    // Asserted as the cap rather than as the specific layout that provides it.
+    // This was pinned to the two-column grid that used to hold the radar
+    // alongside; when the radar left the home page the column went with it and
+    // the cap moved onto the block itself, which bounds the rows just as well.
+    // A test that names one mechanism fails on a layout change that preserves
+    // the property it exists to protect.
+    const home = read("app/page.tsx");
+    const shelf = home.slice(home.indexOf("<WaysTeaser"));
+    expect(shelf).not.toBe("");
+
+    // The nearest wrapper above the shelf caps its width, by a max-w on the
+    // block or by handing it a column of a wider grid.
+    const capped =
+      /max-w-\[\d+px\][^>]*>\s*(?:\{\/\*(?:[^*]|\*(?!\/))*\*\/\}\s*)*(?:<AddToHomeScreen[^>]*\/>\s*)?<WaysTeaser/.test(home) ||
+      /lg:grid-cols-\[minmax\(/.test(home);
+    expect(capped).toBe(true);
   });
 
   it("draws every channel's glyph from the shared set", () => {
