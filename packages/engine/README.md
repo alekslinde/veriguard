@@ -7,7 +7,7 @@ Extracted from the Veriguard app so it can be bundled into clients that are not
 the Next.js app: the WebExtension first, then anything else that needs to score
 a message without sending it anywhere.
 
-*Last reviewed: 2026-09-26.*
+*Last reviewed: 2026-10-01.*
 
 ```bash
 npm install @veriguard/scam-detect
@@ -16,15 +16,20 @@ npm install @veriguard/scam-detect
 ```ts
 import { checkUrl, analyzeContent } from "@veriguard/scam-detect";
 
-const result = await checkUrl("https://commbank-secure-login.tk/verify");
+const result = checkUrl("https://commbank-secure-login.tk/verify");
 // → verdict "likely_scam", score 85, flags explaining why
 
 // Or hand it arbitrary text and get one result per identifier found:
 const results = await analyzeContent("Your parcel is held: pay at auspost-redelivery.bond");
 ```
 
-Every check is synchronous work behind an async signature, deterministic, and
-free of I/O unless you hand it a transport yourself — see below.
+`checkUrl`, `checkSms`, `checkEmail`, `checkPhone` and `checkCustom` are
+**synchronous** — they return a result, not a promise. `analyzeContent` is the
+one async entry point, because it may expand a shortened link if you hand it a
+transport.
+
+Every check is deterministic and free of I/O unless you supply that transport
+yourself — see below.
 
 ## Reading a result
 
@@ -77,6 +82,7 @@ question — recorded in the roadmap rather than settled here.
 
 ```
 src/
+  index.ts            ← the barrel: the front door for a new consumer
   scamDetector.ts     ← the scorer and the public check* / analyzeContent API
   detectType.ts       ← input classification
   engineTypes.ts      ← shared value types (breaks the scorer ↔ detectType cycle)
@@ -84,6 +90,11 @@ src/
   emailHeaders.ts     ← header parsing and SPF/DKIM/DMARC summarising
   phoneIntel.ts       ← number intelligence (the one external dep)
   urlExpander.ts      ← shortener resolution, transport injected
+  publicSuffix.ts     ← registrable-domain lookup, the hinge of the typosquat rule
+  publicSuffixList.ts ← generated data (`npm run psl`); never edited by hand
+  keyboardAdjacency.ts ← keyboard-adjacency typosquat detection (region-free)
+  hostHash.ts         ← the hostname-hashing scheme the blocklist endpoint shares with its clients
+  verdictRank.ts      ← verdict severity ordering, and the worst-wins collapse
   regions/            ← per-country signal packs (data, never logic)
 ```
 
