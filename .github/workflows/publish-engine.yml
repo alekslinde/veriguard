@@ -50,8 +50,16 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          # 24, not 22. Trusted publishing exchanges the Actions OIDC token for
+          # a short-lived registry credential, which needs npm >= 11.5.1 — and
+          # Node 22 bundles npm 10.x. On an old npm no exchange happens, the
+          # PUT goes out unauthenticated, and the registry answers 404. That
+          # reads as "package missing" rather than "credential missing", which
+          # sends you debugging the wrong thing.
+          node-version: "24"
           cache: npm
+          # The registry the OIDC exchange targets. Needed even though no token
+          # is written: setup-node uses it to scope the .npmrc it creates.
           registry-url: https://registry.npmjs.org
 
       - run: npm ci
@@ -98,13 +106,33 @@ jobs:
       - name: Check packing left the tree clean
         run: git diff --exit-code -- packages/detect/package.json
 
-      # Publishes on a tag push, or on a manual run that named a tag and turned
-      # dry_run off. The manual path previously could not publish at all: it was
-      # gated on `refs/tags/`, which a workflow_dispatch ref never matches, so
-      # the retry it existed for reported green and uploaded nothing.
-      - name: Publish
+      # STAGES rather than publishes. The tarball is uploaded and held; it
+      # reaches no installer until a maintainer approves it with 2FA
+      # (`npm stage list`, then `npm stage approve <id>`, or the Staged
+      # Packages tab on npmjs.com).
+      #
+      # That is the point of the arrangement: a version on npm cannot be
+      # replaced and unpublishing is restricted after 72 hours, so no workflow
+      # run — including one started by a mistyped tag — should be able to put
+      # code in front of users by itself. Merging reviews the change; approving
+      # the stage reviews the artifact.
+      #
+      # Auth is OIDC, so there is deliberately no NODE_AUTH_TOKEN here, not
+      # even an empty one: an empty value reads as absent while implying a
+      # token signs these releases. The trusted publisher is configured on
+      # npmjs.com instead — owner, repo, `publish-engine.yml` as the workflow
+      # filename, environment left empty, and "Allow npm publish" UNCHECKED so
+      # the staging gate cannot be bypassed.
+      #
+      # --provenance is passed explicitly rather than left to
+      # publishConfig.provenance, so the attestation is visible at the call
+      # site and a manifest edit cannot silently drop it.
+      #
+      # Runs on a tag push, or on a manual run that named a tag and turned
+      # dry_run off. The manual path previously could not publish at all: it
+      # was gated on `refs/tags/`, which a workflow_dispatch ref never matches,
+      # so the retry it existed for reported green and uploaded nothing.
+      - name: Stage the release
         if: |
           (github.event_name == 'push' || inputs.tag != '') && inputs.dry_run != true
-        run: npm publish --workspace @veriguard/detect
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm stage publish --workspace @veriguard/detect --provenance

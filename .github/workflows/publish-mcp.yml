@@ -53,7 +53,10 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          # 24, not 22 — see the note in publish-engine.yml. Trusted publishing
+          # needs npm >= 11.5.1; Node 22 bundles npm 10.x, and the failure is a
+          # bare 404 rather than an auth error.
+          node-version: "24"
           cache: npm
           registry-url: https://registry.npmjs.org
 
@@ -96,7 +99,9 @@ jobs:
         run: |
           range="$(node -p "require('./packages/mcp/package.json').dependencies['@veriguard/detect']")"
           if ! npm view "@veriguard/detect@${range}" version >/dev/null 2>&1; then
-            echo "no published @veriguard/detect matching ${range} — publish the engine first" >&2
+            echo "no published @veriguard/detect matching ${range}" >&2
+            echo "npm view sees published versions only, so a STAGED detect does not count:" >&2
+            echo "approve its stage first, then re-run this." >&2
             exit 1
           fi
           echo "engine range ${range} resolves to: $(npm view "@veriguard/detect@${range}" version | tail -1)"
@@ -113,9 +118,17 @@ jobs:
       - name: Check packing left the tree clean
         run: git diff --exit-code -- packages/mcp/package.json
 
-      - name: Publish
+      # Stages rather than publishes — see publish-engine.yml for why, and for
+      # the trusted-publisher settings. The only difference here is the
+      # workflow filename npm matches against: `publish-mcp.yml`.
+      #
+      # This package's staging gate carries extra weight. It depends on
+      # @veriguard/detect by version range, and the step above checks that
+      # range resolves on the registry — but a staged detect is not yet
+      # installable, so approving this one before approving detect would put a
+      # package on npm whose own dependency cannot be resolved. Approve detect
+      # first.
+      - name: Stage the release
         if: |
           (github.event_name == 'push' || inputs.tag != '') && inputs.dry_run != true
-        run: npm publish --workspace @veriguard/mcp
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm stage publish --workspace @veriguard/mcp --provenance

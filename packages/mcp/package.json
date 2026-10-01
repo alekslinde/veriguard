@@ -22,7 +22,7 @@
   "bugs": "https://github.com/alekslinde/veriguard/issues",
   "type": "module",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "bin": {
     "veriguard-mcp": "./dist/cli.js"
