@@ -17,7 +17,9 @@
 // __tests__/mcpPublish.test.ts, which needs a build and skips without one.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createServer, DEFAULT_OPTIONS, type ServerOptions } from "../packages/mcp/src/server";
+import { z } from "zod";
+import { createServer, DEFAULT_OPTIONS, regionArg, type ServerOptions } from "../packages/mcp/src/server";
+import { UrlhausBlocklist } from "../packages/mcp/src/blocklist";
 import { parseArgs } from "../packages/mcp/src/cli";
 import { formatResult, formatAnalysis } from "../packages/mcp/src/format";
 import { checkPhone, analyzeContent } from "@veriguard/scam-detect/scamDetector";
@@ -263,6 +265,146 @@ describe("MCP server — privacy invariant", () => {
       expect(text, `${name} produced nothing offline`).toMatch(/\d+\/100/);
     }
     expect(contacted).toEqual([]);
+  });
+});
+
+describe("MCP server — blocklist refresh", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("does not re-fetch a feed that just failed", async () => {
+    // The bug this covers: only a SUCCESSFUL refresh advanced the clock, so
+    // once the copy was stale and abuse.ch unreachable, every tool call
+    // re-issued the fetch and waited up to the 10s timeout before answering.
+    // A third-party feed being down longer than the TTL is ordinary, and the
+    // cost landed on whoever was waiting for a verdict.
+    const fetchMock = vi.fn(async () => new Response(null, { status: 503 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const blocklist = new UrlhausBlocklist();
+    for (let i = 0; i < 5; i++) await blocklist.refreshIfStale();
+
+    expect(fetchMock.mock.calls.length, "a failed feed was retried on every call").toBe(1);
+  });
+
+  it("retries after the backoff window has passed", async () => {
+    // The other half: backing off must not become giving up. A transient
+    // failure should not cost a six-hour TTL of blocklist coverage.
+    vi.useFakeTimers();
+    const fetchMock = vi.fn(async () => new Response(null, { status: 503 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const blocklist = new UrlhausBlocklist();
+    await blocklist.refreshIfStale();
+    expect(fetchMock.mock.calls.length).toBe(1);
+
+    vi.advanceTimersByTime(61_000);
+    await blocklist.refreshIfStale();
+    expect(fetchMock.mock.calls.length, "did not retry after the backoff elapsed").toBe(2);
+  });
+
+  it("treats a 200 carrying an unparseable body as a failure", async () => {
+    // An error page served with a 200 would otherwise replace the blocklist
+    // with an empty set and record it as a success, silently dropping the
+    // signal for the whole TTL.
+    const fetchMock = vi.fn(async () => new Response("<html>nope</html>", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const blocklist = new UrlhausBlocklist();
+    await blocklist.refreshIfStale();
+
+    expect(blocklist.ready, "an unparseable body was accepted as a copy").toBe(false);
+    expect(blocklist.size).toBe(0);
+  });
+
+  it("serves the previous copy when a later refresh fails", async () => {
+    // Losing contact with the feed is not evidence that its entries became
+    // safe, so a failed refresh must not empty a good list.
+    vi.useFakeTimers();
+    // A numeric id, not the literal "id": the parser skips a line starting
+    // with '"id"' as the CSV header, so a fixture using it is silently dropped.
+    const csv = '"123","2026-01-01","http://known-bad.tk/x","online","","","","",""';
+
+    let attempt = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        attempt += 1;
+        return attempt === 1
+          ? new Response(csv, { status: 200 })
+          : new Response(null, { status: 503 });
+      }),
+    );
+
+    const blocklist = new UrlhausBlocklist();
+    await blocklist.refreshIfStale();
+    expect(blocklist.has("known-bad.tk"), "the first copy did not load").toBe(true);
+
+    // Past the TTL, so the next call refreshes — and fails.
+    vi.advanceTimersByTime(7 * 60 * 60 * 1000);
+    await blocklist.refreshIfStale();
+
+    expect(blocklist.has("known-bad.tk"), "a failed refresh discarded a good copy").toBe(true);
+  });
+
+  it("shares one request across concurrent callers", async () => {
+    // Every tool call asks for the blocklist, so a burst of calls must not
+    // become a burst of requests to abuse.ch.
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(String.raw`"123","2026-01-01","http://x.tk/","online","","","","",""`, { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const blocklist = new UrlhausBlocklist();
+    await Promise.all([
+      blocklist.refreshIfStale(),
+      blocklist.refreshIfStale(),
+      blocklist.refreshIfStale(),
+    ]);
+
+    expect(fetchMock.mock.calls.length).toBe(1);
+  });
+});
+
+describe("MCP server — region validation", () => {
+  // resolveRegionPack never throws: an unknown code resolves to DEFAULT_REGION,
+  // which is AU, whose coverage is "full". So a near-miss code does not degrade
+  // to a cautious answer — it scores against the wrong country's bank and
+  // government rules and presents the result with full confidence. The CLI
+  // already refused these; the tool argument did not.
+  const schema = z.object({ region: regionArg });
+
+  it.each(["UK", "USA", "AUS", "England", "GBR", ""])(
+    "rejects %o rather than silently scoring against the default pack",
+    (code) => {
+      expect(schema.safeParse({ region: code }).success, `accepted ${code}`).toBe(false);
+    },
+  );
+
+  it.each(["AU", "GB", "US", "NZ"])("accepts the real code %s", (code) => {
+    expect(schema.safeParse({ region: code }).success, `rejected ${code}`).toBe(true);
+  });
+
+  it("still accepts a lowercase code, which worked before", () => {
+    // The engine uppercases internally, so "au" was always a working call.
+    // Validation must not turn it into an error.
+    const parsed = schema.safeParse({ region: "au" });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.region).toBe("AU");
+  });
+
+  it("treats an omitted region as the default, not as invalid", () => {
+    expect(schema.safeParse({}).success).toBe(true);
+  });
+
+  it("names the confusable codes in its error, since those are the likely input", () => {
+    const parsed = schema.safeParse({ region: "UK" });
+    expect(parsed.success).toBe(false);
+    const message = parsed.success ? "" : JSON.stringify(parsed.error.issues);
+    expect(message).toMatch(/GB/);
   });
 });
 

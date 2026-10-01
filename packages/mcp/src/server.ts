@@ -64,17 +64,39 @@ export const DEFAULT_OPTIONS: ServerOptions = {
  *
  * Optional, because an assistant usually does not know where its user is and a
  * required argument would be answered with a guess. Omitted means the default
- * pack rather than no pack, and the result carries its own coverage note, so a
- * wrong region degrades to "generic signals only" rather than to a wrong
- * verdict.
+ * pack.
+ *
+ * An ENUM rather than a free string, and that is the load-bearing part.
+ * `resolveRegionPack` never throws: an unrecognised code resolves to
+ * DEFAULT_REGION, which is AU, whose coverage is `full` — so there is no
+ * coverage note to warn anyone. A near-miss code like "UK" (the real one is
+ * "GB") or "USA" would therefore score a British message against Australian
+ * bank and government rules and present the verdict with full confidence. That
+ * silent fallback is right for a web request carrying a stale cookie and wrong
+ * for an argument a model just invented, which is the same reasoning the CLI's
+ * --region flag already applies.
+ *
+ * Enumerating the codes also puts them in the tool schema, so a client sees
+ * which values exist instead of inferring them from a sentence.
  */
-const regionArg = z
+const REGION_CODES = supportedRegions();
+
+export const regionArg = z
   .string()
+  // Case-folded before validation, not after: the engine uppercases internally,
+  // so "au" is a working call today and a bare enum would turn it into an error
+  // for no benefit. This accepts what already worked and rejects only codes
+  // that name no pack.
+  .transform((value) => value.toUpperCase())
+  .refine((value): value is string => (REGION_CODES as readonly string[]).includes(value), {
+    message: `unknown region — expected one of ${REGION_CODES.join(", ")} (note GB, not UK; US, not USA)`,
+  })
   .optional()
   .describe(
-    `Two-letter region code governing which local scam rules apply (${supportedRegions().join(", ")}). ` +
+    `Two-letter region code governing which local scam rules apply. ` +
       `Defaults to ${DEFAULT_REGION}. Pass the user's country when you know it — the rules for ` +
-      `impersonated banks, government services and phone formats are country-specific.`,
+      `impersonated banks, government services and phone formats are country-specific. ` +
+      `Use the exact code: GB (not UK), US (not USA).`,
   );
 
 export function createServer(options: ServerOptions = DEFAULT_OPTIONS): McpServer {
@@ -90,8 +112,9 @@ export function createServer(options: ServerOptions = DEFAULT_OPTIONS): McpServe
    *
    * Awaited rather than fired and forgotten: on the first call it is the
    * difference between consulting the feed and silently not. `refreshIfStale`
-   * owns the timing and the failure handling, and returns immediately when the
-   * copy is fresh, so this costs nothing on the calls after the first.
+   * owns the timing, the failure backoff and the in-flight sharing, and returns
+   * immediately whenever the copy is fresh or a recent attempt failed — so the
+   * only calls that wait are the ones actually fetching.
    */
   async function lookup(): Promise<HostLookup | undefined> {
     if (!blocklist) return undefined;

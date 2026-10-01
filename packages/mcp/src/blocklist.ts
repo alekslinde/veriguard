@@ -27,6 +27,16 @@ const MAX_ENTRIES = 5000;
 /** A fetch of the feed that hangs must not wedge the server's first check. */
 const FETCH_TIMEOUT_MS = 10_000;
 
+/**
+ * How long to wait after a failed refresh before trying again.
+ *
+ * Shorter than the TTL, because a transient failure should not cost six hours
+ * of blocklist coverage, and long enough that a sustained outage is not
+ * hammered. One minute also bounds the worst case a user can feel: at most one
+ * FETCH_TIMEOUT_MS wait per minute rather than one per tool call.
+ */
+const RETRY_AFTER_FAILURE_MS = 60_000;
+
 function parseHostnames(csv: string): Set<string> {
   const hostnames = new Set<string>();
   for (const line of csv.split("\n")) {
@@ -69,6 +79,8 @@ function parseHostnames(csv: string): Set<string> {
 export class UrlhausBlocklist implements HostLookup {
   #hosts = new Set<string>();
   #fetchedAt = 0;
+  /** When the last attempt failed, so a dead feed is not retried every call. */
+  #failedAt = 0;
   #inFlight: Promise<void> | null = null;
 
   has(hostname: string): boolean {
@@ -86,7 +98,7 @@ export class UrlhausBlocklist implements HostLookup {
   }
 
   /**
-   * Refresh if the copy is older than the TTL.
+   * Refresh if the copy is older than the TTL and we are not backing off.
    *
    * Concurrent callers share one in-flight request: the server calls this
    * before each check, and a burst of tool calls must not become a burst of
@@ -94,6 +106,8 @@ export class UrlhausBlocklist implements HostLookup {
    */
   async refreshIfStale(): Promise<void> {
     if (Date.now() - this.#fetchedAt < TTL_MS) return;
+    // A failed attempt is remembered, or every call retries. See #failedAt.
+    if (Date.now() - this.#failedAt < RETRY_AFTER_FAILURE_MS) return;
     if (this.#inFlight) return this.#inFlight;
 
     this.#inFlight = this.#refresh().finally(() => {
@@ -108,18 +122,33 @@ export class UrlhausBlocklist implements HostLookup {
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         headers: { "User-Agent": "veriguard-mcp (scam-detection tool)" },
       });
-      if (!res.ok) return;
+      if (!res.ok) return this.#fail();
 
       const parsed = parseHostnames(await res.text());
       // An empty parse means the feed changed shape or returned an error body
       // with a 200. Keeping the previous copy is safer than trusting it.
-      if (parsed.size === 0) return;
+      if (parsed.size === 0) return this.#fail();
 
       this.#hosts = parsed;
       this.#fetchedAt = Date.now();
+      this.#failedAt = 0;
     } catch {
       // Unreachable or timed out. Keep whatever we had; see the class comment.
+      this.#fail();
     }
+  }
+
+  /**
+   * Record a failed attempt so the next calls do not retry immediately.
+   *
+   * Without this, a stale copy plus an unreachable feed means every tool call
+   * re-issues the fetch and waits up to FETCH_TIMEOUT_MS before answering,
+   * because only success advanced the clock. A third-party feed being down for
+   * longer than the TTL is an ordinary condition, not an exotic one, and the
+   * cost landed on the person waiting for a verdict.
+   */
+  #fail(): void {
+    this.#failedAt = Date.now();
   }
 }
 
