@@ -66,10 +66,24 @@ describe("external links go through ExternalLink", () => {
     ).toEqual([]);
   });
 
-  it("never uses → for a link that leaves the site", () => {
+  it("never uses → inside an external link", () => {
     // → means "this continues"; ↗ means "this leaves". The two were mixed, so
     // the glyph told the reader nothing.
-    const offenders = FILES.filter((f) => read(f).includes('aria-hidden="true"> →'));
+    //
+    // → on an INTERNAL link is correct and stays: the packages CTA in WaysGrid
+    // uses it, because that navigation does not leave the site. So this looks
+    // for → in an external link specifically, rather than anywhere in a file —
+    // the broader check flagged that CTA, which was the test being wrong rather
+    // than the code.
+    const offenders = FILES.filter((f) => {
+      const source = read(f);
+      // Each <ExternalLink …>…</ExternalLink> and each raw <a target="_blank">.
+      const externals = [
+        ...source.matchAll(/<ExternalLink[\s\S]*?<\/ExternalLink>/g),
+        ...source.matchAll(/<a\s[^>]*target="_blank"[\s\S]*?<\/a>/g),
+      ].map((m) => m[0]);
+      return externals.some((block) => block.includes("→"));
+    });
     expect(offenders, `these mark an external link with → instead of ↗: ${offenders.join(", ")}`)
       .toEqual([]);
   });

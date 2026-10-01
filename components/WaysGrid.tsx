@@ -350,6 +350,24 @@ function Row({ way }: { way: WayIn }) {
             // nothing, and rather than linking to a store page that 404s.
             <p className="text-[13px] text-[var(--faint)]">{t("ways.ext.unavailable")}</p>
           ))}
+
+        {/* A plain link, for the row whose action is one. Internal, so Link
+            rather than ExternalLink — the arrow would say "this leaves the
+            site", which it does not.
+
+            Both `cta` and `href` are required: a label with nowhere to go is
+            not an action, and an href with no label has nothing to click. */}
+        {way.cta && way.href && (
+          <p>
+            <Link
+              href={way.href}
+              className="text-[13.5px] font-semibold text-[var(--clear)] hover:underline underline-offset-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--clear)] rounded-sm"
+            >
+              {t(way.cta)}
+              <span aria-hidden="true"> →</span>
+            </Link>
+          </p>
+        )}
       </div>
     </details>
   );

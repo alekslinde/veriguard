@@ -20,10 +20,32 @@ describe("ways in", () => {
     // `detail`, `cta` and `href` are not rendered while an entry is pending.
     // They stay written anyway: clearing the one flag is then the whole change,
     // where an entry emptied while it waited would need writing from nothing.
-    for (const way of WAYS_IN.filter((w) => w.unavailable)) {
-      expect(messages[way.detail]).toBeTruthy();
-      expect(way.cta && messages[way.cta]).toBeTruthy();
+    //
+    // No entry is pending today — the packages row was the last one and it
+    // shipped. So this asserts the rule against every row instead of iterating
+    // an empty filter, which would pass while checking nothing. The property is
+    // the same either way: a row's copy is complete whether or not it is
+    // currently rendered.
+    for (const way of WAYS_IN) {
+      expect(messages[way.detail], `${way.id}: no detail copy`).toBeTruthy();
     }
+  });
+
+  it("gives a row with a call to action somewhere for it to go", () => {
+    // A label with no href renders nothing, so the pair has to hold: this is
+    // how a CTA goes quietly missing after an href is set to null.
+    for (const way of WAYS_IN.filter((w) => w.cta)) {
+      expect(way.href, `${way.id} has a cta but no href`).toBeTruthy();
+      expect(messages[way.cta!], `${way.id}: cta copy missing`).toBeTruthy();
+    }
+  });
+
+  it("does not describe any surface as pending", () => {
+    // The branch is written to ship with both packages published, so a row
+    // still flagged unavailable here would reach production announcing
+    // something that is live.
+    const pending = WAYS_IN.filter((w) => w.unavailable).map((w) => w.id);
+    expect(pending, `still marked unavailable: ${pending.join(", ")}`).toEqual([]);
   });
 });
 
