@@ -12,8 +12,10 @@
 
 import type { MessageKey } from "@/lib/i18n";
 
-export const ENGINE_SOURCE_URL =
-  "https://github.com/alekslinde/veriguard/tree/main/packages/detect";
+// The package source URL used to be declared here as well as in
+// lib/npmPackage.ts. Two copies of the same path is how a rename gets applied
+// to one of them — npmPackage.ts is the single place both are named now, and
+// this module no longer needs it: the npm row points at the on-site docs.
 
 /**
  * Where scoring happens, which is the distinction users actually care about.
@@ -116,10 +118,15 @@ export const WAYS_IN: readonly WayIn[] = [
     how: "ways.npm.how",
     detail: "ways.npm.detail",
     cta: "ways.npm.cta",
-    // The engine source for now — the package has no registry page to point at,
-    // and this is where its docs will live. Unrendered while `unavailable` is
-    // set: the row is flat until the package ships. Repoint it at the docs then.
-    href: ENGINE_SOURCE_URL,
+    // The on-site docs, which cover both packages. This pointed at the GitHub
+    // source while there was no docs page to send anyone to; now there is, and
+    // a reader following "read the docs" should land on prose with copyable
+    // samples rather than on a source tree.
+    //
+    // Still unrendered while `unavailable` is set: the row stays flat until the
+    // packages are on npm, because the install line is the one instruction on
+    // that page that would not yet work.
+    href: "/ways/packages",
     runs: "device",
     unavailable: "ways.npm.unavailable",
   },
