@@ -34,31 +34,22 @@ export default function WaysTeaser() {
 
   return (
     <section id="ways" aria-labelledby="ways-heading" className="scroll-mt-24">
-      {/* The heading is visible again.
-          It was dropped when this was the last block on a single-column page,
-          where the rows were self-describing and a label over them read as a
-          second offer competing with the check box. It is a column of a
-          control centre now, sitting beside the radar's own heading — and an
-          unlabelled column next to a labelled one reads as a fragment of the
-          section above it rather than a thing in its own right.
+      {/* The heading is for screen readers only, and the lede is gone.
+          Both were visible while this was one column of a two-column control
+          centre: an unlabelled column beside the radar's labelled one read as a
+          fragment of it rather than a thing in its own right. The radar left,
+          so that reason left with it, and what is back is the older and better
+          one — the rows are self-describing (a name, what you do with it, where
+          it runs), and two lines of framing over three lines of content made
+          this read as a second offer competing with the check box.
 
-          Matched to the radar's heading so the two columns are visibly peers.
-          The dot is neutral rather than the radar's amber: that colour says
-          "something is happening", which is true of circulating scams and not
-          of a list of ways to install. */}
-      <h2
-        id="ways-heading"
-        className="flex items-center gap-2 text-[15px] font-semibold text-[var(--foreground)]"
-      >
-        <span
-          aria-hidden="true"
-          className="w-[7px] h-[7px] rounded-full bg-[var(--faint)] shrink-0"
-        />
+          It stays an <h2> rather than becoming a bare <div>: the section is a
+          landmark in the document outline and someone navigating by heading
+          needs it to exist. Hidden visually, announced normally — the one case
+          where those should differ. */}
+      <h2 id="ways-heading" className="sr-only">
         {t("home.ways.heading")}
       </h2>
-      <p className="mt-1 mb-3 text-[13.5px] text-[var(--text-dim)] leading-relaxed">
-        {t("home.ways.lede")}
-      </p>
       <WaysGrid />
     </section>
   );

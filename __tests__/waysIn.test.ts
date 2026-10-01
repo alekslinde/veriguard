@@ -102,14 +102,36 @@ describe("the shelf scales to the channels still being added", () => {
     expect(capped).toBe(true);
   });
 
-  it("draws every channel's glyph from the shared set", () => {
-    // A tile's icon is named in the data and drawn by one component, so adding
-    // a channel cannot introduce a glyph at a different weight — a shelf is
-    // read as one object, and an odd glyph reads as a different KIND of thing.
-    expect(grid).toMatch(/<WayIcon name=\{way\.icon\}/);
+  it("names a glyph for every channel", () => {
+    // The shelf no longer DRAWS these. The rows are one line each — name, the
+    // clause that follows it, and where it runs — and the icon column was
+    // decoration costing the horizontal room that the right-hand chip now uses;
+    // three named rows do not need telling apart by picture.
+    //
+    // The field stays authored and asserted because it is data about the
+    // channel rather than about this shelf: WayIcon still exists and anything
+    // else listing these surfaces draws from the same named set, which is what
+    // stops a second list introducing a glyph at a different weight.
     for (const way of WAYS_IN) {
       expect(way.icon, way.id).toBeTruthy();
     }
+  });
+
+  it("gives every row its name, its clause and where it runs", () => {
+    // What replaced the glyph. The one-line row is only self-describing if all
+    // three parts are there — without `runs` on the face, the privacy
+    // distinction between forwarding (via email) and the extension (on your
+    // device) is invisible until a row is opened, and that is the fact a reader
+    // choosing between them most needs.
+    expect(grid).toMatch(/t\(way\.name\)/);
+    expect(grid).toMatch(/t\(way\.how\)/);
+    expect(grid).toMatch(/ways\.runs\.device/);
+    expect(grid).toMatch(/ways\.runs\.server/);
+
+    // And it is stated once, on the face. It used to be in the body because a
+    // narrow tile had no room for it; both copies on screen would say the same
+    // thing twice in two registers.
+    expect(grid.match(/ways\.runs\.device/g)).toHaveLength(1);
   });
 });
 
@@ -168,6 +190,11 @@ describe("an undistributed surface is not interactive", () => {
     // The status itself is rendered by the shared face, which is where the
     // interactive tile gets its name and half-line too — so the two shapes
     // cannot drift apart.
-    expect(grid).toMatch(/\{t\(way\.unavailable!\)\}/);
+    //
+    // Matched without the surrounding braces: the face renders this from a
+    // ternary now (a pending row shows its status where a live one shows where
+    // it runs), so `{t(…)}` as a literal was asserting the call's punctuation
+    // rather than that the status is shown.
+    expect(grid).toMatch(/t\(way\.unavailable!\)/);
   });
 });

@@ -25,7 +25,6 @@ import { useLang } from "@/lib/lang";
 import ExternalLink from "@/components/ExternalLink";
 import { bold } from "@/lib/richText";
 import { WAYS_IN, type WayIn } from "@/lib/waysIn";
-import WayIcon from "@/components/WayIcon";
 import { installsForBrowser, INSTALL_TARGETS } from "@/lib/extensionInstalls";
 import { currentBrowser } from "@/lib/detectBrowser";
 
@@ -260,31 +259,45 @@ function TileFace({ way, pending }: { way: WayIn; pending: boolean }) {
   const { t } = useLang();
   return (
     <>
-      <span className={`shrink-0 mt-px ${pending ? "text-[var(--faint)]" : "text-[var(--clear)]"}`}>
-        <WayIcon name={way.icon} />
-      </span>
+      {/* Name and half-line on ONE line, the clause following the name after a
+          dash — which is how `how` was authored ("get a verdict by reply"), so
+          this is the shape the copy was always written for.
 
-      <span className="flex-1 min-w-0">
-        <span className="flex items-center gap-2 flex-wrap">
-          <span
-            className={`font-semibold text-[14px] ${
-              pending ? "text-[var(--text-dim)]" : "text-[var(--foreground)]"
-            }`}
-          >
-            {t(way.name)}
-          </span>
-          {pending && (
-            <span className="font-[family-name:var(--font-mono-ui)] text-[9.5px] uppercase tracking-[0.08em] text-[var(--faint)]">
-              {t(way.unavailable!)}
-            </span>
-          )}
+          The glyph went with the second line. It was decoration doing no work:
+          three rows do not need to be told apart by icon when each is named,
+          and the icon column cost horizontal room the right-hand chip now
+          uses. WayIcon survives for anything else that draws a channel.
+
+          The half-line hides below xs rather than wrapping. A wrapped clause
+          puts the row back at two lines, which is the thing this shape exists
+          to avoid; the name alone still says what the row is, and opening it
+          is one tap. */}
+      <span className="flex-1 min-w-0 truncate">
+        <span
+          className={`font-semibold text-[14px] ${
+            pending ? "text-[var(--text-dim)]" : "text-[var(--foreground)]"
+          }`}
+        >
+          {t(way.name)}
         </span>
-        {/* The half-line someone scans to decide whether to open the tile.
-            Clamped to two lines so an unusually long one cannot make its tile
-            taller than its neighbours and break the shelf's grid. */}
-        <span className="mt-0.5 block text-[12.5px] leading-snug text-[var(--text-dim)] line-clamp-2">
+        <span className="hidden xs:inline text-[13px] text-[var(--text-dim)]">
+          {" — "}
           {t(way.how)}
         </span>
+      </span>
+
+      {/* Where it runs, as the row's right edge.
+          This used to be inside the body, on the grounds that a narrow tile had
+          no room for it and the claim differs per row. The row is full width
+          now, so there is room — and it is the one fact worth having BEFORE
+          opening: "via email" vs "on your device" is the privacy distinction,
+          and a reader deciding between these rows is often deciding exactly
+          that. A pending row shows its own status here instead, since "where it
+          runs" is not yet a fact about it. */}
+      <span className="shrink-0 font-[family-name:var(--font-mono-ui)] text-[10px] uppercase tracking-[0.08em] text-[var(--faint)]">
+        {pending
+          ? t(way.unavailable!)
+          : t(way.runs === "device" ? "ways.runs.device" : "ways.runs.server")}
       </span>
     </>
   );
@@ -313,7 +326,10 @@ function TileFace({ way, pending }: { way: WayIn; pending: boolean }) {
 function PendingTile({ way }: { way: WayIn }) {
   return (
     <div className="rounded-xl border border-[var(--rule)] bg-[var(--ink-2)] opacity-70 overflow-hidden">
-      <div className="flex items-start gap-3 p-3.5">
+      {/* Padded to the same line box as an interactive row, minus the chevron's
+          width, so a pending row sits flush in the stack rather than reading as
+          a shorter kind of thing. */}
+      <div className="flex items-center gap-3 px-3.5 py-3 pr-[calc(0.875rem+16px+0.75rem)]">
         <TileFace way={way} pending />
       </div>
     </div>
@@ -339,7 +355,9 @@ function Tile({ way }: { way: WayIn }) {
       // the room, and opening one moves nothing else sideways.
       className="group rounded-xl border border-[var(--rule)] bg-[var(--ink-2)] overflow-hidden transition-colors hover:border-[var(--ink-3)]"
     >
-      <summary className="flex items-start gap-3 p-3.5 list-none marker:hidden [&::-webkit-details-marker]:hidden cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--clear)]">
+      {/* items-center, not items-start: one line of content has no second line
+          for the chevron and the chip to align to the top of. */}
+      <summary className="flex items-center gap-3 px-3.5 py-3 list-none marker:hidden [&::-webkit-details-marker]:hidden cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--clear)]">
         <TileFace way={way} pending={false} />
         <Chevron />
       </summary>
@@ -347,13 +365,10 @@ function Tile({ way }: { way: WayIn }) {
       <div className="px-3.5 pb-3.5 pt-0.5 flex flex-col gap-3">
         <p className="text-[13px] text-[var(--text-dim)] leading-relaxed">{t(way.detail)}</p>
 
-        {/* Where it runs. On the tile this is always in the body rather than
-            the header — a tile has no spare horizontal room for it, and the
-            claim differs per channel (forwarding goes through mail servers),
-            so it cannot be stated once above the shelf. */}
-        <p className="font-[family-name:var(--font-mono-ui)] text-[10px] uppercase tracking-[0.08em] text-[var(--faint)]">
-          {t(way.runs === "device" ? "ways.runs.device" : "ways.runs.server")}
-        </p>
+        {/* "Where it runs" is NOT repeated here. It moved to the row's right
+            edge, where it is readable without opening anything — see TileFace.
+            It lived in the body only because a narrow tile had no room for it,
+            and that constraint went with the grid. */}
 
         {way.id === "email" && <ForwardBody />}
 
