@@ -1,6 +1,6 @@
 {
   "name": "@veriguard/detect",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Rule-based scam, phishing and impersonation detection. Runs offline — no API key, no model, nothing sent anywhere.",
   "keywords": [
     "scam",
