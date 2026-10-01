@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkUrl, analyzeContent } from "@veriguard/scam-detect/scamDetector";
+import { checkUrl, analyzeContent } from "@veriguard/detect/scamDetector";
 
 // ── Punycode / internationalised domains ─────────────────────────────────────
 //

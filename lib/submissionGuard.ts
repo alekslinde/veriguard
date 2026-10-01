@@ -8,7 +8,7 @@
 //
 // All three return an identical-looking success response to the client.
 
-import { checkUrl, checkSms, checkEmail, checkPhone, checkCustom, ScamType } from "@veriguard/scam-detect/scamDetector";
+import { checkUrl, checkSms, checkEmail, checkPhone, checkCustom, ScamType } from "@veriguard/detect/scamDetector";
 import { checkAndRecordRateLimit, isRecentDuplicate } from "./reportStore";
 
 export type GuardVerdict = "accept" | "suspect" | "poison";

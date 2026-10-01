@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { checkEmail } from "@veriguard/scam-detect/scamDetector";
-import type { Signal } from "@veriguard/scam-detect/engineTypes";
+import { checkEmail } from "@veriguard/detect/scamDetector";
+import type { Signal } from "@veriguard/detect/engineTypes";
 import { BULK_FIXTURES, MARKETING_LOOKALIKE_SCAM } from "./fixtures/bulkMail";
 
 // Legitimate marketing mail is scored as a scam, and the reasons are structural

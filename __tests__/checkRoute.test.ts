@@ -12,7 +12,7 @@ vi.mock("@/lib/reportStore", async (importOriginal) => {
 
 import { POST } from "@/app/api/check/route";
 import { NextRequest } from "next/server";
-import { DEFAULT_REGION } from "@veriguard/scam-detect/regions";
+import { DEFAULT_REGION } from "@veriguard/detect/regions";
 import { CHECK_RATE_LIMIT } from "@/lib/reportStore";
 
 // The route's rate limiter is module-level state shared across this file, keyed

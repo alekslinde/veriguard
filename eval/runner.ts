@@ -12,7 +12,7 @@
 //     network call on the same footing; a case that depends on expansion
 //     should say so in its notes rather than silently hitting the wire.
 
-import { analyzeContent, type AnalyzedIdentifier } from "@veriguard/scam-detect/scamDetector";
+import { analyzeContent, type AnalyzedIdentifier } from "@veriguard/detect/scamDetector";
 import { toPrediction, type EvalCase, type Prediction, type SuspiciousPolicy } from "./schema";
 import type { Outcome } from "./metrics";
 

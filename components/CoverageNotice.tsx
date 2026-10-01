@@ -1,7 +1,7 @@
 "use client";
 
 import { useLang } from "@/lib/lang";
-import type { RegionCoverage } from "@veriguard/scam-detect/regions";
+import type { RegionCoverage } from "@veriguard/detect/regions";
 
 /**
  * What this check could and couldn't see, when the region pack that ran has

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
-import { analyzeContent } from "@veriguard/scam-detect/scamDetector";
+import { analyzeContent } from "@veriguard/detect/scamDetector";
 import { getUrlhausBlocklist } from "@/lib/urlhausBlocklist";
 import { analyseEmailSource } from "@/lib/emailSource";
 import { analysePressureTactics } from "@/lib/pressureTactics";

@@ -37,7 +37,7 @@ export default defineConfig({
   // Bundling either would ship a second copy that no lockfile, audit or dedupe
   // pass can see — and for the engine specifically it would mean detection
   // rules frozen at build time, diverging from the version actually installed.
-  external: ["@modelcontextprotocol/sdk", "@veriguard/scam-detect", "zod"],
+  external: ["@modelcontextprotocol/sdk", "@veriguard/detect", "zod"],
   // The CLI is a bin entry. tsup preserves a leading shebang and chmods the
   // output executable on its own, so nothing here has to arrange either —
   // __tests__/mcpPublish.test.ts asserts both on the built file rather than

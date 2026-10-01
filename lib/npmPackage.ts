@@ -6,11 +6,11 @@
 // needs to name the package it bundles.
 
 /** The published package, named in one place so the docs and the links agree. */
-export const NPM_PACKAGE = "@veriguard/scam-detect";
+export const NPM_PACKAGE = "@veriguard/detect";
 
 export const NPM_URL = `https://www.npmjs.com/package/${NPM_PACKAGE}`;
 
 export const ENGINE_SOURCE_URL =
-  "https://github.com/alekslinde/veriguard/tree/main/packages/engine";
+  "https://github.com/alekslinde/veriguard/tree/main/packages/detect";
 
 export const ENGINE_README_URL = `${ENGINE_SOURCE_URL}#readme`;

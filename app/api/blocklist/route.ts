@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUrlhausBlocklist, BLOCKLIST_TTL_SECONDS } from "@/lib/urlhausBlocklist";
-import { hashHost, HOST_HASH_ALGORITHM, HOST_HASH_HEX_LENGTH } from "@veriguard/scam-detect/hostHash";
+import { hashHost, HOST_HASH_ALGORITHM, HOST_HASH_HEX_LENGTH } from "@veriguard/detect/hostHash";
 import { checkAndRecordRateLimit, FEED_RATE_LIMIT } from "@/lib/reportStore";
 import { clientIpFromHeaders } from "@/lib/geo";
 import { corsHeaders, corsPreflightHeaders } from "@/lib/cors";
@@ -22,7 +22,7 @@ import { corsHeaders, corsPreflightHeaders } from "@/lib/cors";
  * abuse.ch publishes the same data openly anyway. Nothing in this system may
  * treat these hashes as secret. What it does buy is narrower and still worth
  * having: the response is not a turnkey list of live malware hosts served under
- * our name at our URL. See `packages/engine/src/hostHash.ts`, which carries the
+ * our name at our URL. See `packages/detect/src/hostHash.ts`, which carries the
  * same note so neither half reads as a stronger claim than it is.
  *
  * **What it is not.** Not a lookup API. There is deliberately no

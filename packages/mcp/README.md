@@ -6,7 +6,7 @@ link or phone number into your assistant and it gets a verdict with the
 evidence behind it.
 
 The scoring is not done by a model. It is the same rule-based engine
-([`@veriguard/scam-detect`](https://www.npmjs.com/package/@veriguard/scam-detect))
+([`@veriguard/detect`](https://www.npmjs.com/package/@veriguard/detect))
 that runs the Veriguard website and browser extension — keyword lists, domain
 allow/denylists, regex and weighted scoring. Your assistant decides what to
 *say* about a result; it has no part in producing one. That is the reason to
@@ -115,7 +115,7 @@ const server = createServer({ ...DEFAULT_OPTIONS, blocklist: false });
 ```
 
 To score messages without MCP at all, use
-[`@veriguard/scam-detect`](https://www.npmjs.com/package/@veriguard/scam-detect)
+[`@veriguard/detect`](https://www.npmjs.com/package/@veriguard/detect)
 directly.
 
 ## Licence

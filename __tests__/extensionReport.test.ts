@@ -13,7 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { isReportable, prefillFor, reportUrl } from "../extension/src/report";
 import { parseReportPrefill } from "../lib/reportPrefill";
-import { analyzeContent } from "@veriguard/scam-detect/scamDetector";
+import { analyzeContent } from "@veriguard/detect/scamDetector";
 
 const API = "https://veriguard.app";
 

@@ -6,8 +6,8 @@
 // moves, on the same hostname, through the real scorer.
 
 import { describe, it, expect } from "vitest";
-import { hashHost, hashedHostLookup } from "@veriguard/scam-detect/hostHash";
-import { checkUrl } from "@veriguard/scam-detect/scamDetector";
+import { hashHost, hashedHostLookup } from "@veriguard/detect/hostHash";
+import { checkUrl } from "@veriguard/detect/scamDetector";
 
 /** What the endpoint publishes for a set of hosts. */
 const publish = (hosts: string[]) => [...new Set(hosts)].map(hashHost).sort();

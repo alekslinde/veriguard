@@ -1,6 +1,6 @@
 // Public surface of the engine package.
 //
-// Subpath exports (`@veriguard/scam-detect/scamDetector`) mirror the old
+// Subpath exports (`@veriguard/detect/scamDetector`) mirror the old
 // `@/lib/*` layout, so the extraction was a move rather than a re-architecture
 // and call sites changed only in their import specifier. This barrel is the
 // front door for new consumers — a client that wants "the engine" imports here

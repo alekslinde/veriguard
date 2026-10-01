@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkSms, checkEmail } from "@veriguard/scam-detect/scamDetector";
+import { checkSms, checkEmail } from "@veriguard/detect/scamDetector";
 
 // The email path scores an SMS pass over the body at 0.7. That is right for
 // keyword-frequency signals — a longer message has more room to use an ordinary

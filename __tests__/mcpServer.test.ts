@@ -22,8 +22,8 @@ import { createServer, DEFAULT_OPTIONS, regionArg, type ServerOptions } from "..
 import { UrlhausBlocklist } from "../packages/mcp/src/blocklist";
 import { parseArgs } from "../packages/mcp/src/cli";
 import { formatResult, formatAnalysis } from "../packages/mcp/src/format";
-import { checkPhone, analyzeContent } from "@veriguard/scam-detect/scamDetector";
-import { SHORTENER_HOSTS } from "@veriguard/scam-detect/urlExpander";
+import { checkPhone, analyzeContent } from "@veriguard/detect/scamDetector";
+import { SHORTENER_HOSTS } from "@veriguard/detect/urlExpander";
 
 /**
  * Hosts that appear in the fixtures and must never be contacted.

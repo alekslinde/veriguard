@@ -74,7 +74,7 @@ never move because of the app.
 
 | Part | File | Bump it when |
 |---|---|---|
-| Detection engine | `packages/engine/package.json` | Anything in `packages/engine/src` changes. The app bumps too, since it serves the engine. |
+| Detection engine | `packages/detect/package.json` | Anything in `packages/detect/src` changes. The app bumps too, since it serves the engine. |
 | Browser extension | `extension/package.json` | Anything in the extension build changes. Every store submission needs a number higher than the last one shipped, and a shipped number can never be reused. |
 | Inbound email worker | `workers/inbound-email/package.json` | Anything in `workers/inbound-email/src` changes. |
 

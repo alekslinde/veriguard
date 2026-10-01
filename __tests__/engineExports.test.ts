@@ -8,17 +8,17 @@ import { createRequire } from "module";
 // nothing consults is documentation, not encapsulation.
 //
 // The extraction originally shipped that way: a tsconfig `paths` entry and a
-// vitest alias both resolved @veriguard/scam-detect by file path, so an
+// vitest alias both resolved @veriguard/detect by file path, so an
 // unexported subpath imported cleanly under test and under tsc while failing
 // for anyone importing the package for real. Both overrides are gone; the
 // package now resolves through the workspace symlink like any dependency.
 
-const PKG_DIR = path.join(process.cwd(), "packages/engine");
+const PKG_DIR = path.join(process.cwd(), "packages/detect");
 const pkg = JSON.parse(readFileSync(path.join(PKG_DIR, "package.json"), "utf8")) as {
   name: string;
   // Each subpath resolves by condition: `development` to source for the
   // workspace, `default` to dist/ for a consumer. See the note in
-  // packages/engine/package.json for why this is not publishConfig.exports,
+  // packages/detect/package.json for why this is not publishConfig.exports,
   // and __tests__/enginePublish.test.ts for what checks the built half.
   exports: Record<string, { development: string; types: string; default: string }>;
 };
@@ -35,10 +35,10 @@ describe("engine package exports map", () => {
     expect(configs, "expected exactly one vitest config at the repo root").toHaveLength(1);
 
     const vitestConfig = readFileSync(path.join(process.cwd(), configs[0]), "utf8");
-    expect(vitestConfig).not.toContain("packages/engine/src");
+    expect(vitestConfig).not.toContain("packages/detect/src");
 
     const tsconfig = readFileSync(path.join(process.cwd(), "tsconfig.json"), "utf8");
-    expect(tsconfig).not.toContain("packages/engine/src");
+    expect(tsconfig).not.toContain("packages/detect/src");
   });
 
   it("resolves every subpath it advertises", () => {
@@ -75,7 +75,7 @@ describe("engine package exports map", () => {
   });
 
   it("exposes the checking API through the barrel", async () => {
-    const engine = await import("@veriguard/scam-detect");
+    const engine = await import("@veriguard/detect");
     for (const fn of ["checkUrl", "checkSms", "checkEmail", "checkPhone", "checkCustom", "analyzeContent"]) {
       expect(typeof engine[fn as keyof typeof engine], `${fn} missing from the barrel`).toBe("function");
     }

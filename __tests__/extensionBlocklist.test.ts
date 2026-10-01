@@ -10,7 +10,7 @@
 //      outlives the session that fetched it.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { hashHost, HOST_HASH_ALGORITHM } from "@veriguard/scam-detect/hostHash";
+import { hashHost, HOST_HASH_ALGORITHM } from "@veriguard/detect/hostHash";
 
 // In-memory stand-in for extension storage.
 let store: Record<string, unknown> = {};

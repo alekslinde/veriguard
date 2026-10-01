@@ -37,9 +37,9 @@ const eslintConfig = defineConfig([
     // Apple's converter, carrying a copy of the built bundle above.
     "extension/safari/**",
     // The published engine build (`npm run build:engine`) — a compiled copy of
-    // packages/engine/src, which is linted at source. Linting both would report
+    // packages/detect/src, which is linted at source. Linting both would report
     // every finding twice and attribute the transpiler's output to us.
-    "packages/engine/dist/**",
+    "packages/detect/dist/**",
     // The published MCP server build (`npm run build:mcp`) — a bundled copy of
     // packages/mcp/src plus the inlined lib/signalTactics.ts, both linted at
     // source. Linting the bundle would report every finding twice and attribute
@@ -99,7 +99,7 @@ const eslintConfig = defineConfig([
             name,
             message:
               "Network access from the detector would break the never-visit-a-submitted-URL invariant. " +
-              "Outbound calls go through the injected transport (see packages/engine/src/urlExpander.ts) or an explicit " +
+              "Outbound calls go through the injected transport (see packages/detect/src/urlExpander.ts) or an explicit " +
               "fetch to a fixed endpoint we chose. See __tests__/privacyInvariant.test.ts.",
           })),
         },

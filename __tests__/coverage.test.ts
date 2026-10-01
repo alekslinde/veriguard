@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { checkUrl, checkSms, checkEmail, checkCustom, checkPhone, analyzeContent } from "@veriguard/scam-detect/scamDetector";
+import { checkUrl, checkSms, checkEmail, checkCustom, checkPhone, analyzeContent } from "@veriguard/detect/scamDetector";
 import { overallCoverage, isClean, formatVerdictEmail } from "@/lib/verdictSummary";
 import { reportingFor } from "@/lib/reportingResources";
-import { FALLBACK_REGION, resolveRegionPack, supportedRegions, type RegionCoverage } from "@veriguard/scam-detect/regions";
+import { FALLBACK_REGION, resolveRegionPack, supportedRegions, type RegionCoverage } from "@veriguard/detect/regions";
 import { toPrediction } from "@/eval/schema";
-import { analysePhone } from "@veriguard/scam-detect/phoneIntel";
-import { BASE_SIGNALS } from "@veriguard/scam-detect/regions/base";
+import { analysePhone } from "@veriguard/detect/phoneIntel";
+import { BASE_SIGNALS } from "@veriguard/detect/regions/base";
 
 // The Phase 3 guarantee: a "safe" verdict asserts we looked and found nothing.
 // Where we have no rules to look with, that assertion isn't available — a clean

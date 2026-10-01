@@ -13,7 +13,7 @@
 import type { MessageKey } from "@/lib/i18n";
 
 export const ENGINE_SOURCE_URL =
-  "https://github.com/alekslinde/veriguard/tree/main/packages/engine";
+  "https://github.com/alekslinde/veriguard/tree/main/packages/detect";
 
 /**
  * Where scoring happens, which is the distinction users actually care about.

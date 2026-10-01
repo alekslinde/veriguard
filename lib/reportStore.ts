@@ -4,7 +4,7 @@
 
 import { randomBytes } from "crypto";
 import { scrubPii } from "./piiScrubber";
-import { defang, defangEmail, defangPhone, defangText } from "@veriguard/scam-detect/urlSanitizer";
+import { defang, defangEmail, defangPhone, defangText } from "@veriguard/detect/urlSanitizer";
 import { getDb } from "./db";
 
 // Privacy contract: this shape is exactly what reaches the database. The

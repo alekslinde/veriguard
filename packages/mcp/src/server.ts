@@ -32,10 +32,10 @@ import {
   checkUrl,
   checkPhone,
   checkEmail,
-} from "@veriguard/scam-detect/scamDetector";
-import { supportedRegions, DEFAULT_REGION } from "@veriguard/scam-detect/regions";
-import type { RegionInput } from "@veriguard/scam-detect/regions";
-import type { HostLookup } from "@veriguard/scam-detect/engineTypes";
+} from "@veriguard/detect/scamDetector";
+import { supportedRegions, DEFAULT_REGION } from "@veriguard/detect/regions";
+import type { RegionInput } from "@veriguard/detect/regions";
+import type { HostLookup } from "@veriguard/detect/engineTypes";
 
 import { UrlhausBlocklist } from "./blocklist.js";
 import { formatResult, formatAnalysis } from "./format.js";

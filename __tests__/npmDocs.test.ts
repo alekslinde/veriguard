@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkUrl, checkSms, analyzeContent } from "@veriguard/scam-detect";
+import { checkUrl, checkSms, analyzeContent } from "@veriguard/detect";
 import { INSTALL, QUICKSTART, ANALYZE, REGIONS } from "@/components/NpmDocs";
 import { NPM_PACKAGE } from "@/lib/npmPackage";
 

@@ -32,8 +32,8 @@ app/            ← Routes (App Router): page.tsx, about/, learn/, radar/,
                   stats, feed-stats
 components/     ← UI components (check here first) — CheckFlow, ReportForm,
                   VerdictBadge, SubmissionsBrowser, etc.
-packages/engine ← The detection engine, as its own workspace package
-                  (@veriguard/scam-detect). src/: scamDetector.ts,
+packages/detect ← The detection engine, as its own workspace package
+                  (@veriguard/detect). src/: scamDetector.ts,
                   phoneIntel.ts, urlSanitizer.ts, urlExpander.ts,
                   detectType.ts, emailHeaders.ts, engineTypes.ts,
                   regions/ (au, gb, us, ca, ie, nz, rest-of-world).
@@ -64,7 +64,7 @@ docs/           ← threat-intel/ — PUBLIC sweep research only, one file per
 ```
 
 **Import detection from the package, not `lib/`:**
-`import { analyzeContent } from "@veriguard/scam-detect/scamDetector"`.
+`import { analyzeContent } from "@veriguard/detect/scamDetector"`.
 Top-level entry points are `checkUrl`, `checkSms`, `checkEmail`, `checkPhone`,
 `checkCustom` and `analyzeContent` — the last returns an **array**, one result
 per identifier found in the input.
@@ -74,7 +74,7 @@ per identifier found in the input.
 ## Component & Code Reuse
 
 - Check `components/` before building anything new; extend before creating
-- Scoring logic lives in `packages/engine/src/` — check there before writing
+- Scoring logic lives in `packages/detect/src/` — check there before writing
   any detection or URL/phone parsing helper
 - App-side logic lives in `lib/` — check there before writing presentation,
   email, data or safety helpers
@@ -119,7 +119,7 @@ per identifier found in the input.
 
 Use these scopes in commit messages:
 
-- `(detector)` — Detection logic in `packages/engine/` (scamDetector,
+- `(detector)` — Detection logic in `packages/detect/` (scamDetector,
   phoneIntel, region packs, etc.)
 - `(ui)` — Components and screens
 - `(api)` — Route handlers under `app/api/`

@@ -94,12 +94,12 @@ jobs:
       # `npm view` on the exact range is the cheapest way to ask the registry.
       - name: Check the engine dependency is published
         run: |
-          range="$(node -p "require('./packages/mcp/package.json').dependencies['@veriguard/scam-detect']")"
-          if ! npm view "@veriguard/scam-detect@${range}" version >/dev/null 2>&1; then
-            echo "no published @veriguard/scam-detect matching ${range} — publish the engine first" >&2
+          range="$(node -p "require('./packages/mcp/package.json').dependencies['@veriguard/detect']")"
+          if ! npm view "@veriguard/detect@${range}" version >/dev/null 2>&1; then
+            echo "no published @veriguard/detect matching ${range} — publish the engine first" >&2
             exit 1
           fi
-          echo "engine range ${range} resolves to: $(npm view "@veriguard/scam-detect@${range}" version | tail -1)"
+          echo "engine range ${range} resolves to: $(npm view "@veriguard/detect@${range}" version | tail -1)"
 
       # What npm would actually ship, printed before it ships. `files` is easy
       # to get wrong in the direction that matters least visibly — omitting

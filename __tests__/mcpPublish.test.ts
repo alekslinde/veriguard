@@ -150,7 +150,7 @@ describe("MCP package — manifest", () => {
 
   it("declares the engine as a real dependency, not a workspace link", () => {
     // A "*" or "workspace:*" range publishes a package nobody can install.
-    const range = (pkg.dependencies as Record<string, string>)["@veriguard/scam-detect"];
+    const range = (pkg.dependencies as Record<string, string>)["@veriguard/detect"];
     expect(range).toBeTruthy();
     expect(range).toMatch(/^\^?\d+\.\d+\.\d+/);
   });

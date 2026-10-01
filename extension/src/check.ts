@@ -11,13 +11,13 @@
 // correct behaviour for a client running on the user's machine: expanding it
 // here would disclose the user's IP to the scammer's shortener.
 
-import { analyzeContent, UNEXPANDED_SHORTENER_NOTE } from "@veriguard/scam-detect/scamDetector";
-import type { AnalyzedIdentifier } from "@veriguard/scam-detect/scamDetector";
-import { worstBy, evidenceFor } from "@veriguard/scam-detect/verdictRank";
-import type { Verdict } from "@veriguard/scam-detect/verdictRank";
-import type { Signal } from "@veriguard/scam-detect/engineTypes";
-import type { RegionCoverage } from "@veriguard/scam-detect/regions";
-import type { HostLookup } from "@veriguard/scam-detect/engineTypes";
+import { analyzeContent, UNEXPANDED_SHORTENER_NOTE } from "@veriguard/detect/scamDetector";
+import type { AnalyzedIdentifier } from "@veriguard/detect/scamDetector";
+import { worstBy, evidenceFor } from "@veriguard/detect/verdictRank";
+import type { Verdict } from "@veriguard/detect/verdictRank";
+import type { Signal } from "@veriguard/detect/engineTypes";
+import type { RegionCoverage } from "@veriguard/detect/regions";
+import type { HostLookup } from "@veriguard/detect/engineTypes";
 
 export interface ExtensionCheck {
   verdict: Verdict;

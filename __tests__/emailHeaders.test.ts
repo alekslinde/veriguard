@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseEmailHeaders, analyseEmailIdentities, summariseAuth, domainOf } from "@veriguard/scam-detect/emailHeaders";
+import { parseEmailHeaders, analyseEmailIdentities, summariseAuth, domainOf } from "@veriguard/detect/emailHeaders";
 
 describe("domainOf", () => {
   it("returns the lowercased domain after the last @", () => {

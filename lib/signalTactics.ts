@@ -1,4 +1,4 @@
-import type { Signal } from "@veriguard/scam-detect/engineTypes";
+import type { Signal } from "@veriguard/detect/engineTypes";
 
 // Maps detection signals onto the six tactics the Learn page teaches.
 //

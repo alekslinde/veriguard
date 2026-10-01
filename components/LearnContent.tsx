@@ -17,7 +17,7 @@ import {
   scamTextForwarding,
 } from "@/lib/reportingResources";
 import ReportingLink from "@/components/ReportingLink";
-import type { RegionCode } from "@veriguard/scam-detect/regions";
+import type { RegionCode } from "@veriguard/detect/regions";
 import RegionBar from "@/components/RegionBar";
 
 // Type icons mirror the input/report type pickers used across the app, so they

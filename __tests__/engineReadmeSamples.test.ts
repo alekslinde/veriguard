@@ -24,10 +24,10 @@ import {
   checkPhone,
   checkCustom,
   analyzeContent,
-} from "@veriguard/scam-detect";
+} from "@veriguard/detect";
 
 const README = readFileSync(
-  path.join(process.cwd(), "packages/engine/README.md"),
+  path.join(process.cwd(), "packages/detect/README.md"),
   "utf8",
 );
 
@@ -58,7 +58,7 @@ describe("engine README — the samples it shows", () => {
     // Guards against this suite going vacuous if the fences are renamed or the
     // samples move: every assertion below reads from TS.
     expect(tsBlocks().length, "no ```ts blocks found in the README").toBeGreaterThan(0);
-    expect(TS).toContain("@veriguard/scam-detect");
+    expect(TS).toContain("@veriguard/detect");
   });
 
   it.each(SYNC_ENTRIES)("$name is synchronous, so the README must not await it", ({ name, call }) => {
@@ -112,7 +112,7 @@ describe("engine README — the samples it shows", () => {
     const layout = /```\n(src\/[\s\S]*?)```/.exec(README)?.[1];
     expect(layout, "no src/ layout block found in the README").toBeTruthy();
 
-    const actual = readdirSync(path.join(process.cwd(), "packages/engine/src"))
+    const actual = readdirSync(path.join(process.cwd(), "packages/detect/src"))
       .filter((f) => f.endsWith(".ts"));
 
     expect(actual.length, "no engine source modules found").toBeGreaterThan(5);
@@ -124,8 +124,8 @@ describe("engine README — the samples it shows", () => {
   it("imports only symbols the package actually exports", async () => {
     // A sample importing a renamed or removed export fails for the reader on
     // their first copy-paste, and nothing else in the suite would see it.
-    const barrel = await import("@veriguard/scam-detect");
-    const imported = [...TS.matchAll(/import\s*\{([^}]+)\}\s*from\s*"@veriguard\/scam-detect"/g)]
+    const barrel = await import("@veriguard/detect");
+    const imported = [...TS.matchAll(/import\s*\{([^}]+)\}\s*from\s*"@veriguard\/detect"/g)]
       .flatMap((m) => m[1].split(",").map((s) => s.trim()).filter(Boolean));
 
     expect(imported.length, "no imports parsed out of the samples").toBeGreaterThan(0);

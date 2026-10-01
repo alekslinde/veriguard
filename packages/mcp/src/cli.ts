@@ -14,8 +14,8 @@
 // go to stderr, which the client shows in its logs.
 
 import { main, DEFAULT_OPTIONS, type ServerOptions } from "./server.js";
-import { supportedRegions, DEFAULT_REGION } from "@veriguard/scam-detect/regions";
-import type { RegionInput } from "@veriguard/scam-detect/regions";
+import { supportedRegions, DEFAULT_REGION } from "@veriguard/detect/regions";
+import type { RegionInput } from "@veriguard/detect/regions";
 
 const HELP = `veriguard-mcp — rule-based scam, phishing and impersonation checks over MCP
 

@@ -10,7 +10,7 @@
 // two-letter country code the edge already derived.
 
 import { countryFromHeaders } from "@/lib/geo";
-import { resolveRegionPack, DEFAULT_REGION, FALLBACK_REGION, type RegionCode } from "@veriguard/scam-detect/regions";
+import { resolveRegionPack, DEFAULT_REGION, FALLBACK_REGION, type RegionCode } from "@veriguard/detect/regions";
 
 export function resolveRegion(headers: Headers, requested?: unknown): RegionCode {
   // A request may carry an unsupported or junk region; resolveRegionPack

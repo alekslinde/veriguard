@@ -17,8 +17,8 @@
 // blocklist, scoring exactly as it does today. A blocklist that is absent can
 // only lower a score, so degrading is a miss, never a false accusation.
 
-import { hashedHostLookup, HOST_HASH_ALGORITHM } from "@veriguard/scam-detect/hostHash";
-import type { HostLookup } from "@veriguard/scam-detect/engineTypes";
+import { hashedHostLookup, HOST_HASH_ALGORITHM } from "@veriguard/detect/hostHash";
+import type { HostLookup } from "@veriguard/detect/engineTypes";
 import { storageGet, storageSet, hasExtensionApi } from "./browser";
 
 const CACHE_KEY = "blocklist";

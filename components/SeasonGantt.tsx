@@ -32,7 +32,7 @@ import {
   labelSpan,
   type CivilDate,
 } from "@/lib/scamCalendar";
-import type { RegionCode } from "@veriguard/scam-detect/regions";
+import type { RegionCode } from "@veriguard/detect/regions";
 
 // Short month names, January-first. Deliberately not localised, for the same
 // reason the ribbon's initials weren't: these are axis ticks on a glance-level

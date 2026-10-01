@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkSms } from "@veriguard/scam-detect/scamDetector";
+import { checkSms } from "@veriguard/detect/scamDetector";
 
 // Regression cover for #234 — one phrase counted as two findings.
 //

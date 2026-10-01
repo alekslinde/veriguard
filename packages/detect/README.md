@@ -1,4 +1,4 @@
-# `@veriguard/scam-detect`
+# `@veriguard/detect`
 
 Rule-based scam, phishing and impersonation detection. Runs offline: no API key,
 no model, no external service — you install it and call a function.
@@ -10,11 +10,11 @@ a message without sending it anywhere.
 *Last reviewed: 2026-10-01.*
 
 ```bash
-npm install @veriguard/scam-detect
+npm install @veriguard/detect
 ```
 
 ```ts
-import { checkUrl, analyzeContent } from "@veriguard/scam-detect";
+import { checkUrl, analyzeContent } from "@veriguard/detect";
 
 const result = checkUrl("https://commbank-secure-login.tk/verify");
 // → verdict "likely_scam", score 85, flags explaining why

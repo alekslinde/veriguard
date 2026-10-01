@@ -26,7 +26,7 @@
  */
 
 import { parsePhoneNumberFromString } from "libphonenumber-js/max";
-import { resolveRegionPack, supportedRegions } from "@veriguard/scam-detect/regions";
+import { resolveRegionPack, supportedRegions } from "@veriguard/detect/regions";
 
 /** ISO-3166 alpha-2, or "" when no national signal was found. */
 export type TargetRegion = string;

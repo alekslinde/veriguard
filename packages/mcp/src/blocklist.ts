@@ -14,7 +14,7 @@
 // distinction is the whole privacy contract, and __tests__/privacyInvariant
 // .test.ts enforces it on the engine side.
 
-import type { HostLookup } from "@veriguard/scam-detect/engineTypes";
+import type { HostLookup } from "@veriguard/detect/engineTypes";
 
 const URLHAUS_CSV = "https://urlhaus.abuse.ch/downloads/csv_recent/";
 

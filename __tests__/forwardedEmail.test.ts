@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { unwrapForwarded } from "@/lib/forwardedEmail";
-import { parseEmailHeaders } from "@veriguard/scam-detect/emailHeaders";
+import { parseEmailHeaders } from "@veriguard/detect/emailHeaders";
 
 // The victim's own forward wrapper — every fixture is wrapped in headers that
 // look like THIS, and the whole point is that we must NOT report these.

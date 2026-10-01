@@ -67,7 +67,7 @@ describe("README freshness wiring", () => {
     // "Never reviewed" must not read as "current" — there is nothing to
     // compare against, which is the least safe state, not the safest.
     const rows = report([
-      { readme: "package.json", subject: ["packages/engine/src"] },
+      { readme: "package.json", subject: ["packages/detect/src"] },
     ]);
     expect(rows[0]).toMatchObject({ reviewed: null, stale: true });
   });

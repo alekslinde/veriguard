@@ -18,8 +18,8 @@
 // Structured JSON goes out alongside this text, so a client that wants fields
 // is not reduced to parsing prose.
 
-import type { CheckResult } from "@veriguard/scam-detect/engineTypes";
-import type { AnalyzedIdentifier } from "@veriguard/scam-detect/scamDetector";
+import type { CheckResult } from "@veriguard/detect/engineTypes";
+import type { AnalyzedIdentifier } from "@veriguard/detect/scamDetector";
 // The teaching taxonomy is app-side on purpose (see lib/signalTactics.ts), and
 // it is pure — one type-only engine import, no React, no I/O. The bundler
 // inlines it into dist/, the same way the extension takes lib/reportPrefill.ts,

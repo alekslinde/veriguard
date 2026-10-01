@@ -31,7 +31,7 @@ import { writeFileSync, mkdirSync, rmSync, existsSync, readFileSync } from "fs";
 import { execFileSync } from "child_process";
 import { join } from "path";
 import { fileURLToPath } from "url";
-import { checkUrl } from "../packages/engine/src/scamDetector.ts";
+import { checkUrl } from "../packages/detect/src/scamDetector.ts";
 import { findFont, CHROME, TOKENS } from "./lib/brandRender.mts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));

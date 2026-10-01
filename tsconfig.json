@@ -40,7 +40,7 @@
   "exclude": [
     "node_modules",
     "workers",
-    "packages/engine/dist",
+    "packages/detect/dist",
     "packages/mcp/dist"
   ]
 }

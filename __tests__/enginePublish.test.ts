@@ -28,7 +28,7 @@ import { pathToFileURL } from "url";
 //
 // All four are invisible from inside the workspace and none is caught by tsc.
 
-const PKG_DIR = path.join(process.cwd(), "packages/engine");
+const PKG_DIR = path.join(process.cwd(), "packages/detect");
 const DIST = path.join(PKG_DIR, "dist");
 
 const pkg = JSON.parse(readFileSync(path.join(PKG_DIR, "package.json"), "utf8")) as {
@@ -62,7 +62,7 @@ const whenBuilt = built ? describe : describe.skip;
 
 if (!built) {
   console.warn(
-    "[enginePublish] packages/engine/dist is absent — skipping. " +
+    "[enginePublish] packages/detect/dist is absent — skipping. " +
       "Run `npm run build:engine` before trusting a green run on a publish change.",
   );
 }

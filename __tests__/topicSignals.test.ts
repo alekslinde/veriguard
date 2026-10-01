@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkSms } from "@veriguard/scam-detect/scamDetector";
+import { checkSms } from "@veriguard/detect/scamDetector";
 
 // Three signals fired on the SUBJECT of a message rather than on anything wrong
 // with it, and together they scored every genuine AU sender template as

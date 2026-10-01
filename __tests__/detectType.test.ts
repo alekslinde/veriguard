@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { detectType } from "@veriguard/scam-detect/detectType";
+import { detectType } from "@veriguard/detect/detectType";
 
 describe("detectType — URLs", () => {
   it("classifies http/https URLs as url", () => {

@@ -9,7 +9,7 @@
 // value from a region we no longer support degrades to auto rather than
 // pinning the user to a dead option.
 
-import { supportedRegions } from "@veriguard/scam-detect/regions";
+import { supportedRegions } from "@veriguard/detect/regions";
 
 export const CHECK_REGION_STORAGE_KEY = "vg_region";
 

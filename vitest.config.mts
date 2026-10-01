@@ -28,7 +28,7 @@ export default defineConfig({
   resolve: {
     // Only the app's own "@/" alias is declared here.
     //
-    // @veriguard/scam-detect is deliberately NOT aliased: it resolves through
+    // @veriguard/detect is deliberately NOT aliased: it resolves through
     // the workspace symlink in node_modules, which means Vite consults the
     // package's own `exports` map. Aliasing it by file path would resolve
     // around that map, so a subpath the package does not export — or one it

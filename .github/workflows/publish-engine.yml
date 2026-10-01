@@ -1,6 +1,6 @@
 name: Publish engine
 
-# Publishes @veriguard/scam-detect to npm when a tag names a version of it.
+# Publishes @veriguard/detect to npm when a tag names a version of it.
 #
 # Tagged rather than run on every push to main: a version on npm cannot be
 # replaced, and unpublishing is restricted after 72 hours. Publishing needs to
@@ -79,7 +79,7 @@ jobs:
         if: github.event_name == 'push'
         run: |
           tag_version="${GITHUB_REF_NAME#engine-v}"
-          pkg_version="$(node -p "require('./packages/engine/package.json').version")"
+          pkg_version="$(node -p "require('./packages/detect/package.json').version")"
           if [ "$tag_version" != "$pkg_version" ]; then
             echo "tag ${GITHUB_REF_NAME} does not match package version ${pkg_version}" >&2
             exit 1
@@ -89,14 +89,14 @@ jobs:
       # to get wrong in the direction that matters least visibly — omitting
       # something the package needs, or including something it should not.
       - name: Show the tarball contents
-        run: npm pack --dry-run --workspace @veriguard/scam-detect
+        run: npm pack --dry-run --workspace @veriguard/detect
 
       # Packing edits package.json and postpack restores it. If a pack died
       # between the two, the tree still holds a dist/-pointing map — publishing
       # from that state would ship a package whose `exports` was rewritten
       # twice. Cheap to check, and the failure is otherwise silent.
       - name: Check packing left the tree clean
-        run: git diff --exit-code -- packages/engine/package.json
+        run: git diff --exit-code -- packages/detect/package.json
 
       # Publishes on a tag push, or on a manual run that named a tag and turned
       # dry_run off. The manual path previously could not publish at all: it was
@@ -105,6 +105,6 @@ jobs:
       - name: Publish
         if: |
           (github.event_name == 'push' || inputs.tag != '') && inputs.dry_run != true
-        run: npm publish --workspace @veriguard/scam-detect
+        run: npm publish --workspace @veriguard/detect
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

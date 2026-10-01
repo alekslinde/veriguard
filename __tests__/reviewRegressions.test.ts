@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkSms, containsLoose, stripForwardingPrefix } from "@veriguard/scam-detect/scamDetector";
+import { checkSms, containsLoose, stripForwardingPrefix } from "@veriguard/detect/scamDetector";
 
 // Regressions found reviewing this branch. Each was a false NEGATIVE introduced
 // or left by the false-positive work above, which is the trade that pass was

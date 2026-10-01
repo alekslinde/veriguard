@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkSms, checkEmail } from "@veriguard/scam-detect/scamDetector";
+import { checkSms, checkEmail } from "@veriguard/detect/scamDetector";
 
 // Naming an agency is not by itself evidence — every genuine ATO email says
 // "ATO" — so that signal holds its points back until something ELSE scores.

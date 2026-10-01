@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkSms } from "@veriguard/scam-detect/scamDetector";
+import { checkSms } from "@veriguard/detect/scamDetector";
 
 // Coverage for D3 (#227) and D2 (#226) of the 2026-08-31 roadmap.
 //

@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { mixedScriptWords } from "@veriguard/scam-detect/urlSanitizer";
+import { mixedScriptWords } from "@veriguard/detect/urlSanitizer";
 
 // mixedScriptWords takes the host-strip as a function, because deciding what is
 // a hostname is five guards in extractBareHosts rather than a TLD lookup. The
 // cases about the strip therefore run through checkSms, where the engine
 // injects the real guard; the cases about word splitting call it directly,
 // where the default identity strip is what they want.
-import { checkSms, checkCustom, checkEmail } from "@veriguard/scam-detect/scamDetector";
+import { checkSms, checkCustom, checkEmail } from "@veriguard/detect/scamDetector";
 
 // Homoglyph splicing in the MESSAGE BODY, as distinct from the hostname case
 // covered by unicodeNormalisation.test.ts and punycodeDomains.test.ts.

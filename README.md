@@ -26,13 +26,13 @@ Under the hood it runs:
 
 ### Region-aware detection
 
-Detection is country-aware. A **region pack** ([`packages/engine/src/regions/`](packages/engine/src/regions/)) layers national signals — agencies, banks and brands, number-plan semantics, legitimate-domain allowlists, local campaigns — on top of a universal base set (generic urgency, "Hi Mum" voice-clone lures, URL shorteners, abused TLDs, phishing hosting).
+Detection is country-aware. A **region pack** ([`packages/detect/src/regions/`](packages/detect/src/regions/)) layers national signals — agencies, banks and brands, number-plan semantics, legitimate-domain allowlists, local campaigns — on top of a universal base set (generic urgency, "Hi Mum" voice-clone lures, URL shorteners, abused TLDs, phishing hosting).
 
 | Region | Coverage |
 | --- | --- |
 | 🇦🇺 Australia, 🇬🇧 United Kingdom, 🇺🇸 United States, 🇳🇿 New Zealand, 🇮🇪 Ireland | `full` |
 | 🇨🇦 Canada | `partial` |
-| 21 further packs (see [`packages/engine/src/regions/`](packages/engine/src/regions/)) | `minimal` — agencies + reporting body |
+| 21 further packs (see [`packages/detect/src/regions/`](packages/detect/src/regions/)) | `minimal` — agencies + reporting body |
 | Everywhere else | `none` — base signals only |
 
 The region comes from an explicit choice first, then a coarse country code from the edge, then a default; the IP itself is never read for region resolution. **Coverage is stated honestly:** where a pack is `partial`, `minimal` or `none`, a clean result is downgraded from "safe" to "unknown" and a notice explains that nothing matched *because no local rule exists* — plus the patterns to judge it yourself. If the geo guess is wrong (roaming, VPN), you can correct the region right there and re-run.
@@ -144,7 +144,7 @@ npm run build    # production build
 
 ## Detection logic
 
-All scam detection is **rule-based** and runs in [`packages/engine/`](packages/engine/) — chiefly [`scamDetector.ts`](packages/engine/src/scamDetector.ts), with [`phoneIntel.ts`](packages/engine/src/phoneIntel.ts), [`emailHeaders.ts`](packages/engine/src/emailHeaders.ts), [`urlSanitizer.ts`](packages/engine/src/urlSanitizer.ts), and the per-country signal data in [`packages/engine/src/regions/`](packages/engine/src/regions/). It uses keyword lists, domain allowlists/denylists, regex patterns, and a weighted scoring system. **No models in the scoring path today** — and no user content sent anywhere for scoring. ML, NLP or LLM help is on the table wherever it can meet that same privacy bar.
+All scam detection is **rule-based** and runs in [`packages/detect/`](packages/detect/) — chiefly [`scamDetector.ts`](packages/detect/src/scamDetector.ts), with [`phoneIntel.ts`](packages/detect/src/phoneIntel.ts), [`emailHeaders.ts`](packages/detect/src/emailHeaders.ts), [`urlSanitizer.ts`](packages/detect/src/urlSanitizer.ts), and the per-country signal data in [`packages/detect/src/regions/`](packages/detect/src/regions/). It uses keyword lists, domain allowlists/denylists, regex patterns, and a weighted scoring system. **No models in the scoring path today** — and no user content sent anywhere for scoring. ML, NLP or LLM help is on the table wherever it can meet that same privacy bar.
 
 The educational modules — [`threatRadar.ts`](lib/threatRadar.ts) and [`scamCalendar.ts`](lib/scamCalendar.ts) — are deliberately kept out of that path. Neither is imported by the scorer.
 

@@ -13,8 +13,8 @@ It doesn't, and here's the reasoning:
   read-receipt headers — these are published standards and well-known
   anti-phishing signals, not secret heuristics. Reading
   [`lib/emailTracking.ts`](lib/emailTracking.ts),
-  [`packages/engine/src/emailHeaders.ts`](packages/engine/src/emailHeaders.ts), or
-  [`packages/engine/src/scamDetector.ts`](packages/engine/src/scamDetector.ts) tells a scammer nothing they
+  [`packages/detect/src/emailHeaders.ts`](packages/detect/src/emailHeaders.ts), or
+  [`packages/detect/src/scamDetector.ts`](packages/detect/src/scamDetector.ts) tells a scammer nothing they
   couldn't get from any email-security write-up.
 
 - **The signals are load-bearing for the *attack*, so detecting them can't be
