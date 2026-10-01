@@ -8,8 +8,12 @@
 
 Australian scam / phishing / impersonation detector. Users paste a dodgy link,
 SMS, phishing email, or phone number and get an instant rule-based verdict.
-Detection is **hardcoded pattern/heuristic logic, not an LLM** — no ML, no
-external analysis APIs, nothing sent off-device for scoring.
+Detection today is **hardcoded pattern/heuristic logic — no model in the
+scoring path**, no external analysis APIs, nothing sent off-device for scoring.
+A model may only enter that path if it clears the same privacy bar: it runs
+locally, it is opt-in, and no user content leaves the device. Absent that, the
+answer is no. See *Detection is rule-based* below for what this means in
+practice.
 
 **Stack:** Next.js 16.3 (App Router) + React 19, Tailwind CSS v4
 **Package manager:** npm (npm workspaces — `packages/*`)
@@ -89,8 +93,19 @@ per identifier found in the input.
 
 ## Stack Conventions
 
-- **Detection is rule-based only** — keyword lists, domain allow/denylists,
-  regex, weighted scoring. Never introduce an LLM or external analysis API.
+- **Detection is rule-based** — keyword lists, domain allow/denylists, regex,
+  weighted scoring. **Never** an LLM in the scoring path, and never an external
+  analysis API: sending user content to a third party to be scored is the thing
+  this project exists not to do, whatever the service promises.
+  - A **local, opt-in** model is the one exception on the table, and it is not
+    a default: it must run on-device, download only on explicit opt-in with its
+    size stated, and reach the scorer the way every other outside capability
+    does — as an argument, producing named and capped signals, so that with no
+    model present results are identical to today's.
+  - Shipping one means changing what the app claims. `README.md` is already
+    worded for this; `app/about/page.tsx` says "no AI anywhere in the scoring",
+    which would stop being true. That copy changes in the **same commit** as
+    the model, never after.
 - Styling via **Tailwind CSS v4** (utility classes; `app/globals.css`)
 - App Router route handlers under `app/api/*/route.ts`
 - i18n strings go in `messages/` — don't hardcode user-facing copy
