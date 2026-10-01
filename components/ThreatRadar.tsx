@@ -17,6 +17,7 @@
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { useLang, type MessageKey } from "@/lib/lang";
+import ExternalLink from "@/components/ExternalLink";
 import {
   radarForRegion,
   threatsByStatus,
@@ -142,15 +143,11 @@ function ThreatCard({ threat }: { threat: ThreatEntry }) {
         {threat.detection ??
           t(threat.coverage === "n/a" ? "radar.coverage.na.body" : "radar.coverage.none.body")}
         {" · "}
-        <a
-          href={roadmapUrl(threat)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline underline-offset-2 hover:text-[var(--clear)] transition-colors"
-        >
+        {/* No arrow: the label already reads as a citation ("source, 27 Sep")
+            and an arrow after a date reads as part of the date. */}
+        <ExternalLink href={roadmapUrl(threat)} arrow={false}>
           {t("radar.source", { date: formatRadarDate(threat.lastSeen) })}
-          <span className="sr-only"> ({t("a11y.newTab")})</span>
-        </a>
+        </ExternalLink>
       </p>
     </li>
   );

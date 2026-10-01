@@ -1,26 +1,22 @@
 "use client";
 
-import { useLang } from "@/lib/lang";
 import type { ReportingLink as ReportingLinkData } from "@/lib/reportingResources";
+import ExternalLink from "@/components/ExternalLink";
 
 /**
  * A reporting-body reference: linked where the pack carries a URL, plain
- * text where it doesn't (rest-of-world). The new-tab note matches every
- * other external link in the app.
+ * text where it doesn't (rest-of-world).
+ *
+ * The arrow, the new-tab note and the focus ring come from ExternalLink, which
+ * is where every external link in the app gets them. This one previously used
+ * `hover:opacity-80` — one of five hover treatments across the app, and the
+ * only one that dimmed rather than brightened.
  */
 export default function ReportingLink({ link }: { link: ReportingLinkData }) {
-  const { t } = useLang();
   if (!link.url) return <>{link.label}</>;
   return (
-    <a
-      href={link.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-[var(--clear)] underline underline-offset-2 hover:opacity-80"
-    >
+    <ExternalLink href={link.url} className="text-[var(--clear)]">
       {link.label}
-      <span className="sr-only"> ({t("a11y.newTab")})</span>
-      <span aria-hidden="true"> ↗</span>
-    </a>
+    </ExternalLink>
   );
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useLang } from "@/lib/lang";
+import ExternalLink from "@/components/ExternalLink";
 import { useBugReport, BugIcon } from "./BugReportProvider";
 
 export default function SiteFooter() {
@@ -15,15 +16,9 @@ export default function SiteFooter() {
       <div className="max-w-[1180px] mx-auto px-5 sm:px-8 pt-3 pb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-[var(--text-dim)] leading-relaxed">
         <span className="text-[var(--foreground)]">
           {t("footer.built")}{" "}
-          <a
-            href="https://alekslinde.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[var(--clear)] font-semibold hover:underline underline-offset-2"
-          >
-            Aleks Linde<span className="sr-only"> ({t("a11y.newTab")})</span>
-            <span aria-hidden="true"> ↗</span>
-          </a>
+          <ExternalLink href="https://alekslinde.com" variant="strong">
+            Aleks Linde
+          </ExternalLink>
         </span>
         <span aria-hidden="true" className="hidden sm:inline text-[var(--ink-3)]">
           ·

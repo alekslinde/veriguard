@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
+import ExternalLink from "@/components/ExternalLink";
 import { EXTENSION_LISTINGS, reportedAsOf, totalReportedUsers } from "@/lib/extensionInstalls";
 
 export const metadata: Metadata = {
@@ -105,15 +106,9 @@ export default function AboutPage() {
             for the UK, US, New Zealand and Ireland as well. Paste a suspicious link, text, email
             or phone number and get an instant best-effort verdict — no account, no tracking, no
             data sold. It&apos;s an independent project by{" "}
-            <a
-              href="https://alekslinde.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={LINK}
-            >
-              Aleks Linde<span className="sr-only"> (opens in a new tab)</span>
-              <span aria-hidden="true"> ↗</span>
-            </a>
+            <ExternalLink href="https://alekslinde.com" variant="bare" className={LINK}>
+              Aleks Linde
+            </ExternalLink>
             , not a government service.
           </p>
           <p className={P}>
@@ -340,9 +335,9 @@ export default function AboutPage() {
               <li key={listing.store} className={`${P} flex flex-wrap items-baseline gap-x-2`}>
                 <span className={STRONG}>
                   {listing.url ? (
-                    <a href={listing.url} className={LINK} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink href={listing.url} variant="bare" className={LINK}>
                       {listing.name}
-                    </a>
+                    </ExternalLink>
                   ) : (
                     listing.name
                   )}

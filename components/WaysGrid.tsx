@@ -22,6 +22,7 @@
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/lang";
+import ExternalLink from "@/components/ExternalLink";
 import { bold } from "@/lib/richText";
 import { WAYS_IN, type WayIn } from "@/lib/waysIn";
 import { installsForBrowser, INSTALL_TARGETS } from "@/lib/extensionInstalls";
@@ -124,10 +125,13 @@ function InstallLinks() {
 
         return (
           <li key={target.id}>
-            <a
+            {/* A store button, so no arrow: the label already names the store
+                and these sit in a row where one arrow each is noise. The
+                new-tab note is announced either way, which it was not before. */}
+            <ExternalLink
               href={target.url}
-              target="_blank"
-              rel="noopener noreferrer"
+              variant="bare"
+              arrow={false}
               className={`${shell} transition-colors ${
                 isYours
                   ? "border-[var(--clear)]/50 bg-[var(--clear)]/10 text-[var(--clear)]"
@@ -135,7 +139,7 @@ function InstallLinks() {
               }`}
             >
               {label}
-            </a>
+            </ExternalLink>
           </li>
         );
       })}

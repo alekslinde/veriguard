@@ -22,6 +22,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { useLang, type MessageKey } from "@/lib/lang";
+import ExternalLink from "@/components/ExternalLink";
 import SeasonGantt from "@/components/SeasonGantt";
 import FreshnessStamp from "@/components/FreshnessStamp";
 import PageHeader from "@/components/PageHeader";
@@ -178,15 +179,12 @@ function SeasonRow({
         {season.sources.map((source, i) => (
           <span key={source.url}>
             {i > 0 && " · "}
-            <a
-              href={source.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2 hover:text-[var(--clear)] transition-colors"
-            >
+            {/* No arrow: this is an inline run of citations separated by
+                middots, and one ↗ per source turned a source line into a row
+                of arrows. The new-tab note is still announced. */}
+            <ExternalLink href={source.url} arrow={false}>
               {source.label}
-              <span className="sr-only"> ({t("a11y.newTab")})</span>
-            </a>
+            </ExternalLink>
           </span>
         ))}
       </p>

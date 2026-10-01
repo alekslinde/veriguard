@@ -29,6 +29,7 @@ import { useLang } from "@/lib/lang";
 import PageHeader from "@/components/PageHeader";
 import CodeBlock from "@/components/CodeBlock";
 import AnchorHeading from "@/components/AnchorHeading";
+import ExternalLink from "@/components/ExternalLink";
 import InstallTabs, {
   ManagerTabs,
   useManager,
@@ -160,15 +161,13 @@ function PackageBanner({ name, url, children }: { name: string; url: string; chi
         <code className="font-[family-name:var(--font-mono-ui)] text-[14px] font-semibold text-[var(--clear)]">
           {name}
         </code>
-        <a
+        <ExternalLink
           href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[12.5px] font-semibold text-[var(--text-dim)] hover:text-[var(--clear)]"
+          variant="bare"
+          className="text-[12.5px] font-semibold text-[var(--text-dim)] hover:text-[var(--clear)] transition-colors"
         >
           npm
-          <span aria-hidden="true"> →</span>
-        </a>
+        </ExternalLink>
       </div>
       <p className="mt-2 text-[13.5px] text-[var(--text-dim)] leading-relaxed">{children}</p>
     </div>
@@ -409,10 +408,9 @@ export default function PackagesDocs() {
                   t("npm.more.source"),
                 ].map((label, i) => (
                   <li key={label}>
-                    <a href={group.links[i]} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink href={group.links[i]} variant="action">
                       {label}
-                      <span aria-hidden="true"> →</span>
-                    </a>
+                    </ExternalLink>
                   </li>
                 ))}
               </ul>
