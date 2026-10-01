@@ -1,5 +1,9 @@
 # Releases
 
+This file covers two release paths that do not touch each other. **The app**
+deploys from a branch, below. **The packages** under `packages/` publish from a
+tag and never see `production` at all — see *Publishing a package*, at the end.
+
 `main` is integration. `production` is what users see. Nothing reaches
 production except through a `main` → `production` promotion.
 
@@ -84,3 +88,97 @@ behind. Promote when that lands, or whenever the work on `main` warrants it.
 **Rollback:** revert on `production`, or reset it to the previous tag and
 force-push only `production` (the one branch where this is acceptable, with
 maintainer sign-off).
+
+---
+
+## Publishing a package
+
+`@veriguard/detect` and `@veriguard/mcp` publish from **tags**, independently of
+the app's promotion. A merge to `main` publishes nothing; `production` is not
+involved. Each package has its own prefix, because this repo also tags the app
+with a bare `vX.Y.Z`:
+
+| Package | Tag | Workflow |
+|---|---|---|
+| `@veriguard/detect` | `engine-vX.Y.Z` | `publish-engine.yml` |
+| `@veriguard/mcp` | `mcp-vX.Y.Z` | `publish-mcp.yml` |
+
+Bump the version in a PR as usual ([`versioning.md`](versioning.md)), merge it,
+then tag the merge commit on `main`:
+
+```bash
+git tag -a engine-v0.1.1 -m "engine 0.1.1"
+git push origin engine-v0.1.1
+```
+
+`git push` alone does not carry tags — push the tag by name, or nothing
+triggers. The workflow refuses to run if the tag disagrees with the version in
+`package.json`, so a mistyped tag fails instead of publishing a number nothing
+in the history points at.
+
+### Approving the release
+
+The workflow **stages**; it does not publish. The tarball is held until a
+maintainer approves it with 2FA:
+
+```bash
+npm stage list
+npm stage approve <id>
+```
+
+That is the point of the arrangement. A version on npm cannot be replaced and
+unpublishing is restricted after 72 hours, so no workflow run — including one
+started by a mistyped tag — puts code in front of users by itself. Merging
+reviews the change; approving the stage reviews the artifact.
+
+### Order: engine first, always
+
+`publish-mcp.yml` refuses to run until a **published** `@veriguard/detect`
+satisfies the range in the server's manifest. A staged engine does not count:
+the check asks the public registry, which sees approved versions only. So the
+full order for a release touching both is
+
+1. tag the engine → approve its stage → **wait for it to resolve**
+2. tag the server
+
+Step 1's wait is real. A newly published package can 404 from
+`registry.npmjs.org` for several minutes after npmjs.com shows it live, and the
+server's gate reads the registry, not the website. Confirm with `npm view
+@veriguard/detect version` before tagging the server, rather than reading the
+404 as a failed publish.
+
+Publishing the server by hand to get around the gate ships a tarball that
+cannot resolve its own scorer on install — permanently, under a version number
+that cannot be reused.
+
+### First publish of a new package
+
+Trusted publishing is configured per package on npmjs.com, so a package that
+has never been published may have nowhere to attach it — the first release can
+need a package that only a first release creates. Check npmjs.com for a pending
+publisher on the scope first; if there is none, publish the first version from
+a maintainer's machine to create the package, after which CI owns every
+version:
+
+```bash
+npm publish --workspace @veriguard/<name> --access public --provenance=false
+```
+
+`--provenance=false` is required: provenance needs an OIDC token that only CI
+has, and the manifest sets `publishConfig.provenance`, so without the override
+the command fails rather than publishing unattested. That bootstrap version
+carries no provenance — prefer burning a throwaway `0.1.0` over a version
+anyone should install.
+
+Then register the trusted publisher on the package's settings page: this repo,
+the workflow filename from the table above, environment blank, and **"Allow npm
+publish" unchecked** so the staging gate cannot be bypassed.
+
+### When it fails
+
+| Symptom | Cause |
+|---|---|
+| `EUSAGE … provider: null` | `--provenance` run outside CI. Provenance needs the Actions OIDC token. |
+| `E401` after "Signed provenance statement" | OIDC worked, the registry exchange did not — no trusted publisher matching this workflow filename. |
+| Registry 404 right after a successful publish | Propagation. The website leads the registry by minutes. |
+| `no published @veriguard/detect matching …` | The engine is unpublished, or staged and not yet approved. |
