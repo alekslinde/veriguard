@@ -510,6 +510,7 @@
   "install.menu.step2": "Tap \"Add to Home screen\" or \"Install\"",
   "install.menu.step3": "Confirm — the icon appears with your other apps",
   "a11y.mainNav": "Main",
+  "a11y.sectionNav": "Section",
   "check.stage.qr": "Looking for a QR code",
   "check.stage.ocrLocal": "Reading the text on your device",
   "check.stage.ocrServer": "Reading the text on our server",

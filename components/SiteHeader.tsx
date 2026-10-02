@@ -23,6 +23,15 @@ export default function SiteHeader() {
   const { t } = useLang();
   const pathname = usePathname();
 
+  // The children of whichever section the reader is in, if it has any.
+  //
+  // Resolved exactly as MobileTabBar resolves its own sub-nav row, from the
+  // same list and the same predicate — the two bars are one navigation at two
+  // widths, and a second rule here is how they would drift into disagreeing
+  // about which section a route belongs to.
+  const section = HEADER_LINKS.find((l) => isCurrentPath(l.href, pathname));
+  const children = section?.children ?? [];
+
   return (
     <header
       data-app-chrome
@@ -53,61 +62,108 @@ export default function SiteHeader() {
         {/* Desktop: the links sit inline. Below md they are not hidden here so
             much as somewhere else — see MobileTabBar.
 
-            A section's children render inline beside it rather than in a hover
-            dropdown. A dropdown would put Radar and Calendar back behind an
-            interaction someone has to discover, which is the problem folding
-            them into Learn created in the first place; it also needs keyboard
-            and touch handling to not be a trap. Six flat links fit this bar
-            with room to spare, and the only cost is that the children are
-            smaller and dimmer than their parent — which is the information,
-            not a compromise. */}
+            THE CHILDREN ARE NOT ALWAYS HERE. Every section's children used to
+            render flat beside their parent, which put six links in this bar —
+            Check, Learn, Radar, Calendar, Reports, About — while the phone
+            showed three. Two navigations disagreeing about how many
+            destinations the site has, and the wider one contradicting the model
+            in navLinks: Radar, Calendar and Reports are Learn's, not peers of
+            Check.
+
+            The answer is the one the tab bar already found. Children appear
+            only while the reader is IN the section that owns them, which is
+            also the moment they are worth offering — on Check or About this bar
+            is three links, and entering Learn brings its pages with it.
+
+            This is NOT the dropdown the previous note argued against, and that
+            argument still stands: nothing here is behind a hover, a click or
+            anything to discover. The children are either on screen or they are
+            on a page one click away that lists them. What changed is that six
+            flat links "fitting with room to spare" was never the question —
+            the bar had room, and the reader still had to read past three
+            destinations that were not peers to find the one that was. */}
         <nav aria-label={t("a11y.mainNav")} className="hidden md:flex items-center gap-1 min-w-0">
           {HEADER_LINKS.map((l) => {
             const current = isCurrentPath(l.href, pathname);
             const onChild = isChildCurrent(l, pathname);
             return (
-              <div key={l.href} className="flex items-center">
-                <Link
-                  href={l.href}
-                  aria-current={current && !onChild ? "page" : undefined}
-                  // The filled pill marks the page you are ON, so it moves to
-                  // the child when you are on one — two filled pills side by
-                  // side read as a single blob and stop saying which is which.
-                  // The parent keeps the brighter text, which is what says
-                  // "you are still in this section".
-                  className={`min-h-[44px] flex items-center px-2.5 text-sm rounded-[7px] transition-colors ${
-                    current && !onChild
-                      ? "text-[var(--foreground)] bg-[var(--ink-2)] font-medium"
-                      : current
-                        ? "text-[var(--foreground)] font-medium hover:bg-[var(--ink-2)]"
-                        : "text-[var(--text-dim)] hover:text-[var(--foreground)] hover:bg-[var(--ink-2)]"
-                  }`}
-                >
-                  {t(l.key)}
-                </Link>
-
-                {l.children?.map((c) => {
-                  const childCurrent = isCurrentPath(c.href, pathname);
-                  return (
-                    <Link
-                      key={c.href}
-                      href={c.href}
-                      aria-current={childCurrent ? "page" : undefined}
-                      className={`min-h-[44px] flex items-center px-2 text-[13px] rounded-[7px] transition-colors ${
-                        childCurrent
-                          ? "text-[var(--foreground)] bg-[var(--ink-2)] font-medium"
-                          : "text-[var(--faint)] hover:text-[var(--foreground)] hover:bg-[var(--ink-2)]"
-                      }`}
-                    >
-                      {t(c.key)}
-                    </Link>
-                  );
-                })}
-              </div>
+              <Link
+                key={l.href}
+                href={l.href}
+                aria-current={current && !onChild ? "page" : undefined}
+                // The filled pill marks the page you are ON, so it moves to
+                // the child when you are on one — two filled pills side by
+                // side read as a single blob and stop saying which is which.
+                // The parent keeps the brighter text, which is what says
+                // "you are still in this section".
+                className={`min-h-[44px] flex items-center px-2.5 text-sm rounded-[7px] transition-colors ${
+                  current && !onChild
+                    ? "text-[var(--foreground)] bg-[var(--ink-2)] font-medium"
+                    : current
+                      ? "text-[var(--foreground)] font-medium hover:bg-[var(--ink-2)]"
+                      : "text-[var(--text-dim)] hover:text-[var(--foreground)] hover:bg-[var(--ink-2)]"
+                }`}
+              >
+                {t(l.key)}
+              </Link>
             );
           })}
         </nav>
       </div>
+
+      {/* The current section's own pages, as a second row.
+          Desktop only: below md the tab bar renders this same list above
+          itself, and two copies would be two places to look for one thing.
+
+          A row rather than inline beside the parent, because inline is what
+          this replaced — there it was three more links in the primary row,
+          indistinguishable in kind from the destinations they sit under. On
+          its own row, under the section it belongs to, the hierarchy is the
+          layout rather than a size and colour difference.
+
+          Chips match the tab bar's sub-nav exactly, so a reader moving between
+          widths meets the same control. */}
+      {children.length > 0 && (
+        /* data-header-subnav is what tells --header-h this row exists. The
+           token is what everything pinning below the header measures from —
+           the learn page's sticky table of contents among them, and Learn is
+           exactly the section that has children — so without it that bar pins
+           itself under this row and disappears behind it. */
+        <div
+          data-header-subnav
+          className="hidden md:block border-t border-[var(--rule)] bg-[var(--ink-2)]"
+        >
+          <nav
+            aria-label={t("a11y.sectionNav")}
+            className="max-w-[1180px] mx-auto px-5 sm:px-8"
+          >
+            {/* A fixed height rather than padding around the chips, so the row
+                is a number --header-h can state instead of one derived from a
+                font metric that varies. 36px + the 1px top border = the 37 the
+                token adds. */}
+            <ul className="flex items-center gap-1.5 h-[36px]">
+              {children.map((c) => {
+                const current = isCurrentPath(c.href, pathname);
+                return (
+                  <li key={c.href}>
+                    <Link
+                      href={c.href}
+                      aria-current={current ? "page" : undefined}
+                      className={`block rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
+                        current
+                          ? "border-[var(--clear)] bg-[var(--clear)]/12 text-[var(--clear)]"
+                          : "border-[var(--rule)] text-[var(--text-dim)] hover:border-[var(--ink-3)] hover:text-[var(--foreground)]"
+                      }`}
+                    >
+                      {t(c.key)}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+        </div>
+      )}
     </header>
   );
 }

@@ -90,6 +90,23 @@
     /* No safe-area inset applies on a desktop, and the bar is taller. */
     --header-h: 59px;
   }
+
+  /* The header's own sub-nav row, on the sections that have one.
+     Desktop only, because that row is: below md the same links are a row above
+     the tab bar instead, which --subnav-h already accounts for.
+
+     Same mechanism as --subnav-h above and for the same reason — the header
+     renders the row deep in its own tree, and everything that pins below the
+     header reads this token to know where its bottom edge is. The learn page's
+     sticky table of contents is the one that proves it: Learn is precisely the
+     section with children, so a token that ignored this row would pin that bar
+     underneath it on the only page where both are on screen.
+
+     37px: the chips' 2×6px padding, their ~25px line box, and the row's 1px
+     top border. */
+  :root:has(header [data-header-subnav]) {
+    --header-h: calc(59px + 37px);
+  }
 }
 
 @theme inline {

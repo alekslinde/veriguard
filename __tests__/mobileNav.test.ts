@@ -209,7 +209,44 @@ describe("exactly one element claims to be the page", () => {
 
 describe("the section's pages are offered where the reader is", () => {
   it("renders the sub-links in the header", () => {
-    expect(read("components/SiteHeader.tsx")).toMatch(/l\.children\?\.map/);
+    const header = read("components/SiteHeader.tsx");
+
+    // Shown for the section the reader is IN, resolved the same way the tab
+    // bar resolves its own row — one predicate over one list, so the two bars
+    // cannot come to disagree about which section a route belongs to.
+    //
+    // This used to assert `l.children?.map`, which rendered EVERY section's
+    // children flat beside their parent: six links in a bar whose phone
+    // equivalent showed three, with Radar, Calendar and Reports sitting as
+    // visual peers of Check while the model says they are Learn's. The
+    // property the suite protects is that a section's pages are offered where
+    // the reader is, and that still holds — it is the flat rendering that went.
+    expect(header).toMatch(/HEADER_LINKS\.find\(/);
+    expect(header).toMatch(/section\?\.children/);
+    expect(header).toMatch(/children\.map/);
+  });
+
+  it("reserves room for the header's own row", () => {
+    // --header-h is what everything pinning below the header measures from,
+    // and the learn page's sticky table of contents is the proof: Learn is
+    // exactly the section that has children, so a token blind to this row
+    // would pin that bar underneath it on the one page where both show.
+    const header = read("components/SiteHeader.tsx");
+    const css = read("app/globals.css");
+    expect(header).toMatch(/data-header-subnav/);
+    expect(css).toMatch(/:root:has\(header \[data-header-subnav\]\)/);
+
+    // The row's height is declared, not left to a font metric, so the token
+    // can state it exactly rather than approximating it.
+    expect(header).toMatch(/h-\[36px\]/);
+  });
+
+  it("shows each width one copy of the section row", () => {
+    // Both bars render the same children. The header's row is md-and-up and
+    // the tab bar's is below it, so a reader meets one — two would be two
+    // places to look for one thing.
+    expect(read("components/SiteHeader.tsx")).toMatch(/hidden md:block[^"]*/);
+    expect(read("components/MobileTabBar.tsx")).toMatch(/md:hidden/);
   });
 
   it("renders them above the tab bar too", () => {
