@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
 // SPDX-License-Identifier: MPL-2.0
 
 // The extension's copy of the URLhaus blocklist.

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Server hashes a host; client looks it up; the engine scores it.

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Regenerates packages/detect/src/publicSuffixList.ts from publicsuffix.org.

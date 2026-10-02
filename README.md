@@ -172,7 +172,7 @@ The engine is permissive so anyone can build on it. The app is AGPL so a modifie
 
 Releases before 2 October 2026 (up to app v0.36.0) were licensed under Apache-2.0 as a whole, and remain licensed under it. The licences above apply to everything released since.
 
-Copyright 2026 Aleks Linde. Contributions are accepted under the licence of the part they change, with a [DCO sign-off](CONTRIBUTING.md#licensing-and-sign-off).
+Copyright 2026 Aleksandr Linde. Contributions are accepted under the licence of the part they change, with a [DCO sign-off](CONTRIBUTING.md#licensing-and-sign-off).
 
 ---
 

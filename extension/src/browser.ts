@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
 // SPDX-License-Identifier: MPL-2.0
 
 // One promise-based handle on the extension APIs, for both browsers.

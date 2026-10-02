@@ -11,28 +11,28 @@ version = 1
 # tooling. Copyleft, including over a network (AGPL §13).
 [[annotations]]
 path = "**"
-SPDX-FileCopyrightText = "2026 Aleks Linde"
+SPDX-FileCopyrightText = "2026 Aleksandr Linde"
 SPDX-License-Identifier = "AGPL-3.0-or-later"
 
 # The detection engine and MCP server, published to npm. Permissive, so the
 # engine can be reused anywhere.
 [[annotations]]
 path = ["packages/detect/**", "packages/mcp/**"]
-SPDX-FileCopyrightText = "2026 Aleks Linde"
+SPDX-FileCopyrightText = "2026 Aleksandr Linde"
 SPDX-License-Identifier = "Apache-2.0"
 
 # The browser extension, shipped through the Chrome, Edge, Firefox and Apple
 # stores. File-level copyleft that is compatible with the App Store.
 [[annotations]]
 path = "extension/**"
-SPDX-FileCopyrightText = "2026 Aleks Linde"
+SPDX-FileCopyrightText = "2026 Aleksandr Linde"
 SPDX-License-Identifier = "MPL-2.0"
 
 # Written content: the threat-intel sweeps and their source registry, the
 # scam-calendar and release docs, and the interface copy.
 [[annotations]]
 path = ["docs/**", "messages/**"]
-SPDX-FileCopyrightText = "2026 Aleks Linde"
+SPDX-FileCopyrightText = "2026 Aleksandr Linde"
 SPDX-License-Identifier = "CC-BY-SA-4.0"
 
 # Generated from the Public Suffix List (https://publicsuffix.org/).
@@ -61,5 +61,5 @@ path = [
   "extension/store/*.png",
 ]
 precedence = "override"
-SPDX-FileCopyrightText = "2026 Aleks Linde"
+SPDX-FileCopyrightText = "2026 Aleksandr Linde"
 SPDX-License-Identifier = "LicenseRef-Veriguard-Brand"

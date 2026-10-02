@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
 // SPDX-License-Identifier: MPL-2.0
 
 // Build for both browsers.
@@ -169,7 +169,7 @@ function emitStaticAssets() {
           "",
           "This extension bundles the following. Its own source is MPL-2.0 (LICENSE.txt).",
           "",
-          "@veriguard/detect — Copyright 2026 Aleks Linde — Apache-2.0 (text below).",
+          "@veriguard/detect — Copyright 2026 Aleksandr Linde — Apache-2.0 (text below).",
           "Public Suffix List data — https://publicsuffix.org/ — MPL-2.0 (LICENSE.txt).",
           "libphonenumber-js — MIT (text below).",
           "",

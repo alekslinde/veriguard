@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Metric computation. Pure functions over scored outcomes — no I/O, no engine.

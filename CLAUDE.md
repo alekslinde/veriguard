@@ -121,7 +121,7 @@ per identifier found in the input.
   with an SPDX header for its directory:
   <!-- REUSE-IgnoreStart -->
   ```ts
-  // SPDX-FileCopyrightText: 2026 Aleks Linde
+  // SPDX-FileCopyrightText: 2026 Aleksandr Linde
   // SPDX-License-Identifier: AGPL-3.0-or-later
   ```
   <!-- REUSE-IgnoreEnd -->
