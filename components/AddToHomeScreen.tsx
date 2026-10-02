@@ -160,24 +160,41 @@ function useInstallState(): {
  * something the device cannot do is worse than no button, and this is a tool
  * about not being misled.
  *
- * One shape: the card on the home page, under a finished check.
+ * IN THE HEADER'S TOP-RIGHT CORNER, which is where app chrome belongs and
+ * where a phone has room: the main nav is `hidden md:flex`, so that corner is
+ * empty below the md breakpoint — exactly the width this offer applies to,
+ * since a desktop gets no route at all (see resolveInstallState).
  *
- * There was a second, a row in the mobile tab bar's More sheet. The sheet is
- * gone — three destinations fit three tabs, so nothing needs hiding — and the
- * variant went with it rather than staying as a branch no caller can reach.
- * The card is the better placement anyway: someone who has just got a verdict
- * is the one deciding whether to keep the tool around, which is not a thought
- * anyone has while opening a navigation menu.
+ * It has been a card under the check flow and, before that, a row in a
+ * navigation sheet. The card was the better of those, but it was still a
+ * bordered panel with a heading and a blurb sitting in the page's content,
+ * competing with the thing the page is for. An offer to keep the app around is
+ * chrome, not content.
  *
- * The `variant` prop went too. A single-member union that nothing reads does
- * not document a choice, it just makes every call site pass a constant — and
- * the day a second placement exists, adding the prop back is the smaller job
- * than having carried a dead one until then.
+ * The steps still need somewhere to go — on iOS Safari, which has no install
+ * API, the steps ARE the feature — so they open as a popover anchored under the
+ * button. That works here and would not have worked inside the check card,
+ * which clips its own overflow.
  */
 export default function AddToHomeScreen() {
   const { t } = useLang();
   const { state, promptInstall } = useInstallState();
   const [showSteps, setShowSteps] = useState(false);
+
+  // Escape closes the steps, which a popover in the page's chrome has to
+  // honour: there is no dialog here to do it for us, and a reader who opened
+  // this from the header expects the key that closes everything else to work.
+  //
+  // Declared before the route's early return, because hooks cannot sit after a
+  // conditional return — it simply does nothing while the popover is shut.
+  useEffect(() => {
+    if (!showSteps) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowSteps(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showSteps]);
 
   if (state.route === "none") return null;
 
@@ -196,40 +213,48 @@ export default function AddToHomeScreen() {
     }
   }
 
-  // A button, not a card.
-  //
-  // This was a bordered panel with a glyph, a heading and a three-line blurb
-  // explaining that a home-screen shortcut opens like an app and downloads
-  // nothing. All of it true, and all of it an answer to a question nobody on
-  // this page is asking: they came to check a message, and the offer to keep
-  // the tool around is worth one line at most. "Add to Home Screen" already
-  // says what it does — the blurb was explaining what a home screen is.
-  //
-  // The steps survive, because on the platforms that have no install API the
-  // steps ARE the feature: there is nothing to call, and a button that only
-  // says "here is how" has to be able to show how.
   return (
-    <div>
+    <div className="relative shrink-0">
       <button
         type="button"
         onClick={activate}
         aria-expanded={isPrompt ? undefined : showSteps}
-        className="inline-flex items-center gap-2 rounded-lg border border-[var(--rule)] px-3 py-2 text-[13px] font-medium text-[var(--text-dim)] transition-colors hover:border-[var(--ink-3)] hover:text-[var(--foreground)]"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--rule)] px-2.5 py-1.5 text-[12.5px] font-medium text-[var(--text-dim)] transition-colors hover:border-[var(--ink-3)] hover:text-[var(--foreground)]"
       >
         <span className="shrink-0 text-[var(--clear)]">
           <InstallIcon />
         </span>
-        {/* One label for both routes. They used to differ — "Add to Home
+        {/* The word "Add" alone in the header, with the full label from sm.
+            A header control is read in place — the glyph and the corner say
+            what kind of thing it is — and at 390px a four-word button next to
+            the wordmark is the widest thing in the row.
+
+            One label for both routes. They used to differ ("Add to Home
             Screen" where the browser has an install API, "Show me how" where
-            the reader has to do it by hand — and that distinction was worth
-            making under a heading that set the subject. Alone on a page, "Show
-            me how" names no subject at all. What the button offers is the same
-            either way; whether it is delivered by a prompt or by three steps is
-            ours to worry about, not something to put in the label. */}
-        {t("install.action")}
+            the reader does it by hand) and that distinction was worth making
+            under a heading that set the subject; alone it names no subject at
+            all. Whether the offer is delivered by a prompt or by three steps
+            is ours to worry about, not something to put in the label. */}
+        <span className="xs:hidden">{t("install.short")}</span>
+        <span className="hidden xs:inline">{t("install.action")}</span>
       </button>
 
-      {showSteps && state.platform && <ManualSteps platform={state.platform} />}
+      {showSteps && state.platform && (
+        <>
+          {/* Closes on a tap anywhere else. A header popover has no scrim to
+              dismiss it and nothing else on the page knows it is open, so
+              without this the only way out is the button it came from. */}
+          <button
+            type="button"
+            aria-label={t("install.close")}
+            onClick={() => setShowSteps(false)}
+            className="fixed inset-0 z-40 cursor-default"
+          />
+          <div className="absolute right-0 top-full z-50 mt-2 w-[270px] rounded-xl border border-[var(--rule)] bg-[var(--ink-2)] p-3 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.7)]">
+            <ManualSteps platform={state.platform} />
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -251,7 +276,9 @@ function ManualSteps({ platform }: { platform: ManualPlatform }) {
       : [t("install.menu.step1"), t("install.menu.step2"), t("install.menu.step3")];
 
   return (
-    <ol className="mt-3 space-y-2 text-[13.5px] text-[var(--text-dim)]">
+    // No top margin: the popover holding this supplies its own padding, and the
+    // margin was for the card where this sat beneath a button.
+    <ol className="space-y-2 text-[13px] text-[var(--text-dim)]">
       {steps.map((step, i) => (
         <li key={i} className="flex gap-2.5 leading-relaxed">
           <span

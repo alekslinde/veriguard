@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import AddToHomeScreen from "@/components/AddToHomeScreen";
 import CheckStage from "@/components/CheckStage";
 import HomeHero, { HomeCaption } from "@/components/HomeHero";
 import WaysTeaser from "@/components/WaysTeaser";
@@ -111,22 +110,13 @@ export default async function Home() {
         />
       </div>
 
-      {/* ── Under the tool ──────────────────────────────────────────────────
-          The install prompt, and nothing else.
+      {/* NOTHING UNDER THE TOOL, deliberately.
 
-          THE WAYS-IN SHELF IS GONE FROM HERE. Its three rows are a menu in the
-          card's own action bar now (see OtherWaysMenu) — they are another way
-          to start the same check, so they belong with the two already in that
-          bar rather than as a second block of page beneath it. That also
-          leaves exactly one thing above the fold for the centring to act on,
-          which is what makes the centring simple: the tool is the page.
-
-          This block renders nothing at all on most desktops — AddToHomeScreen
-          returns null where the app is installed or cannot be — so on those
-          the page below the tool is empty, deliberately. */}
-      <div className="mt-8 sm:mt-12 max-w-[760px] mx-auto">
-        <AddToHomeScreen />
-      </div>
+          The ways-in rows are tethered to the check card itself (the stage's
+          `attached` slot), and the install offer is a button in the header's
+          top-right — app chrome rather than page content. What is left is one
+          block for the centring to act on, which is what makes the centring
+          simple: the tool is the page. */}
     </main>
   );
 }

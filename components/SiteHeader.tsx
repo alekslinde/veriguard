@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLang } from "@/lib/lang";
 import { HEADER_LINKS, isCurrentPath, isChildCurrent } from "./navLinks";
+import AddToHomeScreen from "@/components/AddToHomeScreen";
 
 /**
  * The top bar.
@@ -82,6 +83,15 @@ export default function SiteHeader() {
             flat links "fitting with room to spare" was never the question —
             the bar had room, and the reader still had to read past three
             destinations that were not peers to find the one that was. */}
+        {/* The install offer owns the corner below md, where the nav is hidden
+            and nothing else is competing for it. It renders nothing at all
+            where there is no route — already installed, or a platform with no
+            way to do it — which on a desktop is always, so this costs that
+            layout nothing. */}
+        <div className="md:hidden">
+          <AddToHomeScreen />
+        </div>
+
         <nav aria-label={t("a11y.mainNav")} className="hidden md:flex items-center gap-1 min-w-0">
           {HEADER_LINKS.map((l) => {
             const current = isCurrentPath(l.href, pathname);

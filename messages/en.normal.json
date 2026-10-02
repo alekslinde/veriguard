@@ -495,6 +495,8 @@
   "radar.filter.none": "Nothing matches that filter.",
   "nav.check": "Check",
   "install.action": "Add to Home Screen",
+  "install.short": "Add",
+  "install.close": "Close",
   "install.ios.step1": "Tap the Share button",
   "install.ios.step2": "Scroll down and tap \"Add to Home Screen\"",
   "install.ios.step3": "Tap \"Add\" — the icon appears with your other apps",
