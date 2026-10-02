@@ -354,8 +354,13 @@ body:has(dialog[open]) {
   /* The page's own top padding is cancelled inside the centred region and the
      viewport reservation accounts only for the header. Left in, main's pt-10
      sat above the centred box and pushed it ~30px below the true centre line —
-     close enough to look like a mistake rather than a choice. */
-  main[data-home] {
+     close enough to look like a mistake rather than a choice.
+
+     ONLY WHILE CENTRING. Once a verdict is up there is no centred region for
+     the padding to interfere with, and cancelling it there just pressed the
+     checked strip flush against the sticky header. The :not() is what scopes
+     this to the step that asked for it. */
+  main[data-home]:not(:has([data-check-done])) {
     padding-top: 0;
   }
 
