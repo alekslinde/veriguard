@@ -1,25 +1,30 @@
 // SPDX-FileCopyrightText: 2026 Aleksandr Linde
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Flags when `production` has fallen too far behind `main`.
+// Flags when `production` has fallen too far behind `main` — that is, when work
+// has been merged but never released.
 //
-// Promotion is deliberately manual (docs/releases.md): merges to `main` do not
-// deploy, and production moves only when a maintainer merges a promotion PR.
-// That is what decouples merge frequency from deploy frequency, and it has
-// one failure mode — nothing is watching, so "I'll cut a release later"
-// decays into a month of unshipped work with no prompt.
+// Releasing is deliberately manual (docs/releases.md): merges to `main` do not
+// deploy, and production moves only when the release workflow fast-forwards it
+// to a new app release tag. That is what decouples merge frequency from deploy
+// frequency, and it has one failure mode — nothing is watching, so "I'll cut a
+// release later" decays into a month of unshipped work with no prompt.
+//
+// `production` equals the last app release by construction, so the distance
+// measured here IS the count of unreleased commits; no separate tag arithmetic
+// is needed to ask the same question.
 //
 // This is the prompt. It measures two independent things, because they go
 // wrong separately:
 //
 //   · AGE    — how long since production last moved. Detection work that sits
 //              on main helps nobody; a scam pattern shipped to main in week one
-//              and promoted in week five was undetected for four weeks.
-//   · SIZE   — how many commits are waiting. A large promotion is harder to
+//              and released in week five was undetected for four weeks.
+//   · SIZE   — how many commits are unreleased. A large release is harder to
 //              review and harder to roll back, which is what makes the next one
 //              feel risky enough to defer again.
 //
-// It FLAGS, it does not promote — same philosophy as the rest of the checks
+// It FLAGS, it does not release — same philosophy as the rest of the checks
 // here. When to ship is a judgement about what is on main, and a cron job has
 // no way to make it.
 //
@@ -164,7 +169,7 @@ function markdown(d: Drift): string {
     lines.push(
       d.commits === 0
         ? `\`${PROD}\` is level with \`${MAIN}\`. Nothing waiting.`
-        : `${d.commits} commit(s) waiting, last promotion ${d.ageDays} day(s) ago — inside both thresholds.`,
+        : `${d.commits} commit(s) unreleased, last release ${d.ageDays} day(s) ago — inside both thresholds.`,
     );
     return lines.join("\n");
   }
@@ -176,16 +181,16 @@ function markdown(d: Drift): string {
     ``,
     `| | |`,
     `|---|---|`,
-    `| Waiting | ${d.commits} commit(s) |`,
-    `| Last promotion | ${d.lastPromotion} (${d.ageDays} days ago) |`,
+    `| Unreleased | ${d.commits} commit(s) |`,
+    `| Last release | ${d.lastPromotion} (${d.ageDays} days ago) |`,
     `| Version | \`${d.prodVersion ?? "?"}\` → \`${d.mainVersion ?? "?"}\` |`,
     ``,
-    `Promote with the **Promotion train** workflow (\`workflow_dispatch\`), or`,
-    `open a \`${MAIN}\` → \`${PROD}\` PR by hand. Rules: \`docs/releases.md\`.`,
+    `Ship it by merging the open **app** release PR, which release-please keeps`,
+    `up to date. Rules: \`docs/releases.md\`.`,
     ``,
     `Nothing here says the work is *ready* — only that it has been waiting a`,
     `while. Deferring deliberately is a fine answer; this issue closes itself`,
-    `on the next promotion.`,
+    `on the next release.`,
   );
 
   const shown = d.waiting.slice(0, 30);
@@ -201,7 +206,7 @@ function human(d: Drift): string {
   if (!d.configured) return `${PROD} does not exist yet — see docs/releases.md.`;
   const why = reasons(d);
   if (d.commits === 0) return `${PROD} is level with ${MAIN}.`;
-  const head = `${d.commits} commit(s) waiting, last promotion ${d.ageDays} day(s) ago.`;
+  const head = `${d.commits} commit(s) unreleased, last release ${d.ageDays} day(s) ago.`;
   return why.length === 0 ? `${head} Inside thresholds.` : `${head}\n` + why.map((r) => `  · ${r}`).join("\n");
 }
 
@@ -241,9 +246,9 @@ async function main() {
         body: markdown(drift),
         clean: reasons(drift).length === 0,
         labelColor: "1d76db",
-        labelDescription: "Production has not been promoted for a while",
+        labelDescription: "Production has not been released for a while",
         closeComment:
-          "Production has been promoted — closing. Reopened automatically if " +
+          "Production has been released — closing. Reopened automatically if " +
           "the next gap passes the age or size threshold.",
       });
       console.error(number === null ? `Digest issue ${action}.` : `Digest issue #${number} ${action}.`);
