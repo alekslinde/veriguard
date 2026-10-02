@@ -211,7 +211,56 @@ describe("exactly one element claims to be the page", () => {
 
 describe("the section's pages are offered where the reader is", () => {
   it("renders the sub-links in the header", () => {
-    expect(read("components/SiteHeader.tsx")).toMatch(/l\.children\?\.map/);
+    const header = read("components/SiteHeader.tsx");
+
+    // Shown for the section the reader is IN, resolved the same way the tab
+    // bar resolves its own row — one predicate over one list, so the two bars
+    // cannot come to disagree about which section a route belongs to.
+    //
+    // This used to assert `l.children?.map`, which rendered EVERY section's
+    // children flat beside their parent: six links in a bar whose phone
+    // equivalent showed three, with Radar, Calendar and Reports sitting as
+    // visual peers of Check while the model says they are Learn's. The
+    // property the suite protects is that a section's pages are offered where
+    // the reader is, and that still holds — it is the flat rendering that went.
+    expect(header).toMatch(/HEADER_LINKS\.find\(/);
+    expect(header).toMatch(/section\?\.children/);
+    expect(header).toMatch(/children\.map/);
+  });
+
+  it("reserves room for the header's own row", () => {
+    // --header-h is what everything pinning below the header measures from,
+    // and the learn page's sticky table of contents is the proof: Learn is
+    // exactly the section that has children, so a token blind to this row
+    // would pin that bar underneath it on the one page where both show.
+    const header = read("components/SiteHeader.tsx");
+    const css = read("app/globals.css");
+    expect(header).toMatch(/data-header-subnav/);
+    expect(css).toMatch(/:root:has\(header \[data-header-subnav\]\)/);
+
+    // The row's height is declared, not left to a font metric, so the token can
+    // state it exactly rather than approximating it — and the two numbers have
+    // to agree, which is the thing that actually breaks. Read both and compare
+    // rather than pinning either: the height is a design choice that may change
+    // again, while "the token equals the row plus its 1px border" may not.
+    // Anchored to the sub-nav's own <ul>, not the first h-[…] in the file —
+    // that one is the main row's min-h-[52px], which is a different bar and was
+    // what this compared against on its first writing.
+    const rowH = header.match(/justify-end[^"]*\bh-\[(\d+)px\]/);
+    expect(rowH, "the sub-nav row declares a height").not.toBeNull();
+
+    const tokenH = css.match(/--header-h: calc\(59px \+ (\d+)px\)/);
+    expect(tokenH, "--header-h accounts for the row").not.toBeNull();
+
+    expect(Number(tokenH![1])).toBe(Number(rowH![1]) + 1);
+  });
+
+  it("shows each width one copy of the section row", () => {
+    // Both bars render the same children. The header's row is md-and-up and
+    // the tab bar's is below it, so a reader meets one — two would be two
+    // places to look for one thing.
+    expect(read("components/SiteHeader.tsx")).toMatch(/hidden md:block[^"]*/);
+    expect(read("components/MobileTabBar.tsx")).toMatch(/md:hidden/);
   });
 
   it("renders them above the tab bar too", () => {
@@ -280,9 +329,45 @@ describe("the More sheet and its machinery are gone", () => {
     expect(bar).not.toMatch(/useEffect|useState/);
   });
 
-  it("leaves the footer reachable on a phone", () => {
-    // The sheet held the bug report, because the footer was desktop-only. With
-    // the sheet gone, a footer still hidden below md would make it unreachable.
-    expect(read("app/layout.tsx")).not.toMatch(/hidden md:block[\s\S]{0,80}SiteFooter/);
+  it("keeps the bug report reachable on a phone", () => {
+    // The property, across three homes. It lived in the More sheet, then in a
+    // site footer that had to render at every width because nothing else
+    // offered it. Both are gone — an app has neither — and it is on the about
+    // page now, beside the prose explaining what sending one includes.
+    //
+    // What makes that safe is that /about is a tab: reachable in one tap on a
+    // phone, not scrolled to. If the bug report ever moves somewhere that is
+    // not a top-level destination, this is the test that should stop it.
+    const about = read("app/about/page.tsx");
+    expect(about).toMatch(/<ReportBugButton/);
+
+    const aboutIsATab = LINKS.some((l) => l.href === "/about" && l.icon);
+    expect(aboutIsATab).toBe(true);
+  });
+
+  it("keeps the footer off the width the tab bar owns", () => {
+    // A footer above the tab bar is a second strip of chrome stacked on the
+    // first — a website's shape on a phone. On a desktop there is no bar and a
+    // footer is what a reader expects at the bottom, so it is hidden by
+    // breakpoint rather than removed.
+    //
+    // This asserted that no footer was mounted at all, when the footer had been
+    // deleted outright. The property was never "there is no footer" — it was
+    // "nothing stacks above the tab bar", which the breakpoint satisfies.
+    const footer = read("components/SiteFooter.tsx");
+    expect(footer).toMatch(/hidden md:block/);
+
+    // And the tab bar is the other half of that pair: below md it is the only
+    // thing on the bottom edge.
+    expect(read("components/MobileTabBar.tsx")).toMatch(/md:hidden/);
+  });
+
+  it("keeps the AGPL source offer reachable without the footer", () => {
+    // The footer carries the §13 offer on a desktop, but it is hidden on a
+    // phone — so the offer has to exist somewhere a phone can reach, or hiding
+    // the footer withdraws it for every mobile reader. /about is a tab.
+    const about = read("app/about/page.tsx");
+    expect(about).toMatch(/github\.com\/alekslinde\/veriguard"/);
+    expect(about).toMatch(/AGPL/);
   });
 });

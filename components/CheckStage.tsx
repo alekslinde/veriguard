@@ -35,6 +35,7 @@ export default function CheckStage({
   surface = "web",
   children,
   above,
+  attached,
 }: {
   /** Seeds the check box — used by the share target. */
   initialContent?: string;
@@ -60,6 +61,27 @@ export default function CheckStage({
    * unmounted across the swap for its own state's sake.
    */
   above?: ReactNode;
+  /**
+   * Rendered directly under the card on the input step, with no gap.
+   *
+   * The home page's ways-in rows, which hang off the card's bottom edge as its
+   * continuation rather than sitting as a separate block below it. They retire
+   * with the input for the same reason the head does: a reader looking at a
+   * verdict is not choosing how to submit one.
+   *
+   * UNMOUNTED here, unlike `above` — which is hidden rather than unmounted
+   * because it holds StatsBar and a live event listener. Nothing attached under
+   * the card holds state worth preserving across the swap, so there is no
+   * reason to keep it in the tree.
+   *
+   * NOT CALLED `below`. That name belonged to what is now `above` — the slot
+   * holding the caption and its StatsBar — and homeFold.test.ts still guards it
+   * by the old name, asserting that no slot is conditionally unmounted on
+   * `done`, because doing so tears the counter's refresh listener down at the
+   * moment the event fires. A new slot reusing the name trips a guard about a
+   * different thing, so this one is named for what it does to the card.
+   */
+  attached?: ReactNode;
 } = {}) {
 
   const { t } = useLang();
@@ -85,12 +107,29 @@ export default function CheckStage({
     // belongs to the flow. It expands toward 1180px (the page's own container)
     // and stops, so the verdict never runs wider than the rest of the site,
     // and is bounded by the viewport on a phone where the margins clamp to 0.
-    <div className={done ? "lg:-mx-[calc((min(1180px,100vw-4rem)-760px)/2)]" : ""}>
+    // data-check-done is what the home page reads to stop centring the tool in
+    // the viewport (see globals.css). An attribute rather than a prop, because
+    // the step belongs to the flow and the page that centres it is a server
+    // component two levels up — this is the same shape the tab bar uses to tell
+    // the root about its sub-nav row.
+    <div
+      data-check-done={done || undefined}
+      className={done ? "lg:-mx-[calc((min(1180px,100vw-4rem)-760px)/2)]" : ""}
+    >
       {/* The record of what was checked. Shown only once there is something to
           record, and it sits above the results because it is the question the
           verdict below is answering. */}
       {done && checked && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[var(--rule)] bg-[var(--ink-2)] px-3.5 py-2.5">
+        // mb-5 is the gap between this strip and the results below it. The
+        // stage's column has no `gap` of its own — it also holds the input
+        // step, where the ways-in rows are tethered to the card and any gap at
+        // all would be the seam that tethering removes — so the space belongs
+        // to the strip, which only exists on the step that wants it.
+        //
+        // Without it the "Evidence" rule-and-label sat flush against this box,
+        // reading as a caption belonging to the strip rather than the heading
+        // of what follows.
+        <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[var(--rule)] bg-[var(--ink-2)] px-3.5 py-2.5">
           <span className="font-[family-name:var(--font-mono-ui)] text-[10.5px] font-medium uppercase tracking-[0.1em] text-[var(--faint)] shrink-0">
             {t("check.checked")}
           </span>
@@ -130,7 +169,17 @@ export default function CheckStage({
           lets the caption inside `above` move below the box with `order-last`
           on a phone. Nested in a wrapper of its own they could not reorder
           across each other. */}
-      <div key="stage-grid" className="min-w-0 flex flex-col">
+      {/* group/stage + data-tethered: the card squares its bottom corners when
+          something is attached under it, and it learns that from here rather
+          than from a prop — CheckFlow does not need to know what `attached`
+          holds, only that it is occupied. The attribute is absent when it is not, so
+          the card keeps all four corners on every other surface that mounts a
+          stage (the share target, the extension). */}
+      <div
+        key="stage-grid"
+        data-tethered={attached && !done ? "" : undefined}
+        className="group/stage min-w-0 flex flex-col"
+      >
         {/* The page head. `display: contents` so its children join THIS flex
             column rather than forming a row of their own — that is what puts
             the title and the caption in the same ordering context as the card.
@@ -151,6 +200,11 @@ export default function CheckStage({
           onStepChange={setStep}
           onChecked={(c) => setChecked(summarise(c))}
         />
+
+        {/* No wrapper and no margin: the point is that there is no gap between
+            the card and whatever this holds. Inside the same flex column as the
+            card so it cannot drift away from it. */}
+        {!done && attached}
       </div>
 
     </div>

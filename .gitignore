@@ -97,3 +97,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local agent tooling — per-developer config for whichever coding assistant
+# someone uses, plus the lockfile pinning its skills. It belongs to the person,
+# not the project: committing it would make one contributor's setup everyone's,
+# and the repo already documents how to work on it in CLAUDE.md and AGENTS.md.
+/.claude/
+/.agents/
+/skills-lock.json

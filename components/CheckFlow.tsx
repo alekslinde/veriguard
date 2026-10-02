@@ -1048,7 +1048,7 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
               levers, and the separation is what lets that be said without
               calling a shop a scam. Nothing here contributes to the score. */}
           {pressure.count > 0 && (
-            <div className="space-y-2 border-t border-[var(--rule)] px-5 py-4">
+            <div className="space-y-2 border-t border-[var(--rule)] px-5 py-5">
               <div className="flex items-baseline justify-between gap-3">
                 <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">
                   {t("pressure.heading")}
@@ -1088,7 +1088,7 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
               this was email source that came up clean. Findings carry their own
               copy; the values they surface are already non-clickable text. */}
           {trackingReport && (trackingReport.hasTracking || hasSender) && (
-            <div className="space-y-2 border-t border-[var(--rule)] px-5 py-4">
+            <div className="space-y-2 border-t border-[var(--rule)] px-5 py-5">
               <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">
                 {t("tracking.heading")}
               </div>
@@ -1122,7 +1122,7 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
             const { headers, identityFlags: flags } = emailAnalysis;
             const authSummary = summariseAuth(headers);
             return (
-              <div className="space-y-2 border-t border-[var(--rule)] px-5 py-4">
+              <div className="space-y-2 border-t border-[var(--rule)] px-5 py-5">
                 <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">
                   {t("email.analysis.heading")}
                 </div>
@@ -1176,7 +1176,12 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
             payoff rather than one panel inside it. Always present: it is part
             of the result's frame, and a heading that comes and goes with the
             verdict makes the safe and scam states two different pages. */}
-        <p className="mb-3 flex items-center gap-2.5 font-[family-name:var(--font-mono-ui)] text-[11px] font-medium uppercase tracking-[0.1em] text-[var(--text-dim)]">
+        {/* mb-2.5, deliberately less than the space above this heading (the
+            checked strip carries mb-5). A heading belongs to what follows it,
+            so the gap below must be the smaller of the two — equal or larger
+            and it reads as floating between the two blocks rather than
+            introducing the one underneath. */}
+        <p className="mb-2.5 flex items-center gap-2.5 font-[family-name:var(--font-mono-ui)] text-[11px] font-medium uppercase tracking-[0.1em] text-[var(--text-dim)]">
           {t("verdict.evidence.heading")}
           <span aria-hidden="true" className="h-px flex-1 bg-[var(--rule)]" />
         </p>
@@ -1237,7 +1242,7 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
                     wrong guess most needed correcting. The warning band stays
                     conditional (CoverageNotice returns null on full), so the
                     top rule below only draws around something. */}
-                <div className="border-t border-[var(--rule)] px-5 py-4 space-y-3">
+                <div className="border-t border-[var(--rule)] px-5 py-5 space-y-3">
                   <CheckRegionPicker
                     id="result-region"
                     value={checkRegion ?? region}
@@ -1266,7 +1271,7 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
                     message carrying a dodgy link is only visible here) or when
                     the pixel row and its ESP links have something to add. */}
                 {(results.length > 1 || pixelReport) && (
-                <div className="space-y-2 border-t border-[var(--rule)] px-5 py-4">
+                <div className="space-y-2 border-t border-[var(--rule)] px-5 py-5">
                   <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">
                     {t("verdict.breakdown.heading")}
                   </div>
@@ -1421,9 +1426,15 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
           spread across the whole card rather than confined to one row — this is
           the element whose size actually moves, and animating anything smaller
           left the 25px jump exactly where it was. */}
+      {/* rounded-b-none when something is tethered beneath: the shelf supplies
+          the stack's bottom corners, and two rounded edges meeting would leave
+          a pinched waist where the card's curve and the shelf's curve both pull
+          away from the join. Driven by a group attribute rather than a prop, so
+          CheckFlow does not need to know what is under it — only that something
+          is. */}
       <div
         ref={swapRef}
-        className={`check-swap bg-[var(--paper)] text-[var(--ink)] rounded-2xl overflow-hidden relative shadow-[0_18px_44px_-20px_rgba(0,0,0,0.6)] transition-shadow ${
+        className={`check-swap bg-[var(--paper)] text-[var(--ink)] rounded-2xl group-data-[tethered]/stage:rounded-b-none overflow-hidden relative shadow-[0_18px_44px_-20px_rgba(0,0,0,0.6)] transition-shadow ${
           dragOver ? "ring-2 ring-[var(--clear)]" : emptyPrompt && !content.trim() ? "ring-2 ring-[var(--caution)]" : ""
         }`}
         onDragOver={(e) => { e.preventDefault(); if (!busy) setDragOver(true); }}
@@ -1454,6 +1465,15 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
               placeholder={t("check.placeholder")}
               rows={4}
               aria-describedby={emptyPrompt ? "check-empty-hint" : undefined}
+              // What gets pasted here is a URL, a sender address or the raw text
+              // of a scam message — never prose. iOS capitalises the first
+              // letter and "corrects" what it reads as typos, which on a
+              // lookalike domain is the one input where a silent edit changes
+              // the verdict: the homoglyph or padded subdomain that made it
+              // worth checking is exactly what autocorrect rewrites.
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               className="w-full min-h-[118px] px-4 py-4 bg-transparent text-[var(--ink)] placeholder-[#8A93A1] border-0 resize-y text-base leading-relaxed focus:outline-none block"
             />
 
@@ -1502,6 +1522,7 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
             <span className="shrink-0"><EmailFileIcon /></span>
             {t("check.uploadEml")}
           </button>
+
 
           {/* The button goes quiet while the panel is up, and says "done" for
               the closing frame after an image read.
@@ -1598,21 +1619,17 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
         </div>
       )}
 
-      {/* Paste guidance for users who aren't sure how to copy on mobile. Stands
-          down while the empty-submit alert is up, so an empty press shows one
-          clear message rather than two stacked hints.
+      {/* The mobile paste hint ("Long-press the message → Copy → tap here →
+          Paste") was here. It had already lost its desktop half, and what was
+          left described the operating system's own copy gesture to someone who
+          had just arrived holding a message they copied to get here. Its cost
+          was a standing line under the card on every empty mobile view — and,
+          once the ways-in rows were tethered to the card, a gap between the two
+          that read as a seam in what should be one stack.
 
-          Mobile only, now. The desktop half told people they could drag a .eml
-          file or a screenshot onto the box — a capability the two upload buttons
-          directly above already offer by name, and one that costs nothing to
-          discover by trying it. On the narrow viewport this hint is the only
-          route to it, which is why that half stays. */}
-      {!content && !pipeStages && !emptyPrompt && (
-        <p className="sm:hidden text-xs text-[var(--faint)] px-0.5">
-          {t("check.pasteHint")}
-        </p>
-      )}
-
+          The empty-submit alert above still catches the case this was for: a
+          press with nothing pasted says what to paste, at the moment the reader
+          has shown they need telling. */}
 
       {uploadError && <p className="text-sm text-red-400" role="alert">{uploadError}</p>}
 

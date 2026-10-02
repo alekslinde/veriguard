@@ -65,7 +65,7 @@ export default function RegionBar({ region }: { region: RegionCode }) {
         id="radar-region"
         value={region}
         onChange={(e) => change(e.target.value)}
-        className="sm:ml-auto w-full sm:w-auto rounded-lg border border-[var(--ink-3)] bg-[var(--ink)] px-2.5 py-2 text-[13.5px] text-[var(--foreground)] cursor-pointer"
+        className="sm:ml-auto w-full sm:w-auto rounded-lg border border-[var(--ink-3)] bg-[var(--ink)] px-2.5 py-2 text-[16px] sm:text-[13.5px] text-[var(--foreground)] cursor-pointer"
       >
         {REGION_OPTIONS.map((o) => (
           <option key={o.code} value={o.code}>

@@ -93,6 +93,24 @@
     /* No safe-area inset applies on a desktop, and the bar is taller. */
     --header-h: 59px;
   }
+
+  /* The header's own sub-nav row, on the sections that have one.
+     Desktop only, because that row is: below md the same links are a row above
+     the tab bar instead, which --subnav-h already accounts for.
+
+     Same mechanism as --subnav-h above and for the same reason — the header
+     renders the row deep in its own tree, and everything that pins below the
+     header reads this token to know where its bottom edge is. The learn page's
+     sticky table of contents is the one that proves it: Learn is precisely the
+     section with children, so a token that ignored this row would pin that bar
+     underneath it on the only page where both are on screen.
+
+     41px: the row's declared 40px height plus its 1px top border. The height is
+     declared rather than left to the chips' line box precisely so this number
+     can be stated instead of approximated. */
+  :root:has(header [data-header-subnav]) {
+    --header-h: calc(59px + 41px);
+  }
 }
 
 @theme inline {
@@ -163,6 +181,59 @@ button,
 label[for],
 summary {
   -webkit-tap-highlight-color: transparent;
+
+  /* The browser's 300ms wait to see whether a second tap is coming, so it can
+     double-tap-zoom. None of these elements is a zoom target, so the wait is
+     pure latency — and it is latency the reader reads as the app thinking,
+     which is the wrong thing to suggest about a control that has not started
+     working yet. */
+  touch-action: manipulation;
+}
+
+/* 1b. Press feedback, which the rule above makes mandatory rather than
+       optional: removing the system highlight removed the only response a
+       touch reader was getting, and the 79 hover styles in this codebase
+       compile to `@media (hover: hover)` under Tailwind v4 — so on a phone
+       they never run. Without this, every control on every page would be
+       visually inert from the moment a finger lands to the moment the next
+       screen paints.
+
+       Scale rather than a colour change, because it is one rule that works on
+       all of them: these controls sit on the dark ground, on --ink-2 cards and
+       on the light --paper check card, and no single colour reads as "pressed"
+       against all three. 0.97 is small enough to feel like the surface giving
+       way under the finger rather than the element resizing.
+
+       On :active, not on click: native controls respond when the finger lands.
+       Waiting for the tap to complete reads as lag even when the handler is
+       instant, because the feedback arrives after the reader has already let
+       go.
+
+       Excluded: the tab bar's links, which own their own pressed treatment and
+       whose labels would shift against a fixed bar; and disabled controls,
+       which must not suggest they did something. */
+@media (hover: none) {
+  a:active,
+  button:not(:disabled):active,
+  [role="button"]:not([aria-disabled="true"]):active,
+  label[for]:active,
+  summary:active {
+    transform: scale(0.97);
+  }
+
+  nav a:active {
+    transform: none;
+  }
+}
+
+@media (hover: none) and (prefers-reduced-motion: no-preference) {
+  a,
+  button,
+  [role="button"],
+  label[for],
+  summary {
+    transition: transform 0.1s ease-out;
+  }
 }
 
 /* 2. Rubber-band scrolling past the end of the page, which on a fixed shell
@@ -191,8 +262,14 @@ html {
 
 /* 4. The bottom tab bar is fixed, so the last row of every page would sit
       underneath it. Reserved on <body> rather than on each <main>: a route
-      that forgets the class is a route whose footer is unreachable, and there
-      is no way to notice that from the code. */
+      that forgets the class is a route whose final row is unreachable, and
+      there is no way to notice that from the code.
+
+      The footer used to be what this protected. It is desktop-only now, where
+      --tabbar-h is 0 and there is no bar to clear — so on the width that still
+      reserves anything, the last row is the page's own content rather than a
+      strip nobody minded losing a few pixels of. The reservation matters more
+      for that, not less. */
 body {
   padding-bottom: var(--tabbar-h);
 }
@@ -243,6 +320,237 @@ body:has(dialog[open]) {
 
    All of it is opt-in via motion-safe. Someone who has asked for less motion
    gets the same states, arriving instantly. */
+
+/* 0a. The home page's column is sized by the page, never by its contents.
+       ────────────────────────────────────────────────────────────────────
+       Opening a ways-in row under the check card used to widen everything
+       above it: the card, the headline and the rows all went from ~619px to
+       the 760px cap, because the open row's body is wider than a closed one's
+       summary and the column was taking its width from whichever was showing.
+
+       The cause is auto margins on a flex item. Both of these elements centre
+       themselves with `mx-auto` — `margin-inline: auto` — and both are flex
+       items: <main> of the layout's column, and the tool of <main>'s. A flex
+       item with an auto cross-axis margin is opted out of `stretch` by spec
+       and sized shrink-to-fit instead, so neither had a definite width to
+       begin with; the max-w each carries was only ever a ceiling the content
+       stayed under. Hence the growth, and hence `width: 100%`, which gives
+       back the definite width stretch would have supplied — which is also
+       what the auto margins need in order to centre anything.
+
+       UNCONDITIONAL, deliberately. The centring block below is scoped to
+       desktop viewports over 720px tall, but <main> is a flex item of the
+       layout column at every size, so scoping the fix the same way left short
+       laptop windows still resizing. This is about who decides the width, not
+       about whether the tool is centred in the viewport.
+
+       The caps still apply at every width, so nothing here moves: it only
+       stops an open disclosure being the thing that sets the measure. */
+main[data-home],
+main[data-home] [data-home-tool] {
+  width: 100%;
+}
+
+/* 0. The home page's tool, centred in the viewport until a check runs.
+      ────────────────────────────────────────────────────────────────────
+      An empty paste box at the top of a tall dark page reads as the start of
+      a document. Centred, it reads as the thing the page is for.
+
+      THE TOOL IS CENTRED, NOT THE PAGE, and that distinction is the whole
+      mechanism. The first version padded <main> by half the leftover viewport,
+      with the tool's own height written in as a constant — which was wrong
+      twice over. The constant was a guess (320px against a real ~470px), and
+      more importantly <main> held the ways-in rows as well, so padding it
+      pushed the tool down by half the height of everything BELOW it too. The
+      result sat near the bottom of the screen rather than the middle.
+
+      So the tool's own wrapper is the thing that fills the viewport and centres
+      its contents. No constant, no measurement: the box lands on the centre
+      line whatever its height. The ways-in rows that confused the first attempt
+      are not under the tool any more either — they are a menu in the card's own
+      action bar — so this really is the only block above the fold.
+
+      Desktop only, and only while there is room. On a phone the box is already
+      most of the screen and centring would push it under the fold — the exact
+      regression the short mobile title exists to prevent (see HomeHero). Below
+      720px tall the same is true of a laptop window.
+
+      WHY MIN-HEIGHT AND NOT justify-content: a flex switch cannot animate,
+      because `center` is not an interpolable value — and neither is a change
+      of `align-items` or `margin: auto`. min-height is one length moving to
+      another, and with the content centred inside it, shrinking the box to the
+      content's own height IS the rise. One property, fully interpolable.
+
+      It is not a transform, which would be cheaper but would slide the tool up
+      without releasing the space it occupied — leaving the rows below pushed
+      down with a gap above them. This is the layout, so giving it back moves
+      everything that follows. */
+@media (min-width: 640px) and (min-height: 720px) {
+  /* The page's own top padding is cancelled inside the centred region and the
+     viewport reservation accounts only for the header. Left in, main's pt-10
+     sat above the centred box and pushed it ~30px below the true centre line —
+     close enough to look like a mistake rather than a choice.
+
+     ONLY WHILE CENTRING. Once a verdict is up there is no centred region for
+     the padding to interfere with, and cancelling it there just pressed the
+     checked strip flush against the sticky header. The :not() is what scopes
+     this to the step that asked for it. */
+  main[data-home]:not(:has([data-check-done])) {
+    /* Both ends, not just the top. The page's own pt-10/pb-12 are for a
+       scrolling document; inside a box that is exactly the viewport they are
+       dead space at each end — and because they differ, the one that was left
+       pushed the centred tool up by half its height. */
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  /* NOT a calc of the viewport minus the things around it. That was the first
+     two attempts and both scrolled: subtracting the header left no room for
+     the footer, and subtracting header + footer still ignored main's own
+     pb-12. Every such sum is a list of contributors that has to stay complete,
+     and it silently stops being complete the next time padding changes
+     anywhere in the chain.
+
+     So the page is a flex column that is exactly the viewport, and the tool is
+     the item that grows into whatever the header, the footer and main's own
+     padding have left. Nothing is enumerated, so nothing can be forgotten —
+     and `justify-content: center` inside the grown item is what puts the box
+     on the centre line of that remainder. */
+  body:has(main[data-home]) {
+    height: 100vh;
+  }
+
+  /* NO align-items HERE, and that is the point. Centring the item that way
+     makes its cross size shrink-to-fit, so the tool became as wide as whatever
+     it currently held — and every ways row that opened resized the whole card.
+     `width: 100%` could not fix it either: that resolves against a parent whose
+     own width was shrink-to-fit, which is circular.
+
+     The default `stretch` keeps the tool the full width of main, and the tool
+     centres its own 760px box with the auto margins it already carries. Those
+     work because stretch leaves it a definite width to have margins against. */
+  main[data-home] {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* No width here either — the element's own max-w-[760px] and mx-auto do that
+     job, and they work because main stretches this to its full width (see
+     above). What this rule adds is only the vertical behaviour: grow into the
+     leftover height, and centre the content inside it. */
+  [data-home-tool] {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  /* A verdict has arrived, so the tool stops being the only thing on screen:
+     the evidence sheet and the tactics rail need the height, and a page that
+     stayed centred would open with its answer half below the fold.
+
+     `flex-grow: 0` is the release: the tool stops claiming the leftover space
+     and falls back to its content height, and the page scrolls normally from
+     there. The viewport lock on <body> goes with it, or a verdict taller than
+     the screen would be clipped inside a 100vh box.
+
+     flex-grow is a NUMBER, which is why the motion survives this rewrite — it
+     interpolates, where the `auto` this once used could not. The tool shrinks
+     from the full remainder to its own height over the same transition. */
+  body:has(main[data-home]):has([data-check-done]) {
+    height: auto;
+  }
+
+  main[data-home]:has([data-check-done]) [data-home-tool] {
+    flex-grow: 0;
+  }
+}
+
+/* The motion itself, opt-in. Someone who asked for less motion gets both
+   positions, arriving instantly.
+
+   0.42s and an ease-out curve with a long tail: this is a bigger move than
+   anything else in the flow (the tool travels a third of the viewport), and
+   the usual 200ms UI timing applied to that distance reads as a jump rather
+   than a rise. It is deliberately a touch slower than the verdict's own
+   0.32s fade, so the page settles just after the answer lands rather than
+   racing it — the verdict is what the reader is looking at, and the layout
+   moving under it should finish second.
+
+   Reduced motion does not merely shorten this: it is excluded entirely, so
+   there is no travel at all. */
+@media (min-width: 640px) and (min-height: 720px) and (prefers-reduced-motion: no-preference) {
+  [data-home-tool] {
+    transition: flex-grow 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+/* ── the ways-in rows ────────────────────────────────────────────────────
+   A <details> snaps open. The browser toggles `content-visibility` on the
+   body, which is not a property anything can transition, so the row jumps to
+   its full height in one frame — the same flinch the check card's own swap
+   exists to remove, three times over on a page that shows three of them.
+
+   THE MECHANISM: an outer grid whose single row goes 0fr → 1fr, with the body
+   clipped inside it. grid-template-rows interpolates where `height: auto` does
+   not, so this is the one shape of the animation that needs no measurement —
+   no ResizeObserver, no JS-set custom property, and no stale height if the
+   content reflows (the install buttons wrap at some widths, and the forwarding
+   body's copy button changes label).
+
+   `interpolate-size: allow-keywords` would do this in two lines and is the
+   right answer the day it can be relied on. It is Chromium-only as of this
+   writing, and this project's browserslist includes iOS 15 — so the grid
+   trick, which works everywhere, is what ships.
+
+   WHY THE BODY MUST STAY DISPLAYED: a closed <details> applies
+   `content-visibility: hidden` to everything after the summary, which skips
+   rendering entirely — there is nothing to animate from. Overriding that is
+   what makes the row animatable at all, and it is why the clip has to be ours:
+   with the browser's own hiding off, only `overflow: hidden` on a zero-height
+   row keeps the closed body off the screen.
+
+   The content stays in the accessibility tree while closed, which is the cost
+   of this technique and worth stating plainly: a screen reader can reach the
+   body of a shut row. The summary still carries the expanded state, so the
+   control is announced correctly; what changes is that the content behind it
+   is not removed. */
+details > .ways-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  /* The column is stated too. With only rows declared, the single implicit
+     column is sized to its content — so an opening row also got WIDER, from
+     nothing to its text's natural width, and the animation read as a box
+     growing in two directions when only one was asked for. `minmax(0, 1fr)`
+     rather than `1fr`: a bare 1fr has an auto minimum, so a long unbroken
+     string (the forwarding address) would push the row past its container
+     instead of being clipped inside it. */
+  grid-template-columns: minmax(0, 1fr);
+}
+
+details[open] > .ways-body {
+  grid-template-rows: 1fr;
+}
+
+/* The override described above. ::details-content is the modern handle for
+   this and is not yet everywhere, so the older selector carries it. */
+details:not([open]) > .ways-body {
+  content-visibility: visible;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  details > .ways-body {
+    /* 0.26s, matching the check card's own swap: these rows sit directly under
+       that card on the home page, and two different speeds for the same kind
+       of "a box changed size" read as two different components. ease-out
+       because the row is entering — the reader has just asked for it, and the
+       movement should be fastest at the moment they are watching for it. */
+    transition: grid-template-rows 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
 
 /* 1. The panel and the textarea swap inside the card.
       They occupy the same slot, so the card has to move between two heights it

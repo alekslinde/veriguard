@@ -5,6 +5,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import ExternalLink from "@/components/ExternalLink";
+import ReportBugButton from "@/components/ReportBugButton";
+import WaysTeaser from "@/components/WaysTeaser";
 import { EXTENSION_LISTINGS, reportedAsOf, totalReportedUsers } from "@/lib/extensionInstalls";
 
 export const metadata: Metadata = {
@@ -122,7 +124,7 @@ export default function AboutPage() {
             for the UK, US, New Zealand and Ireland as well. Paste a suspicious link, text, email
             or phone number and get an instant best-effort verdict — no account, no tracking, no
             data sold. It&apos;s an independent project by{" "}
-            <ExternalLink href="https://alekslinde.com" variant="bare" className={LINK}>
+            <ExternalLink href="https://alekslinde.com" variant="text">
               Aleks Linde
             </ExternalLink>
             , not a government service.
@@ -351,7 +353,7 @@ export default function AboutPage() {
               <li key={listing.store} className={`${P} flex flex-wrap items-baseline gap-x-2`}>
                 <span className={STRONG}>
                   {listing.url ? (
-                    <ExternalLink href={listing.url} variant="bare" className={LINK}>
+                    <ExternalLink href={listing.url} variant="text">
                       {listing.name}
                     </ExternalLink>
                   ) : (
@@ -408,12 +410,9 @@ export default function AboutPage() {
           <p className={P}>
             None of this is a promise you have to take on trust. The extension ships unminified
             so it can be read, and the{" "}
-            <a
-              href="https://github.com/alekslinde/veriguard/blob/main/__tests__/extensionBundle.test.ts"
-              className={LINK}
-            >
+            <ExternalLink href="https://github.com/alekslinde/veriguard/blob/main/__tests__/extensionBundle.test.ts">
               tests that enforce these claims
-            </a>{" "}
+            </ExternalLink>{" "}
             run against the built file — they fail if a second network call, a request body, or a
             way to inject markup ever appears in it.
           </p>
@@ -434,6 +433,11 @@ export default function AboutPage() {
             it. The site&apos;s security policy prevents pages from talking to any third-party
             server at all.
           </p>
+          {/* The control sits with the paragraphs that say what pressing it
+              does. It used to be an item in the site footer — the only place
+              that offered it — and a reader met the button there without any of
+              this, then met this explanation here without the button. */}
+          <ReportBugButton label="Report a bug" />
         </section>
 
         <section className={SECTION}>
@@ -445,10 +449,84 @@ export default function AboutPage() {
           </p>
         </section>
 
-        <div className="border-t border-[var(--rule)] pt-5">
+        {/* The ways in, in full.
+            Moved here when the home page's shelf became a menu in the check
+            card's action bar: that menu names the three and links here, so this
+            is where the detail each one needs actually lives — the forwarding
+            address and its copy button, an install button per browser, the
+            packages link.
+
+            #ways is load-bearing. The retired /ways route redirects to it
+            permanently (see next.config), so this anchor is the destination of
+            every old link to that page. */}
+        {/* WaysTeaser carries its own heading, the #ways id the retired /ways
+            route redirects to, and useOpenOnHash — which opens whichever row
+            that hash names. A /ways link landing on three collapsed summaries
+            would hide the content it promised, which is the case the hook
+            exists for. */}
+        <WaysTeaser />
+
+        {/* The colophon — what the site footer used to carry on every page.
+            Authorship and the reach claim are facts about the project, which is
+            what this page is for; repeating them under every screen was the
+            footer doing a job this page already does better, with room to say
+            the scope claim in full rather than hiding it below sm. */}
+        <div className="border-t border-[var(--rule)] pt-5 space-y-3">
           <Link href="/" className="text-sm text-[var(--clear)] hover:underline underline-offset-2 font-medium">
             Check or report a scam →
           </Link>
+          <p className="text-[13px] text-[var(--faint)] leading-relaxed max-w-[68ch]">
+            Built by{" "}
+            <ExternalLink href="https://alekslinde.com" variant="strong">
+              Aleks Linde
+            </ExternalLink>
+            . Universal checks run worldwide; full rule packs where we&apos;ve done the
+            groundwork.
+          </p>
+          {/* THE AGPL §13 OFFER OF SOURCE. Anyone using the hosted app has to
+              be able to reach the code running it, and this is where that
+              offer lives now that there is no site footer to carry it on every
+              page — /about is a tab, reachable in one tap from anywhere.
+
+              It names the APP and links the REPOSITORY, deliberately. The line
+              above used to say "the engine is open source" and point at
+              /packages, which is neither: the engine is one component of what
+              AGPL covers, and the developer docs are not the corresponding
+              source. Shortening this to a tidier sentence is how the offer
+              stops being one.
+
+              The parts carry different licences (see REUSE.toml and the
+              README) — this names the app's, which is the one a reader of the
+              hosted site is exercising. */}
+          <p className="text-[13px] text-[var(--faint)] leading-relaxed max-w-[68ch]">
+            Veriguard is free software under the AGPL. You can read, run and
+            modify the code that serves this site —{" "}
+            <ExternalLink href="https://github.com/alekslinde/veriguard" variant="strong">
+              {/* Not a message key: this page carries one wording in every
+                  language mode by design (see the note at the top), and the
+                  footer's own key went with the footer. */}
+              Source code (AGPL)
+            </ExternalLink>
+            . The packages and content under it carry their own licences, listed
+            in the README.
+          </p>
+          {/* The developer docs. This link went missing when the footer's "For
+              developers" item was dropped and this colophon was rewritten as
+              the §13 offer — leaving /packages reachable only from one row on
+              the home page, which is the state the footer's own note warned
+              about: a page nothing points at is a page nobody finds.
+
+              Separate from the licence sentence above on purpose. That one is
+              a legal offer about the whole app; this is a signpost for a
+              reader who writes code, and merging them made the offer vaguer
+              without making the signpost easier to see. */}
+          <p className="text-[13px] text-[var(--faint)] leading-relaxed max-w-[68ch]">
+            Building something with it?{" "}
+            <Link href="/packages" className={LINK}>
+              The developer docs
+            </Link>{" "}
+            cover the detection library and the MCP server.
+          </p>
         </div>
       </div>
     </main>

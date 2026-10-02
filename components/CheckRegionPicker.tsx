@@ -75,7 +75,13 @@ export default function CheckRegionPicker({
     ? "border-[#D9D5CC] bg-white text-[#3D4654]"
     : "border-[var(--ink-3)] bg-[var(--ink)] text-[var(--foreground)]";
   const hintCls = onPaper ? "text-[#8A93A1]" : "text-[var(--faint)]";
-  const sizeCls = small ? "px-2 py-1.5 text-[13px]" : "px-2.5 py-2 text-[13.5px]";
+  // 16px up to sm, then the design's real size. iOS Safari zooms the viewport
+  // when a focused control's text is under 16px and does not zoom back out on
+  // blur, so the reader is left on a cropped, drifted page — on this one that
+  // means the check card they were about to use is half off-screen.
+  const sizeCls = small
+    ? "px-2 py-1.5 text-[16px] sm:text-[13px]"
+    : "px-2.5 py-2 text-[16px] sm:text-[13.5px]";
 
   return (
     <div className={compact ? undefined : "space-y-1.5"}>

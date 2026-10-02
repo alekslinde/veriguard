@@ -3,30 +3,31 @@
 
 "use client";
 
-// The other ways in, as a bare group of rows.
+// The other ways in, in full — the forwarding address, the install buttons,
+// the packages link.
 //
-// No heading and no lede. Both were removed deliberately: "Take it with you"
-// plus a sentence explaining that the same engine runs behind all of them was
-// two lines of framing over three lines of content, and the rows say what they
-// are — a name, what you do with it, where it runs, and how to get it. A
-// section label earns its place when a reader has to be told what they are
-// looking at; these rows are self-describing, and the label was the part that
-// made this read as a second offer competing with the check box.
+// ON /about NOW, not the home page. The home page offers these as a menu in the
+// check card's action bar (OtherWaysMenu), which names the three and links
+// here; a menu attached to a text box is the wrong place for a copyable address
+// and four store buttons, and a shelf of them under the card made the home page
+// two blocks where it should be one.
 //
-// Below the fold on purpose, and last on the page: someone arriving mid-panic
-// with a dodgy SMS needs the paste field first, and "you could also install an
-// extension" is not what they came for. It earns its space further down, where
-// a reader who already has their answer is deciding whether to keep the tool
-// around.
+// The heading is visible here. It was sr-only while this sat unlabelled under
+// the check box, where a label read as a second offer competing with the box —
+// but this is a section among headed sections now, and the odd one without a
+// heading is the one that reads as a fragment of its neighbour.
 //
-// `id` so the retired /ways route can redirect here rather than 404 for anyone
-// holding an old link.
+// `id="ways"` is load-bearing: the retired /ways route redirects to /about#ways
+// permanently, so this anchor is where every old link to that page lands.
 
 import { useLang } from "@/lib/lang";
 import { useOpenOnHash } from "@/lib/useOpenOnHash";
-import WaysGrid from "@/components/WaysGrid";
+import WaysGrid, { type WaysVariant } from "@/components/WaysGrid";
 
-export default function WaysTeaser() {
+export default function WaysTeaser({
+  variant = "cards",
+  heading = true,
+}: { variant?: WaysVariant; heading?: boolean } = {}) {
   const { t } = useLang();
 
   // The retired /ways route redirects here permanently, and this section is
@@ -36,33 +37,41 @@ export default function WaysTeaser() {
   useOpenOnHash();
 
   return (
-    <section id="ways" aria-labelledby="ways-heading" className="scroll-mt-24">
-      {/* The heading is visible again.
-          It was dropped when this was the last block on a single-column page,
-          where the rows were self-describing and a label over them read as a
-          second offer competing with the check box. It is a column of a
-          control centre now, sitting beside the radar's own heading — and an
-          unlabelled column next to a labelled one reads as a fragment of the
-          section above it rather than a thing in its own right.
+    // max-w matched to the page's other sections. The rows are full width, so
+    // whatever hosts this has to bound them — uncapped on a 1180px page each
+    // row is a screen-wide line and three of them read as a footer link farm,
+    // which is the shape this shelf was reworked to escape. Carried here rather
+    // than left to the caller so moving it again cannot lose it.
+    <section
+      id="ways"
+      aria-labelledby="ways-heading"
+      className={variant === "tethered" ? "" : "scroll-mt-24 max-w-[68ch]"}
+    >
+      {/* Matched to the about page's own section headings rather than styled
+          here, so this reads as one of them and not as a widget dropped into
+          the page.
 
-          Matched to the radar's heading so the two columns are visibly peers.
-          The dot is neutral rather than the radar's amber: that colour says
-          "something is happening", which is true of circulating scams and not
-          of a list of ways to install. */}
+          Hidden visually on the home page, where the rows hang off the check
+          card as its continuation and a heading over them would re-introduce
+          the "second offer competing with the box" the tethering exists to
+          avoid. It stays in the outline either way: the section is a landmark
+          and someone navigating by heading needs it to exist. */}
       <h2
         id="ways-heading"
-        className="flex items-center gap-2 text-[15px] font-semibold text-[var(--foreground)]"
+        className={
+          heading
+            ? "font-[family-name:var(--font-display)] font-semibold text-[clamp(18px,2.2vw,22px)] leading-tight tracking-[-0.015em] text-[var(--foreground)]"
+            : "sr-only"
+        }
       >
-        <span
-          aria-hidden="true"
-          className="w-[7px] h-[7px] rounded-full bg-[var(--faint)] shrink-0"
-        />
         {t("home.ways.heading")}
       </h2>
-      <p className="mt-1 mb-3 text-[13.5px] text-[var(--text-dim)] leading-relaxed">
-        {t("home.ways.lede")}
-      </p>
-      <WaysGrid />
+      {heading && (
+        <p className="mt-2 mb-3 max-w-[68ch] text-[14.5px] text-[var(--text-dim)] leading-relaxed">
+          {t("home.ways.lede")}
+        </p>
+      )}
+      <WaysGrid variant={variant} />
     </section>
   );
 }

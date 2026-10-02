@@ -78,6 +78,11 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   // Single theme, so a single colour — and it must be the real page ground.
   themeColor: "#141C2B",
+  // The software keyboard shrinks the layout viewport rather than sliding the
+  // page up under it. Android Chrome's default is to overlay, which leaves the
+  // check box's own Check button behind the keyboard the reader just opened to
+  // fill it; iOS already resizes, so this closes the gap between the two.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({
@@ -98,16 +103,21 @@ export default function RootLayout({
                 orients and navigates away from a degraded feature, so it stays
                 the first thing on the page. */}
             <ServiceNotice />
-            <div className="flex-1">{children}</div>
-            {/* Rendered at every width now.
-                It was desktop-only, because the tab bar owns the bottom edge
-                and a footer above it would have been a second strip of chrome
-                stacked on the first. Its two items lived in the More sheet
-                instead — and the More sheet is gone, so without this the bug
-                report would be unreachable on a phone.
-                The page reserves --tabbar-h at the bottom (see globals.css), so
-                the footer scrolls into view above the bar rather than under it,
-                and on a desktop that reservation is 0px. */}
+            {/* flex-col + min-h-0, not just flex-1. This div grows to fill the
+                body, but a plain block child does not inherit that height — so
+                <main>'s own `flex: 1` had nothing to grow inside and the home
+                page's centred tool sat at the top of a tall empty column.
+                Making this a flex column is what passes the height through to
+                whatever the route renders. */}
+            <div className="flex-1 min-h-0 flex flex-col">{children}</div>
+            {/* Desktop only — the component hides itself below md, where the
+                tab bar owns the bottom edge and a footer above it would be a
+                second strip of chrome stacked on the first.
+
+                What the footer carries is reachable without it, which is what
+                makes hiding it on a phone safe rather than lossy: the bug
+                report and the AGPL §13 source offer both live on /about, which
+                is a tab. See the note on SiteFooter for the full mapping. */}
             <SiteFooter />
             <MobileTabBar />
           </BugReportProvider>

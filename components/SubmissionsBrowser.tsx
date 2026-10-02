@@ -73,7 +73,8 @@ function FilterSelect({
           id={id}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full appearance-none bg-transparent pr-6 text-sm text-[var(--foreground)] focus:outline-none cursor-pointer"
+          // 16px up to sm, or iOS zooms the viewport on focus and stays there.
+          className="w-full appearance-none bg-transparent pr-6 text-[16px] sm:text-sm text-[var(--foreground)] focus:outline-none cursor-pointer"
         >
           {options.map((opt) => (
             // The select is transparent to sit on the panel, but the dropdown
@@ -293,7 +294,13 @@ export default function SubmissionsBrowser() {
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder={t("subs.search.placeholder")}
             aria-label={t("subs.search.label")}
-            className="w-full bg-[var(--ink-2)] border border-[var(--rule)] rounded-xl pl-9 pr-11 py-2.5 text-sm text-[var(--foreground)] placeholder-[var(--faint)] focus:outline-none focus:border-[var(--clear)] focus:ring-1 focus:ring-[var(--clear)] [&::-webkit-search-cancel-button]:hidden"
+            enterKeyHint="search"
+            autoCapitalize="none"
+            autoCorrect="off"
+            // 16px up to sm: iOS Safari zooms the viewport on a focused control
+            // whose text is smaller, and does not undo it on blur. A search
+            // field is focused on purpose, so that zoom lands on every search.
+            className="w-full bg-[var(--ink-2)] border border-[var(--rule)] rounded-xl pl-9 pr-11 py-2.5 text-[16px] sm:text-sm text-[var(--foreground)] placeholder-[var(--faint)] focus:outline-none focus:border-[var(--clear)] focus:ring-1 focus:ring-[var(--clear)] [&::-webkit-search-cancel-button]:hidden"
           />
           {searchInput && (
             <button

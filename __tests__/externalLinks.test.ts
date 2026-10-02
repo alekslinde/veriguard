@@ -191,6 +191,65 @@ describe("the ExternalLink contract", () => {
     }
   });
 
+  it("does not let bare be used as a prose variant", () => {
+    // The gap the invariants above could not see. Every assertion in this file
+    // so far is about what EVERY link gets — the rel, the arrow, the note, the
+    // ring — and all of them passed while three prose links rendered in three
+    // different colours, because each had reached for `bare` and supplied its
+    // own styling on top.
+    //
+    // `bare` means "the caller's box is the control": an agency card, a store
+    // button. Passing it a className that colours or underlines TEXT is the
+    // signature of a prose link going around the variants, which is how five
+    // hover treatments came back the first time.
+    //
+    // Matched on the className rather than on bare itself, so a card keeping
+    // its border and padding in a className is untouched.
+    //
+    // A className given as an identifier (`className={LINK}`) is resolved to
+    // the string that identifier holds in the same file. The real offender was
+    // written exactly that way, so a check reading only the literal text of the
+    // tag saw an opaque name and passed — this assertion was written once
+    // without this step and missed the bug it exists for.
+    const TEXTY = /\b(underline|text-\[var\(--clear\)\])/;
+
+    const offenders: string[] = [];
+    for (const file of FILES) {
+      const source = read(file);
+
+      // `const NAME = "…";` and `const NAME = "…" + "…";` — the shapes these
+      // style constants are written in.
+      //
+      // The separator is `\s*\+\s*` with the + REQUIRED, and the whole group
+      // is what repeats. Written as `(?:"[^"]*"\s*\+?\s*)+` — a string followed
+      // by an optional plus — every part after the first string could match
+      // empty, so a run of adjacent quoted strings gave the engine exponentially
+      // many ways to divide it and CodeQL flagged the backtracking. Requiring
+      // the join inside the repeated group leaves exactly one parse.
+      const consts = new Map<string, string>();
+      for (const c of source.matchAll(/const (\w+)\s*=\s*("[^"]*"(?:\s*\+\s*"[^"]*")*)\s*;/g)) {
+        consts.set(c[1], c[2].replace(/"/g, "").replace(/\s*\+\s*/g, ""));
+      }
+
+      for (const m of source.matchAll(/<ExternalLink[\s\S]*?>/g)) {
+        const tag = m[0];
+        if (!/variant="bare"/.test(tag)) continue;
+
+        const cls = tag.match(/className=(?:\{(\w+)\}|["`]([^"`]*)["`])/);
+        if (!cls) continue;
+        const styles = cls[1] ? (consts.get(cls[1]) ?? "") : (cls[2] ?? "");
+
+        if (TEXTY.test(styles)) {
+          offenders.push(`${file}: ${tag.replace(/\s+/g, " ").slice(0, 80)}`);
+        }
+      }
+    }
+    expect(
+      offenders,
+      `these style a prose link through bare instead of using a variant:\n${offenders.join("\n")}`,
+    ).toEqual([]);
+  });
+
   it("can omit the arrow without omitting the note", () => {
     // Citation runs and store-button rows turn the arrow off because one per
     // item is noise. The note must not be optional with it — that is the part

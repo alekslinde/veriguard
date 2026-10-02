@@ -70,7 +70,13 @@ describe("the shelf scales to the channels still being added", () => {
     // The PAGE solves the width now — this sits in one column of a two-column
     // control centre, so a row is ~420px. Ten channels cost ten short rows in
     // a side column, which is the compactness the grid was reaching for.
-    expect(grid).toMatch(/<div className="space-y-2\.5">/);
+    // One column in BOTH variants: the about page spaces the rows apart as
+    // cards, the home page divides them inside one border as a stack tethered
+    // to the check card. Neither puts them side by side, which is the property
+    // this guards — the container class is no longer a single literal, so it is
+    // asserted as "a column, and no grid" rather than by its exact spelling.
+    expect(grid).toMatch(/space-y-2\.5/);
+    expect(grid).toMatch(/divide-y/);
     expect(gridCode).not.toMatch(/grid-cols-2 md:grid-cols-3/);
   });
 
@@ -82,20 +88,62 @@ describe("the shelf scales to the channels still being added", () => {
     expect(gridCode).not.toMatch(/open:col-span-full/);
   });
 
-  it("sits inside a column the page gives it", () => {
-    // The control centre. If the shelf goes back to spanning the page, a row
-    // is 1180px again and the link-farm problem returns.
-    expect(read("app/page.tsx")).toMatch(/lg:grid-cols-\[minmax\(0,1\.35fr\)_minmax\(0,1fr\)\]/);
+  it("sits inside a width the page caps", () => {
+    // The shelf's rows are full width, so the PAGE has to be what bounds them.
+    // Unbounded, a row is the full 1180px and seven of them read as a footer
+    // link farm — the problem the shelf was reshaped to escape.
+    //
+    // Asserted as the cap rather than as the specific layout that provides it.
+    // This was pinned to the two-column grid that used to hold the radar
+    // alongside; when the radar left the home page the column went with it and
+    // the cap moved onto the block itself, which bounds the rows just as well.
+    // A test that names one mechanism fails on a layout change that preserves
+    // the property it exists to protect.
+    // The cap is on the shelf's own <section> now, not on whatever page hosts
+    // it. It has moved twice — a column of a two-column home layout, then a
+    // capped block on that page, now a section of /about — and each move lost
+    // the cap until someone noticed. Carrying it on the component is what makes
+    // the next move safe, and this asserts it there rather than on a page.
+    const teaser = read("components/WaysTeaser.tsx");
+    expect(teaser).toMatch(/<section[\s\S]*?max-w-\[\d+(?:px|ch)\]/);
+
+    // And it is still mounted somewhere a reader can reach.
+    const hosts = ["app/about/page.tsx", "app/page.tsx"].filter((f) =>
+      read(f).includes("<WaysTeaser"),
+    );
+    expect(hosts, "WaysTeaser is not rendered on any page").not.toEqual([]);
   });
 
-  it("draws every channel's glyph from the shared set", () => {
-    // A tile's icon is named in the data and drawn by one component, so adding
-    // a channel cannot introduce a glyph at a different weight — a shelf is
-    // read as one object, and an odd glyph reads as a different KIND of thing.
-    expect(grid).toMatch(/<WayIcon name=\{way\.icon\}/);
+  it("names a glyph for every channel", () => {
+    // The shelf no longer DRAWS these. The rows are one line each — name, the
+    // clause that follows it, and where it runs — and the icon column was
+    // decoration costing the horizontal room that the right-hand chip now uses;
+    // three named rows do not need telling apart by picture.
+    //
+    // The field stays authored and asserted because it is data about the
+    // channel rather than about this shelf: WayIcon still exists and anything
+    // else listing these surfaces draws from the same named set, which is what
+    // stops a second list introducing a glyph at a different weight.
     for (const way of WAYS_IN) {
       expect(way.icon, way.id).toBeTruthy();
     }
+  });
+
+  it("gives every row its name, its clause and where it runs", () => {
+    // What replaced the glyph. The one-line row is only self-describing if all
+    // three parts are there — without `runs` on the face, the privacy
+    // distinction between forwarding (via email) and the extension (on your
+    // device) is invisible until a row is opened, and that is the fact a reader
+    // choosing between them most needs.
+    expect(grid).toMatch(/t\(way\.name\)/);
+    expect(grid).toMatch(/t\(way\.how\)/);
+    expect(grid).toMatch(/ways\.runs\.device/);
+    expect(grid).toMatch(/ways\.runs\.server/);
+
+    // And it is stated once, on the face. It used to be in the body because a
+    // narrow tile had no room for it; both copies on screen would say the same
+    // thing twice in two registers.
+    expect(grid.match(/ways\.runs\.device/g)).toHaveLength(1);
   });
 });
 
@@ -154,6 +202,11 @@ describe("an undistributed surface is not interactive", () => {
     // The status itself is rendered by the shared face, which is where the
     // interactive tile gets its name and half-line too — so the two shapes
     // cannot drift apart.
-    expect(grid).toMatch(/\{t\(way\.unavailable!\)\}/);
+    //
+    // Matched without the surrounding braces: the face renders this from a
+    // ternary now (a pending row shows its status where a live one shows where
+    // it runs), so `{t(…)}` as a literal was asserting the call's punctuation
+    // rather than that the status is shown.
+    expect(grid).toMatch(/t\(way\.unavailable!\)/);
   });
 });

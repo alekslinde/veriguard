@@ -2,13 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { Metadata } from "next";
-import { headers } from "next/headers";
-import AddToHomeScreen from "@/components/AddToHomeScreen";
 import CheckStage from "@/components/CheckStage";
 import HomeHero, { HomeCaption } from "@/components/HomeHero";
-import RadarTeaser from "@/components/RadarTeaser";
 import WaysTeaser from "@/components/WaysTeaser";
-import { resolveRegion } from "@/lib/regionResolver";
 import { getStats } from "@/lib/reportStore";
 
 // The positioning line the page used to render as an <h1>.
@@ -29,14 +25,13 @@ export const metadata: Metadata = {
     "Paste a suspicious link, text, email or phone number and see exactly what we found. Scored against open-source rules; nothing you paste is stored.",
 };
 
-// Region comes from request headers, so this page is per-request regardless.
-// The check flow is client-side, so little is served statically here in any
-// case.
+// Per-request for the counters below, which are read on this render rather
+// than fetched on mount. Nothing else here needs it — the check flow is
+// client-side, and the region lookup this also used to carry left with the
+// radar section.
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const region = resolveRegion(await headers());
-
   // Resolved here rather than fetched by StatsBar on mount. This render is
   // already happening per visit, so reading two counter rows inside it costs
   // nothing extra — while the client fetch it replaces was a second serverless
@@ -55,7 +50,15 @@ export default async function Home() {
   return (
     // Top padding stays tight on a phone, where the short title plus the box
     // has to clear the fold, and opens up from sm where there is room.
-    <main className="max-w-[1180px] mx-auto px-5 sm:px-8 pt-3 pb-8 sm:pt-10 sm:pb-12">
+    // data-home scopes the centring to this page; data-home-tool below is what
+    // actually carries it. The tool fills the viewport and centres itself while
+    // the box is empty, then collapses to its content height when a verdict
+    // replaces it — see the block in globals.css for why that is a min-height
+    // transition and why the page itself must not be the thing padded.
+    <main
+      data-home
+      className="max-w-[1180px] mx-auto px-5 sm:px-8 pt-3 pb-8 sm:pt-10 sm:pb-12"
+    >
       {/* ── The tool ────────────────────────────────────────────────────────
           One centred column, and the only thing on its row.
 
@@ -68,7 +71,7 @@ export default async function Home() {
           Once a check has run the stage releases the cap itself: the verdict
           splits into an evidence sheet and a tactics rail that need the room.
           See CheckStage. */}
-      <div className="max-w-[760px] mx-auto">
+      <div data-home-tool className="max-w-[760px] mx-auto">
         {/* The head goes in the stage's slot, not the page, because the stage
             owns the step: both the title and the caption retire when a verdict
             replaces the input, and only the stage knows when that happened.
@@ -101,39 +104,22 @@ export default async function Home() {
               />
             </>
           }
+          // The ways in, hanging off the card's bottom edge rather than sitting
+          // as a block beneath it. One stack, no gap, square where the two meet
+          // — so the reader's eye travels from the paste box into them without
+          // crossing a boundary that says "new section". They are the
+          // continuation of the card, not a second offer.
+          attached={<WaysTeaser variant="tethered" heading={false} />}
         />
       </div>
 
-      {/* ── The control centre ──────────────────────────────────────────────
-          Everything that is not the tool, in columns under it.
+      {/* NOTHING UNDER THE TOOL, deliberately.
 
-          These were a single stacked column: the ways-in shelf, then the
-          radar, each capped at 760px and running down the left of the page.
-          Stacked, they pushed the radar most of a screen below the fold and
-          left the same dead margin as the box. Side by side they are what a
-          reader scans once they have their answer — what else can do this,
-          and what is going around — and they fill the width the page already
-          has.
-
-          Radar first on a wide screen and it takes the wider column: it is
-          the one with real content rather than links. Below lg they stack,
-          and the order flips so the channels — the shorter, more actionable
-          block — come first rather than after four quotes.
-
-          `items-start` so neither column stretches to the other's height. */}
-      <div className="mt-8 sm:mt-12 grid gap-6 lg:gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] items-start">
-        <div className="order-2 lg:order-1 min-w-0">
-          <RadarTeaser region={region} />
-        </div>
-
-        <div className="order-1 lg:order-2 min-w-0 space-y-6">
-          {/* Renders nothing at all on a device that already has the app, or
-              cannot install it — so on most desktops this column is just the
-              channels. */}
-          <AddToHomeScreen />
-          <WaysTeaser />
-        </div>
-      </div>
+          The ways-in rows are tethered to the check card itself (the stage's
+          `attached` slot), and the install offer is a button in the header's
+          top-right — app chrome rather than page content. What is left is one
+          block for the centring to act on, which is what makes the centring
+          simple: the tool is the page. */}
     </main>
   );
 }

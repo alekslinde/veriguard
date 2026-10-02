@@ -85,10 +85,13 @@ export function BugReportProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={ctx}>
       {children}
-      {/* The manual entry point now lives inline in the site footer
-          (SiteFooter → useBugReport().openManual), not a floating chip over the
-          check input. Only the modal is mounted here; the trigger moved to where
-          it no longer overlaps the paste box on a phone. */}
+      {/* The manual entry point is ReportBugButton, on the about page's "Bug
+          reports & tracking" section (→ useBugReport().openManual). Only the
+          modal is mounted here.
+
+          It has been a floating chip over the check input and then an item in
+          the site footer; it is beside its own explanation now, and neither the
+          chip nor the footer exists. */}
       {open && (
         <BugModal key={session} diag={diag} auto={auto} onClose={() => setOpen(false)} />
       )}
@@ -249,7 +252,10 @@ function BugModal({
                 placeholder={t("bug.what.placeholder")}
                 rows={3}
                 maxLength={1000}
-                className="w-full bg-[var(--ink)] border border-[var(--rule)] rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-emerald-500 resize-y"
+                // 16px up to sm, or iOS zooms the viewport on focus and does not
+                // undo it — inside a dialog that leaves the reader unable to see
+                // the Send button they were heading for.
+                className="w-full bg-[var(--ink)] border border-[var(--rule)] rounded-lg px-3 py-2 text-[16px] sm:text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-emerald-500 resize-y"
               />
             </div>
 
@@ -264,7 +270,11 @@ function BugModal({
                 onChange={(e) => setContact(e.target.value)}
                 placeholder="you@example.com.au"
                 maxLength={200}
-                className="w-full bg-[var(--ink)] border border-[var(--rule)] rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-emerald-500"
+                inputMode="email"
+                enterKeyHint="done"
+                autoCapitalize="none"
+                autoCorrect="off"
+                className="w-full bg-[var(--ink)] border border-[var(--rule)] rounded-lg px-3 py-2 text-[16px] sm:text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-emerald-500"
               />
             </div>
 
@@ -317,8 +327,7 @@ function BugModal({
 
 // Inline so the trigger carries no external request. currentColor lets it
 // inherit the button's text colour and its hover transition for free. Exported
-// for the footer's inline "Report a bug" button, which is now the manual entry
-// point (see SiteFooter).
+// for ReportBugButton, which is the manual entry point.
 export function BugIcon() {
   return (
     <svg
