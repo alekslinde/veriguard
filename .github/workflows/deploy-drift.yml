@@ -2,18 +2,18 @@ name: Deploy drift
 
 # Flags when `production` has fallen too far behind `main`.
 #
-# Promotion is manual by design (docs/releases.md): merges to `main` do not
-# deploy, and production moves only when a maintainer merges a promotion PR.
+# Releasing is manual by design (docs/releases.md): merges to `main` do not
+# deploy, and production moves only when a maintainer merges the app release PR.
 # That is what decouples merge frequency from deploy frequency, and its
 # one failure mode is silence — "I'll cut a release later" decays into a month
 # of unshipped detection work with nothing prompting.
 #
-# So the cron lives HERE, not on the promotion train. The train opens a PR only
-# when asked (workflow_dispatch); this job just notices the gap and says so, by
-# refreshing a single "🚢 Production is behind main" issue. Clean runs close it
-# — an open digest issue means something is outstanding.
+# So the cron lives HERE, not on the release workflow. That workflow keeps the
+# release PR current but never merges it; this job just notices the gap and says
+# so, by refreshing a single "🚢 Production is behind main" issue. Clean runs
+# close it — an open digest issue means something is outstanding.
 #
-# It FLAGS, it does not promote. When to ship is a judgement about what is on
+# It FLAGS, it does not release. When to ship is a judgement about what is on
 # main, which a cron job has no way to make.
 
 on:

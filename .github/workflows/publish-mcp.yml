@@ -15,6 +15,15 @@ name: Publish MCP server
 # enforces that rather than trusting the order of two manual steps.
 
 on:
+  # Called by release.yml when an MCP release is cut — see the note in
+  # publish-engine.yml for why a release-please tag cannot trigger this itself.
+  workflow_call:
+    inputs:
+      ref:
+        description: "The tag to publish from, e.g. mcp-v0.2.0."
+        type: string
+        required: true
+  # Kept for tags pushed by hand, which remain a valid way to publish.
   push:
     tags:
       - "mcp-v*"
@@ -50,7 +59,7 @@ jobs:
       # rather than whatever main has moved on to.
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.ref || inputs.tag || github.ref }}
       - uses: actions/setup-node@v7
         with:
           # 24, not 22 — see the note in publish-engine.yml. Trusted publishing
@@ -83,12 +92,14 @@ jobs:
       # version number nothing in the history points at, and it cannot be taken
       # back.
       - name: Check the tag matches the package version
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || inputs.ref != ''
+        env:
+          TAG: ${{ inputs.ref || github.ref_name }}
         run: |
-          tag_version="${GITHUB_REF_NAME#mcp-v}"
+          tag_version="${TAG#mcp-v}"
           pkg_version="$(node -p "require('./packages/mcp/package.json').version")"
           if [ "$tag_version" != "$pkg_version" ]; then
-            echo "tag ${GITHUB_REF_NAME} does not match package version ${pkg_version}" >&2
+            echo "tag ${TAG} does not match package version ${pkg_version}" >&2
             exit 1
           fi
 
@@ -128,7 +139,10 @@ jobs:
       # installable, so approving this one before approving detect would put a
       # package on npm whose own dependency cannot be resolved. Approve detect
       # first.
+      # A called run has no dry_run input — see the note on publish-engine.yml's
+      # staging step.
       - name: Stage the release
         if: |
-          (github.event_name == 'push' || inputs.tag != '') && inputs.dry_run != true
+          inputs.ref != '' ||
+          ((github.event_name == 'push' || inputs.tag != '') && inputs.dry_run != true)
         run: npm stage publish --workspace @veriguard/mcp --provenance

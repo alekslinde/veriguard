@@ -1,116 +1,152 @@
 # Versioning
 
-The app version lives in `package.json` and is bumped **in the PR that makes
-the change**, not in a separate release step. The app itself is not packaged or
-published — its version exists so a person reading an issue, a verdict
-screenshot, or a bug report can tell which behaviour they were looking at.
+Every shippable part carries its own version, and **nobody edits a version by
+hand**. release-please reads the commit messages on `main`, works out the next
+number for each part, and keeps a release pull request open per part. Merging
+that PR is what bumps the version, writes the changelog, creates the tag and
+publishes the GitHub Release.
 
-The packages under `packages/` *are* published, and their versions carry a
-consumer's install. See *Parts versioned on their own*, below.
+So the question this file used to answer — "which number do I bump in my PR?" —
+is now answered by the **type of your commit**. Get the type right and the
+number follows.
 
 Format is [semantic versioning](https://semver.org): `MAJOR.MINOR.PATCH`.
 
 ---
 
-## Which number to bump
+## The five version lines
+
+Each part is versioned by what its own users would notice, and they move
+independently: the app's version never changes because the engine shipped, and
+the reverse.
+
+| Part | Path | Tag | Who notices a version change |
+|---|---|---|---|
+| App | `.` (excluding the four below) | `app-vX.Y.Z` | People using the site |
+| Detection engine | `packages/detect` | `engine-vX.Y.Z` | npm consumers, the app, the extension |
+| MCP server | `packages/mcp` | `mcp-vX.Y.Z` | npm consumers, MCP clients |
+| Browser extension | `extension` | `extension-vX.Y.Z` | Chrome, Edge, Firefox and Safari users |
+| Inbound email worker | `workers/inbound-email` | `worker-vX.Y.Z` | People who forward emails |
+
+The app's line continues under `app-v`. Its older bare `vX.Y.Z` tags
+(`v0.26.9`, `v0.28.1`, `v0.36.0`) stay exactly as they are — tags are permanent
+history, and the prefixed line starts beside them rather than replacing them.
+
+Which part a commit belongs to is decided by the **paths it touches**, not by
+its scope word. A commit editing `packages/detect/src` releases the engine; one
+editing `components/` releases the app. A commit touching both appears in both
+parts' release PRs.
+
+---
+
+## Which type to use
 
 The usual semver question is "does this break a consumer's build?" That is the
-wrong question here: the consumers are **people relying on a verdict**, not
+wrong question here: most consumers are **people relying on a verdict**, not
 programs calling an API. So the rule is framed around what a user would notice.
 
-| Bump | When | Examples |
-|---|---|---|
-| **PATCH** | Nothing a user would notice differently, or a fix that only removes wrong output | Refactors, tests, docs, tooling, CI. A false positive removed with no other verdict affected. |
-| **MINOR** | New capability, or detection that flags something it previously missed | A new region pack. New scam patterns. A new input type. Anything that can turn a "safe" into a "suspicious". |
-| **MAJOR** | The tool's promises change | The privacy contract changes; a verdict's meaning changes; a supported surface is withdrawn. Expected to be rare, and to warrant its own discussion. |
+| Commit type | Bump | When | Examples |
+|---|---|---|---|
+| `fix:` | PATCH | A fix that only removes wrong output | A false positive removed with no other verdict affected |
+| `feat:` | MINOR | New capability, or detection that flags something it previously missed | A new region pack. New scam patterns. A new input type. Anything that can turn a "safe" into a "suspicious" |
+| `feat!:` or a `BREAKING CHANGE:` footer | MAJOR, or MINOR below 1.0 | The tool's promises change | The privacy contract changes; a verdict's meaning changes; a supported surface is withdrawn |
+| `refactor:` `perf:` `docs:` `test:` `chore:` `ci:` `build:` | None | Nothing a user would notice | Refactors, tests, docs, tooling, CI |
+
+Note the last row: a `chore:` or `refactor:` commit produces **no release at
+all**, where the old rule asked for a PATCH bump. That is deliberate — a version
+that moves without anything shipping tells a reader nothing.
+
+### Below 1.0, a breaking change bumps the minor
+
+Every part is on `0.x`, and `bump-minor-pre-major` is set, so a `feat!:` below
+1.0 goes 0.38.0 → 0.39.0 rather than to 1.0.0. Nothing reaches 1.0.0 by
+accident; see *Reaching 1.0.0*, below.
 
 ### The asymmetry that matters
 
-**Detection that starts flagging more is MINOR. Detection that stops flagging
-something is PATCH** — but only when it is removing output that was wrong.
+**Detection that starts flagging more is `feat:`. Detection that stops flagging
+something is `fix:`** — but only when it is removing output that was wrong.
 
-A change that makes the detector quieter about real scams is not a patch and
+A change that makes the detector quieter about real scams is not a fix and
 usually not a version question at all; it is a regression. If you cannot say
 which false positive you removed and show a test proving real detection still
-fires, the bump is not the problem you have.
+fires, the type is not the problem you have.
 
 ### Worked examples from this repo
 
-| Change | Bump | Why |
+| Change | Type | Why |
 |---|---|---|
-| Rate-limit `/api/check` (#201) | PATCH | No verdict changes |
-| On-device OCR (#201) | MINOR | Images stop leaving the device — a user-visible capability change |
-| Privacy-invariant test (#202) | PATCH | Test only |
-| Defanged URLs scored (#202) | MINOR | Input that previously produced no verdict now produces one |
-| Verdict emails explain themselves (#204) | MINOR | New user-facing content |
-| SMS rule no longer applied to email (#205) | PATCH | Removes a wrong flag; nothing else moves |
-| Own-domain senders (#207) | PATCH | Same — one false positive class removed |
-| Word-boundary matching (#208) | PATCH | Same, and every existing test passed unchanged |
-
-Several changes can land between bumps. Bump once per PR, to the highest level
-any commit in it warrants.
+| Rate-limit `/api/check` (#201) | `fix:` or `chore:` | No verdict changes |
+| On-device OCR (#201) | `feat:` | Images stop leaving the device — a user-visible capability change |
+| Privacy-invariant test (#202) | `test:` | Test only; no release |
+| Defanged URLs scored (#202) | `feat:` | Input that previously produced no verdict now produces one |
+| Verdict emails explain themselves (#204) | `feat:` | New user-facing content |
+| SMS rule no longer applied to email (#205) | `fix:` | Removes a wrong flag; nothing else moves |
+| Own-domain senders (#207) | `fix:` | Same — one false positive class removed |
+| Word-boundary matching (#208) | `fix:` | Same, and every existing test passed unchanged |
 
 ---
 
-## How to bump
+## How to write the commit
 
-In the same PR as the change:
+Pull requests are **squash-merged with the PR title as the commit message**, so
+the PR title is the commit release-please parses. Get that right and there is
+nothing else to do.
 
-```bash
-npm version patch --no-git-tag-version   # or minor / major
+```
+feat(detector): score defanged URLs
+fix(ui): stop the verdict card clipping on narrow screens
+chore(config): bump eslint
 ```
 
-`--no-git-tag-version` matters: it edits `package.json` without creating a tag
-or a commit, so the bump joins your own commit and the PR stays a single unit
-of review. Tagging is a separate, deliberate act — see below.
+A `pr-title.yml` check rejects a title it cannot parse. That check is
+load-bearing rather than style policing: an unparseable title produces no bump
+and no changelog entry, so the change would ship silently under whatever number
+the last release happened to set.
 
-**Do not bump** for a PR that changes nothing shipped: a docs-only change, a CI
-fix, or a revert that restores the previous version.
+For a breaking change, either mark the type or add the footer:
+
+```
+feat(detector)!: withdraw the legacy verdict shape
+```
+
+Scopes are the ones listed in `CLAUDE.md`. They do not affect the version — the
+paths decide the part, the type decides the number — but they make the changelog
+readable.
+
+**Do not run `npm version`.** The version in each `package.json` is written by
+release-please when a release PR merges. A hand-edited version will be
+overwritten, and in the meantime it disagrees with the manifest.
 
 ---
 
-## Parts versioned on their own
+## Reaching 1.0.0
 
-Four parts ship on their own schedule, so each carries its own version in its
-own `package.json`. The app's version never moves because of them, and they
-never move because of the app.
+Nothing reaches 1.0.0 by accident. The `0.x` line can take breaking changes for
+as long as it needs to.
 
-| Part | File | Bump it when |
-|---|---|---|
-| Detection engine | `packages/detect/package.json` | Anything in `packages/detect/src` changes. The app bumps too, since it serves the engine. |
-| MCP server | `packages/mcp/package.json` | Anything in `packages/mcp/src` changes. Its `@veriguard/detect` range moves with the engine — a range naming a version that was never cut publishes a server nobody can install, which `publishReadiness.test.ts` guards. |
-| Browser extension | `extension/package.json` | Anything in the extension build changes. Every store submission needs a number higher than the last one shipped, and a shipped number can never be reused. |
-| Inbound email worker | `workers/inbound-email/package.json` | Anything in `workers/inbound-email/src` changes. |
+When you decide a part's v1 features are ready:
 
-The two packages were set to a matched version for their first release, so that
-one number names what shipped together. That is a one-off, not a policy: they
-ship on their own schedules, so an engine fix the server does not need will
-separate them, and nothing tries to hold them level.
+1. Plan toward it with a GitHub Milestone (`v1.0`) holding the issues v1 needs.
+   Milestones track the plan, not code.
+2. Optionally ship previews first as pre-releases (`app-v1.0.0-rc.1`), marked as
+   pre-release on GitHub.
+3. Merge a commit whose body says `Release-As: 1.0.0`. release-please then
+   proposes 1.0.0 in that part's release PR.
+4. Write the 1.0.0 Release notes as the announcement: what v1 promises.
+5. Merge the release PR. That creates `app-v1.0.0`, its Release and the deploy.
 
-The same table of PATCH, MINOR and MAJOR applies to each, judged by what that
-part's own users would notice. For the worker, that means the reply someone
-gets after forwarding an email: a reply where there used to be silence is
-MINOR, and so is new wording in the reply. A fix nobody would see in their
-inbox is PATCH.
-
-Bump each from its own directory, the same way:
-
-```bash
-cd workers/inbound-email && npm version patch --no-git-tag-version
-```
+The parts do not have to reach 1.0 together. The engine can stay `0.x` while the
+app is 1.0, or the reverse.
 
 ---
 
 ## Tagging
 
-Tags mark a deployed state worth referring back to, not every merge. Tag when
-you want to be able to say "the behaviour on the 14th was `v0.3.0`" — after a
-detection change reaches production, or before a change you might need to
-reason backwards from.
+Tags are created by the release workflow, never by hand. A tag exists because a
+release PR merged, which means a tag always has a changelog entry and a GitHub
+Release behind it.
 
-```bash
-git tag -a v0.3.0 -m "Own-domain senders, word-boundary matching"
-git push origin v0.3.0
-```
+A milestone is a version whose notes say so — not a separate kind of tag.
 
-Tag `main` after the merge, never a feature branch.
+See [`releases.md`](releases.md) for what happens after a tag is created.

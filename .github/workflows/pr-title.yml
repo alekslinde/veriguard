@@ -1,0 +1,61 @@
+name: PR title
+
+# Checks that a PR title is a Conventional Commit.
+#
+# This is load-bearing, not style policing. PRs are squash-merged with the title
+# as the commit message, so the title IS the commit release-please parses. A
+# title it cannot read produces no version bump and no changelog entry: the
+# change ships silently, under whatever number the last release happened to set.
+#
+# The type decides the bump — `fix:` patch, `feat:` minor, `!` or a
+# BREAKING CHANGE footer major (minor while a part is below 1.0). The scope is
+# free text here; which scopes this repo uses is in CLAUDE.md.
+
+on:
+  pull_request:
+    # `edited` matters as much as `opened`: a title fixed after a red check has
+    # to turn it green, or the check teaches people to ignore it.
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+concurrency:
+  # Per PR, cancelling superseded runs — only the current title matters.
+  group: pr-title-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Conventional Commit title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v6
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          # The types release-please understands, plus the ones this repo
+          # already uses. `revert` is included because reverting is a normal
+          # act and a revert PR still needs a parseable title.
+          types: |
+            feat
+            fix
+            perf
+            refactor
+            docs
+            test
+            chore
+            ci
+            build
+            style
+            revert
+          # Scopes are not restricted: the list in CLAUDE.md is guidance, and a
+          # check that rejects an unlisted scope blocks work on a vocabulary
+          # question. The type is what the release depends on.
+          requireScope: false
+          # A lowercase first word, so changelog entries read consistently.
+          # "Add" and "add" otherwise appear as different styles in one list.
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            The subject "{subject}" should start lowercase, so changelog
+            entries read consistently.

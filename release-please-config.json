@@ -1,0 +1,52 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "0b13ee255bbb5963ba73f2bb5578a37fb338bdcb",
+  "separate-pull-requests": true,
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": false,
+  "include-component-in-tag": true,
+  "include-v-in-tag": true,
+  "pull-request-header": "Release PR for this part. Merging it cuts the version, the tag, the changelog and the GitHub Release.",
+  "changelog-sections": [
+    { "type": "feat", "section": "Features" },
+    { "type": "fix", "section": "Fixes" },
+    { "type": "perf", "section": "Performance" },
+    { "type": "refactor", "section": "Refactors" },
+    { "type": "docs", "section": "Documentation", "hidden": true },
+    { "type": "test", "section": "Tests", "hidden": true },
+    { "type": "chore", "section": "Chores", "hidden": true }
+  ],
+  "packages": {
+    ".": {
+      "component": "app",
+      "release-type": "node",
+      "package-name": "veriguard",
+      "exclude-paths": [
+        "packages/detect",
+        "packages/mcp",
+        "extension",
+        "workers/inbound-email"
+      ]
+    },
+    "packages/detect": {
+      "component": "engine",
+      "release-type": "node",
+      "package-name": "@veriguard/detect"
+    },
+    "packages/mcp": {
+      "component": "mcp",
+      "release-type": "node",
+      "package-name": "@veriguard/mcp"
+    },
+    "extension": {
+      "component": "extension",
+      "release-type": "node",
+      "package-name": "@veriguard/extension"
+    },
+    "workers/inbound-email": {
+      "component": "worker",
+      "release-type": "node",
+      "package-name": "veriguard-inbound-email"
+    }
+  }
+}

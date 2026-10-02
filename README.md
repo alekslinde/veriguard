@@ -113,10 +113,13 @@ The write paths (`/api/report`, `/api/bug`, `/api/ocr`) stay same-origin.
 
 ### Versioning
 
-The app version in `package.json` is bumped in the PR that makes the change.
-See [`docs/versioning.md`](docs/versioning.md) — the rule is framed around what
-a *user* would notice, not what would break a build, since the consumers here
-are people relying on a verdict.
+Each shippable part — app, engine, MCP server, extension, email worker — carries
+its own version, and none is edited by hand: the type of your commit decides the
+bump, and merging a release PR cuts the version, tag and changelog. See
+[`docs/versioning.md`](docs/versioning.md) — the rule is framed around what a
+*user* would notice, not what would break a build, since the consumers here are
+people relying on a verdict — and [`docs/releases.md`](docs/releases.md) for how
+a release ships.
 
 ### Handy commands
 

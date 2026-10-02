@@ -112,10 +112,32 @@ The codebase layout and where each kind of logic lives is documented in
 6. **Open a PR** and fill in the template. The checklist mirrors the principles
    above; it's there to make sure nothing load-bearing slipped.
 
-### Commit messages
+### Commit messages and your PR title
 
-Use a scope prefix so history stays scannable (these match the scopes in
-[`CLAUDE.md`](CLAUDE.md)):
+PRs are **squash-merged with the PR title as the commit message**, so your PR
+title becomes the one commit on `main`. It must be a
+[Conventional Commit](https://www.conventionalcommits.org):
+
+```
+<type>(<scope>): <description>
+```
+
+A `pr-title.yml` check enforces this. It is load-bearing, not style policing: the
+release tooling reads these commits to work out version numbers and changelogs,
+so a title it cannot parse ships your change silently, with no version bump and
+no changelog entry.
+
+**The type decides the release:**
+
+| Type | Effect |
+| --- | --- |
+| `fix` | A patch release |
+| `feat` | A minor release |
+| `feat!` or a `BREAKING CHANGE:` footer | A major release — or a minor one while the part is below 1.0 |
+| `refactor` `perf` `docs` `test` `chore` `ci` `build` | No release |
+
+**The scope** keeps history scannable (these match the scopes in
+[`CLAUDE.md`](CLAUDE.md)) and does not affect the version:
 
 | Scope | For changes in |
 | --- | --- |
@@ -123,14 +145,16 @@ Use a scope prefix so history stays scannable (these match the scopes in
 | `ui` | Components and screens |
 | `api` | Route handlers under `app/api/` |
 | `email` | Email parsing / inbound / distiller |
+| `ext` | The WebExtension under `extension/` |
 | `db` | Data layer and stores |
 | `i18n` | Strings and language handling |
 | `config` | Config, docs, tooling |
 
 Example: `fix(ui): reveal the bug-report chip on scroll, icon-only on mobile`.
 
-If a change is user-noticeable, bump the app version in `package.json` in the
-same PR — see [`docs/versioning.md`](docs/versioning.md).
+**Do not bump a version in your PR.** Versions are written by the release
+tooling when a release PR merges — a hand-edited one gets overwritten. See
+[`docs/versioning.md`](docs/versioning.md).
 
 ---
 
