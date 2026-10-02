@@ -4,13 +4,24 @@ name: Deploy inbound email worker
 # deployed separately by the app host — this only handles the Worker, and only runs
 # when the Worker's own files change, so app-only commits don't redeploy it.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "workers/inbound-email/**"
-      - ".github/workflows/deploy-inbound-worker.yml"
+  # Deploys on a worker RELEASE, not on every push to main. The worker is a
+  # shippable part with its own version line, so what reaches production is a
+  # version somebody cut, the same as every other part. release.yml calls this
+  # with the tag it created — a tag made with the default GITHUB_TOKEN starts no
+  # workflow, so a tag trigger here would never fire.
+  workflow_call:
+    inputs:
+      ref:
+        description: "The tag to deploy, e.g. worker-v0.7.0."
+        type: string
+        required: true
   # Allow a manual run from the Actions tab (e.g. to re-push the secret).
   workflow_dispatch:
+    inputs:
+      ref:
+        description: "Tag or branch to deploy. Blank deploys the default branch."
+        type: string
+        required: false
 
 # Checkout is all this needs; deployment authenticates with its own credential
 # rather than the workflow token. Stated explicitly so the job does not inherit
@@ -26,6 +37,10 @@ jobs:
         working-directory: workers/inbound-email
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The released tag, so a deploy ships the commit its version names
+          # rather than whatever main has moved on to since.
+          ref: ${{ inputs.ref || github.ref }}
 
       - uses: actions/setup-node@v7
         with:

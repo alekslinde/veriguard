@@ -11,6 +11,17 @@ name: Publish engine
 # "v0.1.0" would not say which one it meant.
 
 on:
+  # Called by release.yml when an engine release is cut. A tag made with the
+  # default GITHUB_TOKEN starts no workflow, so the tag trigger below would
+  # never fire for a release-please tag — the release run calls this instead,
+  # passing the tag it just created.
+  workflow_call:
+    inputs:
+      ref:
+        description: "The tag to publish from, e.g. engine-v0.2.0."
+        type: string
+        required: true
+  # Kept for tags pushed by hand, which remain a valid way to publish.
   push:
     tags:
       - "engine-v*"
@@ -41,13 +52,13 @@ jobs:
       # to the commit and workflow that produced it is minted from this token.
       id-token: write
     steps:
-      # A manual run checks out the tag it was given rather than the branch it
-      # was dispatched from, so a retry publishes the same commit the tag names
-      # rather than whatever main has moved on to. Blank means verify-only, and
-      # the default checkout is fine for that.
+      # A called or manual run checks out the tag it was given rather than the
+      # branch it was dispatched from, so it publishes the same commit the tag
+      # names rather than whatever main has moved on to. Blank means
+      # verify-only, and the default checkout is fine for that.
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.ref || inputs.tag || github.ref }}
       - uses: actions/setup-node@v7
         with:
           # 24, not 22. Trusted publishing exchanges the Actions OIDC token for
@@ -81,15 +92,18 @@ jobs:
       # version number nothing in the history points at, and it cannot be taken
       # back.
       #
-      # Only meaningful on a tag run. A manual run has a branch ref, so there is
-      # no tag to agree with; the publish step below is what refuses to run.
+      # Only meaningful when a tag is in play: a tag push, or a release run that
+      # passed the tag it created. A manual run with no tag has a branch ref, so
+      # there is nothing to agree with; the publish step below is what refuses.
       - name: Check the tag matches the package version
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || inputs.ref != ''
+        env:
+          TAG: ${{ inputs.ref || github.ref_name }}
         run: |
-          tag_version="${GITHUB_REF_NAME#engine-v}"
+          tag_version="${TAG#engine-v}"
           pkg_version="$(node -p "require('./packages/detect/package.json').version")"
           if [ "$tag_version" != "$pkg_version" ]; then
-            echo "tag ${GITHUB_REF_NAME} does not match package version ${pkg_version}" >&2
+            echo "tag ${TAG} does not match package version ${pkg_version}" >&2
             exit 1
           fi
 
@@ -128,11 +142,17 @@ jobs:
       # publishConfig.provenance, so the attestation is visible at the call
       # site and a manifest edit cannot silently drop it.
       #
-      # Runs on a tag push, or on a manual run that named a tag and turned
-      # dry_run off. The manual path previously could not publish at all: it
-      # was gated on `refs/tags/`, which a workflow_dispatch ref never matches,
-      # so the retry it existed for reported green and uploaded nothing.
+      # Runs when a release run called this with a tag, on a tag push, or on a
+      # manual run that named a tag and turned dry_run off. The manual path
+      # previously could not publish at all: it was gated on `refs/tags/`, which
+      # a workflow_dispatch ref never matches, so the retry it existed for
+      # reported green and uploaded nothing.
+      #
+      # A called run has no dry_run input at all, so the staging it was asked
+      # for is not gated on one — the release that called it is the deliberate
+      # act, and the npm staging gate is still what puts code in front of users.
       - name: Stage the release
         if: |
-          (github.event_name == 'push' || inputs.tag != '') && inputs.dry_run != true
+          inputs.ref != '' ||
+          ((github.event_name == 'push' || inputs.tag != '') && inputs.dry_run != true)
         run: npm stage publish --workspace @veriguard/detect --provenance

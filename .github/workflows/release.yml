@@ -1,0 +1,192 @@
+name: Release
+
+# Cuts releases with release-please, then ships whichever part was released.
+#
+# One release PR per part stays open as commits land on main; merging it bumps
+# the version, writes the changelog, creates the prefixed tag and publishes the
+# GitHub Release. Nobody edits a version or writes a tag by hand.
+#
+# Why publishing and deploying are JOBS HERE rather than separate workflows
+# keyed on the tag: a tag created with the default GITHUB_TOKEN does not start
+# other workflows. A tag-triggered publish would therefore sit silently and
+# never run. So each shipping step is a job in this run, gated on the
+# release-please outputs that say which part was actually released.
+#
+# Each part releases on its own. A part no merged commit touched has no release
+# to cut, so its gate is false and its job is skipped.
+
+on:
+  push:
+    branches: [main]
+  # Available by hand so a release PR can be refreshed without waiting for the
+  # next merge — e.g. after editing release-please-config.json.
+  workflow_dispatch:
+
+# The release job needs more than this and raises it on itself; stated narrow
+# here so no job inherits write access it does not use.
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Cut release PRs and releases
+    runs-on: ubuntu-latest
+    permissions:
+      # Creating tags, commits on the release branch and GitHub Releases.
+      contents: write
+      pull-requests: write
+    outputs:
+      # One pair per part: whether it was released, and at what tag.
+      #
+      # The key is the package's PATH from release-please-config.json, then
+      # `--`, then the output name — not the component name. The root package
+      # (`.`) is the exception: its outputs are unprefixed. Getting a key wrong
+      # yields an empty string rather than an error, so the gate below reads
+      # false and the part silently never ships while the run reports green.
+      app_released: ${{ steps.release.outputs.release_created }}
+      app_tag: ${{ steps.release.outputs.tag_name }}
+      engine_released: ${{ steps.release.outputs['packages/detect--release_created'] }}
+      engine_tag: ${{ steps.release.outputs['packages/detect--tag_name'] }}
+      mcp_released: ${{ steps.release.outputs['packages/mcp--release_created'] }}
+      mcp_tag: ${{ steps.release.outputs['packages/mcp--tag_name'] }}
+      extension_released: ${{ steps.release.outputs['extension--release_created'] }}
+      extension_tag: ${{ steps.release.outputs['extension--tag_name'] }}
+      worker_released: ${{ steps.release.outputs['workers/inbound-email--release_created'] }}
+      worker_tag: ${{ steps.release.outputs['workers/inbound-email--tag_name'] }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # ── Engine ────────────────────────────────────────────────────────────────
+  # Stages @veriguard/detect on npm. The staging gate is deliberate and
+  # unchanged by release-please: the tarball is held until a maintainer
+  # approves it with 2FA, because a version on npm cannot be replaced and
+  # unpublishing is restricted after 72 hours. Merging reviews the change;
+  # approving the stage reviews the artifact.
+  publish-engine:
+    name: Stage the engine on npm
+    needs: release-please
+    if: needs.release-please.outputs.engine_released == 'true'
+    uses: ./.github/workflows/publish-engine.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      ref: ${{ needs.release-please.outputs.engine_tag }}
+
+  # ── MCP server ────────────────────────────────────────────────────────────
+  # Runs after the engine, never beside it. publish-mcp refuses to run until a
+  # PUBLISHED @veriguard/detect satisfies the range in the server's manifest,
+  # and a staged engine does not count — the check asks the public registry,
+  # which sees approved versions only.
+  #
+  # So when both parts release in one run this job will FAIL, by design: the
+  # engine it depends on is staged and not yet approved. Approve the engine
+  # stage, wait for `npm view @veriguard/detect version` to show it, then
+  # re-run this job. The alternative — publishing the server anyway — ships a
+  # tarball that cannot resolve its own scorer on install, permanently, under
+  # a version number that cannot be reused.
+  publish-mcp:
+    name: Stage the MCP server on npm
+    needs: [release-please, publish-engine]
+    # always() so a skipped engine job (no engine release this run) does not
+    # cancel a server release that has no engine dependency to wait for.
+    if: |
+      always() &&
+      needs.release-please.outputs.mcp_released == 'true' &&
+      needs.publish-engine.result != 'failure'
+    uses: ./.github/workflows/publish-mcp.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      ref: ${{ needs.release-please.outputs.mcp_tag }}
+
+  # ── Extension ─────────────────────────────────────────────────────────────
+  # Builds the store zips and attaches them to the Release. Store upload stays
+  # manual: a maintainer downloads these and submits them. Automating store
+  # submission is a separate decision, not one this workflow makes.
+  pack-extension:
+    name: Build the store zips
+    needs: release-please
+    if: needs.release-please.outputs.extension_released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      # Attaching the zips to the Release the previous job created.
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.extension_tag }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      # extensionBundle.test.ts greps the built bundle to enforce the
+      # one-network-call property, and skips when dist/ is absent. Building
+      # before testing is what makes that check mean anything on this run.
+      - name: Build and pack
+        run: npm run ext:pack
+
+      - name: Test against the built bundle
+        run: npm test
+
+      - name: Attach the zips to the Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release-please.outputs.extension_tag }}
+        run: gh release upload "$TAG" extension/dist/*.zip --clobber
+
+  # ── Email worker ──────────────────────────────────────────────────────────
+  deploy-worker:
+    name: Deploy the inbound email worker
+    needs: release-please
+    if: needs.release-please.outputs.worker_released == 'true'
+    uses: ./.github/workflows/deploy-inbound-worker.yml
+    permissions:
+      contents: read
+    secrets: inherit
+    with:
+      ref: ${{ needs.release-please.outputs.worker_tag }}
+
+  # ── App ───────────────────────────────────────────────────────────────────
+  # Points `production` at the app release tag; the host deploys that branch as
+  # it already does. This is the whole of option A: production equals a release
+  # by construction, and no host configuration changes.
+  #
+  # A fast-forward only (--ff-only): production must already be an ancestor of
+  # the tag. If someone has committed directly to production — a hotfix that
+  # never reached main — this FAILS rather than discarding their commit. The fix
+  # is to merge production back into main and release again, not to force this.
+  deploy-app:
+    name: Point production at the app release
+    needs: release-please
+    if: needs.release-please.outputs.app_released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history: a fast-forward check needs the commits on both sides,
+          # and a shallow clone cannot tell whether one contains the other.
+          fetch-depth: 0
+
+      - name: Fast-forward production to the release tag
+        env:
+          TAG: ${{ needs.release-please.outputs.app_tag }}
+        run: |
+          set -euo pipefail
+          git fetch origin production "refs/tags/${TAG}"
+          git checkout production
+          git merge --ff-only "refs/tags/${TAG}"
+          git push origin production
