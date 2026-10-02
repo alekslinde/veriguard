@@ -78,8 +78,10 @@ behind. Promote when that lands, or whenever the work on `main` warrants it.
    "Promote main → production" PR, then merge it. The diff review is "what
    shipped since the last tag" — line review already happened on `main`.
 2. Tag the merge on `main` after it lands, never a feature branch:
-   `git tag -a vX.Y.Z -m "..." && git push origin vX.Y.Z`, then cut a GitHub
-   Release. `production` must always equal a tag.
+   `git tag -a vX.Y.Z -m "..." && git push origin vX.Y.Z`. `production` must
+   always equal a tag. The tag is the deploy marker and is all a promotion
+   needs; nothing reads a GitHub Release. Create a Release from the tag only
+   when the maintainer decides the version is a milestone worth announcing.
 3. Verify the production deployment, then move on.
 
 **Hotfix:** branch off `production`, fix, merge to `production` (deploys now)
