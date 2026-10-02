@@ -216,8 +216,15 @@ describe("the ExternalLink contract", () => {
 
       // `const NAME = "…";` and `const NAME = "…" + "…";` — the shapes these
       // style constants are written in.
+      //
+      // The separator is `\s*\+\s*` with the + REQUIRED, and the whole group
+      // is what repeats. Written as `(?:"[^"]*"\s*\+?\s*)+` — a string followed
+      // by an optional plus — every part after the first string could match
+      // empty, so a run of adjacent quoted strings gave the engine exponentially
+      // many ways to divide it and CodeQL flagged the backtracking. Requiring
+      // the join inside the repeated group leaves exactly one parse.
       const consts = new Map<string, string>();
-      for (const c of source.matchAll(/const (\w+)\s*=\s*((?:"[^"]*"\s*\+?\s*)+);/g)) {
+      for (const c of source.matchAll(/const (\w+)\s*=\s*("[^"]*"(?:\s*\+\s*"[^"]*")*)\s*;/g)) {
         consts.set(c[1], c[2].replace(/"/g, "").replace(/\s*\+\s*/g, ""));
       }
 
