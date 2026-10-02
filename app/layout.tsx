@@ -103,7 +103,13 @@ export default function RootLayout({
                 orients and navigates away from a degraded feature, so it stays
                 the first thing on the page. */}
             <ServiceNotice />
-            <div className="flex-1">{children}</div>
+            {/* flex-col + min-h-0, not just flex-1. This div grows to fill the
+                body, but a plain block child does not inherit that height — so
+                <main>'s own `flex: 1` had nothing to grow inside and the home
+                page's centred tool sat at the top of a tall empty column.
+                Making this a flex column is what passes the height through to
+                whatever the route renders. */}
+            <div className="flex-1 min-h-0 flex flex-col">{children}</div>
             {/* Desktop only — the component hides itself below md, where the
                 tab bar owns the bottom edge and a footer above it would be a
                 second strip of chrome stacked on the first.

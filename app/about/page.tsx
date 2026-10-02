@@ -510,6 +510,23 @@ export default function AboutPage() {
             . The packages and content under it carry their own licences, listed
             in the README.
           </p>
+          {/* The developer docs. This link went missing when the footer's "For
+              developers" item was dropped and this colophon was rewritten as
+              the §13 offer — leaving /packages reachable only from one row on
+              the home page, which is the state the footer's own note warned
+              about: a page nothing points at is a page nobody finds.
+
+              Separate from the licence sentence above on purpose. That one is
+              a legal offer about the whole app; this is a signpost for a
+              reader who writes code, and merging them made the offer vaguer
+              without making the signpost easier to see. */}
+          <p className="text-[13px] text-[var(--faint)] leading-relaxed max-w-[68ch]">
+            Building something with it?{" "}
+            <Link href="/packages" className={LINK}>
+              The developer docs
+            </Link>{" "}
+            cover the detection library and the MCP server.
+          </p>
         </div>
       </div>
     </main>
