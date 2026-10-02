@@ -9,7 +9,7 @@ import { describe, it, expect } from "vitest";
 import { runCheck } from "../extension/src/check";
 import { UNEXPANDED_SHORTENER_NOTE } from "@veriguard/detect/scamDetector";
 import { VERDICT_COPY } from "../extension/src/copy";
-import messages from "../messages/en.normal.json";
+import messages from "../messages/en.json";
 
 describe("runCheck", () => {
   it("returns null for input with nothing in it", async () => {

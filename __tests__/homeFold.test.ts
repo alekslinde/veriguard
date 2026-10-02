@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import enNormal from "@/messages/en.normal.json";
+import enMessages from "@/messages/en.json";
 
 /**
  * The check box opens above the fold on a phone.
@@ -21,7 +21,7 @@ import enNormal from "@/messages/en.normal.json";
  */
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
-const messages = enNormal as Record<string, string>;
+const messages = enMessages as Record<string, string>;
 
 describe("the phone's head is short enough to keep the box above the fold", () => {
   // The page HAS a title again — removing it left the desktop opening on an

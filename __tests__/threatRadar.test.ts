@@ -18,7 +18,7 @@ import {
   type ThreatEntry,
 } from "@/lib/threatRadar";
 import { supportedRegions } from "@veriguard/detect/regions";
-import enNormal from "@/messages/en.normal.json";
+import enMessages from "@/messages/en.json";
 
 const AU = radarForRegion("AU");
 
@@ -106,7 +106,7 @@ describe("authoring invariants", () => {
   it("has a message key for every channel and coverage value used", () => {
     // These are interpolated into MessageKey lookups at render, so an unmapped
     // value renders the raw key to the user rather than failing loudly.
-    const keys = new Set(Object.keys(enNormal));
+    const keys = new Set(Object.keys(enMessages));
     for (const threat of AU) {
       expect(keys.has(`radar.channel.${threat.channel}`), threat.channel).toBe(true);
       const coverageKey =
@@ -129,14 +129,14 @@ describe("i18n", () => {
       "radar.coverage.na",
     ] as const;
 
-    const missing = keys.filter((k) => !(k in enNormal));
+    const missing = keys.filter((k) => !(k in enMessages));
     expect(missing, missing.join(", ")).toEqual([]);
   });
 
   it("keeps the {region} placeholder in radar.intro", () => {
     // The interpolation is what stops the intro hardcoding one country. A
     // bundle that drops the token silently reintroduces that bug.
-    expect((enNormal as Record<string, string>)["radar.intro"]).toContain("{region}");
+    expect((enMessages as Record<string, string>)["radar.intro"]).toContain("{region}");
   });
 });
 

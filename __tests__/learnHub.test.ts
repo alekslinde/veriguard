@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import enNormal from "@/messages/en.normal.json";
+import enMessages from "@/messages/en.json";
 import { circulatingLures } from "@/lib/threatRadar";
 import { activeSeasons, regionToday } from "@/lib/scamCalendar";
 
@@ -18,7 +18,7 @@ const hub = read("components/LearnHub.tsx");
 // Comments stripped: the component explains the clock it must NOT read, and
 // naming a function is not calling it.
 const hubCode = hub.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-const messages = enNormal as Record<string, string>;
+const messages = enMessages as Record<string, string>;
 
 describe("the hub leads the page", () => {
   it("renders above the table of contents", () => {

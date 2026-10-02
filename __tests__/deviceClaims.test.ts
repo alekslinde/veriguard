@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import enNormal from "@/messages/en.normal.json";
+import enMessages from "@/messages/en.json";
 
 /**
  * "On your device" is the extension's claim, not the website's.
@@ -25,7 +25,7 @@ import enNormal from "@/messages/en.normal.json";
  */
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
-const messages = enNormal as Record<string, string>;
+const messages = enMessages as Record<string, string>;
 
 /** Phrases that assert the reader's own machine did the work. */
 const ON_DEVICE = /\b(on|to|from) your (own )?device\b|\bnever leaves your (own )?device\b|\bon your own machine\b/i;

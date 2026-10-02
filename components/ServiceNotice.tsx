@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { useLang } from "@/lib/lang";
 import { bold } from "@/lib/richText";
 import type { MessageKey } from "@/lib/i18n";
-import enNormal from "@/messages/en.normal.json";
+import enMessages from "@/messages/en.json";
 
 /**
  * Site-wide strip for the state of the service itself: maintenance, a degraded
@@ -52,7 +52,7 @@ const DEFAULT_KEY = "service.inboundDelayed";
  */
 export function resolveNoticeKey(configured: string | undefined): MessageKey {
   const key = configured ?? DEFAULT_KEY;
-  return (key in (enNormal as Record<string, string>) ? key : DEFAULT_KEY) as MessageKey;
+  return (key in (enMessages as Record<string, string>) ? key : DEFAULT_KEY) as MessageKey;
 }
 
 const NOTICE_KEY = resolveNoticeKey(process.env.NEXT_PUBLIC_SERVICE_NOTICE_KEY);

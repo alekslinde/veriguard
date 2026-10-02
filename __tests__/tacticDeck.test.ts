@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import enNormal from "@/messages/en.normal.json";
+import enMessages from "@/messages/en.json";
 import { TACTIC_IDS } from "@/lib/signalTactics";
 
 /**
@@ -20,7 +20,7 @@ const deck = read("components/TacticDeck.tsx");
 // and naming a mistake is not making it. Without this, the assertion that the
 // stride is gone matches the sentence describing its absence.
 const deckCode = deck.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-const messages = enNormal as Record<string, string>;
+const messages = enMessages as Record<string, string>;
 
 describe("the deck positions cards by measurement, not arithmetic", () => {
   // The bug this pins: cards sit at 20, 300, 580… because the rail bleeds to

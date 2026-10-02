@@ -9,9 +9,8 @@ import {
   isCurrentPath,
   isChildCurrent,
 } from "@/components/navLinks";
-import { translate, type LangMode } from "@/lib/i18n";
+import { translate } from "@/lib/i18n";
 
-const NORMAL: LangMode = { locale: "en", tone: "normal" };
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 
 /**
@@ -58,7 +57,7 @@ describe("navigation model", () => {
 
   it("resolves every child's label", () => {
     for (const c of CHILD_LINKS) {
-      expect(translate(NORMAL, c.key), c.href).toBeTruthy();
+      expect(translate("en", c.key), c.href).toBeTruthy();
     }
   });
 
@@ -79,7 +78,7 @@ describe("navigation model", () => {
 
   it("resolves every nav label against the base bundle", () => {
     for (const l of LINKS) {
-      expect(translate(NORMAL, l.key), l.href).toBeTruthy();
+      expect(translate("en", l.key), l.href).toBeTruthy();
     }
   });
 });

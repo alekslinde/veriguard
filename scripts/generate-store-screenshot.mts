@@ -54,7 +54,7 @@ const result = checkUrl(SAMPLE_URL, undefined, REGION) as unknown as {
 // The app's own strings, so the mock cannot describe a verdict differently
 // from the screen it is a picture of.
 const messages = JSON.parse(
-  readFileSync(join(ROOT, "messages/en.normal.json"), "utf8"),
+  readFileSync(join(ROOT, "messages/en.json"), "utf8"),
 ) as Record<string, string>;
 
 const label = messages[`verdict.${result.verdict}.label`];

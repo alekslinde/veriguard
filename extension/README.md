@@ -267,7 +267,7 @@ silently rather than loudly:
   under the score add up to. `check.ts` returns the composed `signals`; the
   popup renders them as given. Re-deriving them from `results` is the specific
   mistake to avoid.
-- **Verdict copy is duplicated from `messages/en.normal.json`** and pinned by a
+- **Verdict copy is duplicated from `messages/en.json`** and pinned by a
   test — the i18n bundle carries every string on every page, which is not worth
   shipping to style one panel.
 - **The background script runs many times, not once.** An idle worker is torn

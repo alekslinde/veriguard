@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
-import { translate, type LangMode, type MessageKey } from "@/lib/i18n";
+import { translate, type MessageKey } from "@/lib/i18n";
 import { privacyClaimFor } from "@/components/CheckFlow";
 
 // The check panel narrates what the check is doing while it runs. Its value is
@@ -26,7 +26,6 @@ import { privacyClaimFor } from "@/components/CheckFlow";
 // through its behaviour instead.
 
 const SRC = readFileSync(path.join(process.cwd(), "components/CheckFlow.tsx"), "utf8");
-const NORMAL: LangMode = { locale: "en", tone: "normal" };
 
 /** The copy a claim actually renders, so assertions read as what a user sees. */
 const CLAIM_COPY: Record<string, MessageKey[]> = {
@@ -37,7 +36,7 @@ const CLAIM_COPY: Record<string, MessageKey[]> = {
   "server-ocr":     ["check.stage.uploaded"],
 };
 
-const copyFor = (claim: string) => CLAIM_COPY[claim].map((k) => translate(NORMAL, k)).join(" ");
+const copyFor = (claim: string) => CLAIM_COPY[claim].map((k) => translate("en", k)).join(" ");
 
 /** Phrases that assert the content never left the machine. */
 const NOTHING_LEFT = /nothing (has been|was) uploaded|on your device/i;
@@ -106,7 +105,7 @@ describe("the retired standing privacy badge", () => {
   });
 
   it("has its key retired from the message bundle", () => {
-    expect(translate(NORMAL, "check.onDevice" as MessageKey)).toBe("check.onDevice");
+    expect(translate("en", "check.onDevice" as MessageKey)).toBe("check.onDevice");
   });
 
   it("leaves the promises with the home caption, which still keeps both", () => {
@@ -121,8 +120,8 @@ describe("the retired standing privacy badge", () => {
     // Matched on the claim rather than one phrasing of it: "what you paste
     // isn't stored" and "nothing you paste is stored" are the same promise, and
     // a guard that only accepts the first fails on a copy edit that keeps it.
-    expect(translate(NORMAL, "home.privacy")).toMatch(/\b(isn't|not|nothing[^.]*\bis)\s+stored\b/i);
-    expect(translate(NORMAL, "home.privacy")).toMatch(/never open/i);
+    expect(translate("en", "home.privacy")).toMatch(/\b(isn't|not|nothing[^.]*\bis)\s+stored\b/i);
+    expect(translate("en", "home.privacy")).toMatch(/never open/i);
   });
 });
 
@@ -146,7 +145,7 @@ describe("check pipeline stages", () => {
     const keys = [...SRC.matchAll(/"(check\.stage\.[A-Za-z]+)"/g)].map((m) => m[1]);
     expect(keys.length).toBeGreaterThan(0);
     for (const k of new Set(keys)) {
-      const s = translate(NORMAL, k as MessageKey);
+      const s = translate("en", k as MessageKey);
       expect(s, `${k} should resolve to copy`).toBeTruthy();
       expect(s, `${k} should not fall through to its own key`).not.toBe(k);
     }

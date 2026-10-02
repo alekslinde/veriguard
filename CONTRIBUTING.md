@@ -180,10 +180,9 @@ plausibly *receive* qualify — infrastructure research stays in `docs/`.
 
 ## Copy and i18n
 
-Don't hardcode user-facing strings. They live in [`messages/`](messages/) as
-`en.normal.json`, the complete base bundle. Copy is keyed on two axes —
-**locale** (the language) and **tone** (the register) — so keep them separate
-when adding strings. Verdict copy should read plainly for a non-technical,
+Don't hardcode user-facing strings. They live in [`messages/`](messages/), one bundle
+per locale named by its language tag (next-intl's layout). `en.json` is the
+complete base bundle: add every new key there first. Verdict copy should read plainly for a non-technical,
 possibly-worried reader.
 
 ---

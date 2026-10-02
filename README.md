@@ -56,7 +56,7 @@ Seen something suspicious? Lodge a report so others can be warned. Submissions a
 A [`/learn`](app/learn/page.tsx) guide covering how to spot scams, how email authentication (SPF/DKIM/DMARC) works, common tactics, what to do if you've been caught, and where to report.
 
 ### Interface language
-The interface ships one neutral English voice. Internally the copy is keyed on two independent axes — **locale** (the language, `en` today) and **tone** (the register, one value today) — so language and regional voice stay separate concerns. Strings live in [`messages/`](messages/) as `en.normal.json`, the complete base bundle.
+The interface ships one neutral English voice. Strings follow the [next-intl](https://next-intl.dev) layout: one bundle per locale in [`messages/`](messages/), named by its language tag. `en.json` is the complete base bundle, and any future locale falls back to it key by key.
 
 ---
 

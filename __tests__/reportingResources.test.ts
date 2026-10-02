@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import enNormal from "@/messages/en.normal.json";
+import enMessages from "@/messages/en.json";
 import {
   reportingFor,
   victimHelpline,
@@ -103,7 +103,7 @@ describe("learn-page reporting copy", () => {
   // packs, so a UK reader was told to file with Scamwatch. These guard the fix:
   // shared strings must interpolate the reader's own body, and the AU-only
   // facts must live in keys that are rendered only for AU.
-  const msg = enNormal as Record<string, string>;
+  const msg = enMessages as Record<string, string>;
 
   it("interpolates the reporting body rather than naming one", () => {
     for (const key of [

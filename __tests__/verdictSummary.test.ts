@@ -12,7 +12,7 @@ import {
 } from "@/lib/verdictSummary";
 import { AnalyzedIdentifier, CheckResult } from "@veriguard/detect/scamDetector";
 import { TrackingPixelReport } from "@/lib/trackingPixel";
-import enNormal from "@/messages/en.normal.json";
+import enMessages from "@/messages/en.json";
 
 // Minimal builders — these mirror the shapes the real analysers emit, kept
 // local so the tests don't depend on the (heavier) full analysis pipeline.
@@ -787,7 +787,7 @@ describe("verdict email with several identifiers", () => {
       pixelReport: null,
     });
     expect(text).toContain(
-      (enNormal as Record<string, string>)["verdict.score.band.suspicious"],
+      (enMessages as Record<string, string>)["verdict.score.band.suspicious"],
     );
   });
 });

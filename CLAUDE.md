@@ -46,7 +46,7 @@ lib/            ← App-side logic — everything that is NOT scoring.
                   reportStore.ts, bugStore.ts. Safety: piiScrubber.ts,
                   submissionGuard.ts. Region/i18n: regionResolver.ts, geo.ts,
                   i18n.ts, lang.tsx. Blocklist: urlhausBlocklist.ts.
-messages/       ← i18n string bundles (en.normal.json)
+messages/       ← i18n string bundles, one per locale (en.json)
 extension/      ← WebExtension for Chrome, Edge, Firefox and Safari, from one
                   source. src/ holds the shared code (popup, background,
                   manifest.ts, check.ts, blocklist.ts, browser.ts);

@@ -121,7 +121,7 @@ function BugModal({
   auto: boolean;
   onClose: () => void;
 }) {
-  const { mode, t } = useLang();
+  const { locale, t } = useLang();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [env] = useState(collectEnv);
   const [description, setDescription] = useState("");
@@ -148,12 +148,8 @@ function BugModal({
           path: env.path,
           userAgent: env.userAgent,
           viewport: env.viewport,
-          // Browser language, annotated with the in-app preference when it
-          // differs from the default (locale/tone are separate axes now).
-          language:
-            mode.tone === "normal"
-              ? `${env.language} (${mode.locale})`
-              : `${env.language} (${mode.locale}, ${mode.tone})`,
+          // Browser language, annotated with the in-app locale.
+          language: `${env.language} (${locale})`,
           hp,
         }),
       });
