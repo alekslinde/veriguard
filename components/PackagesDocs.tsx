@@ -161,11 +161,7 @@ function PackageBanner({ name, url, children }: { name: string; url: string; chi
         <code className="font-[family-name:var(--font-mono-ui)] text-[14px] font-semibold text-[var(--clear)]">
           {name}
         </code>
-        <ExternalLink
-          href={url}
-          variant="bare"
-          className="text-[12.5px] font-semibold text-[var(--text-dim)] hover:text-[var(--clear)] transition-colors"
-        >
+        <ExternalLink href={url} variant="quiet" className="text-[12.5px]">
           npm
         </ExternalLink>
       </div>

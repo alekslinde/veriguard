@@ -102,8 +102,12 @@ function InstallLinks() {
                 button and the new-tab note announced twice. */}
           </>
         );
+        // gap-1 rather than relying on the space before the arrow: the arrow
+        // arrives as its own <span> from ExternalLink, and inline-flex collapses
+        // the whitespace between flex children — so "Chrome ↗" rendered as
+        // "Chrome↗", with the mark crowding the word it qualifies.
         const shell =
-          "inline-flex items-center rounded-lg border px-3 py-1.5 text-[13px] font-semibold";
+          "inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-[13px] font-semibold";
 
         // Not published for this browser yet. Rendered as text rather than a
         // link, for the same reason the npm row is flat: there is nothing behind

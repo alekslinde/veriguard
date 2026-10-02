@@ -38,7 +38,24 @@ const VARIANTS = {
   strong: `text-[var(--clear)] font-semibold hover:underline underline-offset-2 transition-colors ${FOCUS}`,
   /** A standalone action, as in the docs link lists. */
   action: `font-semibold text-[var(--clear)] hover:underline underline-offset-2 transition-colors ${FOCUS}`,
-  /** A card or row that is itself the link. The caller supplies the shell. */
+  /**
+   * A secondary action beside something louder — the "npm" link next to a
+   * package name, where `action`'s clear would compete with the name itself.
+   *
+   * It exists so that case stops being hand-rolled. It was `bare` plus a
+   * className doing exactly this, which is how a component meant to end five
+   * hover treatments grows a sixth: `bare` suppresses all styling, so every
+   * caller reaching for it reinvents one.
+   */
+  quiet: `font-semibold text-[var(--text-dim)] hover:text-[var(--clear)] transition-colors ${FOCUS}`,
+  /**
+   * A card or row that is itself the link — the caller supplies the shell.
+   *
+   * For a link whose whole BOX is the control (an agency card, an install
+   * button). Not an escape hatch for a prose link that wants a different
+   * colour: that is what the variants above are for, and three callers used it
+   * that way before this note existed.
+   */
   bare: FOCUS,
 } as const;
 

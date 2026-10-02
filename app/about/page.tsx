@@ -120,7 +120,7 @@ export default function AboutPage() {
             for the UK, US, New Zealand and Ireland as well. Paste a suspicious link, text, email
             or phone number and get an instant best-effort verdict — no account, no tracking, no
             data sold. It&apos;s an independent project by{" "}
-            <ExternalLink href="https://alekslinde.com" variant="bare" className={LINK}>
+            <ExternalLink href="https://alekslinde.com" variant="text">
               Aleks Linde
             </ExternalLink>
             , not a government service.
@@ -349,7 +349,7 @@ export default function AboutPage() {
               <li key={listing.store} className={`${P} flex flex-wrap items-baseline gap-x-2`}>
                 <span className={STRONG}>
                   {listing.url ? (
-                    <ExternalLink href={listing.url} variant="bare" className={LINK}>
+                    <ExternalLink href={listing.url} variant="text">
                       {listing.name}
                     </ExternalLink>
                   ) : (
@@ -406,12 +406,9 @@ export default function AboutPage() {
           <p className={P}>
             None of this is a promise you have to take on trust. The extension ships unminified
             so it can be read, and the{" "}
-            <a
-              href="https://github.com/alekslinde/veriguard/blob/main/__tests__/extensionBundle.test.ts"
-              className={LINK}
-            >
+            <ExternalLink href="https://github.com/alekslinde/veriguard/blob/main/__tests__/extensionBundle.test.ts">
               tests that enforce these claims
-            </a>{" "}
+            </ExternalLink>{" "}
             run against the built file — they fail if a second network call, a request body, or a
             way to inject markup ever appears in it.
           </p>

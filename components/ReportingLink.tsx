@@ -11,11 +11,17 @@ import ExternalLink from "@/components/ExternalLink";
  * is where every external link in the app gets them. This one previously used
  * `hover:opacity-80` — one of five hover treatments across the app, and the
  * only one that dimmed rather than brightened.
+ *
+ * No colour override. It carried `text-[var(--clear)]`, which is the colour the
+ * default variant hovers TO — so the link sat at its own hover colour and
+ * pointing at it changed nothing. `strong` is the variant for a link that
+ * should read as clear in dim surrounding copy, and it hovers to an underline
+ * instead, which is a change the reader can see.
  */
 export default function ReportingLink({ link }: { link: ReportingLinkData }) {
   if (!link.url) return <>{link.label}</>;
   return (
-    <ExternalLink href={link.url} className="text-[var(--clear)]">
+    <ExternalLink href={link.url} variant="strong">
       {link.label}
     </ExternalLink>
   );
