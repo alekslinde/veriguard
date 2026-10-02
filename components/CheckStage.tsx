@@ -82,7 +82,15 @@ export default function CheckStage({
     // belongs to the flow. It expands toward 1180px (the page's own container)
     // and stops, so the verdict never runs wider than the rest of the site,
     // and is bounded by the viewport on a phone where the margins clamp to 0.
-    <div className={done ? "lg:-mx-[calc((min(1180px,100vw-4rem)-760px)/2)]" : ""}>
+    // data-check-done is what the home page reads to stop centring the tool in
+    // the viewport (see globals.css). An attribute rather than a prop, because
+    // the step belongs to the flow and the page that centres it is a server
+    // component two levels up — this is the same shape the tab bar uses to tell
+    // the root about its sub-nav row.
+    <div
+      data-check-done={done || undefined}
+      className={done ? "lg:-mx-[calc((min(1180px,100vw-4rem)-760px)/2)]" : ""}
+    >
       {/* The record of what was checked. Shown only once there is something to
           record, and it sits above the results because it is the question the
           verdict below is answering. */}

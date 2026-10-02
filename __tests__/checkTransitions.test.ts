@@ -90,3 +90,53 @@ describe("check transitions — height animation", () => {
     expect(SRC.slice(swapIdx, swapIdx + 400)).toMatch(/check-swap[^"]*rounded-2xl|rounded-2xl[^"]*check-swap/);
   });
 });
+
+// ── The tool's resting position ──────────────────────────────────────────────
+//
+// The home page centres the check box in the viewport while it is empty and
+// lets it rise to the normal top-aligned position when a verdict replaces it.
+//
+// Three pieces have to agree for that to work, in three files, and none of them
+// fails a build alone: the page marks itself, the stage says when a check is
+// done, and the CSS joins the two. Any one of them renamed in isolation leaves
+// the page silently stuck in whichever position it happened to start in.
+
+describe("the home page's centred tool", () => {
+  const PAGE = readFileSync(path.join(process.cwd(), "app/page.tsx"), "utf8");
+  const STAGE = readFileSync(path.join(process.cwd(), "components/CheckStage.tsx"), "utf8");
+
+  it("marks the page and the finished check for the CSS to find", () => {
+    expect(PAGE).toMatch(/data-home/);
+    expect(STAGE).toMatch(/data-check-done=\{done \|\| undefined\}/);
+    // `|| undefined` and not `{done}`: React renders data-check-done="false"
+    // for the boolean, and an attribute selector matches on presence — so the
+    // page would read every input step as finished and never centre at all.
+    expect(STAGE).not.toMatch(/data-check-done=\{done\}/);
+
+    expect(CSS).toMatch(/main\[data-home\]/);
+    expect(CSS).toMatch(/main\[data-home\]:has\(\[data-check-done\]\)/);
+  });
+
+  it("moves with a transition rather than a snap", () => {
+    // padding-top, because justify-content/align-items/margin:auto cannot be
+    // interpolated — a layout switch would jump the tool up in one frame, which
+    // is the flinch the rest of this file exists to remove.
+    expect(CSS).toMatch(/transition:\s*padding-top/);
+  });
+
+  it("centres only where there is room for it", () => {
+    // On a phone the box is already most of the screen, and on a short laptop
+    // window centring pushes it toward the fold — the regression HomeHero's
+    // short mobile title exists to prevent.
+    const rule = CSS.slice(CSS.indexOf("main[data-home]") - 200, CSS.indexOf("main[data-home]"));
+    expect(rule).toMatch(/min-width:\s*640px/);
+    expect(rule).toMatch(/min-height:\s*720px/);
+  });
+
+  it("does not travel for a reader who asked for less motion", () => {
+    // Excluded rather than shortened: both positions are correct, and it is the
+    // journey between them that this reader has opted out of.
+    const guarded = CSS.slice(CSS.indexOf("transition: padding-top") - 400, CSS.indexOf("transition: padding-top"));
+    expect(guarded).toMatch(/prefers-reduced-motion:\s*no-preference/);
+  });
+});

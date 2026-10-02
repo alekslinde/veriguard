@@ -316,6 +316,66 @@ body:has(dialog[open]) {
    All of it is opt-in via motion-safe. Someone who has asked for less motion
    gets the same states, arriving instantly. */
 
+/* 0. The home page's tool, centred in the viewport until a check runs.
+      ────────────────────────────────────────────────────────────────────
+      An empty paste box at the top of a tall dark page reads as the start of
+      a document. Centred, it reads as the thing the page is for.
+
+      Desktop only, and only while there is room. On a phone the box is already
+      most of the screen and centring would push it under the fold — the exact
+      regression the short mobile title exists to prevent (see HomeHero). The
+      min-height query is what guarantees the room: below 720px tall, centring
+      would start pushing the box down on a laptop too.
+
+      WHY PADDING AND NOT justify-content: `center` is not an interpolable
+      value, so a flex switch would snap. The same is true of `align-items`,
+      `margin: auto` and a height change on the container. Padding-top is one
+      length transitioning to another, which is the only shape of this that can
+      actually move.
+
+      It is NOT a transform, either, though that would be cheaper. A transform
+      would slide the tool up without releasing the space it occupied, so the
+      rows under it — the install card, the ways-in shelf — would stay pushed
+      down the page and a gap would open above them. The padding is the layout,
+      so giving it back moves everything that follows with it.
+
+      The reservation is halved: `(100vh - --header-h)` is the space the tool
+      lives in, and half of what remains after the tool's own height puts it on
+      the centre line. 320px is the measured input-step height of the head plus
+      the card; it does not need to be exact, because an error here shifts the
+      resting position by half of it and nothing breaks. */
+@media (min-width: 640px) and (min-height: 720px) {
+  main[data-home] {
+    padding-top: max(2.5rem, calc((100vh - var(--header-h) - 320px) / 2));
+  }
+
+  /* A verdict has arrived, so the tool stops being the only thing on screen:
+     the evidence sheet and the tactics rail need the height, and a page that
+     stayed centred would open with its answer half below the fold. */
+  main[data-home]:has([data-check-done]) {
+    padding-top: 2.5rem;
+  }
+}
+
+/* The motion itself, opt-in. Someone who asked for less motion gets both
+   positions, arriving instantly.
+
+   0.42s and an ease-out curve with a long tail: this is a bigger move than
+   anything else in the flow (the tool travels a third of the viewport), and
+   the usual 200ms UI timing applied to that distance reads as a jump rather
+   than a rise. It is deliberately a touch slower than the verdict's own
+   0.32s fade, so the page settles just after the answer lands rather than
+   racing it — the verdict is what the reader is looking at, and the layout
+   moving under it should finish second.
+
+   Reduced motion does not merely shorten this: it is excluded entirely, so
+   there is no travel at all. */
+@media (min-width: 640px) and (min-height: 720px) and (prefers-reduced-motion: no-preference) {
+  main[data-home] {
+    transition: padding-top 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
 /* 1. The panel and the textarea swap inside the card.
       They occupy the same slot, so the card has to move between two heights it
       does not know in advance. CSS cannot interpolate to `auto`, and the

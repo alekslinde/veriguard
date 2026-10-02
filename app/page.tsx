@@ -48,7 +48,14 @@ export default async function Home() {
   return (
     // Top padding stays tight on a phone, where the short title plus the box
     // has to clear the fold, and opens up from sm where there is room.
-    <main className="max-w-[1180px] mx-auto px-5 sm:px-8 pt-3 pb-8 sm:pt-10 sm:pb-12">
+    // data-home is the hook for the centring in globals.css. The tool sits in
+    // the middle of the viewport while the box is empty and rises to its normal
+    // top-aligned place when a verdict replaces it — see that block for why the
+    // motion is a padding transition rather than justify-content.
+    <main
+      data-home
+      className="max-w-[1180px] mx-auto px-5 sm:px-8 pt-3 pb-8 sm:pt-10 sm:pb-12"
+    >
       {/* ── The tool ────────────────────────────────────────────────────────
           One centred column, and the only thing on its row.
 
