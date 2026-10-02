@@ -321,39 +321,61 @@ body:has(dialog[open]) {
       An empty paste box at the top of a tall dark page reads as the start of
       a document. Centred, it reads as the thing the page is for.
 
+      THE TOOL IS CENTRED, NOT THE PAGE, and that distinction is the whole
+      mechanism. The first version padded <main> by half the leftover viewport,
+      with the tool's own height written in as a constant — which was wrong
+      twice over. The constant was a guess (320px against a real ~470px), and
+      more importantly <main> held the ways-in rows as well, so padding it
+      pushed the tool down by half the height of everything BELOW it too. The
+      result sat near the bottom of the screen rather than the middle.
+
+      So the tool's own wrapper is the thing that fills the viewport and centres
+      its contents. No constant, no measurement: the box lands on the centre
+      line whatever its height. The ways-in rows that confused the first attempt
+      are not under the tool any more either — they are a menu in the card's own
+      action bar — so this really is the only block above the fold.
+
       Desktop only, and only while there is room. On a phone the box is already
       most of the screen and centring would push it under the fold — the exact
-      regression the short mobile title exists to prevent (see HomeHero). The
-      min-height query is what guarantees the room: below 720px tall, centring
-      would start pushing the box down on a laptop too.
+      regression the short mobile title exists to prevent (see HomeHero). Below
+      720px tall the same is true of a laptop window.
 
-      WHY PADDING AND NOT justify-content: `center` is not an interpolable
-      value, so a flex switch would snap. The same is true of `align-items`,
-      `margin: auto` and a height change on the container. Padding-top is one
-      length transitioning to another, which is the only shape of this that can
-      actually move.
+      WHY MIN-HEIGHT AND NOT justify-content: a flex switch cannot animate,
+      because `center` is not an interpolable value — and neither is a change
+      of `align-items` or `margin: auto`. min-height is one length moving to
+      another, and with the content centred inside it, shrinking the box to the
+      content's own height IS the rise. One property, fully interpolable.
 
-      It is NOT a transform, either, though that would be cheaper. A transform
-      would slide the tool up without releasing the space it occupied, so the
-      rows under it — the install card, the ways-in shelf — would stay pushed
-      down the page and a gap would open above them. The padding is the layout,
-      so giving it back moves everything that follows with it.
-
-      The reservation is halved: `(100vh - --header-h)` is the space the tool
-      lives in, and half of what remains after the tool's own height puts it on
-      the centre line. 320px is the measured input-step height of the head plus
-      the card; it does not need to be exact, because an error here shifts the
-      resting position by half of it and nothing breaks. */
+      It is not a transform, which would be cheaper but would slide the tool up
+      without releasing the space it occupied — leaving the rows below pushed
+      down with a gap above them. This is the layout, so giving it back moves
+      everything that follows. */
 @media (min-width: 640px) and (min-height: 720px) {
+  /* The page's own top padding is cancelled inside the centred region and the
+     viewport reservation accounts only for the header. Left in, main's pt-10
+     sat above the centred box and pushed it ~30px below the true centre line —
+     close enough to look like a mistake rather than a choice. */
   main[data-home] {
-    padding-top: max(2.5rem, calc((100vh - var(--header-h) - 320px) / 2));
+    padding-top: 0;
+  }
+
+  [data-home-tool] {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: calc(100vh - var(--header-h));
   }
 
   /* A verdict has arrived, so the tool stops being the only thing on screen:
      the evidence sheet and the tactics rail need the height, and a page that
-     stayed centred would open with its answer half below the fold. */
-  main[data-home]:has([data-check-done]) {
-    padding-top: 2.5rem;
+     stayed centred would open with its answer half below the fold.
+
+     0 rather than `auto`: a keyword cannot be interpolated, so `auto` would
+     snap to the content height in a single frame and lose the rise. 0 is a
+     length, and a flex column with no room left to distribute sits at exactly
+     its content's height — the same resting place, arrived at smoothly. */
+  main[data-home]:has([data-check-done]) [data-home-tool] {
+    min-height: 0;
   }
 }
 
@@ -371,8 +393,8 @@ body:has(dialog[open]) {
    Reduced motion does not merely shorten this: it is excluded entirely, so
    there is no travel at all. */
 @media (min-width: 640px) and (min-height: 720px) and (prefers-reduced-motion: no-preference) {
-  main[data-home] {
-    transition: padding-top 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  [data-home-tool] {
+    transition: min-height 0.42s cubic-bezier(0.22, 1, 0.36, 1);
   }
 }
 

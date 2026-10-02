@@ -113,30 +113,75 @@ describe("the home page's centred tool", () => {
     // page would read every input step as finished and never centre at all.
     expect(STAGE).not.toMatch(/data-check-done=\{done\}/);
 
-    expect(CSS).toMatch(/main\[data-home\]/);
-    expect(CSS).toMatch(/main\[data-home\]:has\(\[data-check-done\]\)/);
+    expect(PAGE).toMatch(/data-home-tool/);
+    expect(CSS).toMatch(/\[data-home-tool\]/);
+    expect(CSS).toMatch(/main\[data-home\]:has\(\[data-check-done\]\) \[data-home-tool\]/);
+  });
+
+  it("centres the tool, not the page", () => {
+    // The bug this replaces: <main> was padded by half the leftover viewport,
+    // with the tool's height written in as a constant. <main> also holds the
+    // ways-in rows, so the padding pushed the tool down by half the height of
+    // everything BELOW it too — and the constant (320px) was a guess against a
+    // real ~470px. The tool landed near the bottom of the screen.
+    //
+    // The wrapper around the tool is what fills the viewport and centres its
+    // own contents, so no height needs to be known at all.
+    // Specifically: <main> must not be padded by a CENTRING calculation. It is
+    // still padded — to 0, cancelling its own pt-10 so the centred region
+    // starts flush under the header — and that is not the bug. The bug was a
+    // computed half-viewport value on the element that also holds the rows.
+    const mainRule = CSS.slice(CSS.indexOf("main[data-home] {"));
+    expect(mainRule.slice(0, mainRule.indexOf("}"))).not.toMatch(/padding-top:\s*(max|calc|min)\(/);
+
+    const rule = CSS.slice(CSS.indexOf("[data-home-tool] {"));
+    const body = rule.slice(0, rule.indexOf("}"));
+    expect(body).toMatch(/justify-content:\s*center/);
+    expect(body).toMatch(/min-height:\s*calc\(100vh/);
   });
 
   it("moves with a transition rather than a snap", () => {
-    // padding-top, because justify-content/align-items/margin:auto cannot be
+    // min-height, because justify-content/align-items/margin:auto cannot be
     // interpolated — a layout switch would jump the tool up in one frame, which
     // is the flinch the rest of this file exists to remove.
-    expect(CSS).toMatch(/transition:\s*padding-top/);
+    expect(CSS).toMatch(/transition:\s*min-height/);
+
+    // And it collapses to 0, not auto: `auto` is a keyword, so it would snap to
+    // the content height in one frame and lose the rise. A flex column with no
+    // room to distribute already sits at its content's height.
+    const done = CSS.slice(CSS.indexOf("main[data-home]:has([data-check-done])"));
+    expect(done.slice(0, done.indexOf("}"))).toMatch(/min-height:\s*0/);
   });
 
   it("centres only where there is room for it", () => {
     // On a phone the box is already most of the screen, and on a short laptop
     // window centring pushes it toward the fold — the regression HomeHero's
     // short mobile title exists to prevent.
-    const rule = CSS.slice(CSS.indexOf("main[data-home]") - 200, CSS.indexOf("main[data-home]"));
-    expect(rule).toMatch(/min-width:\s*640px/);
-    expect(rule).toMatch(/min-height:\s*720px/);
+    // Asserted as "the rule is inside the guarded block" rather than by slicing
+    // a fixed number of characters back from it — the first version did that
+    // and broke the moment another rule was added between the @media line and
+    // this one, which says nothing about whether the guard still holds.
+    const guard = "@media (min-width: 640px) and (min-height: 720px) {";
+    const start = CSS.indexOf(guard);
+    expect(start, "the centring guard is gone").toBeGreaterThan(-1);
+
+    // To the end of that block: count braces from the opening one.
+    let depth = 0;
+    let end = start + guard.length - 1;
+    for (let i = start + guard.length - 1; i < CSS.length; i++) {
+      if (CSS[i] === "{") depth++;
+      else if (CSS[i] === "}" && --depth === 0) {
+        end = i;
+        break;
+      }
+    }
+    expect(CSS.slice(start, end)).toMatch(/\[data-home-tool\]\s*\{/);
   });
 
   it("does not travel for a reader who asked for less motion", () => {
     // Excluded rather than shortened: both positions are correct, and it is the
     // journey between them that this reader has opted out of.
-    const guarded = CSS.slice(CSS.indexOf("transition: padding-top") - 400, CSS.indexOf("transition: padding-top"));
-    expect(guarded).toMatch(/prefers-reduced-motion:\s*no-preference/);
+    const at = CSS.indexOf("transition: min-height");
+    expect(CSS.slice(at - 400, at)).toMatch(/prefers-reduced-motion:\s*no-preference/);
   });
 });

@@ -22,6 +22,7 @@ import CoverageNotice from "./CoverageNotice";
 import CheckRegionPicker from "./CheckRegionPicker";
 import { readStoredCheckRegion, writeStoredCheckRegion } from "@/lib/checkRegion";
 import ReportForm from "./ReportForm";
+import OtherWaysMenu from "./OtherWaysMenu";
 
 /**
  * Which part of the flow is on screen. Exported because CheckStage lifts this
@@ -1508,6 +1509,18 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
             <span className="shrink-0"><EmailFileIcon /></span>
             {t("check.uploadEml")}
           </button>
+
+          {/* The three surfaces that are not this box. They were a shelf under
+              the card, which made them a second block on a page whose job is
+              one — and the thing the reader had to scroll past to reach
+              anything else. Here they sit with the other two ways to start a
+              check, which is what they are.
+
+              Not disabled while a check runs, unlike its neighbours: this one
+              opens a menu rather than starting work, and a <summary> stays
+              focusable whatever you do to it — so gating it would leave a dead
+              stop in the tab order rather than a disabled control. */}
+          <OtherWaysMenu />
 
           {/* The button goes quiet while the panel is up, and says "done" for
               the closing frame after an image read.

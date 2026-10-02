@@ -3,6 +3,7 @@ import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import ExternalLink from "@/components/ExternalLink";
 import ReportBugButton from "@/components/ReportBugButton";
+import WaysTeaser from "@/components/WaysTeaser";
 import { EXTENSION_LISTINGS, reportedAsOf, totalReportedUsers } from "@/lib/extensionInstalls";
 
 export const metadata: Metadata = {
@@ -444,6 +445,23 @@ export default function AboutPage() {
             <Link href="/learn#block-email" className={LINK}>Learn page</Link>.
           </p>
         </section>
+
+        {/* The ways in, in full.
+            Moved here when the home page's shelf became a menu in the check
+            card's action bar: that menu names the three and links here, so this
+            is where the detail each one needs actually lives — the forwarding
+            address and its copy button, an install button per browser, the
+            packages link.
+
+            #ways is load-bearing. The retired /ways route redirects to it
+            permanently (see next.config), so this anchor is the destination of
+            every old link to that page. */}
+        {/* WaysTeaser carries its own heading, the #ways id the retired /ways
+            route redirects to, and useOpenOnHash — which opens whichever row
+            that hash names. A /ways link landing on three collapsed summaries
+            would hide the content it promised, which is the case the hook
+            exists for. */}
+        <WaysTeaser />
 
         {/* The colophon — what the site footer used to carry on every page.
             Authorship and the reach claim are facts about the project, which is

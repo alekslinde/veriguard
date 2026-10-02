@@ -91,7 +91,12 @@ const nextConfig: NextConfig = {
   // rather than temporary: the content is not coming back to this path, and the
   // page was in the sitemap long enough to have been indexed.
   async redirects() {
-    return [{ source: "/ways", destination: "/#ways", permanent: true }];
+    // /ways retired long ago; its content is the #ways section of /about, which
+    // is where it moved when the home page's shelf became a menu in the check
+    // card. This pointed at /#ways until then — an anchor the home page no
+    // longer has, so the redirect was landing readers at the top of a page with
+    // no sign of what they followed.
+    return [{ source: "/ways", destination: "/about#ways", permanent: true }];
   },
 
   async headers() {

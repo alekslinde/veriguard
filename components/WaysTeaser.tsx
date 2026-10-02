@@ -1,23 +1,21 @@
 "use client";
 
-// The other ways in, as a bare group of rows.
+// The other ways in, in full — the forwarding address, the install buttons,
+// the packages link.
 //
-// No heading and no lede. Both were removed deliberately: "Take it with you"
-// plus a sentence explaining that the same engine runs behind all of them was
-// two lines of framing over three lines of content, and the rows say what they
-// are — a name, what you do with it, where it runs, and how to get it. A
-// section label earns its place when a reader has to be told what they are
-// looking at; these rows are self-describing, and the label was the part that
-// made this read as a second offer competing with the check box.
+// ON /about NOW, not the home page. The home page offers these as a menu in the
+// check card's action bar (OtherWaysMenu), which names the three and links
+// here; a menu attached to a text box is the wrong place for a copyable address
+// and four store buttons, and a shelf of them under the card made the home page
+// two blocks where it should be one.
 //
-// Below the fold on purpose, and last on the page: someone arriving mid-panic
-// with a dodgy SMS needs the paste field first, and "you could also install an
-// extension" is not what they came for. It earns its space further down, where
-// a reader who already has their answer is deciding whether to keep the tool
-// around.
+// The heading is visible here. It was sr-only while this sat unlabelled under
+// the check box, where a label read as a second offer competing with the box —
+// but this is a section among headed sections now, and the odd one without a
+// heading is the one that reads as a fragment of its neighbour.
 //
-// `id` so the retired /ways route can redirect here rather than 404 for anyone
-// holding an old link.
+// `id="ways"` is load-bearing: the retired /ways route redirects to /about#ways
+// permanently, so this anchor is where every old link to that page lands.
 
 import { useLang } from "@/lib/lang";
 import { useOpenOnHash } from "@/lib/useOpenOnHash";
@@ -33,23 +31,28 @@ export default function WaysTeaser() {
   useOpenOnHash();
 
   return (
-    <section id="ways" aria-labelledby="ways-heading" className="scroll-mt-24">
-      {/* The heading is for screen readers only, and the lede is gone.
-          Both were visible while this was one column of a two-column control
-          centre: an unlabelled column beside the radar's labelled one read as a
-          fragment of it rather than a thing in its own right. The radar left,
-          so that reason left with it, and what is back is the older and better
-          one — the rows are self-describing (a name, what you do with it, where
-          it runs), and two lines of framing over three lines of content made
-          this read as a second offer competing with the check box.
-
-          It stays an <h2> rather than becoming a bare <div>: the section is a
-          landmark in the document outline and someone navigating by heading
-          needs it to exist. Hidden visually, announced normally — the one case
-          where those should differ. */}
-      <h2 id="ways-heading" className="sr-only">
+    // max-w matched to the page's other sections. The rows are full width, so
+    // whatever hosts this has to bound them — uncapped on a 1180px page each
+    // row is a screen-wide line and three of them read as a footer link farm,
+    // which is the shape this shelf was reworked to escape. Carried here rather
+    // than left to the caller so moving it again cannot lose it.
+    <section
+      id="ways"
+      aria-labelledby="ways-heading"
+      className="scroll-mt-24 max-w-[68ch]"
+    >
+      {/* Matched to the about page's own section headings rather than styled
+          here, so this reads as one of them and not as a widget dropped into
+          the page. */}
+      <h2
+        id="ways-heading"
+        className="font-[family-name:var(--font-display)] font-semibold text-[clamp(18px,2.2vw,22px)] leading-tight tracking-[-0.015em] text-[var(--foreground)]"
+      >
         {t("home.ways.heading")}
       </h2>
+      <p className="mt-2 mb-3 max-w-[68ch] text-[14.5px] text-[var(--text-dim)] leading-relaxed">
+        {t("home.ways.lede")}
+      </p>
       <WaysGrid />
     </section>
   );

@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import AddToHomeScreen from "@/components/AddToHomeScreen";
 import CheckStage from "@/components/CheckStage";
 import HomeHero, { HomeCaption } from "@/components/HomeHero";
-import WaysTeaser from "@/components/WaysTeaser";
 import { getStats } from "@/lib/reportStore";
 
 // The positioning line the page used to render as an <h1>.
@@ -48,10 +47,11 @@ export default async function Home() {
   return (
     // Top padding stays tight on a phone, where the short title plus the box
     // has to clear the fold, and opens up from sm where there is room.
-    // data-home is the hook for the centring in globals.css. The tool sits in
-    // the middle of the viewport while the box is empty and rises to its normal
-    // top-aligned place when a verdict replaces it — see that block for why the
-    // motion is a padding transition rather than justify-content.
+    // data-home scopes the centring to this page; data-home-tool below is what
+    // actually carries it. The tool fills the viewport and centres itself while
+    // the box is empty, then collapses to its content height when a verdict
+    // replaces it — see the block in globals.css for why that is a min-height
+    // transition and why the page itself must not be the thing padded.
     <main
       data-home
       className="max-w-[1180px] mx-auto px-5 sm:px-8 pt-3 pb-8 sm:pt-10 sm:pb-12"
@@ -68,7 +68,7 @@ export default async function Home() {
           Once a check has run the stage releases the cap itself: the verdict
           splits into an evidence sheet and a tactics rail that need the room.
           See CheckStage. */}
-      <div className="max-w-[760px] mx-auto">
+      <div data-home-tool className="max-w-[760px] mx-auto">
         {/* The head goes in the stage's slot, not the page, because the stage
             owns the step: both the title and the caption retire when a verdict
             replaces the input, and only the stage knows when that happened.
@@ -105,23 +105,20 @@ export default async function Home() {
       </div>
 
       {/* ── Under the tool ──────────────────────────────────────────────────
-          What a reader scans once they have their answer: the other ways in,
-          and the install prompt.
+          The install prompt, and nothing else.
 
-          This was two columns, the radar's four quoted lures beside these.
-          The radar is gone from the home page — it is a browsing surface, and
-          this screen has one job. It stays a destination (the Learn tab's
-          sub-nav, the Learn hub and the about page all reach /radar), so
-          nothing was removed from the product, only from the screen that
-          should open on the paste box and little else.
+          THE WAYS-IN SHELF IS GONE FROM HERE. Its three rows are a menu in the
+          card's own action bar now (see OtherWaysMenu) — they are another way
+          to start the same check, so they belong with the two already in that
+          bar rather than as a second block of page beneath it. That also
+          leaves exactly one thing above the fold for the centring to act on,
+          which is what makes the centring simple: the tool is the page.
 
-          One column at the tool's own width, so the page reads as a single
-          axis rather than a tool with a sidebar of things to read. */}
-      <div className="mt-8 sm:mt-12 max-w-[760px] mx-auto space-y-6">
-        {/* Renders nothing at all on a device that already has the app, or
-            cannot install it — so on most desktops this is just the channels. */}
+          This block renders nothing at all on most desktops — AddToHomeScreen
+          returns null where the app is installed or cannot be — so on those
+          the page below the tool is empty, deliberately. */}
+      <div className="mt-8 sm:mt-12 max-w-[760px] mx-auto">
         <AddToHomeScreen />
-        <WaysTeaser />
       </div>
     </main>
   );

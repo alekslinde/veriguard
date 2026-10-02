@@ -90,16 +90,19 @@ describe("the shelf scales to the channels still being added", () => {
     // the cap moved onto the block itself, which bounds the rows just as well.
     // A test that names one mechanism fails on a layout change that preserves
     // the property it exists to protect.
-    const home = read("app/page.tsx");
-    const shelf = home.slice(home.indexOf("<WaysTeaser"));
-    expect(shelf).not.toBe("");
+    // The cap is on the shelf's own <section> now, not on whatever page hosts
+    // it. It has moved twice — a column of a two-column home layout, then a
+    // capped block on that page, now a section of /about — and each move lost
+    // the cap until someone noticed. Carrying it on the component is what makes
+    // the next move safe, and this asserts it there rather than on a page.
+    const teaser = read("components/WaysTeaser.tsx");
+    expect(teaser).toMatch(/<section[\s\S]*?max-w-\[\d+(?:px|ch)\]/);
 
-    // The nearest wrapper above the shelf caps its width, by a max-w on the
-    // block or by handing it a column of a wider grid.
-    const capped =
-      /max-w-\[\d+px\][^>]*>\s*(?:\{\/\*(?:[^*]|\*(?!\/))*\*\/\}\s*)*(?:<AddToHomeScreen[^>]*\/>\s*)?<WaysTeaser/.test(home) ||
-      /lg:grid-cols-\[minmax\(/.test(home);
-    expect(capped).toBe(true);
+    // And it is still mounted somewhere a reader can reach.
+    const hosts = ["app/about/page.tsx", "app/page.tsx"].filter((f) =>
+      read(f).includes("<WaysTeaser"),
+    );
+    expect(hosts, "WaysTeaser is not rendered on any page").not.toEqual([]);
   });
 
   it("names a glyph for every channel", () => {
