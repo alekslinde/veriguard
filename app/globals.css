@@ -265,9 +265,11 @@ html {
       that forgets the class is a route whose final row is unreachable, and
       there is no way to notice that from the code.
 
-      This mattered for the site footer, which is gone — but it matters just as
-      much without one, because the last row is now the page's own content
-      rather than a strip nobody minded losing a few pixels of. */
+      The footer used to be what this protected. It is desktop-only now, where
+      --tabbar-h is 0 and there is no bar to clear — so on the width that still
+      reserves anything, the last row is the page's own content rather than a
+      strip nobody minded losing a few pixels of. The reservation matters more
+      for that, not less. */
 body {
   padding-bottom: var(--tabbar-h);
 }

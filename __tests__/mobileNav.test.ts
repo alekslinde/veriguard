@@ -345,10 +345,29 @@ describe("the More sheet and its machinery are gone", () => {
     expect(aboutIsATab).toBe(true);
   });
 
-  it("mounts no site footer", () => {
-    // A chrome strip under every screen is a website's shape. Its items were
-    // rehomed rather than dropped (see the note in layout.tsx), so this guards
-    // the removal rather than merely recording it.
-    expect(read("app/layout.tsx")).not.toMatch(/SiteFooter/);
+  it("keeps the footer off the width the tab bar owns", () => {
+    // A footer above the tab bar is a second strip of chrome stacked on the
+    // first — a website's shape on a phone. On a desktop there is no bar and a
+    // footer is what a reader expects at the bottom, so it is hidden by
+    // breakpoint rather than removed.
+    //
+    // This asserted that no footer was mounted at all, when the footer had been
+    // deleted outright. The property was never "there is no footer" — it was
+    // "nothing stacks above the tab bar", which the breakpoint satisfies.
+    const footer = read("components/SiteFooter.tsx");
+    expect(footer).toMatch(/hidden md:block/);
+
+    // And the tab bar is the other half of that pair: below md it is the only
+    // thing on the bottom edge.
+    expect(read("components/MobileTabBar.tsx")).toMatch(/md:hidden/);
+  });
+
+  it("keeps the AGPL source offer reachable without the footer", () => {
+    // The footer carries the §13 offer on a desktop, but it is hidden on a
+    // phone — so the offer has to exist somewhere a phone can reach, or hiding
+    // the footer withdraws it for every mobile reader. /about is a tab.
+    const about = read("app/about/page.tsx");
+    expect(about).toMatch(/github\.com\/alekslinde\/veriguard"/);
+    expect(about).toMatch(/AGPL/);
   });
 });
