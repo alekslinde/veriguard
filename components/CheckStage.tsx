@@ -32,6 +32,7 @@ export default function CheckStage({
   surface = "web",
   children,
   above,
+  attached,
 }: {
   /** Seeds the check box — used by the share target. */
   initialContent?: string;
@@ -57,6 +58,27 @@ export default function CheckStage({
    * unmounted across the swap for its own state's sake.
    */
   above?: ReactNode;
+  /**
+   * Rendered directly under the card on the input step, with no gap.
+   *
+   * The home page's ways-in rows, which hang off the card's bottom edge as its
+   * continuation rather than sitting as a separate block below it. They retire
+   * with the input for the same reason the head does: a reader looking at a
+   * verdict is not choosing how to submit one.
+   *
+   * UNMOUNTED here, unlike `above` — which is hidden rather than unmounted
+   * because it holds StatsBar and a live event listener. Nothing attached under
+   * the card holds state worth preserving across the swap, so there is no
+   * reason to keep it in the tree.
+   *
+   * NOT CALLED `below`. That name belonged to what is now `above` — the slot
+   * holding the caption and its StatsBar — and homeFold.test.ts still guards it
+   * by the old name, asserting that no slot is conditionally unmounted on
+   * `done`, because doing so tears the counter's refresh listener down at the
+   * moment the event fires. A new slot reusing the name trips a guard about a
+   * different thing, so this one is named for what it does to the card.
+   */
+  attached?: ReactNode;
 } = {}) {
 
   const { t } = useLang();
@@ -135,7 +157,17 @@ export default function CheckStage({
           lets the caption inside `above` move below the box with `order-last`
           on a phone. Nested in a wrapper of its own they could not reorder
           across each other. */}
-      <div key="stage-grid" className="min-w-0 flex flex-col">
+      {/* group/stage + data-tethered: the card squares its bottom corners when
+          something is attached under it, and it learns that from here rather
+          than from a prop — CheckFlow does not need to know what `attached`
+          holds, only that it is occupied. The attribute is absent when it is not, so
+          the card keeps all four corners on every other surface that mounts a
+          stage (the share target, the extension). */}
+      <div
+        key="stage-grid"
+        data-tethered={attached && !done ? "" : undefined}
+        className="group/stage min-w-0 flex flex-col"
+      >
         {/* The page head. `display: contents` so its children join THIS flex
             column rather than forming a row of their own — that is what puts
             the title and the caption in the same ordering context as the card.
@@ -156,6 +188,11 @@ export default function CheckStage({
           onStepChange={setStep}
           onChecked={(c) => setChecked(summarise(c))}
         />
+
+        {/* No wrapper and no margin: the point is that there is no gap between
+            the card and whatever this holds. Inside the same flex column as the
+            card so it cannot drift away from it. */}
+        {!done && attached}
       </div>
 
     </div>

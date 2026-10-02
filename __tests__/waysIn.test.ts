@@ -67,7 +67,13 @@ describe("the shelf scales to the channels still being added", () => {
     // The PAGE solves the width now — this sits in one column of a two-column
     // control centre, so a row is ~420px. Ten channels cost ten short rows in
     // a side column, which is the compactness the grid was reaching for.
-    expect(grid).toMatch(/<div className="space-y-2\.5">/);
+    // One column in BOTH variants: the about page spaces the rows apart as
+    // cards, the home page divides them inside one border as a stack tethered
+    // to the check card. Neither puts them side by side, which is the property
+    // this guards — the container class is no longer a single literal, so it is
+    // asserted as "a column, and no grid" rather than by its exact spelling.
+    expect(grid).toMatch(/space-y-2\.5/);
+    expect(grid).toMatch(/divide-y/);
     expect(gridCode).not.toMatch(/grid-cols-2 md:grid-cols-3/);
   });
 
@@ -199,62 +205,5 @@ describe("an undistributed surface is not interactive", () => {
     // it runs), so `{t(…)}` as a literal was asserting the call's punctuation
     // rather than that the status is shown.
     expect(grid).toMatch(/t\(way\.unavailable!\)/);
-  });
-});
-
-// ── The "Other ways" control in the check card ───────────────────────────────
-//
-// The shelf's three entries are also a control in the card's action bar. The
-// card clips its own overflow, which is what makes the panel's shape a
-// constraint rather than a preference.
-
-describe("the other-ways control", () => {
-  const menu = read("components/OtherWaysMenu.tsx");
-  const flow = read("components/CheckFlow.tsx");
-
-  it("does not float a panel inside the card's clip", () => {
-    // The card carries overflow-hidden — it rounds the corners over the
-    // textarea and the height swap needs it — so an absolutely positioned
-    // panel is cut off wherever it overflows. It was, and the first entry
-    // disappeared completely.
-    //
-    // Nothing here may position itself out of flow: a row cannot overflow, so
-    // nothing can clip it.
-    expect(flow).toMatch(/check-swap[^"]*overflow-hidden/);
-
-    // Checked against the className strings, not the file: the comment above
-    // this panel explains why position:fixed was ruled out, and matching the
-    // bare words failed on that prose while the markup was correct.
-    const classNames = [...menu.matchAll(/className=\{?[`"]([\s\S]*?)[`"]\}?/g)]
-      .map((m) => m[1])
-      .join(" ");
-    expect(classNames).not.toMatch(/\babsolute\b/);
-    expect(classNames).not.toMatch(/\bfixed\b/);
-
-    // It reaches its own line by being full width in a wrapping flex bar, which
-    // is the mechanism that replaces the floating.
-    expect(menu).toMatch(/w-full/);
-    // The bar wraps, which is the only reason a full-width item gets its own
-    // line instead of being squeezed in beside the chips.
-    expect(flow).toMatch(/className="flex flex-wrap[^"]*"/);
-  });
-
-  it("announces the panel it controls", () => {
-    // <details> would have given this; the panel has to be a sibling of the
-    // button rather than its child, so the ARIA is stated instead.
-    expect(menu).toMatch(/aria-expanded=\{open\}/);
-    expect(menu).toMatch(/aria-controls=\{panelId\}/);
-    expect(menu).toMatch(/id=\{panelId\}/);
-  });
-
-  it("sends each way to its own destination", () => {
-    // One shared page would make the reader hunt for the entry they picked.
-    // Typed against the ids, so a new surface without a destination fails the
-    // build rather than rendering a dead row.
-    for (const way of WAYS_IN) {
-      expect(menu, `${way.id} has no destination`).toMatch(
-        new RegExp(`${way.id}:\\s*"/`),
-      );
-    }
   });
 });

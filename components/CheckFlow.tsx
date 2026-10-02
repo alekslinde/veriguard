@@ -22,7 +22,6 @@ import CoverageNotice from "./CoverageNotice";
 import CheckRegionPicker from "./CheckRegionPicker";
 import { readStoredCheckRegion, writeStoredCheckRegion } from "@/lib/checkRegion";
 import ReportForm from "./ReportForm";
-import OtherWaysMenu from "./OtherWaysMenu";
 
 /**
  * Which part of the flow is on screen. Exported because CheckStage lifts this
@@ -1419,9 +1418,15 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
           spread across the whole card rather than confined to one row — this is
           the element whose size actually moves, and animating anything smaller
           left the 25px jump exactly where it was. */}
+      {/* rounded-b-none when something is tethered beneath: the shelf supplies
+          the stack's bottom corners, and two rounded edges meeting would leave
+          a pinched waist where the card's curve and the shelf's curve both pull
+          away from the join. Driven by a group attribute rather than a prop, so
+          CheckFlow does not need to know what is under it — only that something
+          is. */}
       <div
         ref={swapRef}
-        className={`check-swap bg-[var(--paper)] text-[var(--ink)] rounded-2xl overflow-hidden relative shadow-[0_18px_44px_-20px_rgba(0,0,0,0.6)] transition-shadow ${
+        className={`check-swap bg-[var(--paper)] text-[var(--ink)] rounded-2xl group-data-[tethered]/stage:rounded-b-none overflow-hidden relative shadow-[0_18px_44px_-20px_rgba(0,0,0,0.6)] transition-shadow ${
           dragOver ? "ring-2 ring-[var(--clear)]" : emptyPrompt && !content.trim() ? "ring-2 ring-[var(--caution)]" : ""
         }`}
         onDragOver={(e) => { e.preventDefault(); if (!busy) setDragOver(true); }}
@@ -1510,17 +1515,6 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
             {t("check.uploadEml")}
           </button>
 
-          {/* The three surfaces that are not this box. They were a shelf under
-              the card, which made them a second block on a page whose job is
-              one — and the thing the reader had to scroll past to reach
-              anything else. Here they sit with the other two ways to start a
-              check, which is what they are.
-
-              Not disabled while a check runs, unlike its neighbours: this one
-              opens a menu rather than starting work, and a <summary> stays
-              focusable whatever you do to it — so gating it would leave a dead
-              stop in the tab order rather than a disabled control. */}
-          <OtherWaysMenu />
 
           {/* The button goes quiet while the panel is up, and says "done" for
               the closing frame after an image read.

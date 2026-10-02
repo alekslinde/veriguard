@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import AddToHomeScreen from "@/components/AddToHomeScreen";
 import CheckStage from "@/components/CheckStage";
 import HomeHero, { HomeCaption } from "@/components/HomeHero";
+import WaysTeaser from "@/components/WaysTeaser";
 import { getStats } from "@/lib/reportStore";
 
 // The positioning line the page used to render as an <h1>.
@@ -101,6 +102,12 @@ export default async function Home() {
               />
             </>
           }
+          // The ways in, hanging off the card's bottom edge rather than sitting
+          // as a block beneath it. One stack, no gap, square where the two meet
+          // — so the reader's eye travels from the paste box into them without
+          // crossing a boundary that says "new section". They are the
+          // continuation of the card, not a second offer.
+          attached={<WaysTeaser variant="tethered" heading={false} />}
         />
       </div>
 

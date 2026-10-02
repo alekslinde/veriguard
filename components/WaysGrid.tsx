@@ -327,9 +327,30 @@ function TileFace({ way, pending }: { way: WayIn; pending: boolean }) {
  * misrepresent what exists by omitting it. Dimmed to the weight of what it is:
  * an announcement, not an option.
  */
-function PendingTile({ way }: { way: WayIn }) {
+/**
+ * How the shelf is mounted.
+ *
+ * "cards" — three separate rounded rows, each its own object. This is the
+ * about page, where the shelf is a section among sections.
+ *
+ * "tethered" — one stack with a single border, divided rather than gapped, and
+ * flat on top so it meets the check card's bottom edge. This is the home page,
+ * where the rows are not a separate offer but the continuation of the card
+ * above them: the reader's eye should travel from the paste box into them
+ * without crossing a gap that says "new section".
+ */
+export type WaysVariant = "cards" | "tethered";
+
+/** The shell each row wears, which is the whole of the difference. */
+function rowShell(variant: WaysVariant): string {
+  return variant === "tethered"
+    ? "bg-[var(--ink-2)] overflow-hidden transition-colors hover:bg-[var(--ink-3)]/40"
+    : "rounded-xl border border-[var(--rule)] bg-[var(--ink-2)] overflow-hidden transition-colors hover:border-[var(--ink-3)]";
+}
+
+function PendingTile({ way, variant }: { way: WayIn; variant: WaysVariant }) {
   return (
-    <div className="rounded-xl border border-[var(--rule)] bg-[var(--ink-2)] opacity-70 overflow-hidden">
+    <div className={`${rowShell(variant)} opacity-70`}>
       {/* Padded to the same line box as an interactive row, minus the chevron's
           width, so a pending row sits flush in the stack rather than reading as
           a shorter kind of thing. */}
@@ -340,11 +361,11 @@ function PendingTile({ way }: { way: WayIn }) {
   );
 }
 
-function Tile({ way }: { way: WayIn }) {
+function Tile({ way, variant }: { way: WayIn; variant: WaysVariant }) {
   const { t } = useLang();
 
   // Nothing to open: see PendingTile.
-  if (way.unavailable) return <PendingTile way={way} />;
+  if (way.unavailable) return <PendingTile way={way} variant={variant} />;
 
   return (
     <details
@@ -357,7 +378,7 @@ function Tile({ way }: { way: WayIn }) {
       // different widths. The fix is the container, not the tile — the shelf
       // is a single column of full-width rows now, so every body already has
       // the room, and opening one moves nothing else sideways.
-      className="group rounded-xl border border-[var(--rule)] bg-[var(--ink-2)] overflow-hidden transition-colors hover:border-[var(--ink-3)]"
+      className={`group ${rowShell(variant)}`}
     >
       {/* items-center, not items-start: one line of content has no second line
           for the chevron and the chip to align to the top of. */}
@@ -405,7 +426,7 @@ function Tile({ way }: { way: WayIn }) {
   );
 }
 
-export default function WaysGrid() {
+export default function WaysGrid({ variant = "cards" }: { variant?: WaysVariant } = {}) {
   // The email row is the forwarding panel now, so it goes when inbound mail is
   // off — the same condition that used to return null from ForwardPanel.
   const rows = INBOUND_ENABLED ? WAYS_IN : WAYS_IN.filter((w) => w.id !== "email");
@@ -427,10 +448,20 @@ export default function WaysGrid() {
   // with room for a name, a half-line and the buttons a body opens to, and
   // nothing moves sideways when one opens. Ten channels cost ten short rows
   // in a side column, which is the compactness the grid was reaching for.
+  // Tethered: one bordered stack, divided rather than gapped, square along the
+  // top so it meets the check card's bottom edge with no seam. The card above
+  // carries the shadow for both — a second one here would draw a line between
+  // them, which is the join this variant exists to remove.
   return (
-    <div className="space-y-2.5">
+    <div
+      className={
+        variant === "tethered"
+          ? "rounded-b-2xl border border-t-0 border-[var(--rule)] divide-y divide-[var(--rule)] overflow-hidden"
+          : "space-y-2.5"
+      }
+    >
       {rows.map((way) => (
-        <Tile key={way.id} way={way} />
+        <Tile key={way.id} way={way} variant={variant} />
       ))}
     </div>
   );

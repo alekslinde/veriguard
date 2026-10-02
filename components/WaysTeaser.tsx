@@ -19,9 +19,12 @@
 
 import { useLang } from "@/lib/lang";
 import { useOpenOnHash } from "@/lib/useOpenOnHash";
-import WaysGrid from "@/components/WaysGrid";
+import WaysGrid, { type WaysVariant } from "@/components/WaysGrid";
 
-export default function WaysTeaser() {
+export default function WaysTeaser({
+  variant = "cards",
+  heading = true,
+}: { variant?: WaysVariant; heading?: boolean } = {}) {
   const { t } = useLang();
 
   // The retired /ways route redirects here permanently, and this section is
@@ -39,21 +42,33 @@ export default function WaysTeaser() {
     <section
       id="ways"
       aria-labelledby="ways-heading"
-      className="scroll-mt-24 max-w-[68ch]"
+      className={variant === "tethered" ? "" : "scroll-mt-24 max-w-[68ch]"}
     >
       {/* Matched to the about page's own section headings rather than styled
           here, so this reads as one of them and not as a widget dropped into
-          the page. */}
+          the page.
+
+          Hidden visually on the home page, where the rows hang off the check
+          card as its continuation and a heading over them would re-introduce
+          the "second offer competing with the box" the tethering exists to
+          avoid. It stays in the outline either way: the section is a landmark
+          and someone navigating by heading needs it to exist. */}
       <h2
         id="ways-heading"
-        className="font-[family-name:var(--font-display)] font-semibold text-[clamp(18px,2.2vw,22px)] leading-tight tracking-[-0.015em] text-[var(--foreground)]"
+        className={
+          heading
+            ? "font-[family-name:var(--font-display)] font-semibold text-[clamp(18px,2.2vw,22px)] leading-tight tracking-[-0.015em] text-[var(--foreground)]"
+            : "sr-only"
+        }
       >
         {t("home.ways.heading")}
       </h2>
-      <p className="mt-2 mb-3 max-w-[68ch] text-[14.5px] text-[var(--text-dim)] leading-relaxed">
-        {t("home.ways.lede")}
-      </p>
-      <WaysGrid />
+      {heading && (
+        <p className="mt-2 mb-3 max-w-[68ch] text-[14.5px] text-[var(--text-dim)] leading-relaxed">
+          {t("home.ways.lede")}
+        </p>
+      )}
+      <WaysGrid variant={variant} />
     </section>
   );
 }
