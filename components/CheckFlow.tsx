@@ -1045,7 +1045,7 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
               levers, and the separation is what lets that be said without
               calling a shop a scam. Nothing here contributes to the score. */}
           {pressure.count > 0 && (
-            <div className="space-y-2 border-t border-[var(--rule)] px-5 py-4">
+            <div className="space-y-2 border-t border-[var(--rule)] px-5 py-5">
               <div className="flex items-baseline justify-between gap-3">
                 <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">
                   {t("pressure.heading")}
@@ -1085,7 +1085,7 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
               this was email source that came up clean. Findings carry their own
               copy; the values they surface are already non-clickable text. */}
           {trackingReport && (trackingReport.hasTracking || hasSender) && (
-            <div className="space-y-2 border-t border-[var(--rule)] px-5 py-4">
+            <div className="space-y-2 border-t border-[var(--rule)] px-5 py-5">
               <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">
                 {t("tracking.heading")}
               </div>
@@ -1119,7 +1119,7 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
             const { headers, identityFlags: flags } = emailAnalysis;
             const authSummary = summariseAuth(headers);
             return (
-              <div className="space-y-2 border-t border-[var(--rule)] px-5 py-4">
+              <div className="space-y-2 border-t border-[var(--rule)] px-5 py-5">
                 <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">
                   {t("email.analysis.heading")}
                 </div>
@@ -1234,7 +1234,7 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
                     wrong guess most needed correcting. The warning band stays
                     conditional (CoverageNotice returns null on full), so the
                     top rule below only draws around something. */}
-                <div className="border-t border-[var(--rule)] px-5 py-4 space-y-3">
+                <div className="border-t border-[var(--rule)] px-5 py-5 space-y-3">
                   <CheckRegionPicker
                     id="result-region"
                     value={checkRegion ?? region}
@@ -1263,7 +1263,7 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
                     message carrying a dodgy link is only visible here) or when
                     the pixel row and its ESP links have something to add. */}
                 {(results.length > 1 || pixelReport) && (
-                <div className="space-y-2 border-t border-[var(--rule)] px-5 py-4">
+                <div className="space-y-2 border-t border-[var(--rule)] px-5 py-5">
                   <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">
                     {t("verdict.breakdown.heading")}
                   </div>

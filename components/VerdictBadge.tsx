@@ -56,15 +56,27 @@ function Evidence({ signals }: { signals: Signal[] }) {
   // card. The sheet is the card; a second frame inside it drew a box around the
   // evidence and another around the box. Dashed rules separate items within one
   // list, where a solid rule would read as a break between sections.
+  // py-2 on the list rather than the 5px it carried: that figure was smaller
+  // than the row padding inside it, so the first row's label sat nearer the
+  // header rule above than to its own text, and the list read as crowding the
+  // section boundary rather than sitting inside it.
+  //
+  // py-3 on each row, up from 2.5. Each row is two lines — an eyebrow and a
+  // sentence — and 10px of air above a two-line block against a dashed rule is
+  // what made the column of them look tight in a sheet whose other bands
+  // breathe at 16-20px.
   return (
-    <ul className="py-[5px]">
+    <ul className="py-2">
       {signals.map((s, i) => (
         <li
           key={i}
-          className="grid grid-cols-[1fr_auto] items-baseline gap-3.5 border-b border-dashed border-white/[0.09] px-5 py-2.5 last:border-b-0"
+          className="grid grid-cols-[1fr_auto] items-baseline gap-3.5 border-b border-dashed border-white/[0.09] px-5 py-3 last:border-b-0"
         >
           <div className="min-w-0">
-            <div className={`${ROW_SOURCE} mb-[3px]`}>{t(SOURCE_KEY[s.source])}</div>
+            {/* 5px, not 3: an uppercase 10px eyebrow sits optically closer to
+                what follows than its box says, and at 3px the label looked
+                stuck to the sentence rather than introducing it. */}
+            <div className={`${ROW_SOURCE} mb-[5px]`}>{t(SOURCE_KEY[s.source])}</div>
             <p className="text-[14px] leading-relaxed text-[var(--foreground)]">{defangText(s.text)}</p>
           </div>
           {/* Tabular figures so the column of weights lines up as a column. */}
@@ -109,7 +121,9 @@ function ActionSteps({ verdict, reporting }: { verdict: "suspicious" | "likely_s
   // verdict asks of you, so they carry a section heading on a top rule — an
   // inset panel with a coloured edge made them look like an aside.
   return (
-    <div className="border-t border-[var(--rule)] px-5 py-4">
+    // py-5, the sheet's one band inset — see the note on RiskScore. This was
+    // py-4, which made the closing band tighter than the header it answers.
+    <div className="border-t border-[var(--rule)] px-5 py-5">
       <h3
         className={`mb-3 font-[family-name:var(--font-mono-ui)] text-[11px] font-semibold uppercase tracking-[0.09em] ${accentCls}`}
       >
@@ -161,7 +175,7 @@ function PhoneIntelPanel({ intel, reporting }: { intel: PhoneIntel; reporting: R
   const risk = SPOOFING_RISK_STYLE[intel.spoofingRisk];
 
   return (
-    <div className="space-y-3 border-t border-[var(--rule)] px-5 py-4">
+    <div className="space-y-3 border-t border-[var(--rule)] px-5 py-5">
       <div className={EYEBROW}>
         {t("phone.heading")}
       </div>
@@ -283,7 +297,11 @@ function RiskScore({ score, bar, tone, signals }: { score: number; bar: string; 
     // rather than running on as another block of the column. The tint is the
     // same inset treatment used elsewhere for a panel set into a surface, and
     // it does the separating that a rule would otherwise have to.
-    <div className="bg-black/[0.22] px-5 pb-5 pt-4">
+    // py-5, matching the header band above and the px-5 on every side. It was
+    // pt-4/pb-5, which is not an asymmetry anything here asks for — the band
+    // opens on a label row and closes on a paragraph, so an even inset is what
+    // makes it read as one panel rather than a stack that settled low.
+    <div className="bg-black/[0.22] px-5 py-5">
       <div className="flex items-baseline justify-between gap-3 font-[family-name:var(--font-mono-ui)]">
         {/* Not the eyebrow treatment used elsewhere: this labels the sheet's
             headline figure, so it carries the weight of a section heading
@@ -330,7 +348,12 @@ function RiskScore({ score, bar, tone, signals }: { score: number; bar: string; 
       </div>
       {/* Inside the tinted band, under a rule: the sentence explains this
           score, so it belongs to the panel rather than floating after it. */}
-      <p className="mt-3 border-t border-[var(--rule)] pt-3 text-[13.5px] leading-relaxed text-[var(--text-dim)]">
+      {/* mt-4/pt-4, up from 3 each. The rule above this separates the caveat
+          from the scale's tick labels, which are 10px and sit in a fixed h-5
+          box — so the gap the eye reads is smaller than the margin says, and
+          12px around the rule left the sentence crowding the numbers it
+          qualifies. */}
+      <p className="mt-4 border-t border-[var(--rule)] pt-4 text-[13.5px] leading-relaxed text-[var(--text-dim)]">
         {bold(band)}
       </p>
     </div>
