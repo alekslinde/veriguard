@@ -1611,21 +1611,17 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
         </div>
       )}
 
-      {/* Paste guidance for users who aren't sure how to copy on mobile. Stands
-          down while the empty-submit alert is up, so an empty press shows one
-          clear message rather than two stacked hints.
+      {/* The mobile paste hint ("Long-press the message → Copy → tap here →
+          Paste") was here. It had already lost its desktop half, and what was
+          left described the operating system's own copy gesture to someone who
+          had just arrived holding a message they copied to get here. Its cost
+          was a standing line under the card on every empty mobile view — and,
+          once the ways-in rows were tethered to the card, a gap between the two
+          that read as a seam in what should be one stack.
 
-          Mobile only, now. The desktop half told people they could drag a .eml
-          file or a screenshot onto the box — a capability the two upload buttons
-          directly above already offer by name, and one that costs nothing to
-          discover by trying it. On the narrow viewport this hint is the only
-          route to it, which is why that half stays. */}
-      {!content && !pipeStages && !emptyPrompt && (
-        <p className="sm:hidden text-xs text-[var(--faint)] px-0.5">
-          {t("check.pasteHint")}
-        </p>
-      )}
-
+          The empty-submit alert above still catches the case this was for: a
+          press with nothing pasted says what to paste, at the moment the reader
+          has shown they need telling. */}
 
       {uploadError && <p className="text-sm text-red-400" role="alert">{uploadError}</p>}
 

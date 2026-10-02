@@ -48,7 +48,6 @@
   "check.help.photo.body": "Point your camera straight at the message or QR code in good light, fill the frame, and hold steady. We decode QR codes and read text automatically.",
   "check.help.image.body": "A clear screenshot of the full message works best. Any format (PNG, JPG, HEIC) is fine — just make sure the text and any links are readable.",
   "check.placeholder": "Paste a suspicious link, phone number, text message, or email here…",
-  "check.pasteHint": "Long-press the message → Copy → tap here → Paste",
   "check.dropHere": "Drop to analyse",
   "check.forward.noopen": "**Forward it without opening it.** Swipe or right-click it in your inbox list. Opening the message can load a tracking pixel that tells the sender your address is real. If you already opened it, forward it anyway.",
   "check.forward.copy": "Copy",
