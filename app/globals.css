@@ -403,6 +403,62 @@ body:has(dialog[open]) {
   }
 }
 
+/* ── the ways-in rows ────────────────────────────────────────────────────
+   A <details> snaps open. The browser toggles `content-visibility` on the
+   body, which is not a property anything can transition, so the row jumps to
+   its full height in one frame — the same flinch the check card's own swap
+   exists to remove, three times over on a page that shows three of them.
+
+   THE MECHANISM: an outer grid whose single row goes 0fr → 1fr, with the body
+   clipped inside it. grid-template-rows interpolates where `height: auto` does
+   not, so this is the one shape of the animation that needs no measurement —
+   no ResizeObserver, no JS-set custom property, and no stale height if the
+   content reflows (the install buttons wrap at some widths, and the forwarding
+   body's copy button changes label).
+
+   `interpolate-size: allow-keywords` would do this in two lines and is the
+   right answer the day it can be relied on. It is Chromium-only as of this
+   writing, and this project's browserslist includes iOS 15 — so the grid
+   trick, which works everywhere, is what ships.
+
+   WHY THE BODY MUST STAY DISPLAYED: a closed <details> applies
+   `content-visibility: hidden` to everything after the summary, which skips
+   rendering entirely — there is nothing to animate from. Overriding that is
+   what makes the row animatable at all, and it is why the clip has to be ours:
+   with the browser's own hiding off, only `overflow: hidden` on a zero-height
+   row keeps the closed body off the screen.
+
+   The content stays in the accessibility tree while closed, which is the cost
+   of this technique and worth stating plainly: a screen reader can reach the
+   body of a shut row. The summary still carries the expanded state, so the
+   control is announced correctly; what changes is that the content behind it
+   is not removed. */
+details > .ways-body {
+  display: grid;
+  grid-template-rows: 0fr;
+}
+
+details[open] > .ways-body {
+  grid-template-rows: 1fr;
+}
+
+/* The override described above. ::details-content is the modern handle for
+   this and is not yet everywhere, so the older selector carries it. */
+details:not([open]) > .ways-body {
+  content-visibility: visible;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  details > .ways-body {
+    /* 0.26s, matching the check card's own swap: these rows sit directly under
+       that card on the home page, and two different speeds for the same kind
+       of "a box changed size" read as two different components. ease-out
+       because the row is entering — the reader has just asked for it, and the
+       movement should be fastest at the moment they are watching for it. */
+    transition: grid-template-rows 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
 /* 1. The panel and the textarea swap inside the card.
       They occupy the same slot, so the card has to move between two heights it
       does not know in advance. CSS cannot interpolate to `auto`, and the

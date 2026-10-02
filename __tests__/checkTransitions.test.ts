@@ -185,3 +185,50 @@ describe("the home page's centred tool", () => {
     expect(CSS.slice(at - 400, at)).toMatch(/prefers-reduced-motion:\s*no-preference/);
   });
 });
+
+// ── The ways-in rows ─────────────────────────────────────────────────────────
+//
+// A <details> snaps: the browser toggles content-visibility, which nothing can
+// transition. These rows sit directly under the check card on the home page, so
+// a row that jumps while the card above it animates is the one inconsistency
+// the reader can see without looking for it.
+
+describe("the ways-in rows open and close smoothly", () => {
+  const GRID = readFileSync(path.join(process.cwd(), "components/WaysGrid.tsx"), "utf8");
+
+  it("animates a grid row rather than a height", () => {
+    // grid-template-rows interpolates where `height: auto` does not, so this
+    // needs no measurement — no ResizeObserver, no JS-set property, and no
+    // stale height when the body reflows (the install buttons wrap, and the
+    // forwarding body's copy button changes label).
+    expect(CSS).toMatch(/details\s*>\s*\.ways-body\s*\{[^}]*grid-template-rows:\s*0fr/);
+    expect(CSS).toMatch(/details\[open\]\s*>\s*\.ways-body\s*\{[^}]*grid-template-rows:\s*1fr/);
+    expect(CSS).toMatch(/transition:\s*grid-template-rows/);
+  });
+
+  it("keeps the closed body renderable so there is something to animate", () => {
+    // A closed <details> applies content-visibility: hidden to everything after
+    // the summary — there is nothing to animate from. Overriding that is what
+    // makes the row animatable, and it is why the clip has to be ours.
+    expect(CSS).toMatch(/details:not\(\[open\]\)\s*>\s*\.ways-body\s*\{[^}]*content-visibility:\s*visible/);
+    expect(GRID).toMatch(/min-h-0 overflow-hidden/);
+  });
+
+  it("separates the animating row from the padded content", () => {
+    // Padding on a clipped row still occupies height when that row is
+    // collapsed, so a single element would never shut completely. The outer
+    // element owns the transition and the clip; the inner owns the padding.
+    const body = GRID.slice(GRID.indexOf('className="ways-body"'));
+    const open = body.slice(0, body.indexOf("<p "));
+    expect(open).toMatch(/ways-body[\s\S]*min-h-0 overflow-hidden[\s\S]*px-3\.5/);
+    // The row that animates carries no padding of its own.
+    expect(open).not.toMatch(/ways-body[^"]*p[xytb]?-\d/);
+  });
+
+  it("does not animate for a reader who asked for less motion", () => {
+    // The row still opens and closes; it simply arrives. Same rule as every
+    // other transition in this file.
+    const at = CSS.indexOf("transition: grid-template-rows");
+    expect(CSS.slice(at - 500, at)).toMatch(/prefers-reduced-motion:\s*no-preference/);
+  });
+});

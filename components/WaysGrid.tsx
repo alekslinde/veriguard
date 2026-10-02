@@ -387,7 +387,18 @@ function Tile({ way, variant }: { way: WayIn; variant: WaysVariant }) {
         <Chevron />
       </summary>
 
-      <div className="px-3.5 pb-3.5 pt-0.5 flex flex-col gap-3">
+      {/* The body opens and closes on a height transition rather than snapping.
+          See .ways-body in globals.css for the grid-rows mechanism and why it
+          is that rather than a height or `interpolate-size`.
+
+          Two elements, not one: the outer is the animating row (it owns the
+          0fr→1fr and the overflow clip), the inner is the padded content. A
+          single element cannot do both, because padding on a clipped row still
+          occupies height when the row is collapsed — the tile would never shut
+          completely. */}
+      <div className="ways-body">
+       <div className="min-h-0 overflow-hidden">
+        <div className="px-3.5 pb-3.5 pt-0.5 flex flex-col gap-3">
         <p className="text-[13px] text-[var(--text-dim)] leading-relaxed">{t(way.detail)}</p>
 
         {/* "Where it runs" is NOT repeated here. It moved to the row's right
@@ -421,6 +432,8 @@ function Tile({ way, variant }: { way: WayIn; variant: WaysVariant }) {
             </Link>
           </p>
         )}
+        </div>
+       </div>
       </div>
     </details>
   );
