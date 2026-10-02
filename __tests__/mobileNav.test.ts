@@ -236,9 +236,21 @@ describe("the section's pages are offered where the reader is", () => {
     expect(header).toMatch(/data-header-subnav/);
     expect(css).toMatch(/:root:has\(header \[data-header-subnav\]\)/);
 
-    // The row's height is declared, not left to a font metric, so the token
-    // can state it exactly rather than approximating it.
-    expect(header).toMatch(/h-\[36px\]/);
+    // The row's height is declared, not left to a font metric, so the token can
+    // state it exactly rather than approximating it — and the two numbers have
+    // to agree, which is the thing that actually breaks. Read both and compare
+    // rather than pinning either: the height is a design choice that may change
+    // again, while "the token equals the row plus its 1px border" may not.
+    // Anchored to the sub-nav's own <ul>, not the first h-[…] in the file —
+    // that one is the main row's min-h-[52px], which is a different bar and was
+    // what this compared against on its first writing.
+    const rowH = header.match(/justify-end[^"]*\bh-\[(\d+)px\]/);
+    expect(rowH, "the sub-nav row declares a height").not.toBeNull();
+
+    const tokenH = css.match(/--header-h: calc\(59px \+ (\d+)px\)/);
+    expect(tokenH, "--header-h accounts for the row").not.toBeNull();
+
+    expect(Number(tokenH![1])).toBe(Number(rowH![1]) + 1);
   });
 
   it("shows each width one copy of the section row", () => {
@@ -315,9 +327,26 @@ describe("the More sheet and its machinery are gone", () => {
     expect(bar).not.toMatch(/useEffect|useState/);
   });
 
-  it("leaves the footer reachable on a phone", () => {
-    // The sheet held the bug report, because the footer was desktop-only. With
-    // the sheet gone, a footer still hidden below md would make it unreachable.
-    expect(read("app/layout.tsx")).not.toMatch(/hidden md:block[\s\S]{0,80}SiteFooter/);
+  it("keeps the bug report reachable on a phone", () => {
+    // The property, across three homes. It lived in the More sheet, then in a
+    // site footer that had to render at every width because nothing else
+    // offered it. Both are gone — an app has neither — and it is on the about
+    // page now, beside the prose explaining what sending one includes.
+    //
+    // What makes that safe is that /about is a tab: reachable in one tap on a
+    // phone, not scrolled to. If the bug report ever moves somewhere that is
+    // not a top-level destination, this is the test that should stop it.
+    const about = read("app/about/page.tsx");
+    expect(about).toMatch(/<ReportBugButton/);
+
+    const aboutIsATab = LINKS.some((l) => l.href === "/about" && l.icon);
+    expect(aboutIsATab).toBe(true);
+  });
+
+  it("mounts no site footer", () => {
+    // A chrome strip under every screen is a website's shape. Its items were
+    // rehomed rather than dropped (see the note in layout.tsx), so this guards
+    // the removal rather than merely recording it.
+    expect(read("app/layout.tsx")).not.toMatch(/SiteFooter/);
   });
 });

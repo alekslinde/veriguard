@@ -82,10 +82,13 @@ export function BugReportProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={ctx}>
       {children}
-      {/* The manual entry point now lives inline in the site footer
-          (SiteFooter → useBugReport().openManual), not a floating chip over the
-          check input. Only the modal is mounted here; the trigger moved to where
-          it no longer overlaps the paste box on a phone. */}
+      {/* The manual entry point is ReportBugButton, on the about page's "Bug
+          reports & tracking" section (→ useBugReport().openManual). Only the
+          modal is mounted here.
+
+          It has been a floating chip over the check input and then an item in
+          the site footer; it is beside its own explanation now, and neither the
+          chip nor the footer exists. */}
       {open && (
         <BugModal key={session} diag={diag} auto={auto} onClose={() => setOpen(false)} />
       )}
@@ -325,8 +328,7 @@ function BugModal({
 
 // Inline so the trigger carries no external request. currentColor lets it
 // inherit the button's text colour and its hover transition for free. Exported
-// for the footer's inline "Report a bug" button, which is now the manual entry
-// point (see SiteFooter).
+// for ReportBugButton, which is the manual entry point.
 export function BugIcon() {
   return (
     <svg

@@ -4,7 +4,6 @@ import { LangProvider } from "@/lib/lang";
 import { BugReportProvider } from "@/components/BugReportProvider";
 import SiteHeader from "@/components/SiteHeader";
 import ServiceNotice from "@/components/ServiceNotice";
-import SiteFooter from "@/components/SiteFooter";
 import MobileTabBar from "@/components/MobileTabBar";
 import { SITE_URL } from "@/lib/siteUrl";
 import "./globals.css";
@@ -101,16 +100,26 @@ export default function RootLayout({
                 the first thing on the page. */}
             <ServiceNotice />
             <div className="flex-1">{children}</div>
-            {/* Rendered at every width now.
-                It was desktop-only, because the tab bar owns the bottom edge
-                and a footer above it would have been a second strip of chrome
-                stacked on the first. Its two items lived in the More sheet
-                instead — and the More sheet is gone, so without this the bug
-                report would be unreachable on a phone.
-                The page reserves --tabbar-h at the bottom (see globals.css), so
-                the footer scrolls into view above the bar rather than under it,
-                and on a desktop that reservation is 0px. */}
-            <SiteFooter />
+            {/* THERE IS NO SITE FOOTER. A strip of chrome under every screen is
+                a website's shape; an app puts those items where they belong and
+                gives the content the bottom edge back.
+
+                Everything it held has a home rather than being dropped:
+                  - Report a bug → the about page's "Bug reports & tracking"
+                    section, which is the prose that says what sending one
+                    includes. The button was in the footer without that
+                    explanation, and the explanation was here without the
+                    button.
+                  - What we store → About is a tab; the footer was linking to a
+                    destination already one tap away.
+                  - For developers, authorship, the coverage scope → the about
+                    page's colophon. The home page's packages row also reaches
+                    the developer docs.
+
+                The constraint this had to clear first is the one that put the
+                footer at every width to begin with: the bug report was
+                reachable from nowhere else. It is reachable from /about now,
+                which is a tab on a phone and a header link on a desktop. */}
             <MobileTabBar />
           </BugReportProvider>
         </LangProvider>

@@ -102,10 +102,11 @@
      section with children, so a token that ignored this row would pin that bar
      underneath it on the only page where both are on screen.
 
-     37px: the chips' 2×6px padding, their ~25px line box, and the row's 1px
-     top border. */
+     41px: the row's declared 40px height plus its 1px top border. The height is
+     declared rather than left to the chips' line box precisely so this number
+     can be stated instead of approximated. */
   :root:has(header [data-header-subnav]) {
-    --header-h: calc(59px + 37px);
+    --header-h: calc(59px + 41px);
   }
 }
 
@@ -258,8 +259,12 @@ html {
 
 /* 4. The bottom tab bar is fixed, so the last row of every page would sit
       underneath it. Reserved on <body> rather than on each <main>: a route
-      that forgets the class is a route whose footer is unreachable, and there
-      is no way to notice that from the code. */
+      that forgets the class is a route whose final row is unreachable, and
+      there is no way to notice that from the code.
+
+      This mattered for the site footer, which is gone — but it matters just as
+      much without one, because the last row is now the page's own content
+      rather than a strip nobody minded losing a few pixels of. */
 body {
   padding-bottom: var(--tabbar-h);
 }

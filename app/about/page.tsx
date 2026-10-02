@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import ExternalLink from "@/components/ExternalLink";
+import ReportBugButton from "@/components/ReportBugButton";
 import { EXTENSION_LISTINGS, reportedAsOf, totalReportedUsers } from "@/lib/extensionInstalls";
 
 export const metadata: Metadata = {
@@ -431,6 +432,11 @@ export default function AboutPage() {
             it. The site&apos;s security policy prevents pages from talking to any third-party
             server at all.
           </p>
+          {/* The control sits with the paragraphs that say what pressing it
+              does. It used to be an item in the site footer — the only place
+              that offered it — and a reader met the button there without any of
+              this, then met this explanation here without the button. */}
+          <ReportBugButton label="Report a bug" />
         </section>
 
         <section className={SECTION}>
@@ -442,10 +448,24 @@ export default function AboutPage() {
           </p>
         </section>
 
-        <div className="border-t border-[var(--rule)] pt-5">
+        {/* The colophon — what the site footer used to carry on every page.
+            Authorship and the reach claim are facts about the project, which is
+            what this page is for; repeating them under every screen was the
+            footer doing a job this page already does better, with room to say
+            the scope claim in full rather than hiding it below sm. */}
+        <div className="border-t border-[var(--rule)] pt-5 space-y-3">
           <Link href="/" className="text-sm text-[var(--clear)] hover:underline underline-offset-2 font-medium">
             Check or report a scam →
           </Link>
+          <p className="text-[13px] text-[var(--faint)] leading-relaxed max-w-[68ch]">
+            Built by{" "}
+            <ExternalLink href="https://alekslinde.com" variant="strong">
+              Aleks Linde
+            </ExternalLink>
+            . Universal checks run worldwide; full rule packs where we&apos;ve done the
+            groundwork. The engine is open source — see{" "}
+            <Link href="/packages" className={LINK}>the developer docs</Link>.
+          </p>
         </div>
       </div>
     </main>

@@ -137,11 +137,16 @@ export default function SiteHeader() {
             aria-label={t("a11y.sectionNav")}
             className="max-w-[1180px] mx-auto px-5 sm:px-8"
           >
-            {/* A fixed height rather than padding around the chips, so the row
+            {/* Right-aligned, under the menu these descend from.
+                Ranged left they sat at the opposite end of the bar from the
+                Learn link that owns them, which read as a second toolbar the
+                page had grown rather than as that link's contents.
+
+                A fixed height rather than padding around the chips, so the row
                 is a number --header-h can state instead of one derived from a
-                font metric that varies. 36px + the 1px top border = the 37 the
+                font metric that varies. 40px + the 1px top border = the 41 the
                 token adds. */}
-            <ul className="flex items-center gap-1.5 h-[36px]">
+            <ul className="flex items-center justify-end gap-1.5 h-[40px]">
               {children.map((c) => {
                 const current = isCurrentPath(c.href, pathname);
                 return (
@@ -149,7 +154,7 @@ export default function SiteHeader() {
                     <Link
                       href={c.href}
                       aria-current={current ? "page" : undefined}
-                      className={`block rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
+                      className={`block rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
                         current
                           ? "border-[var(--clear)] bg-[var(--clear)]/12 text-[var(--clear)]"
                           : "border-[var(--rule)] text-[var(--text-dim)] hover:border-[var(--ink-3)] hover:text-[var(--foreground)]"
