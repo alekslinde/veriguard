@@ -1173,7 +1173,12 @@ export default function CheckFlow({ initialContent = "", surface = "web", onStep
             payoff rather than one panel inside it. Always present: it is part
             of the result's frame, and a heading that comes and goes with the
             verdict makes the safe and scam states two different pages. */}
-        <p className="mb-3 flex items-center gap-2.5 font-[family-name:var(--font-mono-ui)] text-[11px] font-medium uppercase tracking-[0.1em] text-[var(--text-dim)]">
+        {/* mb-2.5, deliberately less than the space above this heading (the
+            checked strip carries mb-5). A heading belongs to what follows it,
+            so the gap below must be the smaller of the two — equal or larger
+            and it reads as floating between the two blocks rather than
+            introducing the one underneath. */}
+        <p className="mb-2.5 flex items-center gap-2.5 font-[family-name:var(--font-mono-ui)] text-[11px] font-medium uppercase tracking-[0.1em] text-[var(--text-dim)]">
           {t("verdict.evidence.heading")}
           <span aria-hidden="true" className="h-px flex-1 bg-[var(--rule)]" />
         </p>

@@ -117,7 +117,16 @@ export default function CheckStage({
           record, and it sits above the results because it is the question the
           verdict below is answering. */}
       {done && checked && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[var(--rule)] bg-[var(--ink-2)] px-3.5 py-2.5">
+        // mb-5 is the gap between this strip and the results below it. The
+        // stage's column has no `gap` of its own — it also holds the input
+        // step, where the ways-in rows are tethered to the card and any gap at
+        // all would be the seam that tethering removes — so the space belongs
+        // to the strip, which only exists on the step that wants it.
+        //
+        // Without it the "Evidence" rule-and-label sat flush against this box,
+        // reading as a caption belonging to the strip rather than the heading
+        // of what follows.
+        <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[var(--rule)] bg-[var(--ink-2)] px-3.5 py-2.5">
           <span className="font-[family-name:var(--font-mono-ui)] text-[10.5px] font-medium uppercase tracking-[0.1em] text-[var(--faint)] shrink-0">
             {t("check.checked")}
           </span>
