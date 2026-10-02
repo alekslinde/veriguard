@@ -128,32 +128,66 @@ describe("the home page's centred tool", () => {
     // everything BELOW it too — and the constant (320px) was a guess against a
     // real ~470px. The tool landed near the bottom of the screen.
     //
-    // The wrapper around the tool is what fills the viewport and centres its
-    // own contents, so no height needs to be known at all.
-    // Specifically: <main> must not be padded by a CENTRING calculation. It is
-    // still padded — to 0, cancelling its own pt-10 so the centred region
-    // starts flush under the header — and that is not the bug. The bug was a
-    // computed half-viewport value on the element that also holds the rows.
-    const mainRule = CSS.slice(CSS.indexOf("main[data-home] {"));
-    expect(mainRule.slice(0, mainRule.indexOf("}"))).not.toMatch(/padding-top:\s*(max|calc|min)\(/);
-
-    const rule = CSS.slice(CSS.indexOf("[data-home-tool] {"));
+    // NOTHING SUBTRACTS A LIST OF CONTRIBUTORS FROM THE VIEWPORT. Two earlier
+    // versions did, and both scrolled: `100vh - header` left no room for the
+    // footer, and `100vh - header - footer` still ignored main's own pb-12.
+    // Every such sum is a list that has to stay complete, and it stops being
+    // complete the next time padding changes anywhere in the chain — silently,
+    // because the page still renders, just a few pixels too tall.
+    //
+    // The page is a flex column the height of the viewport and the tool grows
+    // into the remainder, so there is nothing to enumerate.
+    // Anchored on the centring block, not on the first `[data-home-tool] {`
+    // in the file — the tool is also given a definite width in an
+    // unconditional rule above (see the width test below), and a bare indexOf
+    // found that one instead and reported the centring missing.
+    const centring = CSS.slice(CSS.indexOf("@media (min-width: 640px) and (min-height: 720px)"));
+    const rule = centring.slice(centring.indexOf("[data-home-tool] {"));
     const body = rule.slice(0, rule.indexOf("}"));
     expect(body).toMatch(/justify-content:\s*center/);
-    expect(body).toMatch(/min-height:\s*calc\(100vh/);
+    expect(body).toMatch(/flex:\s*1/);
+    expect(body).not.toMatch(/calc\(100vh/);
+
+    // The viewport lock lives on <body>, scoped to this page.
+    expect(CSS).toMatch(/body:has\(main\[data-home\]\)\s*\{[^}]*height:\s*100vh/);
+  });
+
+  it("takes its width from the page, not from whatever is open inside it", () => {
+    // Opening a ways-in row under the check card used to widen everything
+    // above it — card, headline and rows together, ~619px to the 760px cap —
+    // because the column was sized by whichever of the row's two states was
+    // showing, and an open body is wider than a closed summary.
+    //
+    // The cause is auto margins on a flex item. Both the page column and the
+    // tool centre themselves with margin-inline: auto, and both are flex
+    // items; a flex item with an auto cross-axis margin is opted out of
+    // `stretch` by spec and sized shrink-to-fit instead. So neither had a
+    // definite width, and the max-w each carries was only a ceiling the
+    // content stayed under. width: 100% is what restores it.
+    const rule = CSS.slice(CSS.indexOf("main[data-home],"));
+    expect(rule.slice(0, rule.indexOf("}"))).toMatch(/width:\s*100%/);
+
+    // OUTSIDE the centring media query. <main> is a flex item of the layout
+    // column at every viewport size, so scoping this fix to the sizes that
+    // centre the tool left short laptop windows still resizing on open.
+    const centring = CSS.indexOf("@media (min-width: 640px) and (min-height: 720px)");
+    expect(CSS.indexOf("main[data-home],")).toBeLessThan(centring);
   });
 
   it("moves with a transition rather than a snap", () => {
-    // min-height, because justify-content/align-items/margin:auto cannot be
+    // flex-grow, because justify-content/align-items/margin:auto cannot be
     // interpolated — a layout switch would jump the tool up in one frame, which
-    // is the flinch the rest of this file exists to remove.
-    expect(CSS).toMatch(/transition:\s*min-height/);
+    // is the flinch the rest of this file exists to remove. flex-grow is a
+    // number, so it interpolates; the tool shrinks from the full remainder to
+    // its own content height over the transition.
+    expect(CSS).toMatch(/transition:\s*flex-grow/);
 
-    // And it collapses to 0, not auto: `auto` is a keyword, so it would snap to
-    // the content height in one frame and lose the rise. A flex column with no
-    // room to distribute already sits at its content's height.
-    const done = CSS.slice(CSS.indexOf("main[data-home]:has([data-check-done])"));
-    expect(done.slice(0, done.indexOf("}"))).toMatch(/min-height:\s*0/);
+    // The release is grow:0 — the tool stops claiming the leftover space. The
+    // viewport lock is lifted with it, or a verdict taller than the screen
+    // would be clipped inside a 100vh box.
+    const done = CSS.slice(CSS.indexOf("main[data-home]:has([data-check-done]) [data-home-tool]"));
+    expect(done.slice(0, done.indexOf("}"))).toMatch(/flex-grow:\s*0/);
+    expect(CSS).toMatch(/body:has\(main\[data-home\]\):has\(\[data-check-done\]\)\s*\{[^}]*height:\s*auto/);
   });
 
   it("centres only where there is room for it", () => {
@@ -184,7 +218,7 @@ describe("the home page's centred tool", () => {
   it("does not travel for a reader who asked for less motion", () => {
     // Excluded rather than shortened: both positions are correct, and it is the
     // journey between them that this reader has opted out of.
-    const at = CSS.indexOf("transition: min-height");
+    const at = CSS.indexOf("transition: flex-grow");
     expect(CSS.slice(at - 400, at)).toMatch(/prefers-reduced-motion:\s*no-preference/);
   });
 });

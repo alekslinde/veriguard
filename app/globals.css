@@ -321,6 +321,36 @@ body:has(dialog[open]) {
    All of it is opt-in via motion-safe. Someone who has asked for less motion
    gets the same states, arriving instantly. */
 
+/* 0a. The home page's column is sized by the page, never by its contents.
+       ────────────────────────────────────────────────────────────────────
+       Opening a ways-in row under the check card used to widen everything
+       above it: the card, the headline and the rows all went from ~619px to
+       the 760px cap, because the open row's body is wider than a closed one's
+       summary and the column was taking its width from whichever was showing.
+
+       The cause is auto margins on a flex item. Both of these elements centre
+       themselves with `mx-auto` — `margin-inline: auto` — and both are flex
+       items: <main> of the layout's column, and the tool of <main>'s. A flex
+       item with an auto cross-axis margin is opted out of `stretch` by spec
+       and sized shrink-to-fit instead, so neither had a definite width to
+       begin with; the max-w each carries was only ever a ceiling the content
+       stayed under. Hence the growth, and hence `width: 100%`, which gives
+       back the definite width stretch would have supplied — which is also
+       what the auto margins need in order to centre anything.
+
+       UNCONDITIONAL, deliberately. The centring block below is scoped to
+       desktop viewports over 720px tall, but <main> is a flex item of the
+       layout column at every size, so scoping the fix the same way left short
+       laptop windows still resizing. This is about who decides the width, not
+       about whether the tool is centred in the viewport.
+
+       The caps still apply at every width, so nothing here moves: it only
+       stops an open disclosure being the thing that sets the measure. */
+main[data-home],
+main[data-home] [data-home-tool] {
+  width: 100%;
+}
+
 /* 0. The home page's tool, centred in the viewport until a check runs.
       ────────────────────────────────────────────────────────────────────
       An empty paste box at the top of a tall dark page reads as the start of
@@ -366,26 +396,76 @@ body:has(dialog[open]) {
      checked strip flush against the sticky header. The :not() is what scopes
      this to the step that asked for it. */
   main[data-home]:not(:has([data-check-done])) {
+    /* Both ends, not just the top. The page's own pt-10/pb-12 are for a
+       scrolling document; inside a box that is exactly the viewport they are
+       dead space at each end — and because they differ, the one that was left
+       pushed the centred tool up by half its height. */
     padding-top: 0;
+    padding-bottom: 0;
   }
 
+  /* NOT a calc of the viewport minus the things around it. That was the first
+     two attempts and both scrolled: subtracting the header left no room for
+     the footer, and subtracting header + footer still ignored main's own
+     pb-12. Every such sum is a list of contributors that has to stay complete,
+     and it silently stops being complete the next time padding changes
+     anywhere in the chain.
+
+     So the page is a flex column that is exactly the viewport, and the tool is
+     the item that grows into whatever the header, the footer and main's own
+     padding have left. Nothing is enumerated, so nothing can be forgotten —
+     and `justify-content: center` inside the grown item is what puts the box
+     on the centre line of that remainder. */
+  body:has(main[data-home]) {
+    height: 100vh;
+  }
+
+  /* NO align-items HERE, and that is the point. Centring the item that way
+     makes its cross size shrink-to-fit, so the tool became as wide as whatever
+     it currently held — and every ways row that opened resized the whole card.
+     `width: 100%` could not fix it either: that resolves against a parent whose
+     own width was shrink-to-fit, which is circular.
+
+     The default `stretch` keeps the tool the full width of main, and the tool
+     centres its own 760px box with the auto margins it already carries. Those
+     work because stretch leaves it a definite width to have margins against. */
+  main[data-home] {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* No width here either — the element's own max-w-[760px] and mx-auto do that
+     job, and they work because main stretches this to its full width (see
+     above). What this rule adds is only the vertical behaviour: grow into the
+     leftover height, and centre the content inside it. */
   [data-home-tool] {
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    min-height: calc(100vh - var(--header-h));
   }
 
   /* A verdict has arrived, so the tool stops being the only thing on screen:
      the evidence sheet and the tactics rail need the height, and a page that
      stayed centred would open with its answer half below the fold.
 
-     0 rather than `auto`: a keyword cannot be interpolated, so `auto` would
-     snap to the content height in a single frame and lose the rise. 0 is a
-     length, and a flex column with no room left to distribute sits at exactly
-     its content's height — the same resting place, arrived at smoothly. */
+     `flex-grow: 0` is the release: the tool stops claiming the leftover space
+     and falls back to its content height, and the page scrolls normally from
+     there. The viewport lock on <body> goes with it, or a verdict taller than
+     the screen would be clipped inside a 100vh box.
+
+     flex-grow is a NUMBER, which is why the motion survives this rewrite — it
+     interpolates, where the `auto` this once used could not. The tool shrinks
+     from the full remainder to its own height over the same transition. */
+  body:has(main[data-home]):has([data-check-done]) {
+    height: auto;
+  }
+
   main[data-home]:has([data-check-done]) [data-home-tool] {
-    min-height: 0;
+    flex-grow: 0;
   }
 }
 
@@ -404,7 +484,7 @@ body:has(dialog[open]) {
    there is no travel at all. */
 @media (min-width: 640px) and (min-height: 720px) and (prefers-reduced-motion: no-preference) {
   [data-home-tool] {
-    transition: min-height 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: flex-grow 0.42s cubic-bezier(0.22, 1, 0.36, 1);
   }
 }
 
@@ -441,6 +521,14 @@ body:has(dialog[open]) {
 details > .ways-body {
   display: grid;
   grid-template-rows: 0fr;
+  /* The column is stated too. With only rows declared, the single implicit
+     column is sized to its content — so an opening row also got WIDER, from
+     nothing to its text's natural width, and the animation read as a box
+     growing in two directions when only one was asked for. `minmax(0, 1fr)`
+     rather than `1fr`: a bare 1fr has an auto minimum, so a long unbroken
+     string (the forwarding address) would push the row past its container
+     instead of being clipped inside it. */
+  grid-template-columns: minmax(0, 1fr);
 }
 
 details[open] > .ways-body {
