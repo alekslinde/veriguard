@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Email header parsing and sender-identity analysis.
 //
 // Scammers spoof the visible From with a friendly display-name alias while the

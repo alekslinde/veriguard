@@ -57,6 +57,8 @@ __tests__/      ← Vitest tests (engine + lib + extension)
 scripts/        ← seed-db.ts, generate-icons.mjs, build-safari.mjs,
                   the check-* freshness and coverage scripts, eval harnesses
 workers/        ← inbound-email worker
+LICENSES/       ← Full licence texts, one per SPDX id; REUSE.toml maps
+                  files to them. NOTICE credits third-party material
 docs/           ← threat-intel/ — PUBLIC sweep research only, one file per
                   sweep as `YYYY-MM-DD-threat-roadmap.md`, plus that archive's
                   README.md and sources.yml. Also scam-calendar/README.md,
@@ -112,6 +114,20 @@ per identifier found in the input.
 - PII is scrubbed before display/storage — route new user content through
   `piiScrubber.ts`
 - **Detection changes must ship with test coverage in `__tests__/`**
+- **Licensing is per directory** — `packages/` Apache-2.0, `extension/`
+  MPL-2.0, `docs/` and `messages/` CC-BY-SA-4.0, everything else
+  AGPL-3.0-or-later; the Veriguard name and icons are not open source
+  (`TRADEMARKS.md`). `REUSE.toml` is the map. Every new source file starts
+  with an SPDX header for its directory:
+  <!-- REUSE-IgnoreStart -->
+  ```ts
+  // SPDX-FileCopyrightText: 2026 Aleks Linde
+  // SPDX-License-Identifier: AGPL-3.0-or-later
+  ```
+  <!-- REUSE-IgnoreEnd -->
+  `licensing.test.ts` checks the headers; the Licensing workflow runs
+  `reuse lint` and the DCO check. Don't move code between licence areas
+  (e.g. lib/ into packages/) without asking — it relicenses it.
 
 ---
 

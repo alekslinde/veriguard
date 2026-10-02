@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Single entry point for analysing a pasted/forwarded email's source.
 //
 // Three surfaces analyse email source — the Check page, the report form, and the

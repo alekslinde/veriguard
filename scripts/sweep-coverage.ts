@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Sweep → surface coverage report.
 //
 // check-promotion-freshness.ts answers "is the newest sweep promoted yet?" — a

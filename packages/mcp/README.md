@@ -120,6 +120,6 @@ directly.
 
 ## Licence
 
-Apache-2.0. Detection logic is intentionally open source: transparency lets the
+Apache-2.0. Copyright 2026 Aleks Linde; see [`NOTICE`](NOTICE). Detection logic is intentionally open source: transparency lets the
 community improve it, and obscuring keyword lists would not stop a sophisticated
 scammer.

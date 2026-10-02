@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The extension's checking layer: does it score, and does it own up to its gaps?
 //
 // The second half is the one that matters. A client that is deliberately less

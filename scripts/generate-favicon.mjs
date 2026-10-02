@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Generates app/favicon.ico from app/icon.svg — on a white ground, since
 // browser tabs are overwhelmingly light chrome and the dark-ground variant
 // disappears into a light tab bar.

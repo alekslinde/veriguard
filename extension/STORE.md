@@ -91,7 +91,7 @@ On a suspicious verdict you can report the scam to the public database. The exte
 
 OPEN SOURCE
 
-The detection rules are public, because obscuring a keyword list wouldn't stop a sophisticated scammer — it would only stop you checking our work. The extension ships unminified so you can read what you installed.
+The detection rules are public, because obscuring a keyword list wouldn't stop a sophisticated scammer — it would only stop you checking our work. The extension ships unminified so you can read what you installed. It is licensed MPL-2.0, and the detection engine inside it Apache-2.0.
 
 github.com/alekslinde/veriguard
 

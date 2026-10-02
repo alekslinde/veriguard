@@ -148,3 +148,10 @@ Two properties of the build are load-bearing and easy to undo:
 
 Publication runs from CI with provenance, so the tarball carries a verifiable
 link back to the commit and workflow that built it.
+
+## Licence
+
+Apache-2.0. Copyright 2026 Aleks Linde. `src/publicSuffixList.ts` is generated
+from the [Public Suffix List](https://publicsuffix.org/) and stays under its
+MPL-2.0 licence; see [`NOTICE`](NOTICE). The rest of the Veriguard repository is
+licensed differently; see the repository README.

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The engine README's code samples, checked against the engine.
 //
 // Code in a README is a claim about the API, and this one had no test while the

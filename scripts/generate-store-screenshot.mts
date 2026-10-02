@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Generates the marketing screenshot: a headline beside a mock of the check
 // panel, showing a real verdict with its real working.
 //

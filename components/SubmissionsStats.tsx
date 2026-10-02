@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 "use client";
 
 // The feed's shape at a glance: how much has been reported, how much of it is

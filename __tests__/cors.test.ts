@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 // This is an access-control boundary, so the negative cases carry the weight:

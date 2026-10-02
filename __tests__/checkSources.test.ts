@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Tests for the threat-intel source registry and its checker.
 //
 // Two things are worth protecting here:

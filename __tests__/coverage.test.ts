@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect } from "vitest";
 import { checkUrl, checkSms, checkEmail, checkCustom, checkPhone, analyzeContent } from "@veriguard/detect/scamDetector";
 import { overallCoverage, isClean, formatVerdictEmail } from "@/lib/verdictSummary";

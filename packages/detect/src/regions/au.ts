@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Australia — region pack.
 //
 // Signals here are AU-specific: national agencies, toll operators, the tax and

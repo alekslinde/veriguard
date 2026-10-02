@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 "use client";
 
 import Link from "next/link";
@@ -48,6 +51,13 @@ export default function SiteFooter() {
         >
           {t("footer.packages")}
         </Link>
+        <span aria-hidden="true" className="text-[var(--ink-3)]">
+          ·
+        </span>
+        {/* The AGPL offer of source (§13): anyone using the hosted app can
+            reach the code that runs it. Names the app's licence; the README
+            lists the other parts'. */}
+        <ExternalLink href="https://github.com/alekslinde/veriguard">{t("footer.source")}</ExternalLink>
         <span aria-hidden="true" className="text-[var(--ink-3)]">
           ·
         </span>

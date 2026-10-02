@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The MCP server's behaviour and its privacy property.
 //
 // This is a second surface on the same engine, so what needs testing here is

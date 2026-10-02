@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: MPL-2.0
+
 // Build for both browsers.
 //
 // `TARGET=chrome|firefox` selects the manifest variant; everything else is
@@ -153,6 +156,35 @@ function emitStaticAssets() {
       ]) {
         copyFileSync(here(`src/${file}`), path.join(outDir, file));
       }
+
+      // Licences travel with the build: the store package is a distribution in
+      // its own right. LICENSE.txt is the extension's own MPL-2.0 (which also
+      // covers the bundled Public Suffix List data); the notices file carries
+      // the bundled engine's Apache-2.0 and libphonenumber-js's MIT texts.
+      copyFileSync(here("LICENSE"), path.join(outDir, "LICENSE.txt"));
+      writeFileSync(
+        path.join(outDir, "THIRD-PARTY-NOTICES.txt"),
+        [
+          "Veriguard browser extension — third-party notices",
+          "",
+          "This extension bundles the following. Its own source is MPL-2.0 (LICENSE.txt).",
+          "",
+          "@veriguard/detect — Copyright 2026 Aleks Linde — Apache-2.0 (text below).",
+          "Public Suffix List data — https://publicsuffix.org/ — MPL-2.0 (LICENSE.txt).",
+          "libphonenumber-js — MIT (text below).",
+          "",
+          "=".repeat(79),
+          "libphonenumber-js",
+          "=".repeat(79),
+          readFileSync(here("../node_modules/libphonenumber-js/LICENSE"), "utf8").trim(),
+          "",
+          "=".repeat(79),
+          "Apache License 2.0 (@veriguard/detect)",
+          "=".repeat(79),
+          readFileSync(here("../LICENSES/Apache-2.0.txt"), "utf8").trim(),
+          "",
+        ].join("\n"),
+      );
 
       // Icons are referenced by the manifest, so a build without them installs
       // with a broken toolbar entry. Warn rather than fail: the bundle is still

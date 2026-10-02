@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // The Veriguard MCP server: rule-based scam checks, exposed as tools.
 //
 // Scoring is the same engine the website and the extension run, unchanged —

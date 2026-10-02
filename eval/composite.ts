@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Composite metamorphic transforms — stacks of the single transforms in
 // metamorphic.ts, applied one after another to the same case.
 //

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Copies the tesseract.js browser runtime into public/ so OCR can run on the
 // user's device instead of on our server.
 //

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Public Suffix List lookup — which part of a hostname a registrant owns.
 //
 // The question this answers is "what is the registrable domain", and it is the

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // What a verdict on a cut-off email did and did not cover.
 //
 // A forward larger than the inbound size limit used to be dropped, and the

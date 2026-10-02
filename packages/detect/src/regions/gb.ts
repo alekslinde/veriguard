@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // United Kingdom — region pack.
 //
 // Phase 5 of the internationalisation plan: the second region, chosen because

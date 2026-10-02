@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import type { NextConfig } from "next";
 
 // Content Security Policy — prevents the browser from making any outbound

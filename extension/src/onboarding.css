@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2026 Aleks Linde
+ * SPDX-License-Identifier: MPL-2.0 */
+
 /* First-run page.
  *
  * Loaded after popup.css, which it builds on rather than repeats: the tokens,

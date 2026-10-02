@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Universal signals — shared by every region.
 //
 // Nothing here should reference a specific country's agencies, brands or number

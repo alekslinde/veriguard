@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Shared pieces for the scripts that render brand imagery through a browser:
 // the store promo tiles and the marketing screenshot.
 //

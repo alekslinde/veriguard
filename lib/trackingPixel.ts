@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Tracking pixel detection and reverse-engineering.
 //
 // Scammers embed 1×1 images (or zero-size beacons) in email HTML. The moment

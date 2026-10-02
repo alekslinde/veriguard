@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Metamorphic relations over the detection engine.
 //
 // The corpus eval answers "how often is the engine right", which needs labels

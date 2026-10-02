@@ -1,0 +1,8 @@
+Copyright 2026 Aleks Linde. All rights reserved.
+
+The Veriguard name, logo and icons, and the store artwork built from them, are
+not covered by any of the open-source licences in this repository. You may
+display them unmodified to refer to the official Veriguard project. Any other
+use, including in a fork or a derived product, needs written permission.
+
+See TRADEMARKS.md for what this means in practice.

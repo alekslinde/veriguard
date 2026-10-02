@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Pure i18n core: message dictionaries + lookup. No React, so it can be unit
 // tested and imported anywhere. The React provider/hook live in lib/lang.tsx.
 //

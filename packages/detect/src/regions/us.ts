@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // United States — region pack.
 //
 // The first of the four cheap follow-ups the Phase 5 sequencing calls for

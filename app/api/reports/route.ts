@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { NextRequest, NextResponse } from "next/server";
 import { getPublicReports, getPublicReportsCount, SortOption } from "@/lib/reportStore";
 import { MOCK_REPORTS } from "@/lib/fixtures/mockReports";

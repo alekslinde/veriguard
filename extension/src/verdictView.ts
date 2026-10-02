@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: MPL-2.0
+
 // Verdict rendering, shared by the popup and the onboarding page.
 //
 // Extracted rather than duplicated: both surfaces show the same card, and a

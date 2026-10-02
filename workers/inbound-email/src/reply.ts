@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Reply MIME building — pure, no Cloudflare runtime imports, so it can be
 // unit-tested under plain Node/vitest. The email() handler in index.ts uses it.
 

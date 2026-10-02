@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Region pack resolution — merges the universal base signals with one region's
 // national layer into the RegionPack that checkers consume.
 

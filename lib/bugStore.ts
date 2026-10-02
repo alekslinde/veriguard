@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Storage for user-consented bug reports. These are submitted only after the
 // user explicitly approves sending the diagnostics shown to them — we never
 // auto-send, and we never capture the scam content or any uploaded file. The

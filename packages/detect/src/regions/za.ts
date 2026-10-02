@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // South Africa — `minimal`.
 //
 // ZA has sat on the roadmap's "not next" list for a while, parked because a

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Carrying the checked message across a browser Back.
 //
 // Next 16.3's App Router serves a same-document `pushState` entry by fully

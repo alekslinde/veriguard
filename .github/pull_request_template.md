@@ -10,6 +10,7 @@
 - [ ] Detection changes ship with tests in `__tests__/`
 - [ ] User-facing copy lives in `messages/`, not hardcoded
 - [ ] PII scrubbing and the submission guard (honeypot, rate limit, timing, dedupe) are not weakened
+- [ ] Commits are signed off (`git commit -s`); new source files carry an SPDX header
 - [ ] No `local.db` / `.env.local` / secrets committed
 
 ## Notes for reviewers

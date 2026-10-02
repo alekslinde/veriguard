@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Public surface of the engine package.
 //
 // Subpath exports (`@veriguard/detect/scamDetector`) mirror the old

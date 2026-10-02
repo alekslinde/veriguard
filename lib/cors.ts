@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Cross-origin access control for the public API.
 //
 // Until now every route was same-origin only — no CORS headers at all, so a

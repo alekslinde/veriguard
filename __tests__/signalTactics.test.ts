@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect } from "vitest";
 import { matchedTactics, TACTIC_IDS , TACTIC_TITLES } from "@/lib/signalTactics";
 import enMessages from "@/messages/en.json";

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The background script, driven end to end against a fake runtime.
 //
 // The check moved here from the popup, which is what lets a badge and a

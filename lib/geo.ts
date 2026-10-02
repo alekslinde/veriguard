@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Coarse submission location, derived from the platform's geo headers
 // (set by Vercel's edge from the connecting IP). The IP itself is used only
 // transiently for rate limiting and is NEVER stored — this string is the only

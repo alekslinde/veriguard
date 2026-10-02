@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: MPL-2.0
+
 // Reader-facing strings for the popup.
 //
 // The verdict lines are the app's own, copied from `messages/en.json`

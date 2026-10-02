@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: MPL-2.0
+
 // Build-time constants injected by Vite's `define`.
 //
 // Declared rather than read from an env object because the value is inlined as

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { NextResponse } from "next/server";
 import { getStats, getCheckEvents, checkAndRecordRateLimit, FEED_RATE_LIMIT, type CheckSurface, type CheckOutcome } from "@/lib/reportStore";
 import { clientIpFromHeaders } from "@/lib/geo";

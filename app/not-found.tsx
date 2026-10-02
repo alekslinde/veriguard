@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import Link from "next/link";
 
 // Matches app/error.tsx: same head shape as every content page, design tokens

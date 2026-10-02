@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // README-freshness checker.
 //
 // The gap this closes: a README makes claims in the PRESENT TENSE about paths,

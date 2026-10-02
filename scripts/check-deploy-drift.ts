@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Flags when `production` has fallen too far behind `main`.
 //
 // Promotion is deliberately manual (docs/releases.md): merges to `main` do not

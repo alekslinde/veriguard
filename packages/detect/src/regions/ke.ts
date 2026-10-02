@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Kenya — `minimal`.
 //
 // Tier rules per sg.ts. Agencies are named public institutions, suffixes are

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Report-form prefill, carried entirely in the URL.
 //
 // The forward-to-us reply email ends with a CTA inviting the forwarder to lodge

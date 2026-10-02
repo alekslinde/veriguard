@@ -1,3 +1,8 @@
+// SPDX-FileCopyrightText: Public Suffix List contributors
+// SPDX-License-Identifier: MPL-2.0
+//! Generated from the Public Suffix List (https://publicsuffix.org/), licensed
+//! under the Mozilla Public License 2.0: https://mozilla.org/MPL/2.0/
+//
 // GENERATED FILE — DO NOT EDIT BY HAND.
 //
 // Regenerate with `npm run psl`. Source: https://publicsuffix.org/list/public_suffix_list.dat

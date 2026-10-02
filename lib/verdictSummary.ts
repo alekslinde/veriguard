@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Shared verdict composition + defang helpers.
 //
 // The Check results page and the forward-to-us email reply must reach the SAME

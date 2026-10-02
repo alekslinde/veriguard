@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Generates the PWA/home-screen icon set from app/icon.svg and its dark-ground
 // counterpart, app/icon-dark.svg.
 //

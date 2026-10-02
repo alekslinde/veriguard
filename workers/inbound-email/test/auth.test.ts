@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Tests for the fresh-send gate.
 //
 // `message.reply()` cannot be aimed at anyone but the forwarder, so nothing it

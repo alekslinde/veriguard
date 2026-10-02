@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Share-target payload → check-box content.
 //
 // The PWA manifest registers a `share_target`, so "Veriguard" appears

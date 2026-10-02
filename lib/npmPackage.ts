@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Where the published packages live, named once.
 //
 // The docs page, its tests and anything linking to a package all read these, so

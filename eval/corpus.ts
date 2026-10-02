@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Corpus loading, with the privacy check enforced at the point of load.
 //
 // The corpus is real user submissions living in a git repository: checked in,

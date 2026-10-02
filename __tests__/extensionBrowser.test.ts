@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The cross-browser compatibility layer.
 //
 // This is four methods over two runtimes that disagree about how they answer,

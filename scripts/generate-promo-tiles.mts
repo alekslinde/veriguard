@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Generates the Chrome Web Store promotional tiles.
 //
 // These are listing assets, not extension assets: the store shows the small

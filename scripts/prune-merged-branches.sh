@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Aleks Linde
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
 # Delete local branches whose remote branch is gone AND that are fully merged
 # into the default branch. Safe by design:
 #   - only touches branches marked "[gone]" (their upstream was deleted on the remote)

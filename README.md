@@ -156,6 +156,24 @@ Because the logic is heuristic and transparent, it's intentionally open source â
 
 ---
 
+## Licence
+
+Veriguard is open source, in parts, so each part can be reused the way that suits it:
+
+| Part | Licence |
+| --- | --- |
+| Web app, inbound-email worker, scripts and tests | [AGPL-3.0-or-later](LICENSES/AGPL-3.0-or-later.txt) |
+| Detection engine and MCP server ([`packages/`](packages/), published to npm) | [Apache-2.0](LICENSES/Apache-2.0.txt) |
+| Browser extension ([`extension/`](extension/)) | [MPL-2.0](LICENSES/MPL-2.0.txt) |
+| Threat-intel sweeps, scam-calendar notes and interface copy ([`docs/`](docs/), [`messages/`](messages/)) | [CC BY-SA 4.0](LICENSES/CC-BY-SA-4.0.txt) |
+| The Veriguard name, logo and icons | Not open source; see [TRADEMARKS.md](TRADEMARKS.md) |
+
+The engine is permissive so anyone can build on it. The app is AGPL so a modified copy run as a public service shares its changes too. Every source file states its licence in an SPDX header, and [`REUSE.toml`](REUSE.toml) covers the rest. Third-party material (the Public Suffix List, Tesseract language data, libphonenumber-js) is credited in [`NOTICE`](NOTICE).
+
+Copyright 2026 Aleks Linde. Contributions are accepted under the licence of the part they change, with a [DCO sign-off](CONTRIBUTING.md#licensing-and-sign-off).
+
+---
+
 ## Disclaimer
 
 This tool gives a best-effort check â€” it does not guarantee 100% detection of every scam, and scammers constantly change their tactics. **Never rely solely on this tool.** When in doubt: don't click, don't call back, don't share.

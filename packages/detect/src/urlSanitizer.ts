@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // URL sanitization for safe handling of untrusted/suspicious links.
 //
 // Three concerns:

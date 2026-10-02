@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Adds `.js` to the relative import specifiers in the built output.
 //
 // The source writes them extensionless, which is correct in-repo: the workspace

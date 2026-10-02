@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect } from "vitest";
 import { isKeyboardTypo, findKeyboardTypo } from "@veriguard/detect/keyboardAdjacency";
 import { checkUrl } from "@veriguard/detect/scamDetector";

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Runs the metamorphic relations and reports violations.
 
 import { scoreContent, type Scored } from "./runner";

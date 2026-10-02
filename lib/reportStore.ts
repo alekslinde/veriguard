@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Rate limiting and dedup are intentionally in-memory — they don't need to
 // survive restarts and keeping them out of the DB makes them fast and
 // impossible for scammers to probe via the API.

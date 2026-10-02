@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: Apache-2.0
+
 import { parseEmailHeaders, analyseEmailIdentities, domainOf } from "./emailHeaders";
 import { extractIdentifiers, normaliseForAnalysis, defang, refang, isDefanged, normaliseUnicode, hasMixedScriptHost, mixedScriptWords, displayedHyphenCount } from "./urlSanitizer";
 import { registrableLabel, registrableDomain, publicSuffix, isNationalCommercialSuffix } from "./publicSuffix";

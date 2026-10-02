@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Unit tests for the email() handler's failure reporting.
 //
 // Why these exist: a stale INBOUND_SECRET took the whole forward-to-check path

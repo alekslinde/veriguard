@@ -1,4 +1,7 @@
 #!/usr/bin/env npx tsx
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //
 // Corpus eval entrypoint.  npm run eval [-- options]
 //

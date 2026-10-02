@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /**
  * The navigation model, shared by the desktop header and the mobile tab bar.
  *

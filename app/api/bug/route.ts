@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { NextRequest, NextResponse } from "next/server";
 import { checkAndRecordRateLimit } from "@/lib/reportStore";
 import { sanitizeBugReport, storeBugReport } from "@/lib/bugStore";

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Explicit check-region choice, persisted on this device.
 //
 // The server resolves a region per request (explicit body field wins over the

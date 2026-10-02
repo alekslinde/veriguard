@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Build for publication.
 //
 // Unlike the engine's config next door, this one BUNDLES, and the difference is

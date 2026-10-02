@@ -107,7 +107,9 @@ The codebase layout and where each kind of logic lives is documented in
    it's reasonable to.
 4. **Run `npm run lint` and `npm test`** — both must pass. CI runs exactly these
    on every PR and is the gate every merge relies on.
-5. **Open a PR** and fill in the template. The checklist mirrors the principles
+5. **Sign off every commit** with `git commit -s` (see
+   [Licensing and sign-off](#licensing-and-sign-off)). CI checks for it.
+6. **Open a PR** and fill in the template. The checklist mirrors the principles
    above; it's there to make sure nothing load-bearing slipped.
 
 ### Commit messages
@@ -197,7 +199,37 @@ what gets merged.
 
 ---
 
-## Licensing
+## Licensing and sign-off
 
-By contributing, you agree that your contributions are licensed under the
-project's [Apache License 2.0](LICENSE).
+Each part of the repository has its own licence; the table in the
+[README](README.md#licence) lists them, and [`REUSE.toml`](REUSE.toml) is the
+complete map. Your contribution is licensed under the licence of the files it
+changes: Apache-2.0 for `packages/`, MPL-2.0 for `extension/`, CC BY-SA 4.0 for
+`docs/` and `messages/`, and AGPL-3.0-or-later for everything else.
+
+New source files start with an SPDX header naming that licence:
+
+<!-- REUSE-IgnoreStart -->
+```ts
+// SPDX-FileCopyrightText: 2026 Your Name
+// SPDX-License-Identifier: AGPL-3.0-or-later
+```
+<!-- REUSE-IgnoreEnd -->
+
+`__tests__/licensing.test.ts` fails if a source file has no header or names the
+wrong licence for its directory.
+
+### Developer Certificate of Origin
+
+Every commit needs a `Signed-off-by:` line. It certifies the
+[Developer Certificate of Origin](https://developercertificate.org/): that you
+wrote the change, or otherwise have the right to submit it under the licence
+above. You keep the copyright on your work. Add it with:
+
+```bash
+git commit -s
+```
+
+Forgot? `git commit --amend -s` fixes the last commit, and
+`git rebase --signoff main` fixes the whole branch. The `DCO` CI check verifies
+every commit in a pull request.

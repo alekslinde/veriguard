@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: MPL-2.0
+
 // The manifest, as one source with two targets.
 //
 // Chrome/Edge and Firefox differ in ways that are cheap to decide now and

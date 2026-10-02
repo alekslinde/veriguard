@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 "use client";
 
 // The year, with every season drawn as a labelled bar on a twelve-month axis.

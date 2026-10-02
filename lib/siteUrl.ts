@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Canonical production origin, used for metadataBase, canonical links, the
 // sitemap and robots.txt. Resolution order:
 //   1. NEXT_PUBLIC_SITE_URL      — explicit override (set this in prod)

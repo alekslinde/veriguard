@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Where the extension is published, and how many people are running it.
 //
 // **This is a hand-maintained file, and that is the design rather than a gap

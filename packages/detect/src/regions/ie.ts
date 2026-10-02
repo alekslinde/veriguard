@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Ireland — region pack.
 //
 // Signals here are Ireland-specific: Revenue and the Department of Social

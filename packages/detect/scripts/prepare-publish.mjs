@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleks Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Rewrites package.json's `exports` from src/ to dist/, in place, at pack time.
 //
 // The workspace and the registry need different maps, and there is no

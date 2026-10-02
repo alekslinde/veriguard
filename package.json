@@ -2,6 +2,7 @@
   "name": "veriguard",
   "version": "0.37.1",
   "private": true,
+  "license": "AGPL-3.0-or-later",
   "engines": {
     "node": ">=22"
   },

@@ -294,3 +294,10 @@ decision first — the OCR core is tens of megabytes and wants `wasm-unsafe-eval
 Before publishing, the packaged extension's origin has to go in
 `CORS_ALLOWED_ORIGINS` (empty by default, no wildcards) — the id is not knowable
 until the extension is signed.
+
+## Licence
+
+MPL-2.0 ([`LICENSE`](LICENSE)). Copyright 2026 Aleks Linde. The build copies it
+into the package as `LICENSE.txt`, next to `THIRD-PARTY-NOTICES.txt`, which
+carries the bundled engine's Apache-2.0 and libphonenumber-js's MIT texts. The
+Veriguard name and icons are not covered; see [TRADEMARKS.md](../TRADEMARKS.md).
