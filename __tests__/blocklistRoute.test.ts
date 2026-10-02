@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The blocklist endpoint.
 //
 // What matters here is not that it returns data, but that it returns the *right

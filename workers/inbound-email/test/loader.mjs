@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Resolver hook mapping `cloudflare:*` to a local stub so the Worker's
 // entrypoint can be imported outside the Workers runtime.
 //

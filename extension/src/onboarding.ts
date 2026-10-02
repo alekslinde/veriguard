@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: MPL-2.0
+
 // The first-run page's behaviour: tick off the steps, then dismiss the tab.
 //
 // Small on purpose. The page is three columns of prose and three diagrams; the

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import type { Metadata } from "next";
 import PackagesDocs from "@/components/PackagesDocs";
 import { NPM_PACKAGE, MCP_PACKAGE } from "@/lib/npmPackage";

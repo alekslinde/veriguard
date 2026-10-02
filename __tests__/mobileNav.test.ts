@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -9,9 +12,8 @@ import {
   isCurrentPath,
   isChildCurrent,
 } from "@/components/navLinks";
-import { translate, type LangMode } from "@/lib/i18n";
+import { translate } from "@/lib/i18n";
 
-const NORMAL: LangMode = { locale: "en", tone: "normal" };
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 
 /**
@@ -58,7 +60,7 @@ describe("navigation model", () => {
 
   it("resolves every child's label", () => {
     for (const c of CHILD_LINKS) {
-      expect(translate(NORMAL, c.key), c.href).toBeTruthy();
+      expect(translate("en", c.key), c.href).toBeTruthy();
     }
   });
 
@@ -79,7 +81,7 @@ describe("navigation model", () => {
 
   it("resolves every nav label against the base bundle", () => {
     for (const l of LINKS) {
-      expect(translate(NORMAL, l.key), l.href).toBeTruthy();
+      expect(translate("en", l.key), l.href).toBeTruthy();
     }
   });
 });

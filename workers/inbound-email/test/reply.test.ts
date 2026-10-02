@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Unit tests for the reply MIME builder. Uses the built-in node:test runner
 // (Node ≥ 22 runs TypeScript natively) so the worker needs no test deps.
 // Run with: npm test  (in workers/inbound-email)

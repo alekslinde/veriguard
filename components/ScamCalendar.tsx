@@ -1,8 +1,11 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 "use client";
 
 // Scam calendar — "what's in season right now", plus the year ahead.
 //
-// A client component so it can read the user's tone preference, which lives in
+// A client component so it can read the user's language preference, which lives in
 // localStorage and is therefore unavailable on the server (see lib/lang.tsx).
 // The *date* is not decided here: `today` is resolved server-side and passed in,
 // because the browser clock is the user's device setting rather than their

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 const ORIGINAL_SECRET = process.env.REPORT_FORM_SECRET;

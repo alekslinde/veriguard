@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Redacts structured PII from free-text descriptions before public exposure.
 // Covers patterns with reliable regex shapes. Names and street addresses
 // cannot be reliably detected without NLP and are out of scope.

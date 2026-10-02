@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect, vi } from "vitest";
 import { isSameOriginRead } from "@/lib/readGuard";
 import { SITE_URL } from "@/lib/siteUrl";

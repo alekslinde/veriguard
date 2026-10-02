@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Server-proof of "when the report form was actually rendered."
 //
 // A client-supplied timestamp is only a claim, not evidence — a form-render

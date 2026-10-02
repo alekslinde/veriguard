@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Reading a forward's raw message, up to a size cap.
 //
 // Past the cap the message used to be dropped, and the forwarder heard

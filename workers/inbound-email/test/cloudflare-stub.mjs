@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Stand-in for the `cloudflare:email` runtime module.
 //
 // The Workers runtime provides it; the default ESM loader rejects the

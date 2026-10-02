@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Guards incoming report submissions against bots, scrapers, rate abusers,
 // and scammers trying to poison the database.
 //

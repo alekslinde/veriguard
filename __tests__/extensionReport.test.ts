@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The extension's report hand-off.
 //
 // The feature is a link, and that is the whole design. Submitting from the

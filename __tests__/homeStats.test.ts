@@ -1,7 +1,10 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import enNormal from "@/messages/en.normal.json";
+import enMessages from "@/messages/en.json";
 
 // Invocation cost on the free tier, not correctness.
 //
@@ -101,7 +104,7 @@ describe("the counters do not overstate what they measure", () => {
   // So each label has to say where it was measured. This is asserted rather
   // than left to the doc comment because it has already been lost once, to a
   // copy pass that trimmed both labels to their unqualified form.
-  const messages = enNormal as Record<string, string>;
+  const messages = enMessages as Record<string, string>;
 
   for (const key of [
     "stats.checked.one",

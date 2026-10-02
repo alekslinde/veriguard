@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/siteUrl";
 

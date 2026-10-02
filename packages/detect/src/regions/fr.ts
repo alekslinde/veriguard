@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // France — `minimal`.
 //
 // Tier rules per sg.ts. Everything here is public-registry or published-policy

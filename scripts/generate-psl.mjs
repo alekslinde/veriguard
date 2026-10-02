@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Regenerates packages/detect/src/publicSuffixList.ts from publicsuffix.org.
 //
@@ -79,7 +81,13 @@ const exception = rules.filter((r) => r.startsWith("!")).map((r) => r.slice(1)).
 
 const list = (xs) => xs.map((x) => JSON.stringify(x)).join(",\n  ");
 
-const out = `// GENERATED FILE — DO NOT EDIT BY HAND.
+// REUSE-IgnoreStart: the generated file's header, not this script's.
+const out = `// SPDX-FileCopyrightText: Public Suffix List contributors
+// SPDX-License-Identifier: MPL-2.0
+//! Generated from the Public Suffix List (https://publicsuffix.org/), licensed
+//! under the Mozilla Public License 2.0: https://mozilla.org/MPL/2.0/
+//
+// GENERATED FILE — DO NOT EDIT BY HAND.
 //
 // Regenerate with \`npm run psl\`. Source: ${SOURCE}
 // Generated from the ICANN section only, multi-label rules only.
@@ -113,6 +121,7 @@ export const PSL_EXCEPTIONS: ReadonlySet<string> = new Set([
   ${list(exception)},
 ]);
 `;
+// REUSE-IgnoreEnd
 
 writeFileSync(OUT, out);
 console.log(

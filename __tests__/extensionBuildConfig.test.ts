@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The extension build has to survive Vite's native config loader.
 //
 // Vite currently bundles a config file before running it, which hides two

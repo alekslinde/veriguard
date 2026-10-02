@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 export function timeAgo(ms: number): string {
   const diff = Date.now() - ms;
   const mins = Math.floor(diff / 60_000);

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // How a right-click check tells the user it finished.
 //
 // This is the gap the extension shipped with: you selected text, chose the menu

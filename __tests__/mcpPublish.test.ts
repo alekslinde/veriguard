@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The MCP package's published form, checked against the built artifact.
 //
 // __tests__/mcpServer.test.ts covers behaviour by importing source. That tells

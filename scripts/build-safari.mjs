@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Generate (or regenerate) the Safari Xcode project from the built extension.
 //
 // Safari runs the same WebExtension source as Chrome and Firefox, but it cannot

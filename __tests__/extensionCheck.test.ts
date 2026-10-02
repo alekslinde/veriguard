@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The extension's checking layer: does it score, and does it own up to its gaps?
 //
 // The second half is the one that matters. A client that is deliberately less
@@ -9,7 +12,7 @@ import { describe, it, expect } from "vitest";
 import { runCheck } from "../extension/src/check";
 import { UNEXPANDED_SHORTENER_NOTE } from "@veriguard/detect/scamDetector";
 import { VERDICT_COPY } from "../extension/src/copy";
-import messages from "../messages/en.normal.json";
+import messages from "../messages/en.json";
 
 describe("runCheck", () => {
   it("returns null for input with nothing in it", async () => {

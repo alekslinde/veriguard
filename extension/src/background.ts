@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: MPL-2.0
+
 // Background: the right-click entry point, and where a right-click check runs.
 //
 // **The check moved here, and that is the substantive change over stashing the

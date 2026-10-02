@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Expands shortened URLs by issuing a HEAD-only request to the shortener
 // service itself, then reading the Location redirect header.
 //

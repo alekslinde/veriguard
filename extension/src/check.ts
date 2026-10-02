@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: MPL-2.0
+
 // The extension's checking layer.
 //
 // Wraps the bundled engine in the two things a client owes its user: a verdict

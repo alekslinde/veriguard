@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Germany — `minimal`.
 //
 // Authored against the tier rules documented in sg.ts, which is the reference

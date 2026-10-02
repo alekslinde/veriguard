@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Shared "one long-lived digest issue" plumbing for the weekly checkers.
 //
 // Three scripts publish a maintenance digest to a single labelled issue rather

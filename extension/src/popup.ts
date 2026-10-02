@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: MPL-2.0
+
 // Popup controller: paste or arrive with a selection, get a verdict.
 //
 // A right-click check has already run in the background by the time this opens

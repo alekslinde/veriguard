@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Every link that leaves the site goes through one component.
 //
 // They did not, and the drift is what this suite exists to stop recurring:

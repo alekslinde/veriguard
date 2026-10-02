@@ -1,7 +1,10 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
-import { translate, type LangMode, type MessageKey } from "@/lib/i18n";
+import { translate, type MessageKey } from "@/lib/i18n";
 import {
   checkFeedback,
   INITIAL_FEEDBACK,
@@ -27,13 +30,7 @@ import {
 // through a re-check, and a .eml upload leaving the image banner up). Driving
 // the reducer catches those; matching source text cannot.
 
-const NORMAL: LangMode = { locale: "en", tone: "normal" };
-// Every tone the app ships. The regional register was retired with the rebrand,
-// so this is a single entry today — kept as a list because these assertions are
-// about a claim holding in every register, and that is what would need
-// re-checking if a second one ever ships.
-const TONES: LangMode[] = [NORMAL];
-const say = (m: LangMode, k: MessageKey, v?: Record<string, string | number>) => translate(m, k, v);
+const say = (k: MessageKey, v?: Record<string, string | number>) => translate("en", k, v);
 
 /** Run a sequence of events from the initial state, as the flow would. */
 const run = (...events: CheckEvent[]): CheckFeedback =>
@@ -147,66 +144,54 @@ describe("image path — reading is not checking", () => {
 // ── Copy ──────────────────────────────────────────────────────────────────────
 //
 // The strings carry the claims, so they are asserted through translate() in
-// every shipped tone rather than by reading the JSON.
+// the shipped bundle rather than by reading the JSON.
 
 describe("what the reader is told", () => {
   it("says the verdict on screen is still the old one", () => {
     // The sentence that stops a failure reading as success.
-    for (const mode of TONES) {
-      for (const k of ["verdict.coverage.recheckError", "verdict.coverage.recheckRateLimited"] as const) {
-        expect(say(mode, k), `${k}`).toMatch(/still (the one from before|the old verdict)/i);
-      }
+    for (const k of ["verdict.coverage.recheckError", "verdict.coverage.recheckRateLimited"] as const) {
+      expect(say(k), `${k}`).toMatch(/still (the one from before|the old verdict)/i);
     }
   });
 
   it("tells a rate-limited reader to wait rather than to retry", () => {
     // "Try again" against a rate limit walks them back into the same wall.
-    for (const mode of TONES) {
-      expect(say(mode, "check.rateLimited")).toMatch(/minute|give it|steady on/i);
-      expect(say(mode, "verdict.coverage.recheckRateLimited")).toMatch(/minute|give it|steady on/i);
-    }
+    expect(say("check.rateLimited")).toMatch(/minute|give it|steady on/i);
+    expect(say("verdict.coverage.recheckRateLimited")).toMatch(/minute|give it|steady on/i);
   });
 
   it("names the region in every re-check status line", () => {
     for (const k of ["verdict.coverage.rechecking", "verdict.coverage.recheckDone"] as const) {
-      expect(say(NORMAL, k, { region: "Canada" }), k).toContain("Canada");
+      expect(say(k, { region: "Canada" }), k).toContain("Canada");
     }
   });
 
-  it("asks for the check in words, in both tones", () => {
-    for (const mode of TONES) {
-      for (const k of ["check.ocr.readTitle", "check.qr.readTitle"] as const) {
-        expect(say(mode, k), k).toMatch(/check it/i);
-      }
+  it("asks for the check in words", () => {
+    for (const k of ["check.ocr.readTitle", "check.qr.readTitle"] as const) {
+      expect(say(k), k).toMatch(/check it/i);
     }
   });
 
   it("warns that a decoded QR is an address, not a destination", () => {
-    for (const mode of TONES) {
-      expect(say(mode, "check.qr.readBody")).toMatch(/opened|near it/i);
-    }
+    expect(say("check.qr.readBody")).toMatch(/opened|near it/i);
   });
 
   it("points at the box rather than a direction the banner isn't in", () => {
     // It said "the address below" while rendering beneath the box.
-    for (const mode of TONES) {
-      expect(say(mode, "check.qr.readBody")).not.toMatch(/below/i);
-    }
+    expect(say("check.qr.readBody")).not.toMatch(/below/i);
   });
 
   it("says what was missing and what to try, instead of refusing", () => {
     // "Nothing to analyse." read as a rejection and gave nowhere to go.
-    for (const mode of TONES) {
-      const s = say(mode, "check.nothing");
-      expect(s).toMatch(/link|phone number|email address/i);
-      expect(s).toMatch(/paste/i);
-    }
+    const s = say("check.nothing");
+    expect(s).toMatch(/link|phone number|email address/i);
+    expect(s).toMatch(/paste/i);
   });
 
   it("retires strings it stopped rendering", () => {
     // An unused key is a trap for the next contributor. translate() falls back
     // to the key itself, so this is how absence reads.
-    expect(translate(NORMAL, "check.analysing" as MessageKey)).toBe("check.analysing");
+    expect(translate("en", "check.analysing" as MessageKey)).toBe("check.analysing");
   });
 });
 

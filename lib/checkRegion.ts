@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Explicit check-region choice, persisted on this device.
 //
 // The server resolves a region per request (explicit body field wins over the
@@ -16,7 +19,7 @@ export const CHECK_REGION_STORAGE_KEY = "vg_region";
 // The key this preference used before the rename. Reads fall back to it so a
 // returning user keeps their region; writes only ever target the new key.
 //
-// Deliberately no write-back, following the invariant parseMode establishes in
+// Deliberately no write-back, following the invariant parseLocale establishes in
 // lib/i18n.ts: reads never rewrite storage. Migrating the value forward would
 // strand it if that user is later served an older cached bundle, which reads
 // only the legacy key — their region would silently revert to auto. Costing one

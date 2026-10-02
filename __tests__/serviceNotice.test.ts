@@ -1,5 +1,8 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect } from "vitest";
-import enNormal from "@/messages/en.normal.json";
+import enMessages from "@/messages/en.json";
 import { resolveNoticeKey } from "@/components/ServiceNotice";
 
 // The site-wide service notice says what is wrong with the service itself —
@@ -7,7 +10,7 @@ import { resolveNoticeKey } from "@/components/ServiceNotice";
 // configured by env var rather than coded per incident, so what these tests
 // pin is the copy and the properties that make it safe to leave in place.
 
-const strings = enNormal as Record<string, string>;
+const strings = enMessages as Record<string, string>;
 
 describe("service notice copy", () => {
   it("has the dismiss control's accessible name", () => {

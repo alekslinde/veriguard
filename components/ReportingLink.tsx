@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 "use client";
 
 import type { ReportingLink as ReportingLinkData } from "@/lib/reportingResources";

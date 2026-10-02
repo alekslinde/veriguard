@@ -48,7 +48,8 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
     "build": "npm run build:js && npm run build:types && npm run build:finish",

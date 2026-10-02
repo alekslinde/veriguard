@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // URLhaus (abuse.ch) blocklist, fetched for a long-lived process.
 //
 // lib/urlhausBlocklist.ts does this job for the website, but it wraps the fetch

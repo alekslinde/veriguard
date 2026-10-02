@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Attribution, asserted through the route rather than around it.
 //
 // This file exists because of a specific failure: `source` was built into the

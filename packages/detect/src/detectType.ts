@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: Apache-2.0
+
 import type { ScamType } from "./engineTypes";
 
 // Heuristic classifier mapping pasted/extracted content to a scam type.

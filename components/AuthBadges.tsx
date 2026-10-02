@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Parses the compact emailAuth summary (e.g. "SPF fail · DKIM pass (tenant[.]com) · DMARC none")
 // into individual pill badges. Used on submission cards and in the Learn page legend.
 
