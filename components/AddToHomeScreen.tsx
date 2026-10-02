@@ -196,35 +196,41 @@ export default function AddToHomeScreen() {
     }
   }
 
+  // A button, not a card.
+  //
+  // This was a bordered panel with a glyph, a heading and a three-line blurb
+  // explaining that a home-screen shortcut opens like an app and downloads
+  // nothing. All of it true, and all of it an answer to a question nobody on
+  // this page is asking: they came to check a message, and the offer to keep
+  // the tool around is worth one line at most. "Add to Home Screen" already
+  // says what it does — the blurb was explaining what a home screen is.
+  //
+  // The steps survive, because on the platforms that have no install API the
+  // steps ARE the feature: there is nothing to call, and a button that only
+  // says "here is how" has to be able to show how.
   return (
-    <section className="rounded-xl border border-[var(--rule)] bg-[var(--ink-2)] p-4">
-      <div className="flex items-start gap-3">
-        <span className="mt-[2px] text-[var(--clear)]">
+    <div>
+      <button
+        type="button"
+        onClick={activate}
+        aria-expanded={isPrompt ? undefined : showSteps}
+        className="inline-flex items-center gap-2 rounded-lg border border-[var(--rule)] px-3 py-2 text-[13px] font-medium text-[var(--text-dim)] transition-colors hover:border-[var(--ink-3)] hover:text-[var(--foreground)]"
+      >
+        <span className="shrink-0 text-[var(--clear)]">
           <InstallIcon />
         </span>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-[15px] font-semibold text-[var(--foreground)]">
-            {t("install.title")}
-          </h2>
-          <p className="mt-1 text-[13.5px] text-[var(--text-dim)] leading-relaxed">
-            {t("install.blurb")}
-          </p>
+        {/* One label for both routes. They used to differ — "Add to Home
+            Screen" where the browser has an install API, "Show me how" where
+            the reader has to do it by hand — and that distinction was worth
+            making under a heading that set the subject. Alone on a page, "Show
+            me how" names no subject at all. What the button offers is the same
+            either way; whether it is delivered by a prompt or by three steps is
+            ours to worry about, not something to put in the label. */}
+        {t("install.action")}
+      </button>
 
-          <button
-            type="button"
-            onClick={activate}
-            aria-expanded={isPrompt ? undefined : showSteps}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-[var(--clear)]/50 bg-[var(--clear)]/10 px-3 py-1.5 text-[13px] font-semibold text-[var(--clear)] transition-colors hover:bg-[var(--clear)]/15"
-          >
-            {isPrompt ? t("install.action") : t("install.how")}
-          </button>
-
-          {showSteps && state.platform && (
-            <ManualSteps platform={state.platform} />
-          )}
-        </div>
-      </div>
-    </section>
+      {showSteps && state.platform && <ManualSteps platform={state.platform} />}
+    </div>
   );
 }
 

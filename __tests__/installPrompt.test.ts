@@ -174,9 +174,6 @@ describe("copy", () => {
   it("resolves every string the component renders", () => {
     for (const key of [
       "install.action",
-      "install.how",
-      "install.title",
-      "install.blurb",
       "install.ios.step1",
       "install.ios.step2",
       "install.ios.step3",
@@ -192,8 +189,24 @@ describe("copy", () => {
     // The app is a PWA — there is nothing to download and no store involved.
     // Copy that implied otherwise would be the exact kind of claim this tool
     // exists to teach people to distrust.
-    const blurb = translate(NORMAL, "install.blurb").toLowerCase();
-    expect(blurb).toContain("no app store");
-    expect(translate(NORMAL, "install.action").toLowerCase()).not.toContain("download");
+    //
+    // This used to read the blurb, which said "no app store, nothing to
+    // download" in as many words. The blurb is gone — the offer is a single
+    // button now — so the guard moves to every string that survived: none of
+    // them may imply a store or a download, which is the property rather than
+    // the particular sentence that used to carry it.
+    for (const key of [
+      "install.action",
+      "install.ios.step1",
+      "install.ios.step2",
+      "install.ios.step3",
+      "install.menu.step1",
+      "install.menu.step2",
+      "install.menu.step3",
+    ] as const) {
+      const copy = translate(NORMAL, key).toLowerCase();
+      expect(copy, key).not.toContain("download");
+      expect(copy, key).not.toContain("app store");
+    }
   });
 });
