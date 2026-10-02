@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Which browser family a user agent string belongs to.
 //
 // Used for ONE thing: putting the reader's own store first in the extension's

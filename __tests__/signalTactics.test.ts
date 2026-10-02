@@ -1,6 +1,9 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect } from "vitest";
 import { matchedTactics, TACTIC_IDS , TACTIC_TITLES } from "@/lib/signalTactics";
-import enNormal from "@/messages/en.normal.json";
+import enMessages from "@/messages/en.json";
 import { checkSms, checkUrl } from "@veriguard/detect/scamDetector";
 import type { Signal } from "@veriguard/detect/engineTypes";
 
@@ -68,7 +71,7 @@ describe("TACTIC_TITLES", () => {
     // same six names will drift the moment one is reworded, and the continuity
     // the tactics layer exists for is exactly what drift destroys.
     for (const id of TACTIC_IDS) {
-      const fromBundle = (enNormal as Record<string, string>)[`learn.tactics.${id}.title`];
+      const fromBundle = (enMessages as Record<string, string>)[`learn.tactics.${id}.title`];
       expect(TACTIC_TITLES[id]).toBe(fromBundle);
     }
   });

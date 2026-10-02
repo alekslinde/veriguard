@@ -91,7 +91,7 @@ On a suspicious verdict you can report the scam to the public database. The exte
 
 OPEN SOURCE
 
-The detection rules are public, because obscuring a keyword list wouldn't stop a sophisticated scammer — it would only stop you checking our work. The extension ships unminified so you can read what you installed.
+The detection rules are public, because obscuring a keyword list wouldn't stop a sophisticated scammer — it would only stop you checking our work. The extension ships unminified so you can read what you installed. It is licensed MPL-2.0, and the detection engine inside it Apache-2.0.
 
 github.com/alekslinde/veriguard
 
@@ -319,7 +319,7 @@ says what is on screen rather than restating the pitch:
 4. A link that raised nothing, with the reminder that a new scam won't match
    the rules either.
 
-These echo the verdict wording in `messages/en.normal.json` rather than
+These echo the verdict wording in `messages/en.json` rather than
 inventing labels for it — "likely a scam" and the caveat in (4) are the
 product's own words. A caption promising a verdict the screen does not show is
 the kind of mismatch a reviewer opens the image to check.
@@ -347,7 +347,7 @@ the panel is already showing — the signal rows and their weights are the
 
 The panel is a mock, but its content is not written by hand. The verdict, the
 score and every signal row come from calling the engine at build time, and the
-verdict wording is read from `messages/en.normal.json`. So a retuned weight or
+verdict wording is read from `messages/en.json`. So a retuned weight or
 a reworded string moves the image on the next run, instead of leaving it
 claiming something the product stopped doing. It fails rather than redraws if
 the sample stops scoring `likely_scam`, or if a verdict string it needs is

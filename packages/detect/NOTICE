@@ -1,0 +1,10 @@
+@veriguard/detect
+Copyright 2026 Aleksandr Linde
+
+Licensed under the Apache License 2.0 (LICENSE).
+
+This package includes data generated from the Public Suffix List
+(https://publicsuffix.org/), licensed under the Mozilla Public License 2.0:
+see src/publicSuffixList.ts (dist/publicSuffixList.*). The source form is
+https://publicsuffix.org/list/public_suffix_list.dat, and the full licence
+text is at https://mozilla.org/MPL/2.0/.

@@ -9,6 +9,10 @@ That ships separately, via numbered issues, in its own PR with tests.
 That separation is deliberate — it keeps the evidence layer reviewable on its
 own terms, and keeps detection PRs small enough to review as code.
 
+**Licence:** the sweeps, this README and `sources.yml` are
+[CC BY-SA 4.0](../../LICENSES/CC-BY-SA-4.0.txt). That covers the writing here;
+quoted material and the sources it cites remain under their owners' terms.
+
 ---
 
 ## Why these are kept

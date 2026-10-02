@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The extension's central claim, asserted against the built artifact.
 //
 // "The bundled engine makes no network call" is the property the whole

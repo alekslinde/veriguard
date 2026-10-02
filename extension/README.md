@@ -267,7 +267,7 @@ silently rather than loudly:
   under the score add up to. `check.ts` returns the composed `signals`; the
   popup renders them as given. Re-deriving them from `results` is the specific
   mistake to avoid.
-- **Verdict copy is duplicated from `messages/en.normal.json`** and pinned by a
+- **Verdict copy is duplicated from `messages/en.json`** and pinned by a
   test — the i18n bundle carries every string on every page, which is not worth
   shipping to style one panel.
 - **The background script runs many times, not once.** An idle worker is torn
@@ -294,3 +294,10 @@ decision first — the OCR core is tens of megabytes and wants `wasm-unsafe-eval
 Before publishing, the packaged extension's origin has to go in
 `CORS_ALLOWED_ORIGINS` (empty by default, no wildcards) — the id is not knowable
 until the extension is signed.
+
+## Licence
+
+MPL-2.0 ([`LICENSE`](LICENSE)). Copyright 2026 Aleksandr Linde. The build copies it
+into the package as `LICENSE.txt`, next to `THIRD-PARTY-NOTICES.txt`, which
+carries the bundled engine's Apache-2.0 and libphonenumber-js's MIT texts. The
+Veriguard name and icons are not covered; see [TRADEMARKS.md](../TRADEMARKS.md).

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Scam calendar — which campaigns spike, and when.
 //
 // Purely educational: this module feeds a calendar view that teaches people what

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // India — `minimal`.
 //
 // The other half of the roadmap's parked pair (with ZA), shipping at `minimal`

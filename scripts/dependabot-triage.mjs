@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Dependabot alert triage.
 //
 // GitHub gives every open Dependabot alert a severity label. That label is the

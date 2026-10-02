@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Rest of world — the base-only fallback pack.
 //
 // Used when we know roughly where someone is but have no national layer for

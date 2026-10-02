@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Broad email-tracking analysis — the superset of trackingPixel.ts.
 //
 // Tracking pixels (1×1 <img> beacons) are just one of several ways an email can

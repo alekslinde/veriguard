@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import type { Metadata } from "next";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
@@ -478,8 +481,34 @@ export default function AboutPage() {
               Aleks Linde
             </ExternalLink>
             . Universal checks run worldwide; full rule packs where we&apos;ve done the
-            groundwork. The engine is open source — see{" "}
-            <Link href="/packages" className={LINK}>the developer docs</Link>.
+            groundwork.
+          </p>
+          {/* THE AGPL §13 OFFER OF SOURCE. Anyone using the hosted app has to
+              be able to reach the code running it, and this is where that
+              offer lives now that there is no site footer to carry it on every
+              page — /about is a tab, reachable in one tap from anywhere.
+
+              It names the APP and links the REPOSITORY, deliberately. The line
+              above used to say "the engine is open source" and point at
+              /packages, which is neither: the engine is one component of what
+              AGPL covers, and the developer docs are not the corresponding
+              source. Shortening this to a tidier sentence is how the offer
+              stops being one.
+
+              The parts carry different licences (see REUSE.toml and the
+              README) — this names the app's, which is the one a reader of the
+              hosted site is exercising. */}
+          <p className="text-[13px] text-[var(--faint)] leading-relaxed max-w-[68ch]">
+            Veriguard is free software under the AGPL. You can read, run and
+            modify the code that serves this site —{" "}
+            <ExternalLink href="https://github.com/alekslinde/veriguard" variant="strong">
+              {/* Not a message key: this page carries one wording in every
+                  language mode by design (see the note at the top), and the
+                  footer's own key went with the footer. */}
+              Source code (AGPL)
+            </ExternalLink>
+            . The packages and content under it carry their own licences, listed
+            in the README.
           </p>
         </div>
       </div>

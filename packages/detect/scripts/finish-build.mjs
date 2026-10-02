@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // The last build step: make the emitted output resolvable.
 //
 // Runs after both tsup (`.js`) and tsc (`.d.ts`), because the rewrite has to

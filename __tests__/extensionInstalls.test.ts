@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The install figures are hand-maintained, so the tests here are about the one
 // failure mode a hand-maintained public claim has: a number that outlives the
 // date attached to it, or a missing figure that renders as zero.

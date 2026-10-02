@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Region pack interface — the data shape that makes detection country-aware.
 //
 // Detection stays rule-based: a region pack is *data* (keyword lists, domain

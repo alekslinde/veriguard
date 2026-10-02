@@ -1,0 +1,43 @@
+Veriguard
+Copyright 2026 Aleksandr Linde
+
+This repository is licensed in parts. See the Licence section of README.md
+and REUSE.toml for which licence covers which file:
+
+  Web app, worker, scripts, tests   AGPL-3.0-or-later
+  packages/detect, packages/mcp     Apache-2.0
+  extension/                        MPL-2.0
+  docs/, messages/                  CC-BY-SA-4.0
+  Name, logo and icons              All rights reserved (TRADEMARKS.md)
+
+Full licence texts are in LICENSES/.
+
+-------------------------------------------------------------------------------
+Third-party material included in this repository or its builds
+-------------------------------------------------------------------------------
+
+Public Suffix List
+  https://publicsuffix.org/
+  Licensed under the Mozilla Public License 2.0 (LICENSES/MPL-2.0.txt).
+  packages/detect/src/publicSuffixList.ts is generated from the ICANN section
+  of the list. It ships in @veriguard/detect and in the browser extension.
+  The source form is https://publicsuffix.org/list/public_suffix_list.dat.
+
+Tesseract OCR language data (eng.traineddata)
+  https://github.com/tesseract-ocr
+  Licensed under the Apache License 2.0 (LICENSES/Apache-2.0.txt).
+  Committed at public/tessdata/ and served by the web app.
+
+tesseract.js
+  https://github.com/naptha/tesseract.js
+  Licensed under the Apache License 2.0 (LICENSES/Apache-2.0.txt).
+  The browser runtime is copied into public/tesseract/ at build time.
+
+libphonenumber-js
+  https://gitlab.com/catamphetamine/libphonenumber-js
+  Copyright (c) 2016 @catamphetamine
+  Licensed under the MIT License. A dependency of @veriguard/detect, and
+  bundled into the browser extension, which ships its full licence text in
+  THIRD-PARTY-NOTICES.txt.
+
+URLhaus data from abuse.ch is fetched at run time and not redistributed here.

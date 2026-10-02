@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // URLhaus (abuse.ch) live malware/phishing domain blocklist.
 //
 // Fetches the CSV dump of recently-added malicious URLs, extracts hostnames

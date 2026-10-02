@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Threat radar — what's circulating now, and whether we catch it.
 //
 // The companion to lib/scamCalendar.ts. The calendar answers "what is likely at

@@ -1,6 +1,9 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: MPL-2.0
+
 // Reader-facing strings for the popup.
 //
-// The verdict lines are the app's own, copied from `messages/en.normal.json`
+// The verdict lines are the app's own, copied from `messages/en.json`
 // rather than paraphrased: a user who checks something on the site and then in
 // the extension must not be told two different things about the same score.
 // That file is the source; a test asserts these still match it, so a reword on

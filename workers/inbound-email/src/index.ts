@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Cloudflare Email Worker for the forward-to-us flow.
 //
 // Flow: a user forwards a suspicious email to check@<domain> → Cloudflare Email

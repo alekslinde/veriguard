@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Phone number intelligence — pure string analysis, no outbound requests.
 //
 // IMPORTANT LIMITATION: Caller ID (CLI) spoofing is a fundamental property of

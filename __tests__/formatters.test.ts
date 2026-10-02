@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { timeAgo, truncate, fmt, formatDayLabel } from "@/lib/formatters";
 

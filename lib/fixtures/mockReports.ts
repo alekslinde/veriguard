@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Loads report mock data from JSON file and computes derived stats
 import mockData from "./mock-data.json" assert { type: "json" };
 import { FeedStats, PublicReport } from "@/lib/reportStore";

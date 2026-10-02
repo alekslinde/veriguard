@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: MPL-2.0
+
 // Handing a finished check to the report form.
 //
 // **The extension never submits a report, and that is a privacy property

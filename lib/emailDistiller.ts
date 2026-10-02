@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Reduce a raw (often forwarded) email to the legible "scam content" a human
 // needs to read — a few meaningful headers plus the decoded message body.
 //

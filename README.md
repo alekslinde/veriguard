@@ -56,7 +56,7 @@ Seen something suspicious? Lodge a report so others can be warned. Submissions a
 A [`/learn`](app/learn/page.tsx) guide covering how to spot scams, how email authentication (SPF/DKIM/DMARC) works, common tactics, what to do if you've been caught, and where to report.
 
 ### Interface language
-The interface ships one neutral English voice. Internally the copy is keyed on two independent axes — **locale** (the language, `en` today) and **tone** (the register, one value today) — so language and regional voice stay separate concerns. Strings live in [`messages/`](messages/) as `en.normal.json`, the complete base bundle.
+The interface ships one neutral English voice. Strings follow the [next-intl](https://next-intl.dev) layout: one bundle per locale in [`messages/`](messages/), named by its language tag. `en.json` is the complete base bundle, and any future locale falls back to it key by key.
 
 ---
 
@@ -153,6 +153,26 @@ The only outbound calls are to fixed, trusted infrastructure — the URLhaus blo
 **That promise is enforced, not just stated.** [`__tests__/privacyInvariant.test.ts`](__tests__/privacyInvariant.test.ts) runs the real engine over real scam inputs with the network intercepted and fails the build if any host from the submitted content is contacted; a lint rule bans Node's network modules from the detector entirely, covering the DNS and socket paths the test can't see. The engine takes its network transport as an argument, so with none supplied it cannot reach the network at all.
 
 Because the logic is heuristic and transparent, it's intentionally open source — obscuring the keyword lists wouldn't stop sophisticated scammers (who already know what triggers spam filters), but it would make it harder for the community to contribute improvements.
+
+---
+
+## Licence
+
+Veriguard is open source, in parts, so each part can be reused the way that suits it:
+
+| Part | Licence |
+| --- | --- |
+| Web app, inbound-email worker, scripts and tests | [AGPL-3.0-or-later](LICENSES/AGPL-3.0-or-later.txt) |
+| Detection engine and MCP server ([`packages/`](packages/), published to npm) | [Apache-2.0](LICENSES/Apache-2.0.txt) |
+| Browser extension ([`extension/`](extension/)) | [MPL-2.0](LICENSES/MPL-2.0.txt) |
+| Threat-intel sweeps, scam-calendar notes and interface copy ([`docs/`](docs/), [`messages/`](messages/)) | [CC BY-SA 4.0](LICENSES/CC-BY-SA-4.0.txt) |
+| The Veriguard name, logo and icons | Not open source; see [TRADEMARKS.md](TRADEMARKS.md) |
+
+The engine is permissive so anyone can build on it. The app is AGPL so a modified copy run as a public service shares its changes too. Every source file states its licence in an SPDX header, and [`REUSE.toml`](REUSE.toml) covers the rest. Third-party material (the Public Suffix List, Tesseract language data, libphonenumber-js) is credited in [`NOTICE`](NOTICE).
+
+Releases before 2 October 2026 (up to app v0.36.0) were licensed under Apache-2.0 as a whole, and remain licensed under it. The licences above apply to everything released since.
+
+Copyright 2026 Aleksandr Linde. Contributions are accepted under the licence of the part they change, with a [DCO sign-off](CONTRIBUTING.md#licensing-and-sign-off).
 
 ---
 

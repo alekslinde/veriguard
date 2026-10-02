@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Loads tracking pixel mock data from JSON file
 import mockData from "./mock-data.json" assert { type: "json" };
 

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Shared value types for the detection engine.
 //
 // These live apart from scamDetector.ts to break a dependency cycle: the

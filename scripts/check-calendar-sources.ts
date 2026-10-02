@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Reachability + structure checker for the scam calendar's source citations.
 //
 // The calendar's companion to scripts/check-sources.mjs. Each ScamSeason carries

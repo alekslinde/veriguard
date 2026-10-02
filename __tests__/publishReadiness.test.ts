@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // What has to be true before either package goes to npm.
 //
 // A published version cannot be replaced and unpublishing is restricted after

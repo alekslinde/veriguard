@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Turning a CheckResult into what an assistant reads back to a person.
 //
 // An MCP tool result is consumed twice: the model reads it to decide what to

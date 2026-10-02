@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Metamorphic relations over the REGION axis.
 //
 // metamorphic.ts transforms content and holds the region fixed: "does rewriting

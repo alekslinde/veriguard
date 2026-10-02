@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Canada — region pack.
 //
 // Signals here are Canada-specific: the CRA and Service Canada, Canada Post,

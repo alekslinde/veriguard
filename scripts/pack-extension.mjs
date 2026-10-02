@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Zip a built extension target for store submission.
 //
 // Exists because zipping the build by hand on macOS produces an archive both

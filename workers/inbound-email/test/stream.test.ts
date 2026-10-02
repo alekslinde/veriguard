@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Tests for reading a forward up to the size cap. Past the cap the forward is
 // kept in part, not dropped, so the API can still give a verdict on it.
 

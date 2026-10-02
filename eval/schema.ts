@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Eval case schema and the verdict → prediction mapping.
 //
 // This tree is deliberately separate from __tests__/. Unit tests assert

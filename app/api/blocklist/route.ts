@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { NextRequest, NextResponse } from "next/server";
 import { getUrlhausBlocklist, BLOCKLIST_TTL_SECONDS } from "@/lib/urlhausBlocklist";
 import { hashHost, HOST_HASH_ALGORITHM, HOST_HASH_HEX_LENGTH } from "@veriguard/detect/hostHash";

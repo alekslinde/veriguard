@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import ScamCalendar from "@/components/ScamCalendar";
@@ -25,7 +28,7 @@ export default async function CalendarPage({
   const { region: requested } = await searchParams;
   const region = resolveRegion(await headers(), requested);
   // Resolved here rather than in the component: the component is a client
-  // component (it needs the tone preference), and the browser clock reflects the
+  // component (it needs the language preference), and the browser clock reflects the
   // device's timezone rather than the user's region. It also has to follow the
   // *chosen* region — reading a UK calendar against Australian local time would
   // put "today" on the wrong side of a season boundary for half the day.

@@ -1,10 +1,12 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect } from "vitest";
 import {
   translate,
-  parseMode,
-  serialiseMode,
-  DEFAULT_MODE,
-  type LangMode,
+  parseLocale,
+  DEFAULT_LOCALE,
+  type Locale,
   type MessageKey,
 } from "@/lib/i18n";
 import {
@@ -12,106 +14,95 @@ import {
   LANG_STORAGE_KEY,
   LEGACY_LANG_STORAGE_KEY,
 } from "@/lib/lang";
-import enNormal from "@/messages/en.normal.json";
+import enMessages from "@/messages/en.json";
 import { checkUrl } from "@veriguard/detect/scamDetector";
 
-const NORMAL: LangMode = { locale: "en", tone: "normal" };
-
 describe("translate", () => {
-  it("returns the base-tone string", () => {
-    expect(translate(NORMAL, "check.report")).toBe("Report this scam");
+  it("returns the base-locale string", () => {
+    expect(translate("en", "check.report")).toBe("Report this scam");
   });
 
   it("resolves every key from the base bundle", () => {
-    // The regional register is retired, so the base bundle is the only dictionary
-    // and must answer every key on its own. Asserted against the bundle rather
-    // than copy literals: the claim is about lookup, not wording.
-    expect(translate(NORMAL, "check.uploadImage")).toBe(enNormal["check.uploadImage"]);
+    // en.json is the only bundle and must answer every key on its own.
+    // Asserted against the bundle rather than copy literals: the claim is
+    // about lookup, not wording.
+    expect(translate("en", "check.uploadImage")).toBe(enMessages["check.uploadImage"]);
   });
 
   it("falls back to the raw key when it exists in no dictionary", () => {
     const missing = "totally.unknown.key" as MessageKey;
-    expect(translate(NORMAL, missing)).toBe("totally.unknown.key");
+    expect(translate("en", missing)).toBe("totally.unknown.key");
   });
 
   it("interpolates {placeholder} tokens from vars", () => {
     // No shipped message has tokens yet, so exercise interpolation via the
     // raw-key fallback path (translate interpolates whatever string resolves).
     const key = "Hi {name}, you have {count} alerts" as MessageKey;
-    expect(translate(NORMAL, key, { name: "Alex", count: 3 })).toBe(
+    expect(translate("en", key, { name: "Alex", count: 3 })).toBe(
       "Hi Alex, you have 3 alerts",
     );
   });
 
   it("leaves token-free strings untouched when vars are passed", () => {
-    expect(translate(NORMAL, "check.submit", { unused: "x" })).toBe(
-      translate(NORMAL, "check.submit"),
+    expect(translate("en", "check.submit", { unused: "x" })).toBe(
+      translate("en", "check.submit"),
     );
   });
 
-  it("resolves an unknown tone via the base tone rather than the raw key", () => {
-    // Still load-bearing after the retirement: a returning user can hold
-    // "en:regional" in storage, and a stale cached bundle can ask for a tone
-    // this build no longer ships. Either must land on real copy, not a raw key.
-    const odd = { locale: "en", tone: "shouty" } as unknown as LangMode;
+  it("resolves an unknown locale via the base locale rather than the raw key", () => {
+    // A stale cached bundle can ask for a locale this build no longer ships.
+    // It must land on real copy, not a raw key.
+    const odd = "fr" as unknown as Locale;
     expect(translate(odd, "check.report")).toBe("Report this scam");
-    const retired = { locale: "en", tone: "regional" } as unknown as LangMode;
-    expect(translate(retired, "check.report")).toBe("Report this scam");
   });
 });
 
-describe("parseMode", () => {
-  it("resolves the legacy 'aussie' value to the one shipped tone", () => {
-    // Returning users have this literal string in localStorage from before the
-    // locale/tone split. The register it selected is retired, so it resolves to
-    // the default rather than to a tone that no longer exists — a read, not a
-    // rewrite, so the stored string itself is left alone.
-    expect(parseMode("aussie")).toEqual(DEFAULT_MODE);
+describe("parseLocale", () => {
+  it("reads a stored locale", () => {
+    expect(parseLocale("en")).toBe("en");
   });
 
-  it("migrates the legacy 'normal' value to the default mode", () => {
-    expect(parseMode("normal")).toEqual(DEFAULT_MODE);
+  it("reads the legacy locale:tone form as its locale", () => {
+    // Returning users hold "en:normal" (or the retired "en:regional") from
+    // when the copy was keyed on a second, tone axis.
+    expect(parseLocale("en:normal")).toBe("en");
+    expect(parseLocale("en:regional")).toBe("en");
   });
 
-  it("parses the serialised locale:tone form", () => {
-    expect(parseMode("en:normal")).toEqual(NORMAL);
-    expect(parseMode("en:normal")).toEqual(NORMAL);
+  it("resolves the legacy single-axis values to the default", () => {
+    // "aussie" and "normal" predate the locale/tone split. Neither names a
+    // locale, so both resolve to the default — a read, not a rewrite.
+    expect(parseLocale("aussie")).toBe(DEFAULT_LOCALE);
+    expect(parseLocale("normal")).toBe(DEFAULT_LOCALE);
   });
 
   it("defaults when the stored value is absent", () => {
-    expect(parseMode(null)).toEqual(DEFAULT_MODE);
-    expect(parseMode(undefined)).toEqual(DEFAULT_MODE);
-    expect(parseMode("")).toEqual(DEFAULT_MODE);
+    expect(parseLocale(null)).toBe(DEFAULT_LOCALE);
+    expect(parseLocale(undefined)).toBe(DEFAULT_LOCALE);
+    expect(parseLocale("")).toBe(DEFAULT_LOCALE);
   });
 
-  it("degrades an unknown tone to the base tone, keeping the locale", () => {
-    expect(parseMode("en:shouty")).toEqual(NORMAL);
-  });
-
-  it("discards the tone too when the locale is unknown", () => {
-    // Tone is only meaningful relative to its locale: someone returning with a
-    // stored "fr:regional" after French is withdrawn should get plain English,
-    // not English in a regional register they never picked for this language.
-    expect(parseMode("fr:regional")).toEqual(DEFAULT_MODE);
-    expect(parseMode("de:normal")).toEqual(DEFAULT_MODE);
+  it("defaults when the locale is not shipped", () => {
+    expect(parseLocale("fr")).toBe(DEFAULT_LOCALE);
+    expect(parseLocale("de:normal")).toBe(DEFAULT_LOCALE);
   });
 
   it("degrades malformed values rather than throwing", () => {
-    expect(parseMode("garbage")).toEqual(DEFAULT_MODE);
-    expect(parseMode("::::")).toEqual(DEFAULT_MODE);
+    expect(parseLocale("garbage")).toBe(DEFAULT_LOCALE);
+    expect(parseLocale("::::")).toBe(DEFAULT_LOCALE);
   });
 
   it("never rewrites storage on read, so a withdrawn locale can come back", () => {
-    // parseMode is pure — the stored string is untouched, so if that locale
+    // parseLocale is pure — the stored string is untouched, so if that locale
     // ships again the user's original preference resumes working.
-    const stored = "fr:regional";
-    expect(parseMode(stored)).toEqual(DEFAULT_MODE);
-    expect(stored).toBe("fr:regional");
+    const stored = "fr";
+    expect(parseLocale(stored)).toBe(DEFAULT_LOCALE);
+    expect(stored).toBe("fr");
   });
 
-  it("round-trips every shipped mode through serialise → parse", () => {
-    for (const mode of [NORMAL]) {
-      expect(parseMode(serialiseMode(mode))).toEqual(mode);
+  it("round-trips every shipped locale, which is stored as-is", () => {
+    for (const locale of ["en"] as const) {
+      expect(parseLocale(locale)).toBe(locale);
     }
   });
 });
@@ -170,15 +161,15 @@ describe("stored language — legacy jcm_ migration", () => {
     expect(readStoredLangRaw(fakeStorage())).toBeNull();
   });
 
-  it("hands the pre-split legacy value through to parseMode", () => {
+  it("hands the pre-split legacy value through to parseLocale", () => {
     // The two migrations compose: an old key holding an older-still value.
     // "aussie" predates the locale/tone split and selected a register that has
     // since been retired, so a user who set it before any of this lands on the
-    // one shipped tone — with real copy, not a raw key.
+    // default locale — with real copy, not a raw key.
     const s = fakeStorage({ [LEGACY_LANG_STORAGE_KEY]: "aussie" });
-    const mode = parseMode(readStoredLangRaw(s));
-    expect(mode).toEqual(DEFAULT_MODE);
-    expect(translate(mode, "check.report")).toBe("Report this scam");
+    const locale = parseLocale(readStoredLangRaw(s));
+    expect(locale).toBe(DEFAULT_LOCALE);
+    expect(translate(locale, "check.report")).toBe("Report this scam");
   });
 });
 
@@ -220,7 +211,7 @@ describe("retired regional register", () => {
   });
 
   it("the shipped message bundle carries none either", () => {
-    const bundle = JSON.stringify(enNormal);
+    const bundle = JSON.stringify(enMessages);
     for (const pattern of RETIRED) {
       expect(bundle).not.toMatch(pattern);
     }

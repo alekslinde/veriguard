@@ -1,12 +1,14 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect } from "vitest";
 import {
   manualPlatformFor,
   resolveInstallState,
   isInstalled,
 } from "@/lib/installPrompt";
-import { translate, type LangMode } from "@/lib/i18n";
+import { translate } from "@/lib/i18n";
 
-const NORMAL: LangMode = { locale: "en", tone: "normal" };
 
 // Real strings, because the whole module is a parse of these and a paraphrase
 // would test the paraphrase. Trimmed to the parts that carry the vendor tokens.
@@ -181,7 +183,7 @@ describe("copy", () => {
       "install.menu.step2",
       "install.menu.step3",
     ] as const) {
-      expect(translate(NORMAL, key), key).toBeTruthy();
+      expect(translate("en", key), key).toBeTruthy();
     }
   });
 
@@ -204,7 +206,7 @@ describe("copy", () => {
       "install.menu.step2",
       "install.menu.step3",
     ] as const) {
-      const copy = translate(NORMAL, key).toLowerCase();
+      const copy = translate("en", key).toLowerCase();
       expect(copy, key).not.toContain("download");
       expect(copy, key).not.toContain("app store");
     }

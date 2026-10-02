@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import ReportPrefillForm from "@/components/ReportPrefillForm";

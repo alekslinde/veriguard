@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The verdict sheet is one object made of bands, and the bands have to share
 // an inset or it stops reading as one.
 //

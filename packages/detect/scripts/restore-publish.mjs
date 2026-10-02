@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Puts package.json back after packing. See prepare-publish.mjs for why the
 // file is edited in the first place.
 //

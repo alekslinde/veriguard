@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Shared verdict composition + defang helpers.
 //
 // The Check results page and the forward-to-us email reply must reach the SAME
@@ -24,7 +27,7 @@ import { formatBytes, type PartialCheck } from "@/lib/partialCheck";
 // the translator, and a hand-copied version already drifted once (a trailing
 // sentence was dropped silently). The email is English-only, so reading the
 // base bundle directly is both correct and the only copy that can be wrong.
-import enNormal from "@/messages/en.normal.json";
+import enMessages from "@/messages/en.json";
 
 // Severity ordering lives in the engine now: the WebExtension bundles the
 // engine and cannot reach `lib/`, and two rank tables that must agree is the
@@ -312,7 +315,7 @@ function scoreBand(score: number, findings: Signal[]): string {
       : score >= 20
         ? "verdict.score.band.suspicious"
         : "verdict.score.band.safe";
-  return (enNormal as Record<string, string>)[key] ?? "";
+  return (enMessages as Record<string, string>)[key] ?? "";
 }
 
 function escapeHtml(s: string): string {

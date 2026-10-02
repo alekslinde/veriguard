@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Reachability checker for the threat-intel source registry.
 //
 // Reads docs/threat-intel/sources.yml, requests every source URL, and reports

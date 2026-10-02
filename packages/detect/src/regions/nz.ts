@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // New Zealand — region pack.
 //
 // The closest region to Australia in scam playbook and language, which makes it

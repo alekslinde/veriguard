@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: Apache-2.0
+
 // Severity ordering for verdicts, and the worst-wins collapse built on it.
 //
 // This lived in `lib/verdictSummary.ts`, which is the right home for everything

@@ -1,0 +1,66 @@
+name: Licensing
+
+# Two checks that keep the repository's licensing honest:
+#
+#   REUSE  Every file has a licence and copyright, from its SPDX header or from
+#          REUSE.toml, and every licence named has its text in LICENSES/.
+#          licensing.test.ts additionally checks that each header names the
+#          right licence for its directory; this catches the files it can't
+#          read (images, data, config).
+#
+#   DCO    Every commit in a pull request is signed off (git commit -s),
+#          certifying https://developercertificate.org/. Skipped for the
+#          repository owner's own pull requests, since the owner holds the
+#          copyright already, and for bots, which cannot certify anything.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: licensing-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reuse:
+    name: REUSE
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: reuse lint
+        run: pipx run reuse==6.2.0 lint
+
+  dco:
+    name: DCO
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.author_association != 'OWNER' &&
+      github.event.pull_request.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Every commit is signed off by its author
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          missing=0
+          for sha in $(git rev-list --no-merges "$BASE..$HEAD"); do
+            email=$(git show -s --format=%ae "$sha")
+            if ! git show -s --format=%B "$sha" | grep -qiF "Signed-off-by:" ||
+               ! git show -s --format=%B "$sha" | grep -iE "^Signed-off-by:" | grep -qiF "<$email>"; then
+              echo "::error::$(git show -s --format='%h %s' "$sha") — no Signed-off-by for <$email>"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Sign off with: git rebase --signoff $BASE && git push --force-with-lease"
+            exit 1
+          fi

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Adding the app to a phone's home screen — what each platform actually
 // allows, and what we are therefore allowed to offer.
 //

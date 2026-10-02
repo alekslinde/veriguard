@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The small slice of MIME that forwarded-email handling needs: split headers
 // from body, walk multipart containers, undo Content-Transfer-Encoding, and
 // turn an HTML part into readable text.

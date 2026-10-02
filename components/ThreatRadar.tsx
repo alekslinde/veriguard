@@ -1,8 +1,11 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 "use client";
 
 // Threat radar — what's circulating now, grouped by how live it is.
 //
-// A client component for the same reason ScamCalendar is one: it reads the tone
+// A client component for the same reason ScamCalendar is one: it reads the language
 // preference, which lives in localStorage and is invisible to the server.
 //
 // Unlike the calendar it takes no date prop. Nothing here is computed against

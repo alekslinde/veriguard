@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { NextRequest, NextResponse } from "next/server";
 import { guardSubmission } from "@/lib/submissionGuard";
 import { generateReportId, storeReport, getStats } from "@/lib/reportStore";
