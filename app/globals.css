@@ -321,7 +321,7 @@ body:has(dialog[open]) {
    All of it is opt-in via motion-safe. Someone who has asked for less motion
    gets the same states, arriving instantly. */
 
-/* 0a. The home page's column is sized by the page, never by its contents.
+/* 0a. Every page's column is sized by the page, never by its contents.
        ────────────────────────────────────────────────────────────────────
        Opening a ways-in row under the check card used to widen everything
        above it: the card, the headline and the rows all went from ~619px to
@@ -345,8 +345,15 @@ body:has(dialog[open]) {
        about whether the tool is centred in the viewport.
 
        The caps still apply at every width, so nothing here moves: it only
-       stops an open disclosure being the thing that sets the measure. */
-main[data-home],
+       stops an open disclosure being the thing that sets the measure.
+
+       EVERY <main>, not just the home page's. Each route centres its <main>
+       the same way, so each was shrink-to-fit, and on a phone any unbreakable
+       line set the page width instead of the viewport. /packages laid out
+       620px wide at 375px: a code block's longest line was the min-content,
+       and the scroll it carries for exactly that never engaged, because its
+       parent had grown to fit it. */
+main,
 main[data-home] [data-home-tool] {
   width: 100%;
 }
