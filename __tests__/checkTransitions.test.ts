@@ -164,14 +164,20 @@ describe("the home page's centred tool", () => {
     // `stretch` by spec and sized shrink-to-fit instead. So neither had a
     // definite width, and the max-w each carries was only a ceiling the
     // content stayed under. width: 100% is what restores it.
-    const rule = CSS.slice(CSS.indexOf("main[data-home],"));
+    //
+    // Every <main>, not just the home page's: each route centres its column
+    // the same way. Probed 2026-10-03 at 375px: /packages laid out 620px wide,
+    // its longest code line setting the page width instead of scrolling.
+    const at = CSS.search(/(^|\n)main,\s*\nmain\[data-home\] \[data-home-tool\]\s*\{/);
+    expect(at).toBeGreaterThan(-1);
+    const rule = CSS.slice(at);
     expect(rule.slice(0, rule.indexOf("}"))).toMatch(/width:\s*100%/);
 
     // OUTSIDE the centring media query. <main> is a flex item of the layout
     // column at every viewport size, so scoping this fix to the sizes that
     // centre the tool left short laptop windows still resizing on open.
     const centring = CSS.indexOf("@media (min-width: 640px) and (min-height: 720px)");
-    expect(CSS.indexOf("main[data-home],")).toBeLessThan(centring);
+    expect(at).toBeLessThan(centring);
   });
 
   it("moves with a transition rather than a snap", () => {
