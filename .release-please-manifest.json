@@ -3,5 +3,5 @@
   "packages/detect": "0.1.1",
   "packages/mcp": "0.1.1",
   "extension": "0.3.2",
-  "workers/inbound-email": "0.6.0"
+  "workers/inbound-email": "0.7.0"
 }
