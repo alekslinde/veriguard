@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.39.1](https://github.com/alekslinde/veriguard/compare/app-v0.39.0...app-v0.39.1) (2026-10-03)
+
+
+### Fixes
+
+* **ui:** stop every page's column taking its width from its content ([#400](https://github.com/alekslinde/veriguard/issues/400)) ([f9b367e](https://github.com/alekslinde/veriguard/commit/f9b367e18a5216d8cb5beecdf8ca355ddf5a42f1))
+
 ## [0.39.0](https://github.com/alekslinde/veriguard/compare/app-v0.38.0...app-v0.39.0) (2026-10-02)
 
 
