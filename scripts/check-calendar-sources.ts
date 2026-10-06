@@ -40,22 +40,47 @@ interface SourceRef {
   cited: string[];
   /** Mirrors SeasonSource.expect — see lib/scamCalendar.ts. */
   expect?: "blocked" | "geofenced";
+  /** Every distinct `expect` the URL's citations declare, when they disagree. */
+  expectConflict?: string[];
+}
+
+interface CitingSeason {
+  code: string;
+  id: string;
+  sources: Array<{ url: string; label: string; expect?: "blocked" | "geofenced" }>;
 }
 
 /** Every source URL cited anywhere in the calendar, deduped, with its call sites. */
 function collectSources(): SourceRef[] {
+  return collectFrom(
+    authoredCalendarRegions().flatMap((code) =>
+      calendarForRegion(code).map((season) => ({ code, id: season.id, sources: season.sources })),
+    ),
+  );
+}
+
+/** collectSources over explicit seasons, so the merge can be tested without the data. */
+export function collectFrom(seasons: CitingSeason[]): SourceRef[] {
   const byUrl = new Map<string, SourceRef>();
-  for (const code of authoredCalendarRegions()) {
-    for (const season of calendarForRegion(code)) {
-      for (const source of season.sources) {
-        const ref = byUrl.get(source.url) ?? { url: source.url, label: source.label, cited: [] };
-        ref.cited.push(`${code}/${season.id}`);
-        // A URL is deduped across seasons, so one citation declaring it blocked
-        // declares it for all of them — the flag is about the HOST's behaviour,
-        // not about any one season's use of it.
-        if (source.expect) ref.expect = source.expect;
-        byUrl.set(source.url, ref);
+  for (const { code, id, sources } of seasons) {
+    for (const source of sources) {
+      const ref = byUrl.get(source.url) ?? { url: source.url, label: source.label, cited: [] };
+      ref.cited.push(`${code}/${id}`);
+      // A URL is deduped across seasons, so one citation declaring it blocked
+      // declares it for all of them — the flag is about the HOST's behaviour,
+      // not about any one season's use of it.
+      //
+      // Two citations declaring DIFFERENT flags is an authoring error, not
+      // something to settle by order: "blocked" short-circuits before the DNS
+      // check and "geofenced" does not, so whichever won would silently change
+      // what a dead host reports. Validation refuses it instead.
+      if (source.expect) {
+        if (ref.expect && ref.expect !== source.expect) {
+          ref.expectConflict = [...new Set([...(ref.expectConflict ?? [ref.expect]), source.expect])];
+        }
+        ref.expect = source.expect;
       }
+      byUrl.set(source.url, ref);
     }
   }
   return [...byUrl.values()].sort((a, b) => a.url.localeCompare(b.url));
@@ -63,11 +88,14 @@ function collectSources(): SourceRef[] {
 
 // ── Structure validation (no network) ────────────────────────────────────────
 
-function validate(sources: SourceRef[]): string[] {
+export function validate(sources: SourceRef[]): string[] {
   const errors: string[] = [];
   if (sources.length === 0) errors.push("calendar cites zero sources — parser or data is broken");
   for (const s of sources) {
     if (!s.label || !s.label.trim()) errors.push(`${s.url} has no label (cited by ${s.cited.join(", ")})`);
+    if (s.expectConflict) {
+      errors.push(`${s.url} is cited with conflicting expect flags (${s.expectConflict.join(" vs ")}) — cited by ${s.cited.join(", ")}`);
+    }
     if (!/^https:\/\//.test(s.url)) errors.push(`url must be https: ${s.url} (cited by ${s.cited.join(", ")})`);
     try {
       new URL(s.url);
@@ -99,6 +127,15 @@ export interface Result extends SourceRef {
   error?: string;
 }
 
+// Fallback rungs that show only that the HOST is up: the publisher's feed and
+// the site's own robots.txt or sitemap.xml. They are enough for the threat-intel
+// registry, which cites a body. A calendar citation is evidence for one claim,
+// so it is the page that matters, and a live host with a refused path is the
+// moved-page shape that lib/scamCalendar.ts calls rot ("if the site's root
+// responds and the path does not, it is rot"). Only an archived snapshot of the
+// page itself still counts as corroboration here.
+const HOST_ONLY_FALLBACK = new Set(["feed", "sitemap", "robots"]);
+
 async function checkOne(ref: SourceRef): Promise<Result> {
   const r = await checkSource({
     domain: new URL(ref.url).hostname.replace(/^www\./, ""),
@@ -107,6 +144,18 @@ async function checkOne(ref: SourceRef): Promise<Result> {
     name: ref.label,
     expect: ref.expect,
   });
+  if (r.state === "LIVE_FALLBACK" && r.via && HOST_ONLY_FALLBACK.has(r.via)) {
+    // A 5xx is the server failing, not the path refusing: it stays the
+    // problem state it would have been, rather than becoming rot.
+    const serverError = (r.status ?? 0) >= 500;
+    return {
+      ...ref,
+      state: serverError ? "SERVER_ERROR" : "DEAD",
+      status: r.status,
+      finalUrl: r.finalUrl,
+      error: `${r.error ?? "path not reached"} — only the host answered, which is how a moved page reads; if it is live in a browser, mark it \`expect: blocked\``,
+    };
+  }
   return {
     ...ref,
     state: (r.state ?? "UNREACHABLE") as State,

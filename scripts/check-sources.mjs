@@ -569,8 +569,11 @@ async function hostResolves(url, resolve = defaultResolve) {
     await resolve(hostname);
     return "resolves";
   } catch (err) {
-    const code = err?.code;
-    return code === "ENOTFOUND" || code === "ENODATA" ? "nxdomain" : "unknown";
+    // Only ENOTFOUND says the name does not exist. ENODATA says it DOES exist
+    // but holds no A or AAAA record in this resolver's view (split-horizon, a
+    // record migration), which a browser may still reach. Reporting that as
+    // NXDOMAIN would skip every corroborating probe and name the wrong cause.
+    return err?.code === "ENOTFOUND" ? "nxdomain" : "unknown";
   }
 }
 
@@ -735,12 +738,14 @@ async function checkOne(entry, { resolveHost = defaultResolve } = {}) {
         }
       }
       else if (!res.ok) {
-        // Catch-all for any other non-2xx (406, 421, 451, ...) not already
-        // branched on above. `expect: blocked` must be honoured here too —
-        // otherwise a WAF that happens to answer with a code this checker has
-        // not been individually taught about defeats the flag by surprise,
-        // the same gap that let a 400 slip through DEAD before 400 got its
-        // own branch above.
+        // Catch-all for any other non-2xx not already branched on above: 401
+        // (re-probed with GET, then lands here as DEAD — a login wall means the
+        // citation no longer serves the public), 406, 421, and so on. 451 is
+        // not one of them; it is a REFUSAL, handled above. `expect: blocked`
+        // must be honoured here too — otherwise a WAF that happens to answer
+        // with a code this checker has not been individually taught about
+        // defeats the flag by surprise, the same gap that let a 400 slip
+        // through DEAD before 400 got its own branch above.
         if (entry.expect === "blocked") {
           result.state = "BLOCKED";
           result.error = `HTTP ${res.status} (expected — bot protection)`;
@@ -797,6 +802,16 @@ async function checkOne(entry, { resolveHost = defaultResolve } = {}) {
           result.state = "LIVE_FALLBACK";
           result.via = live.via;
           result.error = `no direct response from CI; ${live.detail}`;
+          return result;
+        }
+        // Our agent got nothing, but a browser got a refusal: a live server
+        // answered. That is the same evidence the REFUSALS branch above treats
+        // as UNVERIFIED, and it must not become rot just because our own
+        // request hung first (the wa.gov.au misreading).
+        if (REFUSALS.has(browser.status)) {
+          result.state = "UNVERIFIED";
+          result.status = browser.status;
+          result.error = `no response to our agent; HTTP ${browser.status} to a browser — refused, not gone`;
           return result;
         }
         // A host that resolves but never answers is either geo-fenced or a
