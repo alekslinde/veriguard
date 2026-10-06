@@ -182,6 +182,12 @@ const AUTHORITY_MENTIONS = [
   // itself used as a lure ("we're investigating fraud on your account").
   "police", "metropolitan police", "national crime agency", "nca",
   "action fraud", "cifas",
+  // Action Fraud's successor (see reportingBody below). Matched only in title
+  // case, via caseSensitiveAuthorities: "report fraud" in lower case is how
+  // every bank says "call us to report fraud", which names no agency. Probed
+  // 2026-10-06: "Report Fraud: your lost funds ... have been recovered" got
+  // no authority credit.
+  "Report Fraud",
   // Financial regulators and the ombudsman. The FCA never cold-calls consumers,
   // and "FCA-approved" is a prohibited claim.
   "fca", "financial conduct authority", "financial ombudsman",
@@ -413,6 +419,8 @@ export const GB: RegionDefinition = {
   name: "United Kingdom",
   coverage: "full",
   languages: ["en"],
+  // "Report Fraud" is the service; "report fraud" is an ordinary verb phrase.
+  caseSensitiveAuthorities: ["Report Fraud"],
 
   urgency: {
     foreignAuthority: URGENCY_FOREIGN_AUTHORITY,
