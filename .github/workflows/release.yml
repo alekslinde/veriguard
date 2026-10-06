@@ -58,7 +58,7 @@ jobs:
       worker_released: ${{ steps.release.outputs['workers/inbound-email--release_created'] }}
       worker_tag: ${{ steps.release.outputs['workers/inbound-email--tag_name'] }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v5
         id: release
         with:
           config-file: release-please-config.json
