@@ -110,6 +110,11 @@ const URGENCY_TAX_THREAT = [
 const URGENCY_FOREIGN_AUTHORITY = [
   "arrest warrant", "detention order", "deportation notice",
   "money laundering investigation", "your visa will be cancelled",
+  // "Money laundering case" wording (2026-10-06 roadmap D6 / #427). Probed
+  // 2026-10-06: "linked to a money laundering case" scored safe 0 while
+  // "money laundering investigation" scored 35 — the list broke on one word.
+  "money laundering case", "linked to a money laundering",
+  "used in a money laundering", "case has been opened against you",
   "involved in criminal activity",
 ];
 

@@ -10,7 +10,7 @@ import { detectType } from "./detectType";
 import { analysePhone, type PhoneIntel } from "./phoneIntel";
 import { isShortened, expandUrl, type ExpandFetch } from "./urlExpander";
 import { resolveRegionPack, supportedRegions, DEFAULT_REGION, type RegionInput, type RegionCoverage, type RegionPack } from "./regions";
-import { KEYS_BY_POST_PHRASES, FAMILY_RELATION_TERMS, NEW_NUMBER_PRETEXT_PHRASES } from "./regions/base";
+import { KEYS_BY_POST_PHRASES, FAMILY_RELATION_TERMS, NEW_NUMBER_PRETEXT_PHRASES, SCAM_COACHING_PHRASES } from "./regions/base";
 import type { CheckResult, HostLookup, Signal, SignalSource } from "./engineTypes";
 
 // ScamType and CheckResult live in engineTypes.ts to break the import cycle
@@ -1647,6 +1647,18 @@ export function checkSms(
     sig.add("message", `Urgency language detected: "${urgencyHits.slice(0, 3).join('", "')}"`, Math.min(urgencyHits.length * 10, 35));
   }
 
+  // Scam coaching (#423): told to keep the bank out of it, or given a cover
+  // story for the teller. Scored once, however many phrases appear. Probed
+  // 2026-10-06: "Do not tell your bank about this call" in an FBI lure scored
+  // safe 0. Curly apostrophes are folded so "don’t" matches the list.
+  if (mentionsAny(lower.replace(/[\u2018\u2019]/g, "'"), SCAM_COACHING_PHRASES)) {
+    sig.add(
+      "message",
+      "Tells you to keep this from your bank, or what to tell the bank — scam coaching. No police force, agency or bank fraud team asks you to hide a payment from your bank. Anyone who does is the scammer.",
+      30,
+    );
+  }
+
   // Small-fee payment lure. A trivial amount — a few dollars of "customs",
   // "redelivery" or "processing" fee — attached to a payment demand. The money
   // is not the point: the amount is chosen to be too small to argue with, so
@@ -2238,6 +2250,32 @@ export function checkSms(
     sig.add("message", "Winnings held behind a verification step — the signature of fake gambling platform scams. A licensed operator verifies your identity when you sign up or when a payout is processed; none hold a balance you can see behind an extra 'verification' fee or ID upload. Money or documents sent at this step are not recoverable.", 40);
   }
 
+  // Recovery fraud, second stage (2026-10-06 roadmap D5 / #424). Base already
+  // carries the recovery OFFER ("we can recover your money", #179). This is the
+  // follow-up: the money "has been recovered", and a fee stands between the
+  // victim and it. CAFC (fraud trends H1 2026): recovery fraud is growing, and
+  // fraudsters pose as the CAFC itself. Probed 2026-10-06: the GB, US and CA
+  // forms all scored 0.
+  //
+  // Both halves are required. "Recovered" alone is everyday wording (a
+  // recovered account, a recovered parcel), but no police force, regulator or
+  // bank charges a fee to hand back recovered money. The gaps are bounded and
+  // stop at sentence ends (a decimal point in an amount is let through), so
+  // neither pattern can backtrack across the message.
+  const recoveredClaim =
+    /\b(?:funds?|money|losses|payment|deposit)\b(?:[^.!?]|\.(?=\d)){0,40}\b(?:have|has)\s+been\s+recovered\b/i.test(text) ||
+    /\bwe\s+(?:have\s+)?recovered\b(?:[^.!?]|\.(?=\d)){0,40}(?:[$£€]|\d)/i.test(text);
+  const releaseFee =
+    /\b(?:release|processing|clearance|recovery|transfer|administration|admin)\s+fees?\b/i.test(text) ||
+    /\bpay\b[^.!?]{0,40}\bto\s+release\b/i.test(text);
+  if (recoveredClaim && releaseFee) {
+    sig.add(
+      "message",
+      "Says your lost money has been recovered but needs a fee to release it — recovery fraud. No police force, regulator or bank charges you to return recovered funds. This is the same scammer, or one who bought the victim list, coming back for a second payment.",
+      35,
+    );
+  }
+
   // WhatsApp/Telegram investment-group pig-butchering funnel (D5 / #76 / ASIC
   // 26-063MR). Distinct from jobSignals: this targets the investing aspiration,
   // not the side-gig one. Require ≥2 signals, or 1 signal plus a crypto term, so
@@ -2347,6 +2385,21 @@ export function checkSms(
     if (channel === "sms" && urlMatch && mentionsAny(lower, PACK.noLinkSenders)) {
       sig.add("message", PACK.noLinkSendersFlag, 15);
     }
+  }
+
+  // Agency moves the case onto WhatsApp/Telegram (2026-10-06 roadmap D2 /
+  // #426). Probed 2026-10-06: "ATO notice: ... contact our officer on WhatsApp
+  // +61 ..." scored safe 0. Both halves are required — a named agency (prose
+  // only, so a link's hostname can't supply it) and an explicit instruction to
+  // continue on the app — so "message me on WhatsApp" from a friend is
+  // untouched. Opt-in per pack: see authorityMessagingAppFlag. The gap is
+  // bounded and excludes sentence ends, so it cannot backtrack across the text.
+  if (
+    PACK.authorityMessagingAppFlag &&
+    namedAuthorities.length > 0 &&
+    /\b(?:contact|message|chat|continue|reach|speak|talk)\b[^.!?]{0,40}\b(?:on|via|through|using)\s+(?:whatsapp|telegram)\b/i.test(proseOnly)
+  ) {
+    sig.add("message", PACK.authorityMessagingAppFlag, 30);
   }
 
   // Foreign-authority impersonation (D3 / #103 / AFP May 2026). Kept separate

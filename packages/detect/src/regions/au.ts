@@ -175,6 +175,11 @@ const URGENCY_TAX_THREAT = [
 const URGENCY_FOREIGN_AUTHORITY = [
   "arrest warrant", "detention order", "deportation notice",
   "money laundering investigation", "your visa will be cancelled",
+  // "Money laundering case" wording (2026-10-06 roadmap D6 / #427). Probed
+  // 2026-10-06: "linked to a money laundering case" scored safe 0 while
+  // "money laundering investigation" scored 35 — the list broke on one word.
+  "money laundering case", "linked to a money laundering",
+  "used in a money laundering", "case has been opened against you",
   "involved in criminal activity",
 ];
 
@@ -228,6 +233,14 @@ const AUTHORITY_MENTIONS = [
   // /usr/share/dict/words with zero hits, and no common word contains it.
   "vicroads", "service nsw", "servicensw", "transport nsw", "revenue nsw",
   "tmr qld", "qld transport", "department of transport wa", "vcat",
+  // AUSTRAC impersonation (2026-10-06 roadmap D1 / #425). AUSTRAC's Sep 2026
+  // alert: scammers name real AUSTRAC officials by email, phone, fake websites
+  // and WhatsApp/Telegram to push payments or disclosure, and AUSTRAC "will
+  // never unexpectedly request payments". Exchanges and remitters mention it
+  // in genuine KYC mail ("under AUSTRAC requirements..."), but a bare mention
+  // scores nothing — it only counts beside a link, an ask or urgency, the same
+  // trade every agency above makes.
+  "austrac", "australian transaction reports and analysis centre",
 ];
 
 // ATO/myGov/Medicare/Centrelink/Australia Post removed links from their
@@ -336,6 +349,7 @@ const LEGIT_DOMAINS = [
   "myhealth.gov.au", "australia.gov.au", "afp.gov.au", "accc.gov.au",
   "scamwatch.gov.au", "cyber.gov.au", "servicesaustralia.gov.au",
   "medicare.gov.au", "abf.gov.au", "homeaffairs.gov.au",
+  "austrac.gov.au",
 ];
 
 // AU crypto exchanges (D6 / #123). The TOAD variant sends "account suspended,
@@ -353,6 +367,8 @@ const TYPOSQUAT_BRANDS = [
   "medicare", "ebay", "telstra", "optus", "tpg",
   // Toll operators (D1 / #53) and immigration portals (D14 / #50)
   "linkt", "eastlink", "etoll", "homeaffairs", "dibp", "immi",
+  // AUSTRAC lookalike sites (#425), e.g. austrac-compliance.com
+  "austrac",
   // Food delivery platforms (D6 / #66)
   "doordash", "ubereats", "menulog", "deliveroo",
   // Super funds (D3/D4 / #64)
@@ -620,6 +636,13 @@ export const AU: RegionDefinition = {
   // label" is a scam tell — but only in Australia, hence its place here.
   senderIdFlag:
     "'Unverified' label override attempt — since 1 July 2026, legitimate Australian senders must register their SMS Sender ID with ACMA. A message asking you to ignore an 'Unverified' label is almost certainly a scam.",
+
+  // Agency moves the case onto WhatsApp/Telegram (2026-10-06 roadmap D2 /
+  // #426). AUSTRAC's Sep 2026 alert says it never directs people "to
+  // communicate through apps such as WhatsApp or Telegram", and no AU federal
+  // agency named above runs a case there.
+  authorityMessagingAppFlag:
+    "Claims to be from an Australian agency and asks you to continue on WhatsApp or Telegram — Australian government agencies don't move a case onto those apps; AUSTRAC, the ATO and Scamwatch all say so. A message from an 'agency' asking you to continue there is the scam.",
 
   reportingBody: "Scamwatch",
   reportingUrl: "https://www.scamwatch.gov.au",
