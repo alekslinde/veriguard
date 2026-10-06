@@ -815,12 +815,12 @@ describe("expect: blocked citations", () => {
     .flatMap((code) => calendarForRegion(code).flatMap((s) => s.sources))
     .filter((s) => s.expect);
 
-  it("only ever uses the one documented value", () => {
+  it("only ever uses a documented value", () => {
     // A typo ("Blocked", "block") would be silently ignored by the checker and
     // the citation would go back to reporting as dead, which is the confusing
     // failure rather than a loud one.
     for (const s of flagged) {
-      expect({ label: s.label, expect: s.expect }).toEqual({ label: s.label, expect: "blocked" });
+      expect(["blocked", "geofenced"], `${s.label}: expect: "${s.expect}"`).toContain(s.expect);
     }
   });
 

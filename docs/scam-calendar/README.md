@@ -69,16 +69,20 @@ check *now*.
 3. **When a source 404s** (flagged by the weekly check below), find the
    replacement page, update the source, and bump `reviewed`.
 
-   A **403 is not automatically rot.** The checker already retries with a
-   browser user-agent and reports `BLOCKED` when the host answers one, so a
-   403 that survives that is either a dead page or a WAF refusing every agent.
-   Tell them apart by asking for the site's **root**: if the root answers and
-   the path does not, the page moved (Garda, 2026-09-11); if the root refuses
-   too, it is edge protection (Action Fraud). Only in the second case set
-   `expect: "blocked"` on the citation — after opening it in a real browser —
-   and write the verification down next to it. A test requires that comment,
-   because the flag creates the one thing this archive exists to prevent: a
-   citation nothing checks.
+   A **403 is not rot.** The checker shares the threat-intel checker's probe
+   logic: it retries with a browser user-agent (`BLOCKED` when that gets
+   through), tries off-host evidence such as the site's robots.txt or a recent
+   Internet Archive capture (`LIVE_FALLBACK`), and reports a server that still
+   refuses every agent as `UNVERIFIED` — listed, never counted as rot. Only a
+   confirmed 404/410, a host that no longer resolves, or a move is `DEAD`.
+   An `UNVERIFIED` citation still needs a look: ask for the site's **root**
+   in a browser. If the root answers and the path does not, the page moved
+   (Garda, 2026-09-11); if the root refuses too, it is edge protection
+   (Action Fraud). Set `expect: "blocked"` (or `"geofenced"`, for a host that
+   drops connections from outside its own country) only after opening it in a
+   real browser, and write the verification down next to it. A test requires
+   that comment, because the flag creates the one thing this archive exists to
+   prevent: a citation nothing checks.
 
 ---
 

@@ -77,8 +77,15 @@ export interface SeasonSource {
    * 403 that is really a moved page — Garda returned 403 on a path that had
    * genuinely moved, and the root still answered, which is how to tell the two
    * apart: if the site's root responds and the path does not, it is rot.
+   *
+   * `"geofenced"` — the host resolves but drops every connection from outside
+   * its own country, and a human confirmed it live. Reported UNVERIFIED rather
+   * than as rot while the name still resolves. Same as the registry's flag.
+   *
+   * A plain 403/429/451 to every agent needs neither flag: the checker reports
+   * a live server refusing it as UNVERIFIED, not DEAD.
    */
-  expect?: "blocked";
+  expect?: "blocked" | "geofenced";
 }
 
 export interface ScamSeason {
