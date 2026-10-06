@@ -71,10 +71,13 @@ check *now*.
 
    A **403 is not rot.** The checker shares the threat-intel checker's probe
    logic: it retries with a browser user-agent (`BLOCKED` when that gets
-   through), tries off-host evidence such as the site's robots.txt or a recent
-   Internet Archive capture (`LIVE_FALLBACK`), and reports a server that still
-   refuses every agent as `UNVERIFIED` — listed, never counted as rot. Only a
-   confirmed 404/410, a host that no longer resolves, or a move is `DEAD`.
+   through), tries a recent Internet Archive capture of the page
+   (`LIVE_FALLBACK`), and reports a server that still refuses every agent as
+   `UNVERIFIED` — listed, never counted as rot. A confirmed 404/410, a host
+   that no longer resolves, or a move is `DEAD`. So is a refused path whose only
+   sign of life is the host's own robots.txt or sitemap: the threat-intel
+   registry accepts that because it cites a body, but a calendar citation cites
+   a page, and a live host with a refused path is how a moved page looks.
    An `UNVERIFIED` citation still needs a look: ask for the site's **root**
    in a browser. If the root answers and the path does not, the page moved
    (Garda, 2026-09-11); if the root refuses too, it is edge protection
@@ -82,7 +85,8 @@ check *now*.
    drops connections from outside its own country) only after opening it in a
    real browser, and write the verification down next to it. A test requires
    that comment, because the flag creates the one thing this archive exists to
-   prevent: a citation nothing checks.
+   prevent: a citation nothing checks. A URL cited by several seasons must carry the
+   same flag in all of them; `--validate` rejects a conflict.
 
 ---
 

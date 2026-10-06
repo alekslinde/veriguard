@@ -132,12 +132,14 @@ line nobody can now confirm.
 **The sweep brief** is the sweep's input. [`sweep-brief.ts`](../../scripts/sweep-brief.ts)
 runs in CI an hour before the sweep. It collects new items since the newest
 roadmap from every registered source with a `feed:`, adds the rotation plan,
-names the cycle's regions that have no feed, and publishes all of it as one
+names the cycle's regions that have no feed (or whose every feed failed this
+run), and publishes all of it as one
 *🧭 Weekly sweep brief* issue. Discovery needs no judgement, so it costs no
 model tokens; the sweep spends its budget on whether an item is a new tactic
 and whether the engine already catches it. Feed titles are third-party text:
-the script strips markup, caps length, and drops any item whose link is not
-https on the source's own host.
+the script strips markup, URLs and @-mentions, caps length, and drops any
+item whose link is not https on the source's own host. Links are printed in
+their parsed form, as autolinks, so nothing hidden in one renders as markdown.
 
 The brief is only as wide as the registry's feeds. A region with no
 feed-bearing source falls back to capped search, and the brief says which

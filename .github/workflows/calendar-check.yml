@@ -20,6 +20,8 @@ on:
     paths:
       - "lib/scamCalendar.ts"
       - "scripts/check-calendar-sources.ts"
+      # Reachability is delegated to the threat-intel checker's checkOne.
+      - "scripts/check-sources.mjs"
   workflow_dispatch:
 
 permissions:

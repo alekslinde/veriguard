@@ -3,7 +3,7 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 
-import { checkOne, markdown, type Result } from "../scripts/check-calendar-sources";
+import { checkOne, collectFrom, markdown, validate, type Result } from "../scripts/check-calendar-sources";
 
 // The calendar checker delegates reachability to the threat-intel checker, so
 // both apply one rule: DEAD needs a confirmed 404/410, NXDOMAIN or a move. Its
@@ -41,6 +41,54 @@ describe("calendar source reachability", () => {
     stubStatus(200);
     expect((await checkOne(ref)).state).toBe("OK");
   });
+
+  it("reports a refused path on a live host as rot — the moved-page shape", async () => {
+    // The page refuses every agent and only robots.txt answers. The registry
+    // reads that as LIVE_FALLBACK, because it cites a body. A calendar citation
+    // cites a page, and lib/scamCalendar.ts calls this exact shape rot.
+    vi.stubGlobal("fetch", async (input: string | URL) => {
+      const url = String(input);
+      const robots = url.endsWith("/robots.txt");
+      return {
+        status: robots ? 200 : 403, ok: robots, url,
+        text: async () => (robots ? "User-agent: *\nDisallow:" : ""), json: async () => ({}),
+      } as Response;
+    });
+    const r = await checkOne(ref);
+    expect(r.state).toBe("DEAD");
+    expect(r.error).toContain("only the host answered");
+  });
+
+  it("keeps a 5xx with a live robots.txt as SERVER_ERROR, not rot", async () => {
+    vi.stubGlobal("fetch", async (input: string | URL) => {
+      const url = String(input);
+      const robots = url.endsWith("/robots.txt");
+      return {
+        status: robots ? 200 : 520, ok: robots, url,
+        text: async () => (robots ? "User-agent: *\nDisallow:" : ""), json: async () => ({}),
+      } as Response;
+    });
+    expect((await checkOne(ref)).state).toBe("SERVER_ERROR");
+  });
+});
+
+describe("calendar citation flags", () => {
+  const season = (id: string, expect?: "blocked" | "geofenced") =>
+    ({ code: "IE", id, sources: [{ url: "https://x.example/p", label: "X", expect }] });
+
+  it("keeps one flag when the citations agree", () => {
+    const [ref] = collectFrom([season("a", "blocked"), season("b"), season("c", "blocked")]);
+    expect(ref.expect).toBe("blocked");
+    expect(ref.cited).toEqual(["IE/a", "IE/b", "IE/c"]);
+    expect(validate([ref])).toEqual([]);
+  });
+
+  it("refuses citations that declare different flags for one URL", () => {
+    // "blocked" skips the DNS check and "geofenced" does not, so letting the
+    // last one win would silently change what a dead host reports.
+    const [ref] = collectFrom([season("a", "geofenced"), season("b", "blocked")]);
+    expect(validate([ref]).join("\n")).toMatch(/conflicting expect flags \(geofenced vs blocked\)/);
+  });
 });
 
 describe("calendar digest wording", () => {
@@ -55,9 +103,9 @@ describe("calendar digest wording", () => {
   });
 
   it("lists corroborated-live sources in their own section, not as problems", () => {
-    const md = markdown([row("LIVE_FALLBACK", { via: "robots" })]);
+    const md = markdown([row("LIVE_FALLBACK", { via: "wayback" })]);
     expect(md).toContain("**0 need attention**");
-    expect(md).toContain("via robots");
+    expect(md).toContain("via wayback");
   });
 
   it("keeps the all-clear when everything is OK", () => {

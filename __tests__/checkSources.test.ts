@@ -948,6 +948,18 @@ describe("a live server refusing CI is never DEAD (wa.gov.au / ecrime.ae / CONDU
     expect(r.status).toBe(410);
   });
 
+  it("reports UNVERIFIED, not rot, when our agent hangs but a browser is refused", async () => {
+    // A live server answered the browser; our hung request is no evidence the
+    // page is gone. Same reading as a 403 to every agent on the direct path.
+    stub((ua) => (BROWSER.test(ua) ? 403 : "throw"));
+    const r = await checkOne(
+      { domain: "x.example", url: "https://x.example/p", tier: "3" },
+      { resolveHost: resolves },
+    );
+    expect(r.state).toBe("UNVERIFIED");
+    expect(r.status).toBe(403);
+  });
+
   it("still reports DEAD on a 404 the GET confirms", async () => {
     stub(() => 404);
     const r = await checkOne({ domain: "gone.example", url: "https://gone.example/x", tier: "3" });
@@ -998,7 +1010,8 @@ describe("a live server refusing CI is never DEAD (wa.gov.au / ecrime.ae / CONDU
   it("classifies DNS answers", async () => {
     expect(await hostResolves("https://x.example/", resolves)).toBe("resolves");
     expect(await hostResolves("https://x.example/", dnsError("ENOTFOUND"))).toBe("nxdomain");
-    expect(await hostResolves("https://x.example/", dnsError("ENODATA"))).toBe("nxdomain");
+    // ENODATA: the name exists, it just has no address records in this view.
+    expect(await hostResolves("https://x.example/", dnsError("ENODATA"))).toBe("unknown");
     expect(await hostResolves("https://x.example/", dnsError("ETIMEOUT"))).toBe("unknown");
     expect(await hostResolves("not a url", resolves)).toBe("unknown");
   });

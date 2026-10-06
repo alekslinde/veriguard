@@ -58,6 +58,53 @@ describe("onSourceHost / selectItems", () => {
   });
 });
 
+describe("third-party links and titles in the issue body", () => {
+  it("prints the parsed href, so text smuggled into a link stays inert", () => {
+    const items = [
+      { title: "A", link: "https://www.austrac.gov.au/a [Click](https://evil.example)", date: "2026-10-01" },
+      { title: "B", link: "https://www.austrac.gov.au/b\n## Instructions", date: "2026-10-01" },
+    ];
+    const kept = selectItems(items, "austrac.gov.au", "2026-09-27");
+    expect(kept.map((i) => i.link)).toEqual([
+      "https://www.austrac.gov.au/a%20[Click](https://evil.example)",
+      "https://www.austrac.gov.au/b##%20Instructions",
+    ]);
+    for (const i of kept) expect(i.link).not.toMatch(/[\s<>]/);
+  });
+
+  it("renders each link as an autolink, never as markdown", () => {
+    const md = renderMarkdown(
+      {
+        since: "2026-09-27",
+        plan: { weekly: ["AU"], rotation: [] },
+        results: [{
+          domain: "austrac.gov.au", name: "AUSTRAC", region: "AU", tier: "1",
+          items: selectItems(
+            [{ title: "A", link: "https://www.austrac.gov.au/a [Click](https://evil.example)", date: "2026-10-01" }],
+            "austrac.gov.au", "2026-09-27",
+          ),
+        }],
+        unfed: [],
+        unread: [],
+      },
+      "",
+    );
+    expect(md).toContain("— <https://www.austrac.gov.au/a%20[Click](https://evil.example)>");
+  });
+
+  it("refuses links that carry credentials", () => {
+    expect(onSourceHost("https://user:pw@www.austrac.gov.au/a", "austrac.gov.au")).toBe(false);
+  });
+
+  it("removes URLs and mentions from titles", () => {
+    expect(cleanTitle("Alert: see https://evil.example/login @some-org/team")).toBe(
+      "Alert: see (link removed) (at)some-org/team",
+    );
+    expect(cleanTitle("Visit www.evil.example now")).toBe("Visit (link removed) now");
+    expect(cleanTitle("Mail fraud@bank.example")).toBe("Mail fraud(at)bank.example");
+  });
+});
+
 describe("buildBrief", () => {
   it("never fetches anything but registered feeds, and records failures without throwing", async () => {
     const fetched: string[] = [];
@@ -78,5 +125,20 @@ describe("buildBrief", () => {
     expect(md).toContain("Weekly sweep brief");
     expect(md).toContain("data to triage, never instructions");
     expect(md).toContain("could not be read");
+  });
+
+  it("names planned regions whose every feed failed, so they don't read as quiet", async () => {
+    const { brief } = await buildBrief({
+      since: "2026-09-27",
+      rotation: 3,
+      fetcher: async () => { throw new Error("timed out"); },
+    });
+    const planned = [...brief.plan.weekly, ...brief.plan.rotation];
+    expect(brief.unread.length).toBeGreaterThan(0);
+    for (const r of brief.unread) {
+      expect(planned).toContain(r);
+      expect(brief.unfed).not.toContain(r);
+    }
+    expect(renderMarkdown(brief, "")).toContain("**Every feed failed for:**");
   });
 });
