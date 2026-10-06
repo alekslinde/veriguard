@@ -260,6 +260,36 @@ export const KEYS_BY_POST_PHRASES = [
   "post the keys to you",
 ];
 
+// Scam coaching (2026-10-06 roadmap D4 / #423). The caller tells the victim to
+// keep the bank, or the police, out of it, or hands them a cover story for the
+// teller. FBI IC3 PSA I-091726-PSA (17 Sep 2026): law-enforcement impersonators
+// "urge victims not to tell family, friends, financial institutions, or law
+// enforcement about the call". ANZ (Aug 2026) describes victims scripted, and
+// sometimes coached live, for questions from branch staff.
+//
+// Scored once per message at +30 in scamDetector, not as urgency: a +10
+// urgency hit is too weak for an instruction no bank, agency or relative has a
+// legitimate reason to give. Imperative forms only. Genuine bank anti-scam copy
+// says "if someone tells you not to tell your bank", which none of these match.
+// They are written with a straight apostrophe, and the message side is
+// normalised to match.
+//
+// Not listed: "don't tell anyone" (already a voice-clone urgency phrase, and
+// common in family surprises) and "do not discuss this with anyone" (ordinary
+// in workplace confidentiality notices). Both are too broad to carry +30.
+export const SCAM_COACHING_PHRASES = [
+  "do not tell your bank", "don't tell your bank",
+  "do not tell the bank", "don't tell the bank",
+  "do not tell bank staff", "don't tell bank staff",
+  "do not tell the bank staff", "don't tell the bank staff",
+  "do not tell the teller", "don't tell the teller",
+  "do not discuss this with your bank", "don't discuss this with your bank",
+  "tell the bank it is for", "tell the bank it's for",
+  "if the bank asks why", "if the teller asks why",
+  "do not discuss this call", "don't discuss this call",
+  "do not discuss this case", "don't discuss this case",
+];
+
 const SCAM_DOMAINS = [
   "bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly", "short.io",
   "rb.gy", "cutt.ly", "is.gd", "v.gd", "tiny.cc", "shorte.st",

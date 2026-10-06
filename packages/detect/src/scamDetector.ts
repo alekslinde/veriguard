@@ -10,7 +10,7 @@ import { detectType } from "./detectType";
 import { analysePhone, type PhoneIntel } from "./phoneIntel";
 import { isShortened, expandUrl, type ExpandFetch } from "./urlExpander";
 import { resolveRegionPack, supportedRegions, DEFAULT_REGION, type RegionInput, type RegionCoverage, type RegionPack } from "./regions";
-import { KEYS_BY_POST_PHRASES, FAMILY_RELATION_TERMS, NEW_NUMBER_PRETEXT_PHRASES } from "./regions/base";
+import { KEYS_BY_POST_PHRASES, FAMILY_RELATION_TERMS, NEW_NUMBER_PRETEXT_PHRASES, SCAM_COACHING_PHRASES } from "./regions/base";
 import type { CheckResult, HostLookup, Signal, SignalSource } from "./engineTypes";
 
 // ScamType and CheckResult live in engineTypes.ts to break the import cycle
@@ -1645,6 +1645,18 @@ export function checkSms(
   const urgencyHits = URGENCY_WORDS.filter((w) => mentions(lower, w));
   if (urgencyHits.length > 0) {
     sig.add("message", `Urgency language detected: "${urgencyHits.slice(0, 3).join('", "')}"`, Math.min(urgencyHits.length * 10, 35));
+  }
+
+  // Scam coaching (#423): told to keep the bank out of it, or given a cover
+  // story for the teller. Scored once, however many phrases appear. Probed
+  // 2026-10-06: "Do not tell your bank about this call" in an FBI lure scored
+  // safe 0. Curly apostrophes are folded so "don’t" matches the list.
+  if (mentionsAny(lower.replace(/[\u2018\u2019]/g, "'"), SCAM_COACHING_PHRASES)) {
+    sig.add(
+      "message",
+      "Tells you to keep this from your bank, or what to tell the bank — scam coaching. No police force, agency or bank fraud team asks you to hide a payment from your bank. Anyone who does is the scammer.",
+      30,
+    );
   }
 
   // Small-fee payment lure. A trivial amount — a few dollars of "customs",
