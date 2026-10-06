@@ -21,6 +21,8 @@ const words = (p: string) => read(p).replace(/\s+/g, " ").trim();
 /** The licence each directory is under. First match wins. */
 function expectedLicence(path: string): string {
   if (path === "packages/detect/src/publicSuffixList.ts") return "MPL-2.0";
+  // Bundled into @veriguard/mcp; see "keeps what mcp bundles from lib/ Apache-2.0".
+  if (path === "lib/signalTactics.ts") return "Apache-2.0";
   if (path.startsWith("packages/")) return "Apache-2.0";
   if (path.startsWith("extension/")) return "MPL-2.0";
   return "AGPL-3.0-or-later";
@@ -78,6 +80,7 @@ describe("licence declarations agree", () => {
       ['path = "extension/**"', "MPL-2.0"],
       ['path = ["docs/**", "messages/**"]', "CC-BY-SA-4.0"],
       ['path = "packages/detect/src/publicSuffixList.ts"', "MPL-2.0"],
+      ['path = "lib/signalTactics.ts"', "Apache-2.0"],
     ];
     for (const [path, licence] of pairs) {
       const block = toml.slice(toml.indexOf(path));
@@ -101,6 +104,23 @@ describe("licence declarations agree", () => {
       expect(words(`${dir}/LICENSE`)).toBe(words("LICENSES/Apache-2.0.txt"));
       expect(JSON.parse(read(`${dir}/package.json`)).files).toEqual(
         expect.arrayContaining(["LICENSE", "NOTICE"]),
+      );
+    }
+  });
+
+  it("keeps what mcp bundles from lib/ Apache-2.0", () => {
+    // tsup inlines anything src/ imports from outside the package, and the
+    // inlined copy loses its header. An AGPL lib/ module pulled in this way
+    // shipped in @veriguard/mcp 0.1.1 under the package's Apache-2.0 licence.
+    const src = "packages/mcp/src";
+    const bundled = tracked
+      .filter((f) => f.startsWith(`${src}/`) && f.endsWith(".ts"))
+      .flatMap((f) => [...read(f).matchAll(/from "(?:\.\.\/)+lib\/([\w-]+)\.js"/g)])
+      .map((m) => `lib/${m[1]}.ts`);
+    expect(bundled.length).toBeGreaterThan(0);
+    for (const f of new Set(bundled)) {
+      expect(read(f).split("\n").slice(0, 4).join("\n"), f).toContain(
+        "SPDX-License-Identifier: Apache-2.0",
       );
     }
   });

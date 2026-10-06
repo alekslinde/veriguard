@@ -2,3 +2,6 @@
 Copyright 2026 Aleksandr Linde
 
 Licensed under the Apache License 2.0 (LICENSE).
+
+dist/ also includes lib/signalTactics.ts from the Veriguard repository,
+inlined by the build and licensed under the Apache License 2.0 as well.

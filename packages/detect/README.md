@@ -7,6 +7,8 @@ Extracted from the Veriguard app so it can be bundled into clients that are not
 the Next.js app: the WebExtension first, then anything else that needs to score
 a message without sending it anywhere.
 
+Documentation: [veriguard.app/packages](https://veriguard.app/packages).
+
 *Last reviewed: 2026-10-01.*
 
 ```bash
