@@ -360,6 +360,40 @@ Sources: [Singapore Police Force — advisories](https://www.police.gov.sg/media
 
 ---
 
+## Region coverage
+
+| Region | Depth | Notes |
+|---|---|---|
+| AU | deep | Six searches; three gaps measured (D1–D3) |
+| GB | deep | Report Fraud and HMRC lures measured: already covered |
+| US | deep | FBI PSA and FTC alerts; one gap (D6) |
+| NZ | deep | NCSC and Netsafe; one gap (D7), one copy fix (D9) |
+| IE | deep | Garda FCN and PTSB texts; one gap (D8) |
+| CA | light | CAFC trends; routed to BASE (D5) |
+| DE | light | September carrier/parcel wave; nothing to propose at minimal tier |
+| IN | light | Digital arrest; deferral stands |
+| KE | light | Prize and M-PESA texts; covered by base rules |
+| SG | light | ICA + Chinese officials; measured, covered |
+| AE | skipped | Not searched this cycle |
+| BR | skipped | Not searched this cycle |
+| ES | skipped | Not searched this cycle |
+| FR | skipped | Not searched this cycle |
+| ID | skipped | Not searched this cycle |
+| IT | skipped | Not searched this cycle |
+| JP | skipped | Named in a combined search with no result read for it |
+| KR | skipped | Not searched this cycle |
+| MX | skipped | Not searched this cycle |
+| NG | skipped | Named in a combined search with no result read for it |
+| NL | skipped | Not searched this cycle |
+| PH | skipped | Not searched this cycle |
+| PL | skipped | Not searched this cycle |
+| SE | skipped | Not searched this cycle |
+| TH | skipped | Not searched this cycle |
+| VN | skipped | Not searched this cycle |
+| ZA | skipped | Named in a combined search with no result read for it |
+
+---
+
 ## Proposed detection improvements
 
 | ID | Tactic | Proposed rule | Target pack/file | Region(s) | FP risk | Priority |
