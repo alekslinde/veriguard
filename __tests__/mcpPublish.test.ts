@@ -40,6 +40,21 @@ const built = existsSync(CLI);
 
 const pkg = JSON.parse(readFileSync(path.join(PKG_DIR, "package.json"), "utf8"));
 
+/**
+ * npm's semantics for the two range forms the manifest test allows: an exact
+ * version, or a caret — which pre-1.0 pins the leftmost non-zero component.
+ */
+function satisfiesCaret(version: string, range: string): boolean {
+  const parse = (v: string) => v.split(".").map(Number);
+  const v = parse(version);
+  if (!range.startsWith("^")) return range === version;
+  const r = parse(range.slice(1));
+  const pinned = r[0] !== 0 ? 1 : r[1] !== 0 ? 2 : 3;
+  for (let i = 0; i < pinned; i++) if (v[i] !== r[i]) return false;
+  for (let i = pinned; i < 3; i++) if (v[i] !== r[i]) return v[i] > r[i];
+  return true;
+}
+
 /** Every emitted .js, concatenated — the whole runtime surface a consumer gets. */
 function bundledSource(): string {
   const files = ["cli.js", "server.js"];
@@ -156,6 +171,19 @@ describe("MCP package — manifest", () => {
     const range = (pkg.dependencies as Record<string, string>)["@veriguard/detect"];
     expect(range).toBeTruthy();
     expect(range).toMatch(/^\^?\d+\.\d+\.\d+/);
+  });
+
+  it("declares a range the engine in this tree satisfies", () => {
+    // Release PRs bump the engine alone. Pre-1.0 a caret stops at the next
+    // minor, so ^0.1.1 rejects 0.2.0: npm then wants the registry copy instead
+    // of the workspace, the lockfile no longer matches, and every `npm ci` on
+    // that release PR fails before a single check runs. Raise this range (and
+    // regenerate package-lock.json) in the same change as the engine's version.
+    const range = (pkg.dependencies as Record<string, string>)["@veriguard/detect"];
+    const engine = JSON.parse(
+      readFileSync(path.join(process.cwd(), "packages/detect/package.json"), "utf8"),
+    ).version as string;
+    expect(satisfiesCaret(engine, range), `${range} does not accept engine ${engine}`).toBe(true);
   });
 
   it("ships only dist and the documents, never source", () => {
