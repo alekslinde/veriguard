@@ -204,6 +204,9 @@ const GENERIC_INSTITUTION_TERMS = new Set([
   "tax office", "police", "customs", "immigration", "border force",
   "social security", "health service", "electoral commission",
   "consumer protection", "attorney general", "state police",
+  // GB, IE and NZ each have a National Cyber Security Centre. Only NZ lists the
+  // full name, so without this every UK or Irish NCSC message read as NZ.
+  "national cyber security centre",
   // GB's Report Fraud service. Matched by case in the engine, but this probe
   // ignores case, and "call us to report fraud" is ordinary bank wording in
   // every region.

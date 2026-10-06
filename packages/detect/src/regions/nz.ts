@@ -141,6 +141,13 @@ const AUTHORITY_MENTIONS = [
   // itself used as a lure ("we're investigating fraud on your account").
   "nz police", "new zealand police", "police",
   "cert nz", "netsafe", "dia", "department of internal affairs",
+  // The NCSC, which CERT NZ merged into (2026-10-06 roadmap D7 / #428). NCSC
+  // NZ alert "Scammers impersonating the NCSC": scam calls claim to come from
+  // it, and it "does not generally initiate unsolicited contact". Probed
+  // 2026-10-06: "NCSC alert: your device has been compromised. Call 0800 ..."
+  // scored safe 10. GB and IE have their own NCSCs, but this entry only applies
+  // under the NZ pack. No English word starts with "ncsc".
+  "ncsc", "national cyber security centre",
   // Financial regulators. The FMA never cold-calls consumers, and
   // "FMA-registered" is a common false-legitimacy claim.
   "fma", "financial markets authority", "commerce commission", "comcom",
@@ -213,7 +220,7 @@ const LEGIT_DOMAINS = [
   "acc.co.nz", "nzta.govt.nz", "immigration.govt.nz",
   "tewhatuora.govt.nz", "health.govt.nz",
   "realme.govt.nz", "police.govt.nz",
-  "cert.govt.nz", "netsafe.org.nz", "consumerprotection.govt.nz",
+  "cert.govt.nz", "ncsc.govt.nz", "netsafe.org.nz", "consumerprotection.govt.nz",
   "fma.govt.nz", "comcom.govt.nz", "rbnz.govt.nz",
   "nzpost.co.nz",
 ];
