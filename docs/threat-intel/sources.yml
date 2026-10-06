@@ -204,6 +204,15 @@ tiers:
       region: AU
       check: manual
       note: Visa-scam impersonation target.
+    - domain: austrac.gov.au
+      name: AUSTRAC — scam alerts
+      url: https://www.austrac.gov.au/scam-alert-scammers-impersonating-austrac-staff
+      region: AU
+      check: manual
+      note: >-
+        Financial-intelligence regulator. Its own alert (Sep 2026) on staff
+        impersonation by email, phone, fake sites and WhatsApp/Telegram — the
+        2026-10-06 roadmap's AU-D1 and AU-D2 rest on it.
     - domain: ic3.gov
       name: FBI IC3
       url: https://www.ic3.gov/PSA
@@ -824,6 +833,14 @@ tiers:
       name: SANS Internet Storm Center
       url: https://isc.sans.edu/diary.html
       feed: https://isc.sans.edu/rssfeed.xml
+    - domain: group-ib.com
+      name: Group-IB
+      url: https://www.group-ib.com/blog/
+      check: manual
+      note: >-
+        Threat-intel vendor with first-hand PhaaS kit analysis (Phoenix System,
+        the Smishing Triad JWR kit, Sep 2026). Vendor-measured, so corroborate
+        before a figure carries a score alone.
     - domain: netcraft.com
       name: Netcraft
       url: https://www.netcraft.com/resources/blog
