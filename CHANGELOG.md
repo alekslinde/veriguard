@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.39.3](https://github.com/alekslinde/veriguard/compare/app-v0.39.2...app-v0.39.3) (2026-10-06)
+
+
+### Fixes
+
+* **config:** ship mcp's bundled lib code as Apache-2.0, link package docs ([#418](https://github.com/alekslinde/veriguard/issues/418)) ([4bdb288](https://github.com/alekslinde/veriguard/commit/4bdb2880ae64981f9ba887362e8032a437708b35))
+* **threat-intel:** stop reporting live sources as dead in the source check ([#422](https://github.com/alekslinde/veriguard/issues/422)) ([9179e16](https://github.com/alekslinde/veriguard/commit/9179e16097e74e3117820993db78e83769637468))
+
 ## [0.39.2](https://github.com/alekslinde/veriguard/compare/app-v0.39.1...app-v0.39.2) (2026-10-06)
 
 
