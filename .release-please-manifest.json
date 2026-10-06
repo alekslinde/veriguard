@@ -1,7 +1,7 @@
 {
   ".": "0.39.2",
   "packages/detect": "0.2.0",
-  "packages/mcp": "0.1.1",
+  "packages/mcp": "0.1.2",
   "extension": "0.4.0",
   "workers/inbound-email": "0.7.0"
 }
