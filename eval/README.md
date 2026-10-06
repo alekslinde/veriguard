@@ -499,10 +499,11 @@ the second-largest module in the engine.
 
 | File | Cases | What it is |
 |---|---|---|
-| `au-sms.jsonl`, `au-url.jsonl`, `au-email.jsonl` | 47 | AU scams and a small benign set |
+| `au-sms.jsonl`, `au-url.jsonl`, `au-email.jsonl` | 42 | AU scams and a small benign set |
 | `au-benign-senders.jsonl` | 10 | Genuine sender templates — see below |
 | `au-phone.jsonl` | 5 | The phone path, previously unmeasured |
-| `multi-region.jsonl` | 12 | GB / US / NZ / CA / fallback |
+| `multi-region.jsonl`, `intl-benign-senders.jsonl` | 25 | GB / US / NZ / IE / CA / fallback |
+| `audit-breaks.jsonl` | 9 | Break surfaces from the 2026-10 eval audit; each case's `notes` names its finding |
 
 ### Benign sender templates (AU)
 
@@ -611,7 +612,19 @@ everything that did use it. They are now routed through the one matcher.
 
 ## Known open violations
 
-None. All 14 relations hold across 354 checks.
+Two, both `forwarded-prefix` on cases added by the 2026-10 eval audit, plus
+their 11 composite echoes (every composite violation in the current run names
+`forwarded-prefix` as the step that shed the points):
+
+- `au-sms-0017`: `suspicious (22) → safe (15)`. A bare-host lure already two
+  points above the `safe` line goes fully clean inside a forward wrapper.
+- `sg-sms-0001`: `likely_scam (45) → suspicious (31)`. A minimal-pack brand
+  lure drops a full verdict tier when the SMS-channel rules stop applying.
+
+Triage has not yet decided whether these are engine defects (over-reliance on
+channel-anchored signals) or harness scope (a category exclusion like the one
+`parcel-delivery` / `toll` / `government` already carry). Until it does, this
+branch is red on `eval:metamorphic` by design.
 
 The last two — `benign-padding` on `au-sms-0010` and `au-sms-0014` — were closed
 by giving the family gate a second way to recognise address. It anchored on

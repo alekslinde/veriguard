@@ -1,0 +1,40 @@
+# Eval-audit break surfaces (2026-10-06).
+#
+# Each case below pins a finding from the evaluation audit to a concrete input,
+# so a future engine or harness change that moves one of these verdicts shows
+# up as a named baseline regression instead of a silent drift. All forked from
+# inputs the audit measured by hand against analyzeContent; the notes record
+# the score at commit time and which audit finding the case covers.
+#
+# au-sms-0017: bare-host sentence guard. "freemoney.tk" loses its URL card to
+#   the prose-continuation rule and scores 22 (suspicious) on message signals
+#   alone — two points above the safe line. Unit cover in
+#   __tests__/bareHostname.test.ts; this is the eval-layer ratchet.
+# au-sms-0018 / au-sms-0019: forwarded-prefix is never applied by the
+#   metamorphic suite to parcel-delivery / toll / government cases, by category
+#   exclusion. These are the composed inputs the harness skips, committed
+#   directly: 100 -> 90 and 65 -> 45 respectively at commit time.
+# au-sms-0020: card truncation. analyzeContent scores at most 3 URLs per input,
+#   so the 4th host is examined by neither the engine nor the eval.
+# au-sms-0021: shortener without expansion. The eval stubs the fetcher, so this
+#   pins the unexpanded verdict (85 at commit time); prod with a transport
+#   takes max(base, destination) and may read higher.
+# au-sms-0022: bare host carrying a query string. url-tracking-params only
+#   applies to schemed URLs, so this shape has no transform coverage.
+# au-sms-0023: callback number in a PII shape the corpus privacy gate does not
+#   recognise (parenthesised AU mobile). Declared in "identifiers" anyway, so
+#   the case keeps loading if the gate is ever widened to see it. Number is
+#   ACMA drama range (0491 570 156-216), never a real subscriber.
+# de-sms-0001 / sg-sms-0001: minimal-pack brand impersonation with no
+#   open-suffix probe covering the region (probes exist for GB/AU/CA/NZ only).
+#   Both abstain under minimal coverage (25 / 45 at commit time) — expected
+#   until the packs go full, same standing as ca-sms-0001.
+{"id": "au-sms-0017", "type": "sms", "region": "AU", "content": "claim now at freemoney.tk urgently", "label": "scam", "source": "handwritten", "addedAt": "2026-10-06", "notes": "Audit 2026-10-06: bare-host sentence guard suppresses the URL card; scores suspicious (22) on message signals alone. Verdict-only metamorphic relations cannot see further erosion toward the 20-point line."}
+{"id": "au-sms-0018", "type": "sms", "region": "AU", "content": "---------- Forwarded message ----------\nFrom: Unknown <unknown@example.invalid>\nDate: 2 Sep 2026\nSubject: Fwd: hi\n\nAusPost: your parcel is held at customs. Pay the outstanding import duty to release your parcel: http://auspost-clearance.cyou/pay", "label": "scam", "category": "parcel-delivery", "source": "handwritten", "addedAt": "2026-10-06", "identifiers": ["unknown@example.invalid"], "notes": "Audit 2026-10-06: the composed input forwarded-prefix would build on a parcel case but never checks (category exclusion). Scores likely_scam (90) vs 100 unforwaded."}
+{"id": "au-sms-0019", "type": "sms", "region": "AU", "content": "---------- Forwarded message ----------\nFrom: Unknown <unknown@example.invalid>\nDate: 2 Sep 2026\nSubject: Fwd: hi\n\nToll: you have an unpaid toll fee of $4.20. Pay now at http://toll-notice.cyou/bill to avoid extra charges", "label": "scam", "category": "toll", "source": "handwritten", "addedAt": "2026-10-06", "identifiers": ["unknown@example.invalid"], "notes": "Audit 2026-10-06: same composed-input gap as au-sms-0018 for the toll category. Scores likely_scam (45) vs 65 unforwaded — exactly on the verdict floor."}
+{"id": "au-sms-0020", "type": "sms", "region": "AU", "content": "AusPost: parcels held, track them here auspost-track.cyou/p1 auspost-track.top/p2 auspost-track.shop/p3 auspost-track.xyz/p4", "label": "scam", "category": "parcel-delivery", "source": "handwritten", "addedAt": "2026-10-06", "notes": "Audit 2026-10-06: at most 3 URLs per input are scored, so the 4th host is examined by neither the engine nor the eval. Scores likely_scam (75) via the first three."}
+{"id": "au-sms-0021", "type": "sms", "region": "AU", "content": "AusPost: your parcel is held at the depot. Track it here http://bit.ly/3xQz9Lm", "label": "scam", "category": "parcel-delivery", "source": "handwritten", "addedAt": "2026-10-06", "notes": "Audit 2026-10-06: shortener with the eval fetcher stubbed, pinning the unexpanded verdict (likely_scam, 85). Prod with a transport scores max(base, destination)."}
+{"id": "au-sms-0022", "type": "sms", "region": "AU", "content": "AusPost: pay the $2.99 redelivery fee at auspost-redelivery.top/pay?ref=auspost2026 to release your parcel", "label": "scam", "category": "parcel-delivery", "source": "handwritten", "addedAt": "2026-10-06", "notes": "Audit 2026-10-06: bare host carrying a query string. url-tracking-params only applies to schemed URLs, so no transform covers this shape. Scores likely_scam (75)."}
+{"id": "au-sms-0023", "type": "sms", "region": "AU", "content": "Hi Mum, I dropped my phone and need $400 urgently, can you transfer to (0491) 570 160 please", "label": "scam", "category": "family-impersonation", "source": "handwritten", "addedAt": "2026-10-06", "identifiers": ["(0491) 570 160"], "notes": "Audit 2026-10-06: parenthesised mobile is a PII shape findPii does not recognise; declared anyway so the case survives a gate widening. Drama-range number, never real. Scores likely_scam (55)."}
+{"id": "de-sms-0001", "type": "sms", "region": "DE", "content": "Sparkasse: Ihr Konto wurde gesperrt. Verifizieren Sie es unter http://sparkasse-verify-secure.de/login", "label": "scam", "category": "bank-impersonation", "source": "handwritten", "addedAt": "2026-10-06", "notes": "Audit 2026-10-06: minimal-pack brand impersonation with no open-suffix probe covering DE. Abstains under minimal coverage (suspicious, 25) — expected until the pack goes full."}
+{"id": "sg-sms-0001", "type": "sms", "region": "SG", "content": "DBS: your account has been locked. Verify now at http://dbs-secure-verify.sg/login", "label": "scam", "category": "bank-impersonation", "source": "handwritten", "addedAt": "2026-10-06", "notes": "Audit 2026-10-06: same gap as de-sms-0001 for SG. Abstains under minimal coverage (likely_scam, 45) — expected until the pack goes full."}

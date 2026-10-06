@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-09",
+  "generatedAt": "2026-10-06",
   "suspiciousAs": "flagged",
   "predictions": {
     "au-sms-2001": "clean",
@@ -59,6 +59,15 @@
     "au-url-1003": "clean",
     "au-url-1004": "clean",
     "au-url-1005": "clean",
+    "au-sms-0017": "flagged",
+    "au-sms-0018": "flagged",
+    "au-sms-0019": "flagged",
+    "au-sms-0020": "flagged",
+    "au-sms-0021": "flagged",
+    "au-sms-0022": "flagged",
+    "au-sms-0023": "flagged",
+    "de-sms-0001": "abstain",
+    "sg-sms-0001": "abstain",
     "gb-sms-1002": "clean",
     "gb-sms-1003": "clean",
     "gb-sms-1004": "clean",
