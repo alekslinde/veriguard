@@ -446,6 +446,15 @@ export interface RegionDefinition {
    */
   senderIdFlag?: string;
 
+  /**
+   * Flag for an agency message that moves the conversation onto WhatsApp or
+   * Telegram. Whether a government uses those apps is a per-country fact —
+   * Singapore runs official Gov.sg WhatsApp channels, and some agencies
+   * elsewhere take reports there — so only a region whose agencies are on
+   * record as never doing it sets this, and the rule is skipped elsewhere.
+   */
+  authorityMessagingAppFlag?: string;
+
   /** Where to report a confirmed scam — the agency differs per jurisdiction. */
   reportingBody: string;
 
@@ -530,6 +539,7 @@ export interface RegionPack {
   legitDomainFlag: string;
   legitDomainDetails: string;
   senderIdFlag?: string;
+  authorityMessagingAppFlag?: string;
   reportingBody: string;
   /** Resolved report-a-scam URL; absent where the definition carries none. */
   reportingUrl?: string;
