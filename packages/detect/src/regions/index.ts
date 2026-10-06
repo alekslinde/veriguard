@@ -197,6 +197,7 @@ function buildPack(region: RegionDefinition): RegionPack {
     legitDomainFlag: region.legitDomainFlag,
     legitDomainDetails: region.legitDomainDetails,
     senderIdFlag: region.senderIdFlag,
+    authorityMessagingAppFlag: region.authorityMessagingAppFlag,
     reportingBody: region.reportingBody,
     reportingUrl: region.reportingUrl,
     // Normalised to an object so phoneIntel can read fields unconditionally;

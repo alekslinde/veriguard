@@ -2349,6 +2349,21 @@ export function checkSms(
     }
   }
 
+  // Agency moves the case onto WhatsApp/Telegram (2026-10-06 roadmap D2 /
+  // #426). Probed 2026-10-06: "ATO notice: ... contact our officer on WhatsApp
+  // +61 ..." scored safe 0. Both halves are required — a named agency (prose
+  // only, so a link's hostname can't supply it) and an explicit instruction to
+  // continue on the app — so "message me on WhatsApp" from a friend is
+  // untouched. Opt-in per pack: see authorityMessagingAppFlag. The gap is
+  // bounded and excludes sentence ends, so it cannot backtrack across the text.
+  if (
+    PACK.authorityMessagingAppFlag &&
+    namedAuthorities.length > 0 &&
+    /\b(?:contact|message|chat|continue|reach|speak|talk)\b[^.!?]{0,40}\b(?:on|via|through|using)\s+(?:whatsapp|telegram)\b/i.test(proseOnly)
+  ) {
+    sig.add("message", PACK.authorityMessagingAppFlag, 30);
+  }
+
   // Foreign-authority impersonation (D3 / #103 / AFP May 2026). Kept separate
   // from authorityMentions because the reasoning is different and stronger: an
   // authority with no enforcement jurisdiction here demanding payment is a scam
