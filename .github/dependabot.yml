@@ -27,6 +27,14 @@ updates:
     commit-message:
       prefix: "chore(deps)"
       prefix-development: "chore(deps-dev)"
+    # ESLint 10 removed context.getFilename(), which eslint-plugin-react still
+    # calls; that plugin comes in through eslint-config-next, and no release of
+    # either supports ESLint 10 yet (eslint-plugin-react 7.37.5 peers on ^9.7).
+    # `npm run lint` crashes on the first file. Drop this once
+    # eslint-config-next ships a React plugin that supports ESLint 10.
+    ignore:
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
     groups:
       production-minor-patch:
         dependency-type: "production"
