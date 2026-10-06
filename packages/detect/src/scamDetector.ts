@@ -2238,6 +2238,32 @@ export function checkSms(
     sig.add("message", "Winnings held behind a verification step — the signature of fake gambling platform scams. A licensed operator verifies your identity when you sign up or when a payout is processed; none hold a balance you can see behind an extra 'verification' fee or ID upload. Money or documents sent at this step are not recoverable.", 40);
   }
 
+  // Recovery fraud, second stage (2026-10-06 roadmap D5 / #424). Base already
+  // carries the recovery OFFER ("we can recover your money", #179). This is the
+  // follow-up: the money "has been recovered", and a fee stands between the
+  // victim and it. CAFC (fraud trends H1 2026): recovery fraud is growing, and
+  // fraudsters pose as the CAFC itself. Probed 2026-10-06: the GB, US and CA
+  // forms all scored 0.
+  //
+  // Both halves are required. "Recovered" alone is everyday wording (a
+  // recovered account, a recovered parcel), but no police force, regulator or
+  // bank charges a fee to hand back recovered money. The gaps are bounded and
+  // stop at sentence ends (a decimal point in an amount is let through), so
+  // neither pattern can backtrack across the message.
+  const recoveredClaim =
+    /\b(?:funds?|money|losses|payment|deposit)\b(?:[^.!?]|\.(?=\d)){0,40}\b(?:have|has)\s+been\s+recovered\b/i.test(text) ||
+    /\bwe\s+(?:have\s+)?recovered\b(?:[^.!?]|\.(?=\d)){0,40}(?:[$£€]|\d)/i.test(text);
+  const releaseFee =
+    /\b(?:release|processing|clearance|recovery|transfer|administration|admin)\s+fees?\b/i.test(text) ||
+    /\bpay\b[^.!?]{0,40}\bto\s+release\b/i.test(text);
+  if (recoveredClaim && releaseFee) {
+    sig.add(
+      "message",
+      "Says your lost money has been recovered but needs a fee to release it — recovery fraud. No police force, regulator or bank charges you to return recovered funds. This is the same scammer, or one who bought the victim list, coming back for a second payment.",
+      35,
+    );
+  }
+
   // WhatsApp/Telegram investment-group pig-butchering funnel (D5 / #76 / ASIC
   // 26-063MR). Distinct from jobSignals: this targets the investing aspiration,
   // not the side-gig one. Require ≥2 signals, or 1 signal plus a crypto term, so
