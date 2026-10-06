@@ -25,16 +25,13 @@
 //
 // Exit codes: 0 all reachable · 1 rot found · 2 structure invalid.
 
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { authoredCalendarRegions, calendarForRegion } from "../lib/scamCalendar";
+import { checkOne as checkSource } from "./check-sources.mjs";
 
-const TIMEOUT_MS = 30_000; // several .gov sites answer slowly; short budgets cry wolf.
 const CONCURRENCY = 6;
-const RETRIES = 1;
-
-const USER_AGENT =
-  "veriguard-calendar-check/1.0 (+https://github.com/alekslinde/veriguard; abuse-reporting tool)";
-const BROWSER_UA =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 
 interface SourceRef {
   url: string;
@@ -42,7 +39,7 @@ interface SourceRef {
   /** "AU/tax-time, GB/self-assessment" — where the URL is cited, for the report. */
   cited: string[];
   /** Mirrors SeasonSource.expect — see lib/scamCalendar.ts. */
-  expect?: "blocked";
+  expect?: "blocked" | "geofenced";
 }
 
 /** Every source URL cited anywhere in the calendar, deduped, with its call sites. */
@@ -82,132 +79,42 @@ function validate(sources: SourceRef[]): string[] {
 }
 
 // ── Reachability ─────────────────────────────────────────────────────────────
+//
+// Delegated to the threat-intel checker's checkOne, so both digests apply one
+// rule about what counts as rot. This file used to carry its own copy of the
+// probe logic, without the off-host fallback rungs or the DNS check, and it
+// called a page DEAD on "403 to any agent" — the misreading that had live
+// threat-intel sources (wa.gov.au, ecrime.ae) reported dead or retired. DEAD
+// now needs positive evidence: a confirmed 404/410, NXDOMAIN, or a move.
 
-type State = "OK" | "DEAD" | "REDIRECTED" | "BLOCKED" | "SERVER_ERROR" | "TIMEOUT" | "UNREACHABLE";
+type State =
+  | "OK" | "DEAD" | "REDIRECTED" | "BLOCKED" | "SERVER_ERROR" | "TIMEOUT" | "UNREACHABLE"
+  | "LIVE_FALLBACK" | "UNVERIFIED";
 
-interface Result extends SourceRef {
+export interface Result extends SourceRef {
   state: State;
   status?: number;
   finalUrl?: string;
+  via?: string;
   error?: string;
 }
 
-async function withTimeout<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    return await fn(controller.signal);
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function probe(url: string, method: string, signal: AbortSignal, ua = USER_AGENT) {
-  return fetch(url, {
-    method,
-    redirect: "follow",
-    signal,
-    headers: { "User-Agent": ua, Accept: "text/html,application/xhtml+xml,*/*" },
-  });
-}
-
-// A redirect onto a bare homepage, or a different host, is the classic sign of a
-// reorganised site that dropped the deep link: reachable, but the citation is gone.
-function landedElsewhere(requested: string, final: string): boolean {
-  const from = new URL(requested);
-  const to = new URL(final);
-  const landedOnRoot = to.pathname === "/" && from.pathname !== "/";
-  const changedHost = to.hostname.replace(/^www\./, "") !== from.hostname.replace(/^www\./, "");
-  return landedOnRoot || changedHost;
-}
-
-// Tells "a WAF is refusing our bot" apart from "the host is gone" — a browser-UA
-// 200 on the same URL means BLOCKED (reachable, unverifiable), never laundered to OK.
-async function probeWithBrowserUa(url: string): Promise<"alive" | "moved" | "dead"> {
-  try {
-    const res = await withTimeout((signal) => probe(url, "GET", signal, BROWSER_UA));
-    if (!res.ok) return "dead";
-    return landedElsewhere(url, res.url) ? "moved" : "alive";
-  } catch {
-    return "dead";
-  }
-}
-
 async function checkOne(ref: SourceRef): Promise<Result> {
-  const result: Result = { ...ref, state: "OK" };
-
-  for (let attempt = 0; attempt <= RETRIES; attempt++) {
-    try {
-      let res = await withTimeout((signal) => probe(ref.url, "HEAD", signal));
-      if (res.status === 405 || res.status === 403 || res.status === 501) {
-        res = await withTimeout((signal) => probe(ref.url, "GET", signal));
-      }
-      result.status = res.status;
-      result.finalUrl = res.url;
-
-      if (res.status === 404 || res.status === 410) result.state = "DEAD";
-      else if (res.status === 403 || res.status === 429) {
-        const browser = await probeWithBrowserUa(ref.url);
-        if (browser === "alive") result.state = "BLOCKED";
-        else if (browser === "moved") {
-          result.state = "REDIRECTED";
-          result.finalUrl = undefined;
-        } else if (ref.expect === "blocked") {
-          // Declared unverifiable-from-CI by a human who checked in a browser.
-          // Without this a site whose WAF refuses every agent is indistinguishable
-          // from a dead one, and the weekly run reports the same false rot forever
-          // until people stop reading it. Same flag as the threat-intel registry.
-          result.state = "BLOCKED";
-          result.error = `HTTP ${res.status} to any agent (expected: edge bot-protection)`;
-        } else {
-          result.state = "DEAD";
-          result.error = `HTTP ${res.status} to any agent`;
-        }
-      } else if (res.status >= 500) {
-        // A WAF that answers 5xx rather than 403 must honour the flag too, or
-        // it is a no-op on this path and the citation reports SERVER_ERROR —
-        // a PROBLEM state — every run. Cloudflare's edge codes (520-527) are
-        // the common shape. Same reasoning as the 403 branch above.
-        if (ref.expect === "blocked") {
-          result.state = "BLOCKED";
-          result.error = `HTTP ${res.status} (expected: edge bot-protection)`;
-        } else result.state = "SERVER_ERROR";
-      }
-      else if (!res.ok) result.state = "DEAD";
-      else if (landedElsewhere(ref.url, res.url)) result.state = "REDIRECTED";
-      else result.state = "OK";
-
-      return result;
-    } catch (err) {
-      if (attempt === RETRIES) {
-        // A WAF that blackholes the connection hangs instead of answering, so
-        // the flag has to be honoured here as well — otherwise it does nothing
-        // on the very failure mode it exists for, and the weekly run exits 1.
-        // Action Fraud returns 403 today, which the branch above covers; that
-        // is one edge-config change away from becoming this path.
-        if (ref.expect === "blocked") {
-          result.state = "BLOCKED";
-          result.error = "no response to automated agents (expected: edge bot-protection)";
-          return result;
-        }
-        const browser = await probeWithBrowserUa(ref.url);
-        if (browser === "alive") {
-          result.state = "BLOCKED";
-          result.error = "blocks automated agents (responds to a browser)";
-          return result;
-        }
-        if (browser === "moved") {
-          result.state = "REDIRECTED";
-          return result;
-        }
-        result.state = (err as Error).name === "AbortError" ? "TIMEOUT" : "UNREACHABLE";
-        result.error = (err as Error).message;
-        return result;
-      }
-      await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
-    }
-  }
-  return result;
+  const r = await checkSource({
+    domain: new URL(ref.url).hostname.replace(/^www\./, ""),
+    url: ref.url,
+    tier: "calendar",
+    name: ref.label,
+    expect: ref.expect,
+  });
+  return {
+    ...ref,
+    state: (r.state ?? "UNREACHABLE") as State,
+    status: r.status,
+    finalUrl: r.finalUrl,
+    via: r.via,
+    error: r.error,
+  };
 }
 
 async function runPool(refs: SourceRef[], limit: number): Promise<Result[]> {
@@ -224,22 +131,32 @@ async function runPool(refs: SourceRef[], limit: number): Promise<Result[]> {
 
 // ── Reporting ────────────────────────────────────────────────────────────────
 
-// BLOCKED is not rot — a WAF rejecting a bot says nothing about a human's access.
+// BLOCKED, LIVE_FALLBACK and UNVERIFIED are not rot — a WAF or geo-fence
+// rejecting a bot says nothing about a human's access.
 const FAIL = new Set<State>(["DEAD", "UNREACHABLE", "TIMEOUT"]);
 const PROBLEM = new Set<State>(["DEAD", "UNREACHABLE", "TIMEOUT", "SERVER_ERROR", "REDIRECTED"]);
 
-function markdown(results: Result[]): string {
+export function markdown(results: Result[]): string {
   const problems = results.filter((r) => PROBLEM.has(r.state));
   const blocked = results.filter((r) => r.state === "BLOCKED");
+  const fallback = results.filter((r) => r.state === "LIVE_FALLBACK");
+  const unverified = results.filter((r) => r.state === "UNVERIFIED");
   const ok = results.filter((r) => r.state === "OK").length;
 
   const out: string[] = [];
   out.push("## Scam calendar source check");
   out.push("");
-  out.push(`${results.length} source URLs checked · **${ok} OK**, **${problems.length} need attention**, ${blocked.length} blocked-to-bots.`);
+  const extras = [
+    `${blocked.length} blocked-to-bots`,
+    fallback.length ? `${fallback.length} live-via-fallback` : "",
+    unverified.length ? `${unverified.length} unverified from CI` : "",
+  ].filter(Boolean).join(" · ");
+  out.push(`${results.length} source URLs checked · **${ok} OK**, **${problems.length} need attention**, ${extras}.`);
   out.push("");
-  if (problems.length === 0) {
+  if (problems.length === 0 && unverified.length === 0) {
     out.push("✅ Every calendar source URL still resolves. No action needed.");
+  } else if (problems.length === 0) {
+    out.push(`✅ No calendar source has rotted. ${unverified.length} could not be verified from CI — listed below; check them in a browser.`);
   } else {
     out.push("| State | Source | URL | Cited by | Detail |");
     out.push("|---|---|---|---|---|");
@@ -250,6 +167,21 @@ function markdown(results: Result[]): string {
     out.push("");
     out.push("A dead citation means a season's evidence is gone. Find the replacement page and update the source in lib/scamCalendar.ts, then bump that season's `reviewed` date.");
   }
+  const section = (rs: Result[], summary: string, line: (r: Result) => string) => {
+    if (!rs.length) return;
+    out.push("");
+    out.push(`<details><summary>${rs.length} ${summary}</summary>`);
+    out.push("");
+    for (const r of rs) out.push(`- ${line(r)}`);
+    out.push("");
+    out.push("</details>");
+  };
+  section(blocked, "blocked to automated requests (not rot)",
+    (r) => `${r.label} — ${r.error ?? (r.status ? `HTTP ${r.status}` : "no response to our agent")} — ${r.url}`);
+  section(fallback, "unreachable from CI but corroborated live (not rot)",
+    (r) => `${r.label} — via ${r.via} — ${r.url}${r.error ? ` — ${r.error}` : ""}`);
+  section(unverified, "refused by a live server, unverified from CI (not rot)",
+    (r) => `${r.label} — ${r.error ?? "unverified"} — ${r.url}`);
   out.push("");
   out.push("<sub>Reachability only — this does not check whether a source published anything new.</sub>");
   return out.join("\n");
@@ -257,12 +189,15 @@ function markdown(results: Result[]): string {
 
 function human(results: Result[]): string {
   const lines: string[] = [`\n${results.length} calendar source URLs checked\n`];
-  for (const state of ["DEAD", "UNREACHABLE", "TIMEOUT", "SERVER_ERROR", "REDIRECTED", "BLOCKED"] as State[]) {
+  for (const state of ["DEAD", "UNREACHABLE", "TIMEOUT", "SERVER_ERROR", "REDIRECTED", "UNVERIFIED", "BLOCKED", "LIVE_FALLBACK"] as State[]) {
     const rs = results.filter((r) => r.state === state);
     if (!rs.length) continue;
     lines.push(`${state} (${rs.length}):`);
     for (const r of rs) {
-      const extra = r.state === "REDIRECTED" ? ` -> ${r.finalUrl ?? "elsewhere"}` : r.error ? ` (${r.error})` : r.status ? ` (HTTP ${r.status})` : "";
+      const extra =
+        r.state === "REDIRECTED" ? ` -> ${r.finalUrl ?? "elsewhere"}` :
+        r.state === "LIVE_FALLBACK" ? ` (via ${r.via}${r.error ? ` — ${r.error}` : ""})` :
+        r.error ? ` (${r.error})` : r.status ? ` (HTTP ${r.status})` : "";
       lines.push(`  ${r.label} ${r.url}${extra} [${r.cited.join(", ")}]`);
     }
     lines.push("");
@@ -297,7 +232,14 @@ async function main() {
   process.exitCode = results.some((r) => FAIL.has(r.state)) ? 1 : 0;
 }
 
-main().catch((err) => {
-  console.error("check-calendar-sources failed:", err);
-  process.exitCode = 2;
-});
+// Only run when invoked directly, so tests can import the report and checkOne
+// without firing a request at every cited regulator.
+const invokedDirectly = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (invokedDirectly) {
+  main().catch((err) => {
+    console.error("check-calendar-sources failed:", err);
+    process.exitCode = 2;
+  });
+}
+
+export { checkOne };
