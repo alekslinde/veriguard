@@ -11,6 +11,16 @@
 // This checks REACHABILITY ONLY — whether the page still exists. It does not
 // judge freshness or read content; that is the research job, not this one.
 //
+// DEAD needs positive evidence of rot: a 404/410 that GET confirms (from our
+// agent or a browser's), a host that no longer resolves, or a redirect off the
+// page. A server that ANSWERS but refuses every agent (403/429/451) is up — it
+// is reported UNVERIFIED, never DEAD. A host that resolves but never answers is
+// indistinguishable from CI between "geo-fenced" and "server gone", so that
+// one stays rot unless a human has declared `expect: geofenced`. Four live
+// sources were retired or flagged on this confusion: wa.gov.au (403 to every
+// agent), ecrime.ae and condusef.gob.mx (refuse connections from outside their
+// country), and SEC Nigeria (whose real problem was a move, not a block).
+//
 // Safety: entries under `indicators:` are scam domains quoted as evidence. They
 // are never fetched. If one appears in a source tier the run FAILS rather than
 // skipping it quietly, because that is a mistake that must not be merged.
@@ -36,6 +46,7 @@
 // it is not a reachability signal.
 
 import { execFileSync } from "node:child_process";
+import { Resolver } from "node:dns/promises";
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -110,6 +121,26 @@ export function waybackFreshness(data, nowMs = Date.now(), maxAgeDays = WAYBACK_
   const ageDays = (nowMs - ms) / 86_400_000;
   if (ageDays < 0 || ageDays > maxAgeDays) return null;
   return { snapshotUrl: snap.url, ageDays: Math.round(ageDays) };
+}
+
+// Pure: same decision for a CDX query (`output=json`, last row = newest
+// capture). The `available` API regularly answers with no snapshot at all for
+// pages the Archive holds hundreds of captures of, so on its own it leaves
+// heavily-archived sites (wa.gov.au) with no off-host rung. CDX is filtered to
+// statuscode 200 by the caller, so a row is a capture of a page that served.
+export function cdxFreshness(rows, nowMs = Date.now(), maxAgeDays = WAYBACK_MAX_AGE_DAYS) {
+  if (!Array.isArray(rows) || rows.length < 2) return null; // header row only
+  const header = rows[0];
+  const last = rows[rows.length - 1];
+  if (!Array.isArray(header) || !Array.isArray(last)) return null;
+  const timestamp = last[header.indexOf("timestamp")];
+  const original = last[header.indexOf("original")];
+  if (!timestamp || !original) return null;
+  return waybackFreshness({
+    archived_snapshots: {
+      closest: { available: true, timestamp, url: `https://web.archive.org/web/${timestamp}/${original}` },
+    },
+  }, nowMs, maxAgeDays);
 }
 
 // ---------------------------------------------------------------------------
@@ -288,6 +319,8 @@ function parseRegistry(text) {
 // Validation — runs before any network access.
 // ---------------------------------------------------------------------------
 
+const EXPECT_VALUES = new Set(["blocked", "geofenced"]);
+
 function validate(reg) {
   const errors = [];
   const indicators = new Set(reg.indicators.map((d) => d.toLowerCase()));
@@ -350,6 +383,11 @@ function validate(reg) {
     }
     if (!/^https:\/\//.test(e.url)) {
       errors.push(`${e.domain} url must be https: ${e.url}`);
+    }
+    // A misspelt flag is silently a no-op in checkOne, which would report the
+    // very false rot the flag was added to stop.
+    if (e.expect !== undefined && !EXPECT_VALUES.has(e.expect)) {
+      errors.push(`${e.domain} has unknown expect: "${e.expect}" (use ${[...EXPECT_VALUES].join(" or ")})`);
     }
     if (!host) {
       errors.push(`${e.domain} has an unparseable url: ${e.url}`);
@@ -475,22 +513,64 @@ function snapshotMatches(snapshotUrl, requestedUrl) {
   }
 }
 
-// Ask the Internet Archive whether it holds a recent snapshot of the URL.
-async function waybackLookup(url) {
+async function archiveJson(api) {
   try {
-    const api = `https://archive.org/wayback/available?url=${encodeURIComponent(url)}`;
     const res = await withTimeout((signal) =>
       fetch(api, { signal, headers: { "User-Agent": USER_AGENT, Accept: "application/json" } }),
       FALLBACK_TIMEOUT_MS);
     if (!res.ok) return null;
-    const snap = waybackFreshness(await res.json());
-    // archive.org can answer with a nearby ANCESTOR rather than the exact page.
-    // A snapshot of the parent vouches for nothing about a child that 404'd, so
-    // require the snapshot to be of the URL we actually asked about.
-    if (snap && !snapshotMatches(snap.snapshotUrl, url)) return null;
-    return snap;
+    return await res.json();
   } catch {
     return null;
+  }
+}
+
+// Ask the Internet Archive whether it holds a recent snapshot of the URL.
+async function waybackLookup(url) {
+  // archive.org can answer with a nearby ANCESTOR rather than the exact page.
+  // A snapshot of the parent vouches for nothing about a child that 404'd, so
+  // require the snapshot to be of the URL we actually asked about.
+  const exact = (snap) => (snap && snapshotMatches(snap.snapshotUrl, url) ? snap : null);
+
+  // Both asked at once, so the CDX rung costs no extra wall time on a ladder
+  // that is already bounded per rung (see FALLBACK_TIMEOUT_MS).
+  const cdx = `https://web.archive.org/cdx/search/cdx?url=${encodeURIComponent(url)}` +
+    "&output=json&fl=timestamp,original&filter=statuscode:200&limit=-1";
+  const [available, captures] = await Promise.all([
+    archiveJson(`https://archive.org/wayback/available?url=${encodeURIComponent(url)}`),
+    archiveJson(cdx),
+  ]);
+  return exact(waybackFreshness(available)) ?? exact(cdxFreshness(captures));
+}
+
+// Does the source's host still resolve? NXDOMAIN is positive evidence of rot.
+//   "resolves" · "nxdomain" · "unknown" (SERVFAIL, resolver timeout, ...)
+//
+// c-ares queries (Resolver), not dns.lookup: lookup runs getaddrinfo on the
+// libuv threadpool with no timeout, so a stuck resolver would stall the worker
+// and starve the pool every fetch also resolves through. A Resolver carries its
+// own per-query timeout and never touches the pool.
+const DNS_TIMEOUT_MS = 3_000;
+async function defaultResolve(hostname) {
+  const resolver = new Resolver({ timeout: DNS_TIMEOUT_MS, tries: 2 });
+  try {
+    return await resolver.resolve4(hostname);
+  } catch (err) {
+    // ENODATA: the name exists but has no A record. An IPv6-only host is live.
+    if (err?.code === "ENODATA") return await resolver.resolve6(hostname);
+    throw err;
+  }
+}
+
+async function hostResolves(url, resolve = defaultResolve) {
+  let hostname;
+  try { hostname = new URL(url).hostname; } catch { return "unknown"; }
+  try {
+    await resolve(hostname);
+    return "resolves";
+  } catch (err) {
+    const code = err?.code;
+    return code === "ENOTFOUND" || code === "ENODATA" ? "nxdomain" : "unknown";
   }
 }
 
@@ -543,8 +623,12 @@ async function corroborateLiveness(entry) {
  * @property {string} [error]
  */
 
-/** @param {object} entry @returns {Promise<CheckResult>} */
-async function checkOne(entry) {
+/**
+ * @param {object} entry
+ * @param {{ resolveHost?: (hostname: string) => Promise<unknown> }} [deps] DNS lookup, injectable for tests
+ * @returns {Promise<CheckResult>}
+ */
+async function checkOne(entry, { resolveHost = defaultResolve } = {}) {
   /** @type {CheckResult} */
   const result = { domain: entry.domain, url: entry.url, tier: entry.tier, name: entry.name };
 
@@ -563,7 +647,7 @@ async function checkOne(entry) {
       // TIMEOUT while alive — precisely the .gov.au slowness this budget exists
       // to absorb.
       let res = await withTimeout((signal) => probe(entry.url, "HEAD", signal));
-      if ([400, 403, 404, 405, 410, 501].includes(res.status)) {
+      if ([400, 401, 403, 404, 405, 410, 429, 451, 501].includes(res.status)) {
         res = await withTimeout((signal) => probe(entry.url, "GET", signal));
       }
 
@@ -586,7 +670,7 @@ async function checkOne(entry) {
           result.state = "DEAD";
         }
       }
-      else if (res.status === 403 || res.status === 429) {
+      else if (REFUSALS.has(res.status)) {
         // A 403 to our UA is usually a WAF, but it can also be a page pulled
         // behind auth. Confirm the URL still serves someone — unless the entry
         // is marked `expect: blocked`, meaning its edge protection refuses every
@@ -603,6 +687,11 @@ async function checkOne(entry) {
             // Reachable to a browser, but not at this path — that is rot, not a WAF.
             result.state = "REDIRECTED";
             result.finalUrl = browser.finalUrl;
+          } else if (GONE.has(browser.status)) {
+            // The WAF refuses our agent, but the page told a browser it is gone.
+            // That is the positive evidence DEAD needs; a refusal must not mask it.
+            result.state = "DEAD";
+            result.error = `HTTP ${res.status} to our agent; HTTP ${browser.status} to a browser`;
           } else {
             // Refused to every UA — usually an IP-reputation block, not a dead
             // host. Try the off-host fallback ladder before crying rot.
@@ -612,8 +701,12 @@ async function checkOne(entry) {
               result.via = live.via;
               result.error = `HTTP ${res.status} to our agents; ${live.detail}`;
             } else {
-              result.state = "DEAD";
-              result.error = `HTTP ${res.status} to any agent`;
+              // The server answered — it is up. A refusal to every agent from
+              // CI is not evidence the citation rotted (wa.gov.au served a
+              // browser normally while this said DEAD), so it is UNVERIFIED:
+              // listed in the digest, never counted as rot.
+              result.state = "UNVERIFIED";
+              result.error = `HTTP ${res.status} to every agent; nothing off-host corroborates — refused, not gone`;
             }
           }
         }
@@ -670,6 +763,15 @@ async function checkOne(entry) {
           result.error = "no response to automated agents (expected — bot protection)";
           return result;
         }
+        // Ask DNS first: it is one cheap query, and a host that no longer
+        // resolves is gone — no browser probe or ladder rung can change that,
+        // so there is no point paying their timeouts.
+        const dns = await hostResolves(entry.url, resolveHost);
+        if (dns === "nxdomain") {
+          result.state = "UNREACHABLE";
+          result.error = "host does not resolve (NXDOMAIN)";
+          return result;
+        }
         // Before calling it dead, check whether it is only our UA being refused.
         const browser = await probeWithBrowserUa(entry.url);
         if (browser.verdict === "alive") {
@@ -682,6 +784,12 @@ async function checkOne(entry) {
           result.finalUrl = browser.finalUrl;
           return result;
         }
+        if (GONE.has(browser.status)) {
+          result.state = "DEAD";
+          result.status = browser.status;
+          result.error = `no response to our agent; HTTP ${browser.status} to a browser`;
+          return result;
+        }
         // A blackholing WAF hangs rather than answering; the source can still be
         // alive. Corroborate off-host before reporting it unreachable.
         const live = await corroborateLiveness(entry);
@@ -691,8 +799,22 @@ async function checkOne(entry) {
           result.error = `no direct response from CI; ${live.detail}`;
           return result;
         }
+        // A host that resolves but never answers is either geo-fenced or a
+        // server that is gone with its zone left behind, and nothing reachable
+        // from CI tells the two apart. So it stays rot unless a human checked
+        // it from inside the fence and declared `expect: geofenced` —
+        // ecrime.ae and condusef.gob.mx were retired on exactly this shape
+        // while both were live at home.
+        const reason = err.name === "AbortError" ? "timed out" : err.message;
+        if (dns === "resolves" && entry.expect === "geofenced") {
+          result.state = "UNVERIFIED";
+          result.error = `no response from CI (${reason}); host still resolves (expected — geo-fenced)`;
+          return result;
+        }
         result.state = err.name === "AbortError" ? "TIMEOUT" : "UNREACHABLE";
-        result.error = err.message;
+        result.error = dns === "resolves"
+          ? `${reason}; host still resolves — if it is live from its own country, mark it \`expect: geofenced\``
+          : reason;
         return result;
       }
       await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
@@ -718,13 +840,21 @@ async function runPool(entries, limit) {
 // Reporting
 // ---------------------------------------------------------------------------
 
-// BLOCKED is not rot — a WAF rejecting a bot says nothing about whether the
-// citation still resolves for a human. Surfaced, never failed on.
+// Statuses that mean "a live server refused this request", not "this page is
+// gone": 403/429 (WAF, rate limit) and 451 (legal / geo block). 401 is NOT one:
+// a login wall means the citation no longer serves the public, which is rot.
+const REFUSALS = new Set([403, 429, 451]);
+// Statuses that say the page itself is gone.
+const GONE = new Set([404, 410]);
+
+// BLOCKED and UNVERIFIED are not rot — a WAF or geo-fence rejecting a bot says
+// nothing about whether the citation still resolves for a human. Surfaced,
+// never failed on.
 const PROBLEM = new Set(["DEAD", "SERVER_ERROR", "TIMEOUT", "UNREACHABLE", "REDIRECTED"]);
 const FAIL = new Set(["DEAD", "UNREACHABLE", "TIMEOUT"]);
 
 function sortKey(r) {
-  const order = { DEAD: 0, UNREACHABLE: 1, TIMEOUT: 2, SERVER_ERROR: 3, REDIRECTED: 4, BLOCKED: 5, LIVE_FALLBACK: 6, OK: 7 };
+  const order = { DEAD: 0, UNREACHABLE: 1, TIMEOUT: 2, SERVER_ERROR: 3, REDIRECTED: 4, UNVERIFIED: 5, BLOCKED: 6, LIVE_FALLBACK: 7, OK: 8 };
   const tier = r.tier === "brands" ? 9 : Number(r.tier);
   return [order[r.state] ?? 9, tier];
 }
@@ -736,6 +866,7 @@ function markdown(results, reg, retiredCount = 0) {
   });
   const blocked = results.filter((r) => r.state === "BLOCKED");
   const fallback = results.filter((r) => r.state === "LIVE_FALLBACK");
+  const unverified = results.filter((r) => r.state === "UNVERIFIED");
   const ok = results.filter((r) => r.state === "OK").length;
 
   const out = [];
@@ -743,11 +874,14 @@ function markdown(results, reg, retiredCount = 0) {
   out.push("");
   const retiredNote = retiredCount ? ` · ${retiredCount} retired (not checked)` : "";
   const fallbackNote = fallback.length ? ` · ${fallback.length} live-via-fallback` : "";
-  out.push(`Registry \`v${reg.version}\`, updated ${reg.updated} · ${results.length} sources checked · **${ok} OK**, **${problems.length} need attention**, ${blocked.length} blocked-to-bots${fallbackNote}${retiredNote}.`);
+  const unverifiedNote = unverified.length ? ` · ${unverified.length} unverified from CI` : "";
+  out.push(`Registry \`v${reg.version}\`, updated ${reg.updated} · ${results.length} sources checked · **${ok} OK**, **${problems.length} need attention**, ${blocked.length} blocked-to-bots${fallbackNote}${unverifiedNote}${retiredNote}.`);
   out.push("");
 
-  if (problems.length === 0) {
+  if (problems.length === 0 && unverified.length === 0) {
     out.push("✅ Every source URL still resolves. No action needed.");
+  } else if (problems.length === 0) {
+    out.push(`✅ No source has rotted. ${unverified.length} could not be verified from CI — listed below; check them in a browser before citing anything fresh.`);
   } else {
     out.push("| State | Tier | Source | URL | Detail |");
     out.push("|---|---|---|---|---|");
@@ -794,9 +928,31 @@ function markdown(results, reg, retiredCount = 0) {
     out.push("</details>");
   }
 
+  if (unverified.length) {
+    out.push("");
+    out.push(`<details><summary>${unverified.length} refused by a live server, unverified from CI (not rot)</summary>`);
+    out.push("");
+    out.push("The host answered or still resolves, but refused every probe from the runner and no off-host evidence was found. Usually a WAF or geo-fence. Check in a browser before citing anything fresh; retire only on a 404, NXDOMAIN or a confirmed move.");
+    out.push("");
+    for (const r of unverified) {
+      out.push(`- ${r.name || r.domain} — ${r.error || "unverified"} — ${r.url}`);
+    }
+    out.push("");
+    out.push("</details>");
+  }
+
   out.push("");
   out.push("<sub>Reachability only — this does not check whether a source has published anything new. Indicator domains are never fetched.</sub>");
   return out.join("\n");
+}
+
+// Posted when a clean run closes the digest issue. "Reachable" is only true
+// when nothing came back UNVERIFIED; say so rather than overclaim.
+function closeComment(results) {
+  const unverified = results.filter((r) => r.state === "UNVERIFIED").length;
+  return unverified
+    ? `No threat-intel source has rotted as of the latest run — closing. ${unverified} could not be verified from CI (refused or geo-fenced, not gone); the run summary lists them. Reopened automatically the next time one rots.`
+    : "All threat-intel sources are reachable as of the latest run — closing. Reopened automatically the next time one rots.";
 }
 
 function human(results, reg, retiredCount = 0) {
@@ -804,7 +960,7 @@ function human(results, reg, retiredCount = 0) {
   const lines = [];
   lines.push(`\nSource registry v${reg.version} (updated ${reg.updated})`);
   lines.push(`${results.length} sources checked${retiredCount ? `, ${retiredCount} retired (skipped)` : ""}\n`);
-  for (const state of ["DEAD", "UNREACHABLE", "TIMEOUT", "SERVER_ERROR", "REDIRECTED", "BLOCKED", "LIVE_FALLBACK"]) {
+  for (const state of ["DEAD", "UNREACHABLE", "TIMEOUT", "SERVER_ERROR", "REDIRECTED", "UNVERIFIED", "BLOCKED", "LIVE_FALLBACK"]) {
     const rs = by(state);
     if (!rs.length) continue;
     lines.push(`${state} (${rs.length}):`);
@@ -1060,9 +1216,7 @@ async function main() {
         extraLabels: ["threat-intel"],
         labelColor: "1d76db",
         labelDescription: "Weekly threat-intel source reachability digest",
-        closeComment:
-          "All threat-intel sources are reachable as of the latest run — closing. " +
-          "Reopened automatically the next time one rots.",
+        closeComment: closeComment(results),
       });
       console.error(number === null ? `Digest issue ${action}.` : `Digest issue #${number} ${action}.`);
     } catch (err) {
@@ -1085,4 +1239,4 @@ if (invokedDirectly) {
   });
 }
 
-export { parseRegistry, validate, checkOne };
+export { parseRegistry, validate, checkOne, hostResolves, markdown, closeComment };

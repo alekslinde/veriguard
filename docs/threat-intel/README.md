@@ -220,6 +220,14 @@ Two conventions matter:
 - **`retired: true`** marks a source that is known-gone and kept as a record.
   Retired sources are skipped by the checker but stay in the file, because a
   roadmap claim resting on a dead citation is a claim that needs re-sourcing.
+  Gone means a confirmed 404/410, a host that no longer resolves, or a move.
+  A refusal is not rot: a server that answers 403/429/451 to every probe from
+  CI is reported **UNVERIFIED**, never DEAD, and never counts towards
+  reopening the digest issue. A host that still resolves but never answers
+  looks the same from CI as a server that is gone, so it stays rot unless the
+  entry carries **`expect: geofenced`** — set it only once the source is
+  confirmed live from its own country, and say how in the note. Check a source
+  in a browser before retiring it.
 
 `scripts/check-sources.mjs` verifies every source URL still resolves:
 
