@@ -42,6 +42,15 @@ precedence = "override"
 SPDX-FileCopyrightText = "Public Suffix List contributors"
 SPDX-License-Identifier = "MPL-2.0"
 
+# App-side, but bundled into the published @veriguard/mcp, so it takes that
+# package's licence. The test in __tests__/licensing.test.ts fails if mcp
+# starts bundling another lib/ module that is not Apache-2.0.
+[[annotations]]
+path = "lib/signalTactics.ts"
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Aleksandr Linde"
+SPDX-License-Identifier = "Apache-2.0"
+
 # Tesseract English language data (https://github.com/tesseract-ocr).
 [[annotations]]
 path = "public/tessdata/**"

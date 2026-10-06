@@ -156,7 +156,9 @@ describe("the manifests carry what a registry page needs", () => {
     // useful. `directory` has to track the package's real location — it was
     // packages/engine until the package was renamed.
     expect(manifest.repository?.url).toBeTruthy();
-    expect(manifest.homepage).toBeTruthy();
+    // npm shows `homepage` as the package's docs link; both packages are
+    // documented on the site's /packages page.
+    expect(manifest.homepage).toBe("https://veriguard.app/packages");
     expect(manifest.bugs).toBeTruthy();
     expect(manifest.license).toBe("Apache-2.0");
 

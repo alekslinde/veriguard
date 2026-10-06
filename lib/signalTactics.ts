@@ -1,5 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Aleksandr Linde
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
+
+// Apache-2.0 rather than lib/'s AGPL: @veriguard/mcp bundles this file into its
+// published dist/, so it carries that package's licence (see REUSE.toml).
 
 import type { Signal } from "@veriguard/detect/engineTypes";
 
