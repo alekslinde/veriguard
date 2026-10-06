@@ -104,6 +104,17 @@ load-bearing rather than style policing: an unparseable title produces no bump
 and no changelog entry, so the change would ship silently under whatever number
 the last release happened to set.
 
+Each squash-merged PR is one changelog line, under Features, Fixes or
+Performance; refactors, docs, tests and chores are left out of the notes. When
+a title alone would describe a PR poorly, put the line you want in the PR body
+before merging, and release-please uses it instead:
+
+```
+BEGIN_COMMIT_OVERRIDE
+fix(ext): store zips leave out hidden files and the Safari app icon
+END_COMMIT_OVERRIDE
+```
+
 For a breaking change, either mark the type or add the footer:
 
 ```
