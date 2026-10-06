@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.39.2](https://github.com/alekslinde/veriguard/compare/app-v0.39.1...app-v0.39.2) (2026-10-06)
+
+
+### Fixes
+
+* **config:** bump source-map-js to 1.2.2 for GHSA-68fv-2mgg-jv7q ([#408](https://github.com/alekslinde/veriguard/issues/408)) ([23b56d8](https://github.com/alekslinde/veriguard/commit/23b56d83f61aebd25d4484cd19587399f4c185d7))
+* **config:** generate extension icons before packing the store zips ([#409](https://github.com/alekslinde/veriguard/issues/409)) ([b0a9ff0](https://github.com/alekslinde/veriguard/commit/b0a9ff03a97f2050b7157a767c86004bfa52dfb0))
+
 ## [0.39.1](https://github.com/alekslinde/veriguard/compare/app-v0.39.0...app-v0.39.1) (2026-10-03)
 
 
