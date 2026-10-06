@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.40.0](https://github.com/alekslinde/veriguard/compare/app-v0.39.3...app-v0.40.0) (2026-10-06)
+
+
+### Features
+
+* **threat-intel:** sweep brief and region research rotation ([#430](https://github.com/alekslinde/veriguard/issues/430)) ([f65a878](https://github.com/alekslinde/veriguard/commit/f65a878d49be2226311cbd97643b0d763338b118))
+
+
+### Fixes
+
+* **threat-intel:** share the source checker's rot rule with the calendar check ([#431](https://github.com/alekslinde/veriguard/issues/431)) ([260f5ef](https://github.com/alekslinde/veriguard/commit/260f5efe6d2e57fbcfb3a1402bb1d9ff40b7c44d))
+
 ## [0.39.3](https://github.com/alekslinde/veriguard/compare/app-v0.39.2...app-v0.39.3) (2026-10-06)
 
 
