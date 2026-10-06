@@ -34,15 +34,27 @@
 # `check: manual` have no feed and no stable index — a human looks, or they
 # contribute nothing.
 #
-# Two flags the checker honours:
+# Three flags the checker honours:
 #
 #   retired: true    Known-gone. Skipped by the checker but kept as a record —
 #                    any roadmap claim citing it has lost its evidence and needs
-#                    re-sourcing. Requires a note saying what happened.
+#                    re-sourcing. Requires a note saying what happened. Gone
+#                    means a confirmed 404/410, NXDOMAIN or a move — never a
+#                    refusal: a host that 403s CI is live, and the checker
+#                    reports it UNVERIFIED on its own. One that drops foreign
+#                    connections takes `expect: geofenced`.
 #   expect: blocked  Edge bot-protection refuses every automated request, so
 #                    reachability is unverifiable from CI. Reported as expected
 #                    rather than as rot. Use sparingly: each one is a source the
 #                    job has stopped genuinely checking.
+#   expect: geofenced  The host resolves but drops every connection from outside
+#                    its own country, and a human confirmed it live (from inside
+#                    the fence, or by its current official use) — say how in
+#                    the note.
+#                    Reported UNVERIFIED instead of TIMEOUT/UNREACHABLE; a host
+#                    that stops resolving is still reported as rot. Without the
+#                    flag a silent-but-resolving host counts as rot, because
+#                    from CI it looks exactly like a server that is gone.
 #
 # ⚠️  The `indicators:` block at the bottom is NOT a source list. Those are scam
 # domains quoted as evidence in the roadmaps. They must never be fetched. The
@@ -65,7 +77,7 @@
 # 09-09 header.
 
 version: 1
-updated: 2026-09-29
+updated: 2026-10-06
 
 tiers:
   1:
@@ -179,6 +191,13 @@ tiers:
       url: https://www.wa.gov.au
       region: AU
       check: manual
+      note: >-
+        State government portal. Its origin 403s the CI runner on every UA and
+        on /robots.txt, so no on-host probe can confirm it; it serves normally
+        to a browser (confirmed 2026-10-06, and search-indexed 2026 media
+        statements on the site). Reported DEAD on 2026-10-06 — a 403 is a
+        refusal from a live server, not rot, and the checker now reports it as
+        UNVERIFIED.
     - domain: immi.homeaffairs.gov.au
       name: Department of Home Affairs — Immigration
       url: https://immi.homeaffairs.gov.au
@@ -502,16 +521,19 @@ tiers:
         National guard; publishes fraud and scam advisories and is the
         reporting destination named in the MX pack.
     - domain: condusef.gob.mx
-      name: CONDUSEF — alertas (RETIRED)
+      name: CONDUSEF — alertas
       url: https://www.condusef.gob.mx/?p=alertas
       region: MX
+      expect: geofenced
       check: manual
-      retired: true
       note: >-
-        Financial-consumer protection commission; published named financial
-        fraud and phishing alerts. Retired 2026-09-29 — the domain does not
-        respond to any automated or direct probe; no reachable page found.
-        Re-source if an MX claim needs this again.
+        Financial-consumer protection commission; publishes named financial
+        fraud and phishing alerts. Retired 2026-09-29 because the host gave no
+        response to any probe from outside Mexico, then reinstated 2026-10-06:
+        the domain still resolves and the commission is actively publishing
+        alerts (national press coverage of its February and June 2026 alerts),
+        so the silence is geo-fencing, not rot. `expect: geofenced` keeps the
+        checker reporting it UNVERIFIED while it still resolves.
 
     # ── ID ──────────────────────────────────────────────────────────────────
     - domain: ojk.go.id
@@ -611,16 +633,18 @@ tiers:
         2026-09-29 — efccnigeria.org is gone; efcc.gov.ng is the official
         domain.
     - domain: sec.gov.ng
-      name: SEC Nigeria — investor alerts (RETIRED)
-      url: https://sec.gov.ng/category/press-release/
+      name: SEC Nigeria — investor alerts
+      url: https://home.sec.gov.ng/for-investors/keep-track-of-circulars/
+      feed: https://home.sec.gov.ng/feeds/circulars.rss
       region: NG
       check: manual
-      retired: true
       note: >-
         Securities regulator; publishes public warnings about unauthorised
-        investment providers, named in the NG pack's flag copy. Retired
-        2026-09-29 — the press-release path 404s and no live successor page
-        was found. Re-source if an NG investment-scam claim needs this again.
+        investment providers ("illegal operator alert", "public notice"),
+        named in the NG pack's flag copy. Retired 2026-09-29 when the old
+        /category/press-release/ path 404'd; reinstated 2026-10-06 at the
+        site's new circulars index on home.sec.gov.ng, which also publishes
+        an RSS feed of the same notices.
 
     # ── KE ──────────────────────────────────────────────────────────────────
     - domain: dci.go.ke
@@ -695,7 +719,9 @@ tiers:
       note: >-
         National cybersecurity center; ran the public scam-reporting platform
         named in the VN pack. Retired 2026-09-29 — khonggianmang.vn no longer
-        resolves; no live successor domain was confirmed. Re-source if a VN
+        resolves; no live successor domain was confirmed. Rechecked 2026-10-06:
+        the apex and the alert. and canhbao. subdomains press reports still
+        cite all return NXDOMAIN. Re-source if a VN
         claim needs this again.
     - domain: mps.gov.vn
       name: Ministry of Public Security (Vietnam) — announcements
@@ -730,16 +756,19 @@ tiers:
 
     # ── AE ──────────────────────────────────────────────────────────────────
     - domain: ecrime.ae
-      name: Dubai Police — eCrime (RETIRED)
+      name: Dubai Police — eCrime
       url: https://ecrime.ae/
       region: AE
+      expect: geofenced
       check: manual
-      retired: true
       note: >-
-        Dubai Police's cybercrime reporting platform, named in the AE pack.
-        Retired 2026-09-29 — the domain refuses connections outright (not a
-        WAF response, no TLS handshake completes). Re-source if an AE claim
-        needs this again.
+        Dubai Police's cybercrime reporting platform, named in the AE pack and
+        shipped as its reporting URL. Retired 2026-09-29 because connections
+        from outside the UAE are refused; reinstated 2026-10-06 — the domain
+        resolves and the UAE government portal (u.ae, "Report cybercrimes
+        online") still directs the public to it. Refusing foreign IPs is
+        geo-fencing, not rot. `expect: geofenced` keeps the checker reporting
+        it UNVERIFIED while it still resolves.
     - domain: uaecma.gov.ae
       name: Central Bank/Capital Market Authority (UAE) — investor warnings
       url: https://www.uaecma.gov.ae/en/open-data/warnings

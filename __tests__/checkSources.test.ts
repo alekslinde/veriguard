@@ -18,7 +18,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 // Plain .mjs script with no type declarations. `allowJs` lets TypeScript infer
 // its shape from the source, so the import resolves without a suppression.
-import { parseRegistry, validate, waybackFreshness, checkOne, registryContentChanged } from "../scripts/check-sources.mjs";
+import { parseRegistry, validate, waybackFreshness, cdxFreshness, checkOne, hostResolves, markdown, closeComment, registryContentChanged } from "../scripts/check-sources.mjs";
 
 const REGISTRY_PATH = resolve(__dirname, "../docs/threat-intel/sources.yml");
 const registryText = readFileSync(REGISTRY_PATH, "utf8");
@@ -333,6 +333,19 @@ describe("indicator quarantine", () => {
     };
     expect(validate(bad).some((e: string) => e.includes("must be https"))).toBe(true);
   });
+
+  it("rejects an unknown expect: value (a typo would silently disable the flag)", () => {
+    const bad: Registry = {
+      ...reg,
+      brands: [...reg.brands, { domain: "example.test", url: "https://example.test", expect: "geofence" }],
+    };
+    expect(validate(bad).some((e: string) => e.includes("unknown expect"))).toBe(true);
+    const good: Registry = {
+      ...reg,
+      brands: [...reg.brands, { domain: "example.test", url: "https://example.test", expect: "geofenced" }],
+    };
+    expect(validate(good)).toEqual([]);
+  });
 });
 
 describe("lookalike discipline", () => {
@@ -386,6 +399,25 @@ describe("lookalike discipline", () => {
     // would let the next one in unexamined.
     const blocked = allSources.filter((s) => s.expect === "blocked");
     expect(blocked.length).toBeLessThanOrEqual(12);
+  });
+
+  it("keeps live-but-refusing sources in the checked set (rechecked 2026-10-06)", () => {
+    // Each was called dead while it was live: refused the runner (wa.gov.au),
+    // geo-fenced it (ecrime.ae, condusef.gob.mx) or had moved (SEC Nigeria).
+    const expected: Record<string, string | undefined> = {
+      "wa.gov.au": undefined, // a 403 is UNVERIFIED with no flag
+      "sec.gov.ng": undefined, // moved, and reachable at the new URL
+      "ecrime.ae": "geofenced",
+      "condusef.gob.mx": "geofenced",
+    };
+    for (const [domain, flag] of Object.entries(expected)) {
+      const s = allSources.find((x) => x.domain === domain);
+      expect(s, `${domain} missing from the registry`).toBeTruthy();
+      expect(s!.retired, `${domain} is live and must not be retired`).toBeUndefined();
+      expect(s!.expect, `${domain} expect: flag`).toBe(flag);
+    }
+    const sec = allSources.find((x) => x.domain === "sec.gov.ng")!;
+    expect(sec.url).toMatch(/^https:\/\/home\.sec\.gov\.ng\//);
   });
 
   it("keeps retired sources marked and explained", () => {
@@ -518,11 +550,13 @@ describe("ladder corroboration discipline", () => {
       feed: "https://feeds.feedburner.com/TheHackersNews",
       tier: "2",
     };
-    // The cached third-party feed is healthy; the site itself is gone.
+    // The cached third-party feed is healthy; the site itself refuses us.
+    // The mirror vouches for nothing, and a 403 is a live server refusing,
+    // not rot — so neither LIVE_FALLBACK nor DEAD.
     stub((url) => (url.includes("feedburner") ? [200, FEED] : [403, ""]));
     const r = await checkOne(entry);
     expect(r.via).not.toBe("feed");
-    expect(r.state).toBe("DEAD");
+    expect(r.state).toBe("UNVERIFIED");
   });
 
   it("accepts a feed on the source's own host", async () => {
@@ -837,6 +871,205 @@ describe("wayback snapshot must match the requested URL", () => {
   it("accepts a snapshot of the exact page", async () => {
     stubWayback("http://web.archive.org/web/20260819001716/https://x.example/deep/page");
     const r = await checkOne({ domain: "x.example", url: "https://x.example/deep/page", tier: "3" });
+    expect(r.state).toBe("LIVE_FALLBACK");
+    expect(r.via).toBe("wayback");
+  });
+});
+
+describe("a live server refusing CI is never DEAD (wa.gov.au / ecrime.ae / CONDUSEF)", () => {
+  // Probed 2026-10-06: wa.gov.au served a browser normally while the weekly
+  // check called it DEAD on "403 to any agent", and ecrime.ae (Dubai Police's
+  // reporting platform, still linked from u.ae) and condusef.gob.mx had been
+  // retired because they drop connections from outside their own country.
+  // DEAD needs positive evidence: a confirmed 404/410 or NXDOMAIN.
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  const BROWSER = /Mozilla/;
+  type Reply = number | "throw";
+  // Route by user agent and method: our bot vs the browser-UA probe.
+  const stub = (route: (ua: string, method: string, url: string) => Reply) => {
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", async (input: string | URL, init?: RequestInit) => {
+      const url = String(input);
+      const ua = (init?.headers as Record<string, string> | undefined)?.["User-Agent"] ?? "";
+      const method = init?.method ?? "GET";
+      calls.push(`${method} ${url}`);
+      const reply = route(ua, method, url);
+      if (reply === "throw") throw new TypeError("fetch failed");
+      return {
+        status: reply, ok: reply >= 200 && reply < 300, url,
+        text: async () => "", json: async () => ({}),
+      } as Response;
+    });
+    return calls;
+  };
+  const dnsError = (code: string) => async () => { throw Object.assign(new Error(code), { code }); };
+  const resolves = async () => ["203.0.113.7"];
+
+  it("reports a 403 to every agent with nothing corroborating as UNVERIFIED", async () => {
+    stub(() => 403);
+    const r = await checkOne({ domain: "wa.gov.au", url: "https://www.wa.gov.au", tier: "1" });
+    expect(r.state).toBe("UNVERIFIED");
+    expect(r.error).toContain("403");
+  });
+
+  it.each([429, 451])("treats HTTP %i as a refusal, not rot", async (status) => {
+    stub(() => status);
+    const r = await checkOne({ domain: "x.example", url: "https://x.example/p", tier: "3" });
+    expect(r.state).toBe("UNVERIFIED");
+  });
+
+  it("treats a 401 to every agent as rot — a login wall no longer serves the public", async () => {
+    stub(() => 401);
+    const r = await checkOne({ domain: "x.example", url: "https://x.example/p", tier: "3" });
+    expect(r.state).toBe("DEAD");
+  });
+
+  it("confirms a HEAD-only 429 with GET instead of treating it as a refusal", async () => {
+    stub((_ua, method) => (method === "HEAD" ? 429 : 200));
+    const r = await checkOne({ domain: "x.example", url: "https://x.example/p", tier: "3" });
+    expect(r.state).toBe("OK");
+  });
+
+  it("reports DEAD when the WAF refuses our agent but tells a browser 404", async () => {
+    stub((ua) => (BROWSER.test(ua) ? 404 : 403));
+    const r = await checkOne({ domain: "x.example", url: "https://x.example/p", tier: "3" });
+    expect(r.state).toBe("DEAD");
+    expect(r.error).toContain("404 to a browser");
+  });
+
+  it("reports DEAD when our agent hangs but a browser gets 410", async () => {
+    stub((ua) => (BROWSER.test(ua) ? 410 : "throw"));
+    const r = await checkOne(
+      { domain: "x.example", url: "https://x.example/p", tier: "3" },
+      { resolveHost: resolves },
+    );
+    expect(r.state).toBe("DEAD");
+    expect(r.status).toBe(410);
+  });
+
+  it("still reports DEAD on a 404 the GET confirms", async () => {
+    stub(() => 404);
+    const r = await checkOne({ domain: "gone.example", url: "https://gone.example/x", tier: "3" });
+    expect(r.state).toBe("DEAD");
+  });
+
+  it("reports a silent host that resolves as UNVERIFIED when declared expect: geofenced", async () => {
+    stub(() => "throw");
+    const r = await checkOne(
+      { domain: "ecrime.ae", url: "https://ecrime.ae/", tier: "1", expect: "geofenced" },
+      { resolveHost: resolves },
+    );
+    expect(r.state).toBe("UNVERIFIED");
+    expect(r.error).toContain("geo-fenced");
+  });
+
+  it("keeps a silent host that resolves as rot without the flag — it may be a dead server", async () => {
+    stub(() => "throw");
+    const r = await checkOne(
+      { domain: "x.example", url: "https://x.example/", tier: "3" },
+      { resolveHost: resolves },
+    );
+    expect(r.state).toBe("UNREACHABLE");
+    expect(r.error).toContain("expect: geofenced");
+  });
+
+  it("reports NXDOMAIN as UNREACHABLE without walking the ladder, even when geofenced", async () => {
+    const calls = stub(() => "throw");
+    const r = await checkOne(
+      { domain: "gone.example", url: "https://gone.example/", tier: "3", expect: "geofenced" },
+      { resolveHost: dnsError("ENOTFOUND") },
+    );
+    expect(r.state).toBe("UNREACHABLE");
+    expect(r.error).toContain("NXDOMAIN");
+    // Only the direct HEAD probes ran: no browser probe, no ladder rung.
+    expect(calls.every((c) => c.startsWith("HEAD https://gone.example/"))).toBe(true);
+  });
+
+  it("keeps the old verdict when DNS itself is inconclusive", async () => {
+    stub(() => "throw");
+    const r = await checkOne(
+      { domain: "x.example", url: "https://x.example/", tier: "3" },
+      { resolveHost: dnsError("ESERVFAIL") },
+    );
+    expect(r.state).toBe("UNREACHABLE");
+  });
+
+  it("classifies DNS answers", async () => {
+    expect(await hostResolves("https://x.example/", resolves)).toBe("resolves");
+    expect(await hostResolves("https://x.example/", dnsError("ENOTFOUND"))).toBe("nxdomain");
+    expect(await hostResolves("https://x.example/", dnsError("ENODATA"))).toBe("nxdomain");
+    expect(await hostResolves("https://x.example/", dnsError("ETIMEOUT"))).toBe("unknown");
+    expect(await hostResolves("not a url", resolves)).toBe("unknown");
+  });
+});
+
+describe("digest wording with UNVERIFIED sources", () => {
+  const reg = { version: "1", updated: "2026-10-06" };
+  const unverified = { domain: "wa.gov.au", url: "https://www.wa.gov.au", tier: "1", state: "UNVERIFIED", error: "HTTP 403 to every agent" };
+  const ok = { domain: "x.example", url: "https://x.example", tier: "3", state: "OK" };
+
+  it("does not claim every source resolves when some are unverified", () => {
+    const md = markdown([ok, unverified], reg);
+    expect(md).not.toContain("Every source URL still resolves");
+    expect(md).toContain("No source has rotted");
+    expect(md).toContain("1 refused by a live server");
+  });
+
+  it("keeps the all-clear when everything is OK", () => {
+    expect(markdown([ok], reg)).toContain("Every source URL still resolves");
+  });
+
+  it("does not close the issue claiming every source is reachable", () => {
+    expect(closeComment([ok, unverified])).not.toContain("reachable as of");
+    expect(closeComment([ok, unverified])).toContain("1 could not be verified");
+    expect(closeComment([ok])).toContain("All threat-intel sources are reachable");
+  });
+});
+
+describe("wayback CDX rung (available API answers empty)", () => {
+  const NOW = Date.parse("2026-10-06T00:00:00Z");
+  const rows = (ts: string, original = "https://www.wa.gov.au/") => [
+    ["timestamp", "original"],
+    ["20250101000000", original],
+    [ts, original],
+  ];
+
+  it("reads the newest capture from the last row", () => {
+    const r = cdxFreshness(rows("20260930000000"), NOW);
+    expect(r).toBeTruthy();
+    expect(r!.ageDays).toBe(6);
+    expect(r!.snapshotUrl).toBe("https://web.archive.org/web/20260930000000/https://www.wa.gov.au/");
+  });
+
+  it("rejects an empty result, a header-only result and a non-array", () => {
+    expect(cdxFreshness([], NOW)).toBeNull();
+    expect(cdxFreshness([["timestamp", "original"]], NOW)).toBeNull();
+    expect(cdxFreshness({ archived_snapshots: {} }, NOW)).toBeNull();
+  });
+
+  it("rejects a capture older than the window", () => {
+    expect(cdxFreshness(rows("20240101000000"), NOW)).toBeNull();
+  });
+
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it("corroborates via CDX when the available API has nothing", async () => {
+    const recent = new Date(Date.now() - 3 * 86_400_000).toISOString().replace(/\D/g, "").slice(0, 14);
+    vi.stubGlobal("fetch", async (input: string | URL) => {
+      const url = String(input);
+      const { hostname, pathname } = new URL(url);
+      const archive = hostname === "archive.org" || hostname.endsWith(".archive.org");
+      const body =
+        archive && pathname.startsWith("/cdx/") ? JSON.stringify(rows(recent)) :
+        archive ? JSON.stringify({ archived_snapshots: {} }) : "";
+      const status = archive ? 200 : 403;
+      return {
+        status, ok: status === 200, url,
+        text: async () => body, json: async () => JSON.parse(body || "{}"),
+      } as Response;
+    });
+    const r = await checkOne({ domain: "wa.gov.au", url: "https://www.wa.gov.au", tier: "1" });
     expect(r.state).toBe("LIVE_FALLBACK");
     expect(r.via).toBe("wayback");
   });
