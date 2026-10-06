@@ -100,19 +100,66 @@ the time — rewriting it to match the outcome destroys that.
 
 ---
 
+## The Region coverage table and the rotation
+
+Every roadmap carries a `## Region coverage` table, one row per region pack:
+
+```markdown
+## Region coverage
+
+| Region | Depth | Notes |
+|---|---|---|
+| AU | deep | full tier, every cycle |
+| DE | light | rotation |
+| ES | skipped | in rotation, not due |
+```
+
+`deep` and `light` mean the region was researched this cycle; `skipped` means
+it was not. Researching every region every week costs model tokens in
+proportion to the number of packs, and most packs are `minimal` tier, so
+`full` and `partial` regions are swept every cycle while `minimal` regions
+rotate, a few per cycle, stalest first.
+
+The table is what keeps the rotation honest. A skipped region reads exactly
+like a region where nothing happened, which is the failure recorded under
+*Known gaps* below. [`check-research-freshness.ts`](../../scripts/check-research-freshness.ts)
+(`npm run check-research-freshness`) reads the tables, reports any region past
+its window (full 14 days, partial 21, minimal 42), and picks the next
+rotation (`--plan 5`). Roadmaps written before this convention have no table,
+so their regions read as *never recorded*: the honest answer for a quiet-week
+line nobody can now confirm.
+
+**The sweep brief** is the sweep's input. [`sweep-brief.ts`](../../scripts/sweep-brief.ts)
+runs in CI an hour before the sweep. It collects new items since the newest
+roadmap from every registered source with a `feed:`, adds the rotation plan,
+names the cycle's regions that have no feed, and publishes all of it as one
+*🧭 Weekly sweep brief* issue. Discovery needs no judgement, so it costs no
+model tokens; the sweep spends its budget on whether an item is a new tactic
+and whether the engine already catches it. Feed titles are third-party text:
+the script strips markup, caps length, and drops any item whose link is not
+https on the source's own host.
+
+The brief is only as wide as the registry's feeds. A region with no
+feed-bearing source falls back to capped search, and the brief says which
+those are. Registering a source's feed, when it publishes one, is the cheapest
+way to make that region's research both better and cheaper.
+
+---
+
 ## Cadence — what runs when
 
-Four different rhythms, easy to conflate because they all touch this directory
+Five different rhythms, easy to conflate because they all touch this directory
 or what it feeds:
 
 | | Rhythm | Automated? |
 |---|---|---|
 | **Sweep** (threat roadmap) | Roughly weekly, by hand | No |
 | **Probe** | Event-triggered — see below | No |
+| **Sweep brief** | Weekly, Monday ~07:30 AEST (an hour before the sweep routine) | **Yes** |
 | **Source check** | Weekly, Tuesday ~07:00 AEST | **Yes** |
 | **Promotion freshness** | Weekly, Tuesday ~08:00 AEST | **Yes** |
 
-Both crons check *bookkeeping*, never research. The source check verifies that
+The source-check and promotion crons check *bookkeeping*, never research. The source check verifies that
 citation links still resolve; promotion freshness flags a merged sweep whose
 findings never reached `/radar` or `/calendar` (step 5 below). Neither decides a
 sweep is due, and two green runs say nothing about whether the research is

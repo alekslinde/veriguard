@@ -1,0 +1,48 @@
+name: Weekly sweep brief
+
+# Builds the input for the weekly threat-intel sweep, so the sweep spends its
+# model budget on judgement rather than discovery:
+#
+#   - new items from every registered source that publishes a feed, since the
+#     newest roadmap (titles sanitised; links kept only on the source's host);
+#   - this cycle's regions: every full and partial pack, plus the stalest
+#     minimal packs on a rotation (scripts/check-research-freshness.ts);
+#   - which of those regions have no feed, so the sweep knows to search them.
+#
+# Published as one "🧭 Weekly sweep brief" issue, refreshed in place and never
+# closed — it is the sweep's input, not a problem report. Runs in CI rather
+# than inside the sweep because the runner reaches the sources and costs no
+# model tokens.
+
+on:
+  schedule:
+    # Sundays 21:30 UTC — an hour before the weekly sweep routine fires.
+    - cron: "30 21 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: sweep-brief
+  cancel-in-progress: true
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm ci --silent
+
+      # Exit 2 means the brief could not be built or published, which leaves
+      # the sweep without its input — that must go red. Unreachable feeds do
+      # not: they are listed in the brief itself.
+      - name: Build and publish the brief
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: npm run --silent sweep-brief -- --issue --markdown >> "$GITHUB_STEP_SUMMARY"

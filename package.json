@@ -29,6 +29,8 @@
     "check-promotion": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/check-promotion-freshness.ts",
     "sweep-coverage": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/sweep-coverage.ts",
     "check-source-coverage": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/check-source-coverage.ts",
+    "check-research-freshness": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/check-research-freshness.ts",
+    "sweep-brief": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/sweep-brief.ts",
     "check-readme": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/check-readme-freshness.ts",
     "icons": "node scripts/generate-icons.mjs && node scripts/generate-favicon.mjs",
     "promo": "NODE_OPTIONS=--disable-warning=DEP0205 npx tsx scripts/generate-promo-tiles.mts",
