@@ -151,6 +151,14 @@ const URGENCY_TAX_THREAT = [
 const URGENCY_FOREIGN_AUTHORITY = [
   "arrest warrant", "detention order", "deportation notice",
   "money laundering investigation", "your visa will be cancelled",
+  // "Money laundering case" wording (2026-10-06 roadmap D6 / #427). Probed
+  // 2026-10-06: "linked to a money laundering case" scored safe 0 while
+  // "money laundering investigation" scored 35 — the list broke on one word.
+  "money laundering case", "linked to a money laundering",
+  "used in a money laundering", "case has been opened against you",
+  // FBI IC3 PSA I-091726-PSA (17 Sep 2026): agent impersonators claim
+  // the victim's identity is tied to a federal crime.
+  "federal case against you",
   "your visa will be revoked", "involved in criminal activity",
   "immigration violation",
   // Jury-duty / bench-warrant SMS (D4 / #275 / FTC consumer alert Jun 2026;
