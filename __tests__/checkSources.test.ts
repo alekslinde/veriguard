@@ -1058,10 +1058,12 @@ describe("wayback CDX rung (available API answers empty)", () => {
     const recent = new Date(Date.now() - 3 * 86_400_000).toISOString().replace(/\D/g, "").slice(0, 14);
     vi.stubGlobal("fetch", async (input: string | URL) => {
       const url = String(input);
+      const { hostname, pathname } = new URL(url);
+      const archive = hostname === "archive.org" || hostname.endsWith(".archive.org");
       const body =
-        url.includes("/cdx/") ? JSON.stringify(rows(recent)) :
-        url.includes("archive.org") ? JSON.stringify({ archived_snapshots: {} }) : "";
-      const status = url.includes("archive.org") ? 200 : 403;
+        archive && pathname.startsWith("/cdx/") ? JSON.stringify(rows(recent)) :
+        archive ? JSON.stringify({ archived_snapshots: {} }) : "";
+      const status = archive ? 200 : 403;
       return {
         status, ok: status === 200, url,
         text: async () => body, json: async () => JSON.parse(body || "{}"),
