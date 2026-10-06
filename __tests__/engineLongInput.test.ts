@@ -101,14 +101,22 @@ describe("engine on long, unbroken input", () => {
 
   // checkEmail reaches the same rule and was equally slow, but it also does
   // header parsing and distillation that checkSms skips, and that work is
-  // genuinely linear in the input: 63ms, 127ms and 254ms at 25,000, 50,000 and
-  // 100,000 digits. So it is held to the general bound rather than the tight
-  // one above — the tight bound assumes a sub-millisecond floor this path does
-  // not have, and would fail on a loaded runner for a reason unrelated to
-  // backtracking.
+  // genuinely linear in the input — about 0.6s at 100,000 digits on a laptop and
+  // right at a second on a loaded CI runner, so no fixed bound both fits under
+  // the runner and stays below a regression. What separates the two is shape:
+  // doubling the input doubles linear work and quadruples quadratic work. Best
+  // of two runs per size keeps one slow sample from deciding the ratio.
   it("stays linear on a long digit run through the email path", () => {
-    const started = Date.now();
-    checkEmail(fill("0"));
-    expect(Date.now() - started).toBeLessThan(BOUND_MS);
+    const best = (text: string) =>
+      Math.min(
+        ...[0, 1].map(() => {
+          const started = performance.now();
+          checkEmail(text);
+          return performance.now() - started;
+        }),
+      );
+    const half = best(fill("0").slice(0, ROUTE_MAX / 2));
+    const full = best(fill("0"));
+    expect(full / half).toBeLessThan(3);
   });
 });
