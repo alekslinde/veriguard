@@ -131,6 +131,13 @@ jobs:
           cache: npm
       - run: npm ci
 
+      # extension/icons/ is gitignored (generated from app/icon-dark.svg), so a
+      # fresh checkout has none, and pack-extension.mjs rightly refuses a zip
+      # whose manifest names icons it does not contain. It also rewrites the
+      # committed PWA icons under public/; harmless on a throwaway runner.
+      - name: Generate the icons
+        run: node scripts/generate-icons.mjs
+
       # extensionBundle.test.ts greps the built bundle to enforce the
       # one-network-call property, and skips when dist/ is absent. Building
       # before testing is what makes that check mean anything on this run.
