@@ -1,6 +1,6 @@
 {
   "name": "@veriguard/mcp",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MCP server for rule-based scam, phishing and impersonation checks. Scoring runs locally — the content you check is never sent anywhere.",
   "keywords": [
     "mcp",
