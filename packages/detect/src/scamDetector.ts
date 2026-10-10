@@ -4,6 +4,7 @@
 import { parseEmailHeaders, analyseEmailIdentities, domainOf } from "./emailHeaders";
 import { extractIdentifiers, normaliseForAnalysis, defang, refang, isDefanged, normaliseUnicode, hasMixedScriptHost, mixedScriptWords, displayedHyphenCount } from "./urlSanitizer";
 import { looksNonEnglish } from "./languageGuess";
+import { stem } from "./stemGuess";
 import { registrableLabel, registrableDomain, publicSuffix, isNationalCommercialSuffix } from "./publicSuffix";
 import { findKeyboardTypo } from "./keyboardAdjacency";
 import { BASE_SIGNALS } from "./regions/base";
@@ -403,8 +404,44 @@ export function mentions(text: string, entry: string): boolean {
   // Short entries get a hard right anchor: their inflections are other words.
   const suffix = needle.length > INFLECTION_MIN_LEN ? INFLECTION : "";
   const right = /\w$/.test(needle) ? `${suffix}\\b` : "";
-  return new RegExp(`${left}${escaped}${right}`, "i").test(text);
+  if (new RegExp(`${left}${escaped}${right}`, "i").test(text)) return true;
+
+  // Stem fallback — a SECOND OPINION consulted only once the regex above has
+  // already missed, never a replacement for it. INFLECTION covers six literal
+  // suffixes; it cannot reach an irregular (pay/paid), a -y -> -ies swap
+  // (verify/verifies) or consonant doubling (refer/referred), because none of
+  // those is "strip a fixed suffix". See stemGuess.ts for why this is a small
+  // hand-rolled stemmer rather than a general-purpose dependency.
+  //
+  // Gated on STEM_FALLBACK_ENABLED, on the entry being a single bare word (the
+  // same shape the suffix allowance above requires — \w on both ends, above
+  // INFLECTION_MIN_LEN, so short tokens like "pin" or "ato" are never run
+  // through a stemmer that would conflate them with unrelated words), and on
+  // English only — see looksNonEnglish's sibling note on why stemming any
+  // other language risks the entropy trap the roadmap withdrew once already.
+  if (
+    STEM_FALLBACK_ENABLED &&
+    left === "\\b" &&
+    right !== "" &&
+    needle.length > INFLECTION_MIN_LEN &&
+    !looksNonEnglish(text)
+  ) {
+    const needleStem = stem(needle);
+    for (const word of text.match(/[a-z]+/gi) ?? []) {
+      if (word.length > INFLECTION_MIN_LEN && stem(word) === needleStem) return true;
+    }
+  }
+  return false;
 }
+
+/**
+ * Switches the stem fallback above on or off without touching mentions()'s
+ * call sites — the single point the eval ratchet's flip list is read against
+ * (see stemGuess.ts and the roadmap note on adopting it). Left as a runtime
+ * flag rather than removed once adopted, so a future regression has a one-line
+ * way to rule the fallback in or out of a bisection.
+ */
+const STEM_FALLBACK_ENABLED = true;
 
 function mentionsAny(text: string, entries: string[]): boolean {
   return entries.some((entry) => mentions(text, entry));
