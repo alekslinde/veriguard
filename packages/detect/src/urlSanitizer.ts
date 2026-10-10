@@ -199,16 +199,33 @@ export function hasConfusables(text: string): boolean {
 }
 
 /**
- * Cyrillic and Greek ranges — the two scripts that supply Latin homoglyphs.
+ * The Cyrillic and Greek letters that actually render as a Latin lookalike,
+ * as opposed to "any letter in Cyrillic or Greek" (the previous shape of
+ * this check, CONFUSABLE_SCRIPTS, which tested the whole Unicode block for
+ * each script).
  *
- * Deliberately narrow. These are the scripts whose letters render identically
- * to Latin ones in common fonts: Cyrillic а/е/о/р/с/х and Greek ο/ν/α do the
- * work in homoglyph phishing. Widening this to "any non-Latin script" would
- * flag ordinary Japanese, Arabic or Thai domains, which is both wrong and
- * discriminatory — those scripts share no shapes with Latin, so a reader cannot
- * be misled by them the way this guards against.
+ * Cyrillic passes through whole, unchanged from before: it supplies a
+ * lookalike for most Latin letters, and the few that do not (zh/z/shch-shaped
+ * letters) mixed with Latin in a label read as a real Cyrillic word with a
+ * Latin fragment attached, not a disguise — the same judgement call the
+ * body-text rule (TEXT_CONFUSABLES, below) already makes.
+ *
+ * Greek is where the old block test over-flagged: it is now enumerated down
+ * to the letters that render close enough to a Latin one to carry a
+ * homoglyph (the same set TEXT_CONFUSABLES below uses for body text, plus
+ * the unit/symbol letters it carves back out — mu, omega, pi, lambda,
+ * delta — which are unambiguous lookalikes in a hostname with no "500μg"
+ * case to resolve). The rest of the Greek alphabet — beta, zeta, theta, xi
+ * and their neighbours — shares no shape with any Latin letter, so excluding
+ * it costs no detection while sparing a hostname that happens to pair a
+ * Latin TLD or brand fragment with ordinary Greek.
+ *
+ * Widening either half to "any non-Latin script" was rejected earlier still
+ * and flagged ordinary Japanese, Arabic or Thai domains — both wrong and
+ * discriminatory, since those scripts share no shapes with Latin and cannot
+ * mislead a reader the way a lookalike can.
  */
-const CONFUSABLE_SCRIPTS = /[\u0370-\u03FF\u0400-\u04FF\u0500-\u052F]/;
+const CONFUSABLE_LETTERS = /[\u0400-\u04FF\u0500-\u052F]|[\u0391\u0392\u0395\u0396\u0397\u0399\u039A\u039C\u039D\u039F\u03A1\u03A4\u03A5\u03A7\u03B1\u03B5\u03B7\u03B9\u03BA\u03BC\u03BD\u03BF\u03C1\u03C4\u03C5\u03C7]/;
 
 /**
  * The hostname as written, before `new URL()` punycodes it.
@@ -244,9 +261,9 @@ export function displayedHyphenCount(raw: string): number {
 }
 
 /**
- * Whether a URL's hostname mixes Latin letters with Cyrillic or Greek ones
- * inside a single label — the homoglyph attack, as distinct from an ordinary
- * internationalised domain.
+ * Whether a URL's hostname mixes Latin letters with a Cyrillic or Greek
+ * letter *shaped like one* inside a single label — the homoglyph attack, as
+ * distinct from an ordinary internationalised domain.
  *
  * **Must be called on the RAW input, before normaliseForAnalysis.** `new URL()`
  * punycodes a non-ASCII hostname on parse, and the encoded form carries no
@@ -256,17 +273,21 @@ export function displayedHyphenCount(raw: string): number {
  * `node:` imports by design — it has to bundle for a browser — so the signal is
  * taken from the string while it still exists.
  *
- * The mixing is what matters, not the presence of non-Latin characters.
- * "münchen.de", "bücher.de" and a wholly Japanese domain are ordinary names;
- * none mixes a confusable script into a Latin word, because a homoglyph only
- * has value when the rest of the word still reads as the brand being
- * impersonated. Scoring plain IDNs as attacks would penalise people for their
- * language, which is the worst place for this engine to be wrong.
+ * Tests CONFUSABLE_LETTERS: the mixing that matters is a Latin word carrying
+ * a lookalike, not any Latin label touching any Cyrillic or Greek character.
+ * "münchen.de", "bücher.de" and a wholly
+ * Japanese domain are ordinary names; so is a label pairing a Latin TLD
+ * fragment with a real Cyrillic or Greek word that happens to contain a
+ * non-lookalike letter (ж, щ, β, δ…) — none of those mixes a confusable
+ * *shape* into a Latin word, because a homoglyph only has value when the rest
+ * of the word still reads as the brand being impersonated. Scoring either as
+ * an attack would penalise people for their language, which is the worst
+ * place for this engine to be wrong.
  */
 export function hasMixedScriptHost(raw: string): boolean {
   return rawHostname(raw)
     .split(".")
-    .some((label) => /[a-z]/i.test(label) && CONFUSABLE_SCRIPTS.test(label));
+    .some((label) => /[a-z]/i.test(label) && CONFUSABLE_LETTERS.test(label));
 }
 
 /**
@@ -287,8 +308,9 @@ export function hasMixedScriptHost(raw: string): boolean {
  * detection. Ranges were the first attempt and swept in Δ, which is the tell —
  * the set is a judgement about shapes, not a contiguous block of the alphabet.
  *
- * Hostnames keep the wider CONFUSABLE_SCRIPTS: unit symbols do not appear in
- * domain names, so the ambiguity this resolves does not arise there.
+ * Hostnames (CONFUSABLE_LETTERS, above) keep the Greek unit/symbol letters
+ * in their lookalike set: domain names carry no measurements, so the
+ * ambiguity this excludes them for does not arise there.
  */
 const TEXT_CONFUSABLES = /[\u0400-\u04FF\u0500-\u052F]|[ΑΒΕΖΗΙΚΜΝΟΡΤΥΧαεηικνορστυχ]/;
 

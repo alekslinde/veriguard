@@ -59,6 +59,23 @@ describe("legitimate internationalised domains", () => {
     expect(checkUrl("https://münchen.de/info", undefined, "AU").flags.join(" "))
       .toContain("Internationalised");
   });
+
+  // A Latin label touching a Greek letter that shares no shape with any
+  // Latin letter is not a homoglyph: there is nothing it could be disguising.
+  // Before CONFUSABLE_LETTERS narrowed the Greek half of this check down to
+  // the letters that actually look Latin, the full Greek block (as used for
+  // Cyrillic, which supplies a lookalike for most of its own alphabet) meant
+  // any Greek character sitting beside a Latin one was enough — flagging a
+  // unit/symbol letter such as β, δ, θ or ξ the same as a real lookalike
+  // swap, exactly the case the body-text rule (TEXT_CONFUSABLES) already
+  // excludes for the same reason.
+  it.each([
+    ["Greek beta (β), no Latin lookalike", "https://alphaβ.com/"],
+    ["Greek delta (δ), no Latin lookalike", "https://vectorδx.com/"],
+  ])("does not accuse %s of being mixed-script", (_name, url) => {
+    const r = checkUrl(url, undefined, "AU");
+    expect(r.flags.join(" ")).not.toContain("Mixed-script");
+  });
 });
 
 describe("the hyphen rule still works on real hyphens", () => {
