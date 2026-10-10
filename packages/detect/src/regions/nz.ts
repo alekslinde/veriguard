@@ -348,7 +348,7 @@ export const NZ: RegionDefinition = {
 
   foreignAuthorityMentions: FOREIGN_AUTHORITY_MENTIONS,
   foreignAuthorityFlag:
-    "Claims to be a foreign or international police authority — Interpol and Europol have no direct enforcement powers over New Zealand residents and never contact individuals to demand payment, and foreign police and consular officials have no jurisdiction in New Zealand. Report it to CERT NZ or Netsafe.",
+    "Claims to be a foreign or international police authority — Interpol and Europol have no direct enforcement powers over New Zealand residents and never contact individuals to demand payment, and foreign police and consular officials have no jurisdiction in New Zealand. Report it to the NCSC or Netsafe.",
 
   // NZ bank account numbers embed the bank and branch, so there is no separate
   // routing identifier equivalent to a BSB or sort code — the redirect ask is
@@ -389,10 +389,8 @@ export const NZ: RegionDefinition = {
   // explain away. Asserting one would be false, and the rule is skipped where
   // the field is absent.
 
-  reportingBody: "CERT NZ",
-  // CERT NZ has merged into the NCSC; cert.govt.nz (already in legitDomains
-  // above) resolves to the successor body that now takes the reports.
-  reportingUrl: "https://www.cert.govt.nz",
+  reportingBody: "NCSC (ncsc.govt.nz)",
+  reportingUrl: "https://www.ncsc.govt.nz",
 
   phonePlan: {
     // 0900 is the NZ premium-rate range. libphonenumber classifies it, but the

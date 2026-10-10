@@ -331,9 +331,9 @@ describe("NZ detection", () => {
     expect(notes).not.toContain("ATO");
   });
 
-  it("reports CERT NZ when an NZ number scores badly", () => {
+  it("reports the NCSC when an NZ number scores badly", () => {
     const r = checkPhone("0900123456", "NZ");
-    expect(r.details + r.flags.join(" ")).toContain("CERT NZ");
+    expect(r.details + r.flags.join(" ")).toContain("NCSC");
   });
 });
 

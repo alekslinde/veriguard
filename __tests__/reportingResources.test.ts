@@ -76,7 +76,7 @@ describe("reportingAgencies", () => {
   });
 
   it("derives the displayed host from the pack URL, without a www prefix", () => {
-    expect(reportingAgencies("NZ")[0].site).toBe("cert.govt.nz");
+    expect(reportingAgencies("NZ")[0].site).toBe("ncsc.govt.nz");
   });
 
   it("returns nothing for rest-of-world, which has no URL to link", () => {
