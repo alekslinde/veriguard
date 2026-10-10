@@ -3,6 +3,7 @@
 
 import { parseEmailHeaders, analyseEmailIdentities, domainOf } from "./emailHeaders";
 import { extractIdentifiers, normaliseForAnalysis, defang, refang, isDefanged, normaliseUnicode, hasMixedScriptHost, mixedScriptWords, displayedHyphenCount } from "./urlSanitizer";
+import { looksNonEnglish } from "./languageGuess";
 import { registrableLabel, registrableDomain, publicSuffix, isNationalCommercialSuffix } from "./publicSuffix";
 import { findKeyboardTypo } from "./keyboardAdjacency";
 import { BASE_SIGNALS } from "./regions/base";
@@ -2556,7 +2557,7 @@ export function checkSms(
   }
 
   const score = Math.min(sig.total(), 100);
-  return scoreToResult(score, sig, "SMS", PACK.coverage, PACK.reportingBody);
+  return scoreToResult(score, sig, "SMS", PACK.coverage, PACK.reportingBody, looksNonEnglish(text));
 }
 
 /**
@@ -2799,7 +2800,7 @@ export function checkEmail(text: string, blocklist?: HostLookup, region?: Region
   }
 
   const score = Math.min(sig.total(), 100);
-  return scoreToResult(score, sig, "Email", PACK.coverage, PACK.reportingBody);
+  return scoreToResult(score, sig, "Email", PACK.coverage, PACK.reportingBody, looksNonEnglish(text));
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -2961,7 +2962,7 @@ export function checkCustom(text: string, blocklist?: HostLookup, region?: Regio
   }
 
   const score = Math.min(sig.total(), 100);
-  return scoreToResult(score, sig, "Custom", PACK.coverage, PACK.reportingBody);
+  return scoreToResult(score, sig, "Custom", PACK.coverage, PACK.reportingBody, looksNonEnglish(text));
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -2984,15 +2985,29 @@ export function checkCustom(text: string, blocklist?: HostLookup, region?: Regio
 // keeping: a new tier must opt *in* to asserting safety by being `full`, never
 // inherit it by being absent from an enumeration someone forgot to update.
 // Defaulting a new tier to the honest behaviour is the whole point.
-function downgradeForCoverage(result: CheckResult, coverage: RegionCoverage): CheckResult {
-  if (coverage === "full" || result.verdict !== "safe") return result;
-  return {
-    ...result,
-    verdict: "unknown",
-    details:
-      "We don't have full scam-detection rules for your region yet, so we can't give this a clean bill of health. " +
-      "Nothing in our universal checks flagged it — but treat that as 'not checked', not 'safe'.",
-  };
+//
+// `languageUncertain` is the same honesty mechanism applied to a second axis
+// RegionCoverage cannot see: every keyword list here is English regardless of
+// region, so a `full` AU pack reading non-English text has no more right to
+// assert "safe" than a `none` pack reading English — the rules it would need
+// to have found something simply do not exist for that text. It downgrades
+// independently of `coverage`, which is why it is checked even when coverage
+// is `full`. Passed as `undefined` by callers with no prose to judge (checkUrl,
+// checkPhone) rather than `false`, so "not applicable" never reads as "checked
+// and it's English".
+function downgradeForCoverage(
+  result: CheckResult,
+  coverage: RegionCoverage,
+  languageUncertain?: boolean,
+): CheckResult {
+  if (result.verdict !== "safe") return result;
+  if (coverage === "full" && !languageUncertain) return result;
+  const details = languageUncertain
+    ? "This doesn't read as English, and our rules are written for English text — so we can't give this a clean bill of health. " +
+      "Nothing in our universal checks flagged it — but treat that as 'not checked', not 'safe'."
+    : "We don't have full scam-detection rules for your region yet, so we can't give this a clean bill of health. " +
+      "Nothing in our universal checks flagged it — but treat that as 'not checked', not 'safe'.";
+  return { ...result, verdict: "unknown", details };
 }
 
 function scoreToResult(
@@ -3004,6 +3019,9 @@ function scoreToResult(
   // user to contact Scamwatch would send them to an agency with no remit
   // over their case.
   reportingBody: string = resolveRegionPack(DEFAULT_REGION).reportingBody,
+  // Undefined for checkers with no message body to judge (checkUrl, checkPhone):
+  // see the note on downgradeForCoverage above.
+  languageUncertain?: boolean,
 ): CheckResult {
   let verdict: CheckResult["verdict"];
   let details: string;
@@ -3037,6 +3055,7 @@ function scoreToResult(
   const result = downgradeForCoverage(
     { verdict, score, flags: signals.map((x) => x.text), details, category, coverage, signals },
     coverage,
+    languageUncertain,
   );
   if (unsettled.size) PENDING.set(result as object, unsettled);
   return result;

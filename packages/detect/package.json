@@ -32,6 +32,7 @@
     "./engineTypes": "./src/engineTypes.ts",
     "./hostHash": "./src/hostHash.ts",
     "./keyboardAdjacency": "./src/keyboardAdjacency.ts",
+    "./languageGuess": "./src/languageGuess.ts",
     "./phoneIntel": "./src/phoneIntel.ts",
     "./publicSuffix": "./src/publicSuffix.ts",
     "./regions": "./src/regions/index.ts",
