@@ -419,20 +419,37 @@ export function mentions(text: string, entry: string): boolean {
   // through a stemmer that would conflate them with unrelated words), and on
   // English only — see looksNonEnglish's sibling note on why stemming any
   // other language risks the entropy trap the roadmap withdrew once already.
-  if (
-    STEM_FALLBACK_ENABLED &&
-    left === "\\b" &&
-    right !== "" &&
-    needle.length > INFLECTION_MIN_LEN &&
-    !looksNonEnglish(text)
-  ) {
-    const needleStem = stem(needle);
-    for (const word of text.match(/[a-z]+/gi) ?? []) {
-      if (word.length > INFLECTION_MIN_LEN && stem(word) === needleStem) return true;
+  if (STEM_FALLBACK_ENABLED && left === "\\b" && right !== "" && needle.length > INFLECTION_MIN_LEN) {
+    const words = stemmedWordsOf(text);
+    if (words) {
+      const needleStem = stem(needle);
+      for (const word of words) {
+        if (word.length > INFLECTION_MIN_LEN && stem(word) === needleStem) return true;
+      }
     }
   }
   return false;
 }
+
+/**
+ * The stem fallback's per-text precomputation, cached the same way
+ * foldMessage is above: this message is matched against every pack entry in
+ * a run, and recomputing looksNonEnglish(text) plus the full word-stem list
+ * on every single mentions() call that reaches this fallback was most of the
+ * check on long input — a 100,000-character message re-tokenised and
+ * re-stemmed once per entry made the fallback itself the quadratic cost it
+ * exists to avoid becoming. Returns null for non-English text, so the
+ * one-line gate at the call site is "do we have a word list" rather than a
+ * separate flag that could drift from the list it is supposed to guard.
+ */
+function stemmedWordsOf(text: string): string[] | null {
+  if (text !== lastStemmedWords.input) {
+    const words = looksNonEnglish(text) ? null : text.match(/[a-z]+/gi);
+    lastStemmedWords = { input: text, words };
+  }
+  return lastStemmedWords.words;
+}
+let lastStemmedWords: { input: string; words: string[] | null } = { input: "", words: null };
 
 /**
  * Switches the stem fallback above on or off without touching mentions()'s
