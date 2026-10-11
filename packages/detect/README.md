@@ -9,7 +9,7 @@ a message without sending it anywhere.
 
 Documentation: [veriguard.app/packages](https://veriguard.app/packages).
 
-*Last reviewed: 2026-10-01.*
+*Last reviewed: 2026-10-11.*
 
 ```bash
 npm install @veriguard/detect
@@ -95,6 +95,8 @@ src/
   publicSuffix.ts     ← registrable-domain lookup, the hinge of the typosquat rule
   publicSuffixList.ts ← generated data (`npm run psl`); never edited by hand
   keyboardAdjacency.ts ← keyboard-adjacency typosquat detection (region-free)
+  languageGuess.ts    ← "does this read as English", fed to the coverage downgrade
+  stemGuess.ts        ← minimal English stemmer, mentions()'s suffix-match fallback
   hostHash.ts         ← the hostname-hashing scheme the blocklist endpoint shares with its clients
   verdictRank.ts      ← verdict severity ordering, and the worst-wins collapse
   regions/            ← per-country signal packs (data, never logic)

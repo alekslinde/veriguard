@@ -3,6 +3,8 @@
 
 import { parseEmailHeaders, analyseEmailIdentities, domainOf } from "./emailHeaders";
 import { extractIdentifiers, normaliseForAnalysis, defang, refang, isDefanged, normaliseUnicode, hasMixedScriptHost, mixedScriptWords, displayedHyphenCount } from "./urlSanitizer";
+import { looksNonEnglish } from "./languageGuess";
+import { stem } from "./stemGuess";
 import { registrableLabel, registrableDomain, publicSuffix, isNationalCommercialSuffix } from "./publicSuffix";
 import { findKeyboardTypo } from "./keyboardAdjacency";
 import { BASE_SIGNALS } from "./regions/base";
@@ -402,8 +404,61 @@ export function mentions(text: string, entry: string): boolean {
   // Short entries get a hard right anchor: their inflections are other words.
   const suffix = needle.length > INFLECTION_MIN_LEN ? INFLECTION : "";
   const right = /\w$/.test(needle) ? `${suffix}\\b` : "";
-  return new RegExp(`${left}${escaped}${right}`, "i").test(text);
+  if (new RegExp(`${left}${escaped}${right}`, "i").test(text)) return true;
+
+  // Stem fallback — a SECOND OPINION consulted only once the regex above has
+  // already missed, never a replacement for it. INFLECTION covers six literal
+  // suffixes; it cannot reach an irregular (pay/paid), a -y -> -ies swap
+  // (verify/verifies) or consonant doubling (refer/referred), because none of
+  // those is "strip a fixed suffix". See stemGuess.ts for why this is a small
+  // hand-rolled stemmer rather than a general-purpose dependency.
+  //
+  // Gated on STEM_FALLBACK_ENABLED, on the entry being a single bare word (the
+  // same shape the suffix allowance above requires — \w on both ends, above
+  // INFLECTION_MIN_LEN, so short tokens like "pin" or "ato" are never run
+  // through a stemmer that would conflate them with unrelated words), and on
+  // English only — see looksNonEnglish's sibling note on why stemming any
+  // other language risks the entropy trap the roadmap withdrew once already.
+  if (STEM_FALLBACK_ENABLED && left === "\\b" && right !== "" && needle.length > INFLECTION_MIN_LEN) {
+    const words = stemmedWordsOf(text);
+    if (words) {
+      const needleStem = stem(needle);
+      for (const word of words) {
+        if (word.length > INFLECTION_MIN_LEN && stem(word) === needleStem) return true;
+      }
+    }
+  }
+  return false;
 }
+
+/**
+ * The stem fallback's per-text precomputation, cached the same way
+ * foldMessage is above: this message is matched against every pack entry in
+ * a run, and recomputing looksNonEnglish(text) plus the full word-stem list
+ * on every single mentions() call that reaches this fallback was most of the
+ * check on long input — a 100,000-character message re-tokenised and
+ * re-stemmed once per entry made the fallback itself the quadratic cost it
+ * exists to avoid becoming. Returns null for non-English text, so the
+ * one-line gate at the call site is "do we have a word list" rather than a
+ * separate flag that could drift from the list it is supposed to guard.
+ */
+function stemmedWordsOf(text: string): string[] | null {
+  if (text !== lastStemmedWords.input) {
+    const words = looksNonEnglish(text) ? null : text.match(/[a-z]+/gi);
+    lastStemmedWords = { input: text, words };
+  }
+  return lastStemmedWords.words;
+}
+let lastStemmedWords: { input: string; words: string[] | null } = { input: "", words: null };
+
+/**
+ * Switches the stem fallback above on or off without touching mentions()'s
+ * call sites — the single point the eval ratchet's flip list is read against
+ * (see stemGuess.ts and the roadmap note on adopting it). Left as a runtime
+ * flag rather than removed once adopted, so a future regression has a one-line
+ * way to rule the fallback in or out of a bisection.
+ */
+const STEM_FALLBACK_ENABLED = true;
 
 function mentionsAny(text: string, entries: string[]): boolean {
   return entries.some((entry) => mentions(text, entry));
@@ -2556,7 +2611,7 @@ export function checkSms(
   }
 
   const score = Math.min(sig.total(), 100);
-  return scoreToResult(score, sig, "SMS", PACK.coverage, PACK.reportingBody);
+  return scoreToResult(score, sig, "SMS", PACK.coverage, PACK.reportingBody, looksNonEnglish(text));
 }
 
 /**
@@ -2799,7 +2854,7 @@ export function checkEmail(text: string, blocklist?: HostLookup, region?: Region
   }
 
   const score = Math.min(sig.total(), 100);
-  return scoreToResult(score, sig, "Email", PACK.coverage, PACK.reportingBody);
+  return scoreToResult(score, sig, "Email", PACK.coverage, PACK.reportingBody, looksNonEnglish(text));
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -2961,7 +3016,7 @@ export function checkCustom(text: string, blocklist?: HostLookup, region?: Regio
   }
 
   const score = Math.min(sig.total(), 100);
-  return scoreToResult(score, sig, "Custom", PACK.coverage, PACK.reportingBody);
+  return scoreToResult(score, sig, "Custom", PACK.coverage, PACK.reportingBody, looksNonEnglish(text));
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -2984,15 +3039,40 @@ export function checkCustom(text: string, blocklist?: HostLookup, region?: Regio
 // keeping: a new tier must opt *in* to asserting safety by being `full`, never
 // inherit it by being absent from an enumeration someone forgot to update.
 // Defaulting a new tier to the honest behaviour is the whole point.
-function downgradeForCoverage(result: CheckResult, coverage: RegionCoverage): CheckResult {
-  if (coverage === "full" || result.verdict !== "safe") return result;
-  return {
-    ...result,
-    verdict: "unknown",
-    details:
-      "We don't have full scam-detection rules for your region yet, so we can't give this a clean bill of health. " +
-      "Nothing in our universal checks flagged it — but treat that as 'not checked', not 'safe'.",
-  };
+//
+// `languageUncertain` is the same honesty mechanism applied to a second axis
+// RegionCoverage cannot see: every keyword list here is English regardless of
+// region, so a `full` AU pack reading non-English text has no more right to
+// assert "safe" than a `none` pack reading English — the rules it would need
+// to have found something simply do not exist for that text. It downgrades
+// independently of `coverage`, which is why it is checked even when coverage
+// is `full`. Passed as `undefined` by callers with no prose to judge (checkUrl,
+// checkPhone) rather than `false`, so "not applicable" never reads as "checked
+// and it's English".
+function downgradeForCoverage(
+  result: CheckResult,
+  coverage: RegionCoverage,
+  languageUncertain?: boolean,
+): CheckResult {
+  if (result.verdict !== "safe") return result;
+  const coverageGap = coverage !== "full";
+  if (!coverageGap && !languageUncertain) return result;
+
+  // Both reasons are named when both apply, rather than one silently eclipsing
+  // the other — a partial-coverage region reading a non-English message has
+  // two independent grounds to withhold "safe", and dropping either one here
+  // would be the same kind of false confidence this function exists to avoid.
+  const reasons: string[] = [];
+  if (languageUncertain) {
+    reasons.push("This doesn't read as English, and our rules are written for English text");
+  }
+  if (coverageGap) {
+    reasons.push("We don't have full scam-detection rules for your region yet");
+  }
+  const details =
+    `${reasons.join(", and ")}, so we can't give this a clean bill of health. ` +
+    "Nothing in our universal checks flagged it — but treat that as 'not checked', not 'safe'.";
+  return { ...result, verdict: "unknown", details };
 }
 
 function scoreToResult(
@@ -3004,6 +3084,9 @@ function scoreToResult(
   // user to contact Scamwatch would send them to an agency with no remit
   // over their case.
   reportingBody: string = resolveRegionPack(DEFAULT_REGION).reportingBody,
+  // Undefined for checkers with no message body to judge (checkUrl, checkPhone):
+  // see the note on downgradeForCoverage above.
+  languageUncertain?: boolean,
 ): CheckResult {
   let verdict: CheckResult["verdict"];
   let details: string;
@@ -3037,6 +3120,7 @@ function scoreToResult(
   const result = downgradeForCoverage(
     { verdict, score, flags: signals.map((x) => x.text), details, category, coverage, signals },
     coverage,
+    languageUncertain,
   );
   if (unsettled.size) PENDING.set(result as object, unsettled);
   return result;

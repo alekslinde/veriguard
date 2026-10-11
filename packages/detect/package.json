@@ -32,11 +32,13 @@
     "./engineTypes": "./src/engineTypes.ts",
     "./hostHash": "./src/hostHash.ts",
     "./keyboardAdjacency": "./src/keyboardAdjacency.ts",
+    "./languageGuess": "./src/languageGuess.ts",
     "./phoneIntel": "./src/phoneIntel.ts",
     "./publicSuffix": "./src/publicSuffix.ts",
     "./regions": "./src/regions/index.ts",
     "./regions/*": "./src/regions/*.ts",
     "./scamDetector": "./src/scamDetector.ts",
+    "./stemGuess": "./src/stemGuess.ts",
     "./urlExpander": "./src/urlExpander.ts",
     "./urlSanitizer": "./src/urlSanitizer.ts",
     "./verdictRank": "./src/verdictRank.ts"
