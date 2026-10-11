@@ -76,6 +76,16 @@ describe("legitimate internationalised domains", () => {
     const r = checkUrl(url, undefined, "AU");
     expect(r.flags.join(" ")).not.toContain("Mixed-script");
   });
+
+  // Sigma IS a Latin lookalike (it is in CONFUSABLE_LETTERS, the same set
+  // TEXT_CONFUSABLES uses for body text) and must be caught at the hostname
+  // just as it already is in free text — the two paths disagreeing on the
+  // same letter's status would be an unexplained coverage gap, not a
+  // deliberate exclusion like beta or delta above.
+  it("flags a Latin word carrying a Greek sigma (σ) lookalike", () => {
+    const r = checkUrl("https://paypaσl.com/verify", undefined, "AU");
+    expect(r.flags.join(" ")).toContain("Mixed-script");
+  });
 });
 
 describe("the hyphen rule still works on real hyphens", () => {

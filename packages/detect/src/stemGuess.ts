@@ -100,16 +100,28 @@ export function stem(word: string): string {
   // consonant-vowel-consonant (CVC) — "ship" ends "-hip" and "refer" ends
   // "-fer", both CVC, so both qualify.
   //
-  // "l" is excluded from the doubled letter itself, not from the CVC test:
-  // "spell"/"spelled" passes CVC on "-pel" exactly like "ship" passes it on
-  // "-hip", so CVC alone cannot tell a real double-L word from an inflected
-  // one. American spelling does not double a final L before -ed/-ing the way
-  // it doubles P, R, T and the rest ("travel" -> "traveling", not
-  // "travelling"), so a doubled L in the input is already part of the base
-  // word rather than something inflection added, and undoing it would turn
-  // "spelled" into "spel" — one L short of a real word.
+  // "l" and "s" are excluded from the doubled letter itself, not from the CVC
+  // test — the CVC test alone cannot tell a real double-letter word from an
+  // inflected one, because both shapes pass it identically:
+  //
+  //   - "spell"/"spelled" passes CVC on "-pel", exactly like "ship" passes it
+  //     on "-hip". American spelling does not double a final L before
+  //     -ed/-ing the way it doubles P, R, T and the rest ("travel" ->
+  //     "traveling", not "travelling"), so a doubled L in the input is
+  //     already part of the base word, and undoing it would turn "spelled"
+  //     into "spel" — one L short of a real word.
+  //   - "cross"/"crossed" and "pass"/"passed" pass CVC on "-ros"/"-pas" the
+  //     same way "refer"/"referred" passes it on "-fer". A single-S stem
+  //     doubling via inflection is real but rare (gas/gassed, bus/bussed);
+  //     a base word that already ends in a double S is common (cross, pass,
+  //     miss, kiss, toss, dress, address, process…). Undoing the double here
+  //     produces a non-word ("cros", "pas") that can never equal any real
+  //     stem, which is strictly worse than leaving it alone: a miss on the
+  //     rare inflected case costs nothing mentions() didn't already lack,
+  //     while undoing a real double-S word breaks the one candidate stem
+  //     that NEEDS to stay intact to match its own unmodified base form.
   const doubled = /([a-z])\1(?:ed|ing)$/.exec(lower);
-  if (doubled && doubled[1] !== "l") {
+  if (doubled && doubled[1] !== "l" && doubled[1] !== "s") {
     const candidateStem = lower.slice(0, doubled.index + 1);
     if (/[^aeiou][aeiou][^aeiou]$/.test(candidateStem)) return candidateStem;
   }

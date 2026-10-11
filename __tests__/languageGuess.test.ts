@@ -96,11 +96,16 @@ describe("looksNonEnglish feeds the coverage downgrade, never the score", () => 
     expect(r.verdict).toBe("safe");
   });
 
-  it("does not double up with an existing coverage downgrade", () => {
+  it("still downgrades under no coverage, and names both reasons", () => {
     // Under `none` coverage every clean result already downgrades on coverage
-    // alone. The language signal must not change the reason given when
-    // coverage was always going to be the binding one — same wording either way.
+    // alone, and this text also reads as non-English — two independent
+    // grounds to withhold "safe". Neither may silently eclipse the other:
+    // dropping the coverage reason because language already downgraded (or
+    // vice versa) is the same false-confidence failure this mechanism exists
+    // to prevent, just hidden one level down in which caveat the reader sees.
     const r = checkSms(NON_ENGLISH, NO_BLOCKLIST, "ZZ");
     expect(r.verdict).toBe("unknown");
+    expect(r.details).toContain("doesn't read as English");
+    expect(r.details).toContain("don't have full scam-detection rules for your region");
   });
 });

@@ -212,20 +212,20 @@ export function hasConfusables(text: string): boolean {
  *
  * Greek is where the old block test over-flagged: it is now enumerated down
  * to the letters that render close enough to a Latin one to carry a
- * homoglyph (the same set TEXT_CONFUSABLES below uses for body text, plus
- * the unit/symbol letters it carves back out — mu, omega, pi, lambda,
- * delta — which are unambiguous lookalikes in a hostname with no "500μg"
- * case to resolve). The rest of the Greek alphabet — beta, zeta, theta, xi
- * and their neighbours — shares no shape with any Latin letter, so excluding
- * it costs no detection while sparing a hostname that happens to pair a
- * Latin TLD or brand fragment with ordinary Greek.
+ * homoglyph. This is exactly TEXT_CONFUSABLES's own Greek set (below) plus
+ * mu, which free text carves back OUT for its unit/symbol use ("500μg",
+ * "10μF") but a hostname has no such case to resolve, so mu stays in here
+ * as the unambiguous lookalike it is. The rest of the Greek alphabet — beta,
+ * zeta, theta, xi and their neighbours — shares no shape with any Latin
+ * letter, so excluding it costs no detection while sparing a hostname that
+ * happens to pair a Latin TLD or brand fragment with ordinary Greek.
  *
  * Widening either half to "any non-Latin script" was rejected earlier still
  * and flagged ordinary Japanese, Arabic or Thai domains — both wrong and
  * discriminatory, since those scripts share no shapes with Latin and cannot
  * mislead a reader the way a lookalike can.
  */
-const CONFUSABLE_LETTERS = /[\u0400-\u04FF\u0500-\u052F]|[\u0391\u0392\u0395\u0396\u0397\u0399\u039A\u039C\u039D\u039F\u03A1\u03A4\u03A5\u03A7\u03B1\u03B5\u03B7\u03B9\u03BA\u03BC\u03BD\u03BF\u03C1\u03C4\u03C5\u03C7]/;
+const CONFUSABLE_LETTERS = /[\u0400-\u04FF\u0500-\u052F]|[\u0391\u0392\u0395\u0396\u0397\u0399\u039A\u039C\u039D\u039F\u03A1\u03A3\u03A4\u03A5\u03A7\u03B1\u03B5\u03B7\u03B9\u03BA\u03BC\u03BD\u03BF\u03C1\u03C3\u03C4\u03C5\u03C7]/;
 
 /**
  * The hostname as written, before `new URL()` punycodes it.

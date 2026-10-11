@@ -34,6 +34,23 @@ describe("stem", () => {
     expect(stem("cancelled")).toBe("cancelled");
   });
 
+  it("leaves a real double-S word alone rather than cutting it to a non-word", () => {
+    // "crossed" must not reduce to "cros", and "passed" must not reduce to
+    // "pas" — the CVC shape test alone cannot tell a real double-S base word
+    // (cross, pass, miss, kiss, toss, dress) from a genuinely inflected one
+    // (the rare gas/gassed, bus/bussed), so the doubling rule leaves S alone
+    // the same way it already leaves L alone. A false "no match" costs
+    // nothing mentions() didn't already lack; truncating a real word to one
+    // that can never equal any valid stem is strictly worse.
+    expect(stem("crossed")).toBe("crossed");
+    expect(stem("passed")).toBe("passed");
+    // Which means the base and inflected forms of a double-S word no longer
+    // falsely diverge into a word and a non-word — they simply both fall
+    // through unstemmed, so this fallback correctly reports no match rather
+    // than inventing one.
+    expect(sameStem("cross", "crossed")).toBe(false);
+  });
+
   it("does not double a consonant that was never doubled by inflection", () => {
     // Two consonants that already belong to the stem ("spell") must not be
     // read as the doubling rule just because the CVC shape happens to match.

@@ -3038,12 +3038,23 @@ function downgradeForCoverage(
   languageUncertain?: boolean,
 ): CheckResult {
   if (result.verdict !== "safe") return result;
-  if (coverage === "full" && !languageUncertain) return result;
-  const details = languageUncertain
-    ? "This doesn't read as English, and our rules are written for English text — so we can't give this a clean bill of health. " +
-      "Nothing in our universal checks flagged it — but treat that as 'not checked', not 'safe'."
-    : "We don't have full scam-detection rules for your region yet, so we can't give this a clean bill of health. " +
-      "Nothing in our universal checks flagged it — but treat that as 'not checked', not 'safe'.";
+  const coverageGap = coverage !== "full";
+  if (!coverageGap && !languageUncertain) return result;
+
+  // Both reasons are named when both apply, rather than one silently eclipsing
+  // the other — a partial-coverage region reading a non-English message has
+  // two independent grounds to withhold "safe", and dropping either one here
+  // would be the same kind of false confidence this function exists to avoid.
+  const reasons: string[] = [];
+  if (languageUncertain) {
+    reasons.push("This doesn't read as English, and our rules are written for English text");
+  }
+  if (coverageGap) {
+    reasons.push("We don't have full scam-detection rules for your region yet");
+  }
+  const details =
+    `${reasons.join(", and ")}, so we can't give this a clean bill of health. ` +
+    "Nothing in our universal checks flagged it — but treat that as 'not checked', not 'safe'.";
   return { ...result, verdict: "unknown", details };
 }
 

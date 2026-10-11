@@ -81,7 +81,7 @@ const ENGLISH_STOPWORDS = new Set([
 const LATIN_LETTERS = /[a-zA-Z]/g;
 
 /** A script outside Latin, numerals and common punctuation — evidence this is not English, independent of word frequency. */
-const NON_LATIN_SCRIPT = /[^\u0000-ɏ\s0-9!-/:-@[-`{-~]/;
+const NON_LATIN_SCRIPT = /[^\u0000-\u024F\s0-9!-/:-@[-`{-~]/;
 
 /**
  * Whether `text` gives enough evidence to say it is probably not English —
