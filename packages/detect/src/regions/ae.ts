@@ -87,6 +87,13 @@ export const AE: RegionDefinition = {
   legitDomainFlag: "",
   legitDomainDetails: "",
 
+  // Agency moves the case onto WhatsApp/Telegram (#445). Dubai Police's
+  // eCrime Hub (16 Jul 2026) describes government-impersonation lures that
+  // hand the victim off to WhatsApp, a call, or email under manufactured
+  // urgency.
+  authorityMessagingAppFlag:
+    "Claims to be from a UAE government department and asks you to continue on WhatsApp — Dubai Police's eCrime Hub says impersonation scams work by moving you onto WhatsApp, calls or email under false urgency. Verify through the official app or website instead, and report it via ecrime.ae.",
+
   reportingBody: "Dubai Police or Abu Dhabi Police",
   reportingUrl: "https://ecrime.ae/",
 
