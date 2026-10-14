@@ -9,7 +9,7 @@ a message without sending it anywhere.
 
 Documentation: [veriguard.app/packages](https://veriguard.app/packages).
 
-*Last reviewed: 2026-10-11.*
+*Last reviewed: 2026-10-14.*
 
 ```bash
 npm install @veriguard/detect
@@ -88,6 +88,8 @@ src/
   scamDetector.ts     ← the scorer and the public check* / analyzeContent API
   detectType.ts       ← input classification
   engineTypes.ts      ← shared value types (breaks the scorer ↔ detectType cycle)
+  signalRegistry.ts   ← a signal as a value: channels, weight and inputs as fields.
+                        Declared; scoring still lives in scamDetector.ts
   urlSanitizer.ts     ← defanging, refanging, tracking-param stripping
   emailHeaders.ts     ← header parsing and SPF/DKIM/DMARC summarising
   phoneIntel.ts       ← number intelligence (the one external dep)
