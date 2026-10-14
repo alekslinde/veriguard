@@ -38,6 +38,7 @@
     "./regions": "./src/regions/index.ts",
     "./regions/*": "./src/regions/*.ts",
     "./scamDetector": "./src/scamDetector.ts",
+    "./signalRegistry": "./src/signalRegistry.ts",
     "./stemGuess": "./src/stemGuess.ts",
     "./urlExpander": "./src/urlExpander.ts",
     "./urlSanitizer": "./src/urlSanitizer.ts",

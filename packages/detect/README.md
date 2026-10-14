@@ -9,7 +9,7 @@ a message without sending it anywhere.
 
 Documentation: [veriguard.app/packages](https://veriguard.app/packages).
 
-*Last reviewed: 2026-10-11.*
+*Last reviewed: 2026-10-14.*
 
 ```bash
 npm install @veriguard/detect

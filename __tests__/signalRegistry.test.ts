@@ -7,15 +7,20 @@ import {
   SIGNALS,
   duplicateIds,
   missingReads,
+  registryProblems,
   registryScore,
   runsOn,
   signalInventory,
+  undeclaredWeights,
+  unsatisfiableReads,
   weightFor,
   type Channel,
   type Context,
   type SignalDef,
-} from "../packages/detect/src/signalRegistry";
+} from "@veriguard/detect/signalRegistry";
 import { resolveRegionPack } from "@veriguard/detect/regions";
+import { parseEmailHeaders } from "@veriguard/detect/emailHeaders";
+import { analysePhone } from "@veriguard/detect/phoneIntel";
 import { checkPhone, checkSms, checkEmail, checkUrl, checkCustom } from "@veriguard/detect/scamDetector";
 
 // Step 1 of the registry extraction: the types and the scorer exist, and
@@ -133,11 +138,55 @@ describe("channel weighting is a per-signal fact", () => {
     expect(registryScore(ctx(), [counted])[0].points).toBe(30);
   });
 
+  it("never lets a fractional scale sum past the declared weight", () => {
+    // Rounded per row, two hits at scale 0.5 against weight 25 gave 13 + 13 =
+    // 26 — a signal scoring more than it declared. The evidence list is shown
+    // to a reader invited to check that it adds up, so a row belonging to no
+    // visible total is the failure mode. Rounded once, with each row taking the
+    // running remainder.
+    const halves = fires({
+      weight: 25,
+      evaluate: () => [
+        { text: "half", source: "message" as const, scale: 0.5 },
+        { text: "other half", source: "message" as const, scale: 0.5 },
+      ],
+    });
+    const rows = registryScore(ctx(), [halves]);
+    expect(rows.reduce((n, r) => n + r.points, 0)).toBe(25);
+  });
+
+  it("keeps thirds summing to the declared weight", () => {
+    const thirds = fires({
+      weight: 10,
+      evaluate: () => [0, 1, 2].map((i) => ({ text: `t${i}`, source: "message" as const, scale: 1 / 3 })),
+    });
+    const rows = registryScore(ctx(), [thirds]);
+    expect(rows.reduce((n, r) => n + r.points, 0)).toBe(10);
+    expect(rows).toHaveLength(3);
+  });
+
   it("falls to zero rather than guessing when a channel has no weight", () => {
     // No `default`, so an unlisted channel is unweighted. Zero is the safe
     // direction: every guard here fails toward saying nothing, because a scam
     // card on a real message teaches the user the verdicts are noise.
     expect(weightFor(fires({ weight: { sms: 40 } }), "custom")).toBe(0);
+  });
+
+  it("names a channel it runs on with no weight to go with it", () => {
+    // Zero is the safe direction but the wrong visibility: a forgotten weight
+    // and a deliberate zero-point note are indistinguishable at the call site,
+    // and a channel listed in the inventory with 0 against it reads as
+    // coverage that does not exist.
+    expect(undeclaredWeights(fires({ channels: ["sms", "email"], weight: { sms: 40 } }))).toEqual(["email"]);
+  });
+
+  it("accepts a deliberate zero, declared as one", () => {
+    expect(undeclaredWeights(fires({ channels: ["sms"], weight: { sms: 0 } }))).toEqual([]);
+  });
+
+  it("asks nothing of a bare weight or one carrying a default", () => {
+    expect(undeclaredWeights(fires({ channels: "all", weight: 25 }))).toEqual([]);
+    expect(undeclaredWeights(fires({ channels: "all", weight: { default: 25, email: 17 } }))).toEqual([]);
   });
 });
 
@@ -153,17 +202,89 @@ describe("channel gating", () => {
   });
 });
 
-describe("reads makes overlap and missing inputs visible", () => {
-  it("reports an input the context cannot supply", () => {
-    // A signal reading headers on the SMS channel is an authoring error, not a
-    // signal that happens not to fire.
-    expect(missingReads(fires({ reads: ["headers"] }), ctx({ channel: "sms" }))).toEqual(["headers"]);
-    expect(missingReads(fires({ reads: ["headers"] }), ctx({ channel: "email" }))).toEqual([]);
+describe("a signal cannot score on an input it could not read", () => {
+  it("skips a hostname signal when the context carries no URL", () => {
+    // Enforced centrally rather than left to each evaluate: otherwise a signal
+    // reading `hostname` depends on its own body guarding a field the type
+    // says is optional, and "every evaluate checks its own inputs" is the kind
+    // of rule stated in a comment that this file exists to make the code
+    // enforce. This `fires` always returns a hit, so the skip is the assertion.
+    const onHost = fires({ reads: ["hostname"] });
+    expect(registryScore(ctx(), [onHost])).toEqual([]);
+    expect(registryScore(ctx({ hostname: "evil.tk" }), [onHost])).toHaveLength(1);
   });
 
-  it("treats a hostname-reading signal on text with no URL as simply absent", () => {
+  it("skips a headers signal on a message with none parsed", () => {
+    const onHeaders = fires({ reads: ["headers"], channels: ["email"] });
+    expect(registryScore(ctx({ channel: "email" }), [onHeaders])).toEqual([]);
+  });
+
+  it("still runs a signal reading only text", () => {
+    expect(registryScore(ctx(), [fires({ reads: ["body", "words", "original"] })])).toHaveLength(1);
+  });
+});
+
+describe("registryProblems asks every authoring question at once", () => {
+  it("finds none in the live registry", () => {
+    // What stops step 2 onward registering a broken signal.
+    expect(registryProblems()).toEqual([]);
+  });
+
+  it("reports a duplicate id, an unreachable read and a missing weight together", () => {
+    const problems = registryProblems([
+      fires({ id: "dup" }),
+      fires({ id: "dup" }),
+      fires({ id: "unreachable", reads: ["headers"], channels: ["sms"] }),
+      fires({ id: "unweighted", channels: ["sms", "email"], weight: { sms: 10 } }),
+    ]);
+    expect(problems).toHaveLength(3);
+    expect(problems.join("\n")).toContain("dup: registered more than once");
+    expect(problems.join("\n")).toContain("unreachable: reads headers");
+    expect(problems.join("\n")).toContain("unweighted: runs on email");
+  });
+
+  it("passes a well-formed signal", () => {
+    expect(registryProblems([fires()])).toEqual([]);
+  });
+});
+
+describe("reads makes overlap and missing inputs visible", () => {
+  it("reports an input this context does not carry", () => {
     expect(missingReads(fires({ reads: ["hostname"] }), ctx())).toEqual(["hostname"]);
     expect(missingReads(fires({ reads: ["hostname"] }), ctx({ hostname: "evil.tk" }))).toEqual([]);
+  });
+
+  it("answers from what is present, not from the channel", () => {
+    // An SMS carrying a link has a hostname, and an email whose headers failed
+    // to parse does not have headers. Inferring either from the channel would
+    // be the restated-guard move: a judgement the context already decides
+    // properly, approximated somewhere else.
+    expect(missingReads(fires({ reads: ["hostname"] }), ctx({ channel: "sms", hostname: "evil.tk" }))).toEqual([]);
+    expect(missingReads(fires({ reads: ["headers"] }), ctx({ channel: "email" }))).toEqual(["headers"]);
+  });
+
+  it("separates a quiet signal from an authoring error", () => {
+    // These were one function and so could express neither. A signal reading
+    // `hostname` on a message with no link is correctly silent; a signal
+    // reading `headers` on the SMS channel can never fire and will sit in the
+    // inventory looking like coverage.
+    const quiet = fires({ reads: ["hostname"], channels: ["sms"] });
+    expect(missingReads(quiet, ctx())).toEqual(["hostname"]); // nothing to read today
+    expect(unsatisfiableReads(quiet)).toEqual([]); // but an SMS can carry a link
+
+    const broken = fires({ reads: ["headers"], channels: ["sms"] });
+    expect(unsatisfiableReads(broken)).toEqual(["headers"]);
+  });
+
+  it("knows which channels can ever carry which input", () => {
+    expect(unsatisfiableReads(fires({ reads: ["headers"], channels: ["email"] }))).toEqual([]);
+    expect(unsatisfiableReads(fires({ reads: ["phone"], channels: ["phone"] }))).toEqual([]);
+    expect(unsatisfiableReads(fires({ reads: ["phone"], channels: ["sms", "email"] }))).toEqual(["phone"]);
+    // A link cannot reach the phone channel, and nothing else is url-free.
+    expect(unsatisfiableReads(fires({ reads: ["url"], channels: ["phone"] }))).toEqual(["url"]);
+    expect(unsatisfiableReads(fires({ reads: ["url"], channels: "all" }))).toEqual([]);
+    // Text is available everywhere, including as a phone number.
+    expect(unsatisfiableReads(fires({ reads: ["body", "words", "original"], channels: "all" }))).toEqual([]);
   });
 
   it("names two signals sharing a tokeniser", () => {
@@ -201,6 +322,16 @@ describe("the inventory is the registry serialised", () => {
   it("sorts by id so a diff shows the surface changing, not the file order", () => {
     const ids = signalInventory([fires({ id: "c" }), fires({ id: "a" }), fires({ id: "b" })]).map((e) => e.id);
     expect(ids).toEqual(["a", "b", "c"]);
+  });
+
+  it("sorts under a pinned collation, not the runtime's locale", () => {
+    // The artefact's whole job is to make a real change visible in a diff, so a
+    // sort following the runtime's locale reports a change that did not happen
+    // whenever a dev machine and CI disagree. Asserted against an explicit
+    // comparison rather than by re-sorting, which would just repeat the bug.
+    const ids = ["signal.b", "signal-a", "signal_c", "Signal.A"];
+    const inv = signalInventory(ids.map((id) => fires({ id })));
+    expect(inv.map((e) => e.id)).toEqual([...ids].sort((a, b) => a.localeCompare(b, "en")));
   });
 
   it("separates claims about the world from rules that cannot go stale", () => {
@@ -260,6 +391,25 @@ describe("Context carries both forms of the text", () => {
 
   it("exposes one tokenisation, so no signal re-derives it", () => {
     expect(ctx().words).toContain("account");
+  });
+
+  it("carries the inputs every declared Reads names", () => {
+    // `Reads` promising an input that `Context` has no field for would make two
+    // of seven axes undeclarable — a signal could say it reads headers and
+    // never be handed any. checkPhone is the first conversion that needs one.
+    const full = ctx({
+      channel: "phone",
+      hostname: "evil.tk",
+      url: "https://evil.tk/x",
+      headers: parseEmailHeaders("From: a@b.invalid\nSubject: hi\n\nbody"),
+      phone: analysePhone("1900 123 456", "AU"),
+    });
+    const everyRead = fires({
+      reads: ["original", "body", "words", "hostname", "url", "headers", "phone"],
+    });
+    expect(missingReads(everyRead, full)).toEqual([]);
+    expect(full.phone?.lineType).toBeDefined();
+    expect(full.headers?.fromAddress).toBe("a@b.invalid");
   });
 });
 

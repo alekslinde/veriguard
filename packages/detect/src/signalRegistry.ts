@@ -61,7 +61,9 @@
 // tidiness gain. Each `check*` becomes a channel preset over one signal list;
 // the list goes in underneath.
 
+import type { EmailHeaders } from "./emailHeaders";
 import type { SignalSource } from "./engineTypes";
+import type { PhoneIntel } from "./phoneIntel";
 import type { RegionPack } from "./regions";
 
 /**
@@ -165,6 +167,29 @@ export interface Context {
   hostname?: string;
   /** The full lowercased URL, when one was parsed. */
   url?: string;
+  /** Parsed From / Reply-To / Return-Path. Absent off the email channel. */
+  headers?: EmailHeaders;
+  /** The number and its libphonenumber-derived intel. Absent off the phone channel. */
+  phone?: PhoneIntel;
+}
+
+/**
+ * Which `Reads` this context can actually answer.
+ *
+ * Derived from what is present rather than from the channel, because the two
+ * are not the same question: an SMS carrying a link has a hostname, and an
+ * email whose headers failed to parse does not have headers. A rule that
+ * inferred availability from the channel would be the restated-guard move this
+ * file exists to remove — a judgement the context already decides properly,
+ * approximated somewhere else.
+ */
+function available(ctx: Context): Set<Reads> {
+  const set = new Set<Reads>(["original", "body", "words"]);
+  if (ctx.hostname !== undefined) set.add("hostname");
+  if (ctx.url !== undefined) set.add("url");
+  if (ctx.headers !== undefined) set.add("headers");
+  if (ctx.phone !== undefined) set.add("phone");
+  return set;
 }
 
 /** A signal's id. Stable and enumerable — the inventory is these, serialised. */
@@ -223,9 +248,14 @@ export function runsOn(def: SignalDef, channel: Channel): boolean {
  * The weight this signal carries on this channel.
  *
  * A bare number is channel-independent. A record is read as: this channel's own
- * entry, else `default`, else 0 — and 0 means "declared not to run here", which
- * `runsOn` should already have decided. Nothing is multiplied after this, which
- * is the point: a weight read here is the weight that reaches the score.
+ * entry, else `default`, else 0. Nothing is multiplied after this, which is the
+ * point — a weight read here is the weight that reaches the score.
+ *
+ * Total and non-throwing, on the same terms as `duplicateIds`: the registry is
+ * module-level data, so a throw from here fires at import time and takes down
+ * every consumer including the test that would name the problem. The authoring
+ * error it would have thrown on — a channel listed in `channels` with no weight
+ * to go with it — is reported by `undeclaredWeights` instead.
  */
 export function weightFor(def: SignalDef, channel: Channel): number {
   if (typeof def.weight === "number") return def.weight;
@@ -233,19 +263,79 @@ export function weightFor(def: SignalDef, channel: Channel): number {
 }
 
 /**
- * Inputs a signal declares that this context cannot supply.
+ * Channels a signal says it runs on without saying what it is worth there.
  *
- * A signal reading `hostname` on a context with no URL is not a bug — it simply
- * does not fire — but a signal reading `headers` that is declared to run on the
- * SMS channel is an authoring error, and this is what a test asks.
+ * `weightFor` falls to 0 for these, which scores nothing and is the safe
+ * direction — every guard here fails toward saying nothing. But silent is the
+ * wrong *visibility*: a forgotten weight and a deliberate zero-point
+ * contextual note are indistinguishable at the call site, and a signal in the
+ * inventory with a channel listed and 0 against it reads as coverage that does
+ * not exist. That is the shape of a defect this repo has paid for before — a
+ * partial check reporting a clean sweep it never performed.
+ *
+ * A deliberate zero is declared as one (`{ sms: 0 }`), which says it on
+ * purpose, where the author is already looking.
+ */
+export function undeclaredWeights(def: SignalDef): Channel[] {
+  if (typeof def.weight === "number") return [];
+  const weight = def.weight;
+  if (weight.default !== undefined) return [];
+  return CHANNELS.filter((c) => runsOn(def, c) && weight[c] === undefined);
+}
+
+/**
+ * Inputs a signal declares that this particular context cannot supply.
+ *
+ * **A non-empty result is not a defect.** A signal reading `hostname` on a
+ * message with no link is simply a signal that does not fire, which is the
+ * common case and the reason `registryScore` skips rather than scores. Use
+ * `unsatisfiableReads` to ask the authoring question.
  */
 export function missingReads(def: SignalDef, ctx: Context): Reads[] {
-  const available = new Set<Reads>(["original", "body", "words"]);
-  if (ctx.hostname !== undefined) available.add("hostname");
-  if (ctx.url !== undefined) available.add("url");
-  if (ctx.channel === "email") available.add("headers");
-  if (ctx.channel === "phone") available.add("phone");
-  return def.reads.filter((r) => !available.has(r));
+  const supplied = available(ctx);
+  return def.reads.filter((r) => !supplied.has(r));
+}
+
+/**
+ * Inputs a signal declares that no context on its declared channels can ever
+ * supply.
+ *
+ * This is the authoring error, and it is a different question from
+ * `missingReads` — which was the whole of a review finding against the first
+ * version of this file, where one function answered both and so could express
+ * neither. "This email has no parsed headers" and "this signal reads headers on
+ * the SMS channel" are not the same fault: the first is a signal correctly
+ * staying quiet, the second is a signal that can never fire and will sit in the
+ * inventory looking like coverage.
+ *
+ * Answered from the channel rather than from a context, because the claim is
+ * about every context the signal will ever see. A signal declaring `"all"`
+ * reaches the phone channel, where there is no body to match against — hence
+ * `phone`-only reads being satisfiable only where the phone channel is among
+ * those declared.
+ */
+export function unsatisfiableReads(def: SignalDef): Reads[] {
+  const channels = def.channels === "all" ? CHANNELS : def.channels;
+  /** Could a context on ANY declared channel carry this input? */
+  const reachable = (r: Reads): boolean => {
+    switch (r) {
+      // Every channel has text, even if the phone channel's is a number.
+      case "original":
+      case "body":
+      case "words":
+        return true;
+      // A link can appear in an SMS, an email or free text, and is the whole
+      // input on the url channel. Never on the phone channel.
+      case "hostname":
+      case "url":
+        return channels.some((c) => c !== "phone");
+      case "headers":
+        return channels.includes("email");
+      case "phone":
+        return channels.includes("phone");
+    }
+  };
+  return def.reads.filter((r) => !reachable(r));
 }
 
 /**
@@ -279,6 +369,30 @@ export function duplicateIds(defs: readonly SignalDef[] = SIGNALS): SignalId[] {
   return [...dupes];
 }
 
+/**
+ * Every authoring error in a signal list, as one answer.
+ *
+ * The three questions a registry entry can get wrong — a duplicate id, a read
+ * nothing can satisfy, a channel with no weight — asked together, because a
+ * caller that has to remember three calls will eventually make two. A test
+ * asserts this is empty, so step 2 onward cannot register a broken signal.
+ */
+export function registryProblems(defs: readonly SignalDef[] = SIGNALS): string[] {
+  const problems: string[] = [];
+  for (const id of duplicateIds(defs)) problems.push(`${id}: registered more than once`);
+  for (const def of defs) {
+    const unreachable = unsatisfiableReads(def);
+    if (unreachable.length) {
+      problems.push(`${def.id}: reads ${unreachable.join(", ")}, unreachable on its channels`);
+    }
+    const unweighted = undeclaredWeights(def);
+    if (unweighted.length) {
+      problems.push(`${def.id}: runs on ${unweighted.join(", ")} with no weight declared`);
+    }
+  }
+  return problems;
+}
+
 /** One scored row: a hit, with the weight its signal declared. */
 export interface ScoredHit extends Hit {
   id: SignalId;
@@ -302,10 +416,33 @@ export function registryScore(ctx: Context, defs: readonly SignalDef[] = SIGNALS
   const rows: ScoredHit[] = [];
   for (const def of defs) {
     if (!runsOn(def, ctx.channel)) continue;
+    // An input the context cannot supply means the signal cannot have looked,
+    // so it does not get to score. Enforced here rather than left to each
+    // `evaluate` to remember: a signal reading `hostname` on a message with no
+    // link would otherwise depend on its own body guarding a field the type
+    // says is optional, and "every evaluate checks its own inputs" is exactly
+    // the kind of rule stated in a comment that this file exists to turn into
+    // something the code enforces.
+    if (missingReads(def, ctx).length > 0) continue;
+
     const weight = weightFor(def, ctx.channel);
-    for (const hit of def.evaluate(ctx)) {
-      rows.push({ ...hit, id: def.id, points: Math.round(weight * (hit.scale ?? 1)) });
-    }
+    const hits = def.evaluate(ctx);
+    // Rounded once over the signal's whole contribution, with each row taking
+    // the running remainder, so the rows sum to the rounded total exactly.
+    // Rounding per row instead let a fractional `scale` drift off the declared
+    // weight — two hits at `scale: 0.5` against weight 25 gave 13 + 13 = 26,
+    // which is a signal scoring more than it declared. The evidence list is
+    // rendered to a reader who is invited to check that it adds up, so a row
+    // that does not belong to a visible total is the failure mode here.
+    let handed = 0;
+    hits.forEach((hit, i) => {
+      const cumulative = hits
+        .slice(0, i + 1)
+        .reduce((n, h) => n + weight * (h.scale ?? 1), 0);
+      const points = Math.round(cumulative) - handed;
+      handed += points;
+      rows.push({ ...hit, id: def.id, points });
+    });
   }
   return rows;
 }
@@ -341,5 +478,10 @@ export function signalInventory(defs: readonly SignalDef[] = SIGNALS): SignalInv
         kind: def.kind,
       };
     })
-    .sort((a, b) => a.id.localeCompare(b.id));
+    // Collation pinned, not defaulted. This artefact exists to be diffed
+    // across commits, so a sort that follows the runtime's locale reports a
+    // change that did not happen whenever a dev machine and CI disagree —
+    // a spurious diff in the one file whose only job is to make a real diff
+    // visible. `phoneIntel` pins `["en"]` on Intl for the same reason.
+    .sort((a, b) => a.id.localeCompare(b.id, "en"));
 }
