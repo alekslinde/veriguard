@@ -3,9 +3,11 @@
 
 // The phone channel's signals, as values.
 //
-// First conversion out of `scamDetector.ts` — 10 inline `sig.add` sites, the
-// smallest scoring surface in the engine, chosen so the registry's shape is
-// tested against real rules while a revert stays cheap.
+// First conversion out of `scamDetector.ts`: 7 of `checkPhone`'s 10 inline
+// `sig.add` sites. The smallest scoring surface in the engine, chosen so the
+// registry's shape is tested against real rules while a revert stays cheap.
+// The other 3 are pass-level and stayed behind — see below, which is the point
+// of having started here.
 //
 // ## What converted, and what deliberately did not
 //

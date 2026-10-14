@@ -34,8 +34,15 @@ import { analysePhone } from "@veriguard/detect/phoneIntel";
 
 /**
  * One case per distinguishable path, harvested across every line type, all four
- * spoofing rungs, wangiri, high-scam country, and regions with and without an
- * authored phone plan.
+ * spoofing rungs, wangiri, high-scam country in **both** directions (suppressed
+ * by wangiri and not), and regions with and without an authored phone plan.
+ *
+ * The "both directions" is load-bearing and was missing from the first version
+ * of this file, whose header claimed high-scam-country coverage on the strength
+ * of a single wangiri case — where that very signal is deliberately silenced.
+ * **A corpus header is a claim to verify, not a summary to write**: the rule it
+ * asserted coverage of had no end-to-end pin at all. Check a named path against
+ * the rows a case actually produces before listing it here.
  */
 const cases: Array<{
   input: string;
@@ -62,6 +69,31 @@ const cases: Array<{
   // Wangiri suppresses the high-scam-country row, which is why this scores as
   // a premium-shaped 95 rather than carrying a third observation.
   { input: "+252 61 234567", region: "AU", lineType: "mobile", risk: "very_high", score: 95, verdict: "likely_scam", points: [20, 75] },
+
+  // High-scam country WITHOUT wangiri — the unsuppressed direction, which the
+  // first version of this corpus missed entirely. Its only high-scam case was
+  // the wangiri number above, where the row is deliberately silenced, so the
+  // channel's single epistemic signal had no end-to-end pin at all: changing
+  // its weight 0 → 25 failed one assertion, and that assertion was the
+  // inventory comparing against itself rather than any behaviour. The same
+  // injection on `phone.fixedLine` failed 24.
+  //
+  // That is a coverage hole sitting exactly where the safety argument is
+  // weakest — this corpus is the whole evidence that the conversion changed
+  // nothing, and the untested rule is the one kind that goes stale, since
+  // which countries host scam operations is maintained data rather than a
+  // property of a number.
+  //
+  // Two shapes, because the row's position in the evidence list differs: on a
+  // mobile it is the first row, and on a fixed line it follows the fixed-line
+  // observation. Both are zero-point rows ahead of the spoofing note that
+  // carries the score.
+  { input: "+234 802 123 4567", region: "AU", lineType: "mobile", risk: "high", score: 55, verdict: "likely_scam", points: [0, 55] },
+  { input: "+237 6 71 23 45 67", region: "AU", lineType: "mobile", risk: "high", score: 55, verdict: "likely_scam", points: [0, 55] },
+  { input: "+381 11 123 4567", region: "AU", lineType: "fixed", risk: "high", score: 55, verdict: "likely_scam", points: [0, 0, 55] },
+  { input: "+420 2 2112 3456", region: "AU", lineType: "fixed", risk: "high", score: 55, verdict: "likely_scam", points: [0, 0, 55] },
+  { input: "+216 71 123 456", region: "AU", lineType: "fixed", risk: "high", score: 55, verdict: "likely_scam", points: [0, 0, 55] },
+  { input: "+385 1 2345 678", region: "AU", lineType: "fixed", risk: "high", score: 55, verdict: "likely_scam", points: [0, 0, 55] },
 
   // Zero-point observations: the row exists to be read, and the spoofing rung
   // carries the whole score on the following note.
@@ -159,6 +191,56 @@ describe("checkPhone — scores pinned before the registry conversion", () => {
       const summed = (result.signals ?? []).reduce((n, s) => n + s.points, 0);
       expect(summed, `${input} (${region}) rows do not sum to its score`).toBe(score);
     }
+  });
+
+  it("puts the high-scam origin row first, ahead of the line type", () => {
+    // The row named and positioned, not just counted. Registry order is the
+    // order the reader sees, and the country signal is scored before the
+    // line-type ones — so a reordering during a later conversion is a visible
+    // change even when the score is identical.
+    for (const number of ["+234 802 123 4567", "+381 11 123 4567"]) {
+      const signals = checkPhone(number, "AU").signals ?? [];
+      expect(signals[0].text, `${number} first row`).toContain("Call originates from");
+      expect(signals[0].points, `${number} country row should not score`).toBe(0);
+    }
+    // And the fixed-line row follows it rather than preceding it.
+    const fixed = (checkPhone("+381 11 123 4567", "AU").signals ?? []).map((s) => s.text);
+    expect(fixed[1]).toContain("Fixed-line area code");
+  });
+
+  it("names the country it is reporting on", () => {
+    // The sentence interpolates `intel.country`, and a signal reading a
+    // neighbouring field would still produce a plausible-looking row. This
+    // repo has shipped a guard reading a display name behind an ISO-code
+    // regex, which rejected every value it ever saw — so the field's real
+    // contents get pinned rather than pattern-matched.
+    //
+    // The whole sentence, not a substring: `intel.region` is `undefined` for
+    // these numbers, so `toContain("Nigeria")` alone passes while a wrong-field
+    // read emits "Call originates from undefined". Asserting the full row is
+    // what makes that fail.
+    expect(checkPhone("+234 802 123 4567", "AU").flags[0]).toBe(
+      "Call originates from Nigeria — frequently used as a base for scam operations targeting your region",
+    );
+  });
+
+  it("spells one country two ways in a single verdict", () => {
+    // Pinned as found, and NOT as desirable: a +420 verdict calls the country
+    // "Czechia" in the signal row and "Czech Republic" in the spoofing note
+    // below it. Two labels for one country in one sheet, from two sources —
+    // the signal interpolates `intel.country` (an Intl display name) and the
+    // note is built from the pack's own map of dialling codes.
+    //
+    // Pre-existing, visible on `main`, and untouched by the registry
+    // conversion — recorded here because this corpus is where a reader will
+    // look for what the phone channel actually emits, and because the pair is
+    // what makes the inconsistency obvious. Fixing it is a copy change with
+    // its own false-positive surface (the two lists disagree for more than
+    // one country), so it is not smuggled into a refactor whose whole claim is
+    // that it changed nothing observable.
+    const flags = checkPhone("+420 2 2112 3456", "AU").flags;
+    expect(flags[0]).toContain("Czechia");
+    expect(flags[2]).toContain("Czech Republic");
   });
 
   it("carries the intel through on the result", () => {

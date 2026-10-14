@@ -23,18 +23,24 @@ import { parseEmailHeaders } from "@veriguard/detect/emailHeaders";
 import { analysePhone } from "@veriguard/detect/phoneIntel";
 import { checkPhone, checkSms, checkEmail, checkUrl, checkCustom } from "@veriguard/detect/scamDetector";
 
-// Step 1 of the registry extraction: the types and the scorer exist, and
-// nothing consumes them. Two things need asserting at this stage, and they pull
-// in opposite directions:
+// The registry's own behaviour, independent of what has been converted into it.
+// Two things need asserting, and they pull in opposite directions:
 //
-//   · The shape behaves — weighting, channel gating and the inventory are what
-//     later steps rest on, so they get pinned before anything is converted.
-//   · The engine does not move. An empty registry contributing nothing is the
-//     property that makes this step safe to ship, and "empty" is only a
-//     guarantee while a test says so.
+//   · The shape behaves — weighting, channel gating, the input gate and the
+//     inventory are what every conversion rests on, so they are pinned here
+//     against synthetic signals rather than against whatever is registered
+//     today. A test that exercised only real signals would stop covering the
+//     shape as the real ones changed.
+//   · The engine does not move where it has not been converted. A signal
+//     scoring from both the registry and an inline site is the one way this
+//     refactor silently changes a verdict, so both halves are asserted: the
+//     registry contributes nothing on an unconverted channel, and the
+//     converted channel has no inline site left.
 //
-// The second is why the registry is empty rather than partly populated: a
-// signal present both here and in scamDetector.ts would score twice.
+// Converted so far: the phone channel (see phoneSignals.test.ts for those
+// signals' own behaviour, and checkPhonePinned.test.ts for the conversion's
+// behaviour-preservation pin). url, sms, email and custom are still scored
+// inline in scamDetector.ts.
 
 const ctx = (over: Partial<Context> = {}): Context => ({
   channel: "sms",

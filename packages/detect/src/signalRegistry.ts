@@ -34,11 +34,12 @@
 // Incremental extraction, smallest surface first. Done:
 //
 //   1. The types and the scorer, consuming nothing.
-//   2. `checkPhone` — 10 inline sites, now `signals/phone.ts`. The proof the
-//      shape holds, and the step that found its first limit: see the note at
-//      the end of that file. The registry holds independent weighted
+//   2. `checkPhone` — its 7 observation signals, now `signals/phone.ts`. The
+//      proof the shape holds, and the step that found its first limit: see the
+//      note at the end of that file. The registry holds independent weighted
 //      observations cleanly and has no shape yet for a signal whose weight
-//      depends on the rest of the evidence list.
+//      depends on the rest of the evidence list — which is why the other 3 of
+//      the function's 10 sites stayed in the entry point.
 //
 // Remaining:
 //
