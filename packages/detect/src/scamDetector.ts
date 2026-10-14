@@ -12,7 +12,8 @@ import { detectType } from "./detectType";
 import { analysePhone, type PhoneIntel } from "./phoneIntel";
 import { isShortened, expandUrl, type ExpandFetch } from "./urlExpander";
 import { resolveRegionPack, supportedRegions, DEFAULT_REGION, type RegionInput, type RegionCoverage, type RegionPack } from "./regions";
-import { registryScore } from "./signalRegistry";
+import { registryScore, type Channel } from "./signalRegistry";
+import { CLICKFIX_SIGNALS } from "./signals/clickfix";
 import { PHONE_SIGNALS, SPOOFING_POINTS, NOTHING_FOUND_POINTS } from "./signals/phone";
 import { KEYS_BY_POST_PHRASES, FAMILY_RELATION_TERMS, NEW_NUMBER_PRETEXT_PHRASES, SCAM_COACHING_PHRASES } from "./regions/base";
 import type { CheckResult, HostLookup, Signal, SignalSource } from "./engineTypes";
@@ -521,67 +522,35 @@ export function mentionsAsAcronym(text: string, entry: string): boolean {
   return new RegExp(`\\b${escaped}\\b`).test(folded);
 }
 
-const WIN_CLICKFIX_FLAG =
-  "'Press Win+R' instruction detected — this is ClickFix social engineering: scammers trick you into running malware on your own computer disguised as a 'human verification' step";
-
-const MAC_CLICKFIX_FLAG =
-  "'Open Terminal and paste this' instruction detected — this is the macOS ClickFix variant: a fake CAPTCHA or 'browser fix' overlay talks you into running the attacker's command yourself, usually via Spotlight and Terminal. No legitimate site or verification step ever asks for this.";
-
 /**
- * ClickFix macOS variant (D3 / #143 / ACSC ASC-2026-0809, 9 Aug 2026).
+ * Score the ClickFix pair from the registry, on whichever channel is asking.
  *
- * The Windows path keys off "press Win+R", which nothing legitimate says. The
- * macOS equivalent has no such luxury: "open Terminal" and `curl … | bash` are
- * ordinary developer-documentation phrases, so matching either alone would flag
- * every install guide on the internet.
+ * One helper rather than a copy of the branch per entry point, which is the
+ * change: the rule was scored at two call sites, in `checkSms` and
+ * `checkCustom`, each carrying its own `if`/`else if` over the same predicates.
+ * The variants' mutual exclusion — a lure naming both OSes scores once, not
+ * twice — now comes from `clickfix.windows` declaring `supersedes`, resolved in
+ * `registryScore`, instead of from the shape of an `else` a reader has to find
+ * in two places and compare.
  *
- * So each branch needs two halves — the *delivery* cue (Spotlight/Terminal, or a
- * piped shell command) and the *clipboard* cue (a paste instruction, or the
- * fake-CAPTCHA framing that makes it social engineering). An install guide says
- * "run this in Terminal" and stops; the lure says "press Cmd+Space, open
- * Terminal, paste".
- *
- * Note the grouping: an unguarded `curl \| bash` alternative would fire on any
- * README, which is exactly the false positive the issue asked to avoid.
- *
- * Both cue halves are deliberately narrower than they first appear, because a
- * loose half defeats the two-half design — code review found each firing on its
- * own:
- *   - bare "copy" matched "open Terminal and copy the output into this ticket",
- *     which is content moving *out* of the shell, the opposite direction;
- *   - bare "spotlight" is an ordinary noun, so scam-awareness copy ("puts the
- *     spotlight on scam trends… copy the link") self-triggered the flag — this
- *     app publishes exactly that kind of writing.
+ * Reads only `original`, so the context is this thin on purpose: the signals
+ * declare what they consume and nothing here gets to hand them more.
  */
-function isMacClickFix(text: string): boolean {
-  const delivery =
-    /\b(?:open|launch|start)\s+(?:the\s+)?terminal\b/i.test(text) ||
-    /\b(?:cmd|command)\s*\+\s*space\b/i.test(text) ||
-    // "spotlight" is an ordinary English noun ("puts the spotlight on scam
-    // trends"), so it only counts as a delivery cue when used as the macOS
-    // launcher — opening it, or searching in it.
-    /\b(?:open|launch|press|hit|use|via)\s+(?:the\s+)?spotlight\b/i.test(text) ||
-    /\bspotlight\s+(?:search|and\s+type|then\s+type)\b/i.test(text);
-  const shellPipe = /\bcurl\b[^\n]{0,120}\|\s*(?:sudo\s+)?(?:ba|z|)sh\b/i.test(text);
-  // Paste only — not bare "copy". The attack direction is content moving *into*
-  // the user's shell; "copy the output into this ticket" is the opposite, and
-  // matching it flagged a legitimate support instruction as likely_scam.
-  // "copy" is still matched where it's explicitly paired with pasting.
-  const clipboard =
-    /\b(?:paste|pbpaste|ctrl\s*\+\s*v|cmd\s*\+\s*v|command\s*\+\s*v)\b/i.test(text) ||
-    /\bcopy\b[^\n]{0,40}\b(?:paste|run|execute|enter|terminal)\b/i.test(text);
-  // The fake-verification framing is itself a co-signal: it's what separates a
-  // malicious paste instruction from a legitimate one.
-  const captchaFraming =
-    /\b(?:captcha|human verification|browser\s+(?:fix|repair|error))\b/i.test(text) ||
-    // "…not a robot" / "…you are human", with any leading verb — the campaigns
-    // vary it freely ("I'm not a robot", "confirm you are not a robot",
-    // "verify you're human", "prove you are human").
-    /\b(?:i'?m|i am|you'?re|you are)\s+(?:not\s+a\s+robot|(?:a\s+)?human)\b/i.test(text) ||
-    /\b(?:confirm|verify|prove|check)\s+(?:that\s+)?(?:you'?re|you are|i'?m|i am)\s+(?:not\s+a\s+robot|(?:a\s+)?human)\b/i.test(text);
-
-  return (delivery && (clipboard || captchaFraming)) ||
-    (shellPipe && (clipboard || captchaFraming));
+function addClickFixSignals(
+  sig: Signals,
+  text: string,
+  pack: RegionPack,
+  channel: Channel,
+): void {
+  // No `words`: these signals read `original` and nothing tokenises here, so
+  // the field is left absent rather than filled with a plausible `[]`. See the
+  // note on `Context.words`.
+  for (const row of registryScore(
+    { channel, pack, original: text, body: text.toLowerCase() },
+    CLICKFIX_SIGNALS,
+  )) {
+    sig.add(row.source, row.text, row.points);
+  }
 }
 
 /**
@@ -2119,15 +2088,29 @@ export function checkSms(
     sig.add("message", "Fake voicemail notification — scammers send fake 'you have a new voicemail' messages to trick you into clicking a malicious link. Legitimate voicemail services never deliver audio via a separate SMS link.", 20);
   }
 
-  // ClickFix "run a command" social engineering (D3 / #74 / ACSC advisory May
-  // 2026). A fake CAPTCHA overlay tells the user to press Win+R and paste a
-  // PowerShell command, running malware themselves. No legitimate entity asks
-  // this, so the fuzzy match scores near-certain.
-  if (/press\s+(win|windows)(?:\s*\+\s*|\s+)r\b/i.test(text) ||
-      /powershell\s+-[ec]/i.test(text)) {
-    sig.add("message", WIN_CLICKFIX_FLAG, 50);
-  } else if (isMacClickFix(text)) {
-    sig.add("message", MAC_CLICKFIX_FLAG, 50);
+  // ClickFix "run a command" social engineering (D3 / #74 / #143). A fake
+  // CAPTCHA overlay tells the user to press Win+R, or to open Terminal and
+  // paste, running malware themselves. No legitimate entity asks this.
+  //
+  // Scored from the registry, which also owns the exclusion between the two OS
+  // variants and their weight on this channel. The same call is in checkCustom
+  // — one rule, one place it is scored from.
+  //
+  // **Skipped on the email channel, and scored by `checkEmail` itself instead.**
+  // That reads like an exception and is the opposite of one. `checkEmail`
+  // analyses the body by running this function and merging the result at 0.7, so
+  // a registry row scored here would be weighted twice: once by its own declared
+  // channel weight, and again by a blanket multiplier applied to the sub-result
+  // afterwards. Pinning the scores before converting is what caught it — the
+  // declared 50 arrived as 35, which is the defect class the registry exists to
+  // delete, reaching the row through the merge instead of through the exemption
+  // list.
+  //
+  // Scoring it in the caller is what keeps "a weight read from the registry is
+  // the weight that reaches the score" true, rather than discounting the row and
+  // then restoring it by name — which is the shape being removed.
+  if (channel !== "email") {
+    addClickFixSignals(sig, text, PACK, channel);
   }
 
   // ACMA SMS Sender ID "Unverified" label override language (D7 / #78 / post-1
@@ -2641,8 +2624,11 @@ const UNDISCOUNTED_COMPOSITES: string[] = [
   FAMILY_IMPERSONATION_FLAG,
   TASK_PAYMENT_FLAG,
   MESSAGING_HIJACK_FLAG,
-  MAC_CLICKFIX_FLAG,
-  WIN_CLICKFIX_FLAG,
+  // The ClickFix pair is NOT here, and its absence is the point rather than an
+  // omission: both variants now declare `weight: 50` on every channel they run
+  // on, so the email path never discounts them and has nothing to restore.
+  // Each composite converted to the registry leaves this list the same way, and
+  // the list is deleted when the last one does.
 ];
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -2673,6 +2659,19 @@ export function checkEmail(text: string, blocklist?: HostLookup, region?: Region
   });
   // Email gets a bit more lenience than the same words in an SMS.
   sig.merge("message", smsCheck, Math.floor(smsCheck.score * 0.7));
+
+  // The registry's share of the body, scored here rather than inside the pass
+  // above — which skips it on this channel for exactly this reason.
+  //
+  // Its rows do not go through `merge`, so the 0.7 never touches them: each
+  // signal's declared weight for the email channel is the weight that reaches
+  // the score, with nothing to exempt afterwards. That is the whole mechanical
+  // difference between this and `UNDISCOUNTED_COMPOSITES` below, which
+  // discounts a row and then lifts it back by matching its opening text.
+  //
+  // Placed immediately after the merge so the evidence keeps the order a reader
+  // saw before the conversion: body rows, then the sender and link analysis.
+  addClickFixSignals(sig, text, PACK, "email");
 
   // …but not for the gated composites. The 0.7 discount is right for the
   // signals it was written for — urgency and reward keywords really are weaker
@@ -2888,7 +2887,9 @@ export function checkPhone(number: string, region?: RegionInput): CheckResult {
       pack: PACK,
       original: number,
       body: number.toLowerCase(),
-      words: [number],
+      // Left absent rather than `[number]`: a phone number is not prose and
+      // nothing here splits one, so claiming a tokenisation would have handed a
+      // future `reads: ["words"]` signal a one-element answer that looks valid.
       phone: intel,
     },
     PHONE_SIGNALS,
@@ -2981,17 +2982,12 @@ export function checkCustom(text: string, blocklist?: HostLookup, region?: Regio
     sig.merge("link", worst, Math.floor(worst.score * 0.5));
   }
 
-  // ClickFix "run a command" social engineering (D3 / #74). Pasted fake-CAPTCHA
-  // page text is the most likely input path for this here, so mirror the SMS
-  // fuzzy match. No legitimate site tells you to press Win+R and paste a command.
-  if (/press\s+(win|windows)(?:\s*\+\s*|\s+)r\b/i.test(text) ||
-      /powershell\s+-[ec]/i.test(text)) {
-    sig.add("message", WIN_CLICKFIX_FLAG, 50);
-  } else if (isMacClickFix(text)) {
-    // The macOS variant matters more here than in checkSms: a pasted fake-CAPTCHA
-    // page is the likeliest way this reaches us.
-    sig.add("message", MAC_CLICKFIX_FLAG, 50);
-  }
+  // ClickFix (D3 / #74 / #143). Pasted fake-CAPTCHA page text is the likeliest
+  // input path for this here, which is why it is scored on this channel too —
+  // but no longer by a second copy of the branch. The same registry call as
+  // checkSms, so the two channels cannot drift apart in wording, weight or in
+  // which variant wins.
+  addClickFixSignals(sig, text, PACK, "custom");
 
   // Named fraudulent investment platforms (D4 / #104) — mirror of the checkSms
   // rule so pasted ad text / recruitment messages are caught here too.

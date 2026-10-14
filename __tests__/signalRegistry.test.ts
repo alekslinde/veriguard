@@ -39,8 +39,9 @@ import { checkPhone, checkSms, checkEmail, checkUrl, checkCustom } from "@verigu
 //
 // Converted so far: the phone channel (see phoneSignals.test.ts for those
 // signals' own behaviour, and checkPhonePinned.test.ts for the conversion's
-// behaviour-preservation pin). url, sms, email and custom are still scored
-// inline in scamDetector.ts.
+// behaviour-preservation pin), and the ClickFix pair on sms, email and custom
+// (clickFixPinned.test.ts). url is still entirely scored inline in
+// scamDetector.ts.
 
 const ctx = (over: Partial<Context> = {}): Context => ({
   channel: "sms",
@@ -63,23 +64,30 @@ const fires = (over: Partial<SignalDef> = {}): SignalDef => ({
 });
 
 describe("the registry holds what has been converted, and only that", () => {
-  it("holds the phone channel", () => {
-    // Step 1's "is empty" assertion lived here and was deleted by this
-    // conversion — deliberately and visibly, as that test's own comment said
-    // it would be. What replaces it is the invariant that actually matters
-    // from here on: each channel's signals are registered exactly when their
-    // inline sites are gone.
+  it("holds the converted signals, and declares its channels explicitly", () => {
+    // Step 1's "is empty" assertion lived here and was deleted by the phone
+    // conversion — deliberately and visibly, as that test's own comment said it
+    // would be. What replaces it is the invariant that matters from here on.
+    //
+    // `channels: "all"` is rejected while the conversion is partly done, and
+    // that is the load-bearing half: a signal claiming every channel would run
+    // on `url` too, where nothing has been converted and the inline site is
+    // still live, so it would score twice. Until step 4 lands, every signal
+    // names the channels it was converted for.
     expect(SIGNALS.length).toBeGreaterThan(0);
-    expect(SIGNALS.every((d) => d.channels !== "all" && d.channels.includes("phone"))).toBe(true);
+    expect(SIGNALS.every((d) => d.channels !== "all")).toBe(true);
   });
 
   it("scores nothing on a channel not yet converted", () => {
-    // url, sms, email and custom are still scored inline, so the registry must
-    // contribute nothing there or every signal it holds would score twice —
-    // the one way this refactor can silently change a verdict.
-    for (const channel of ["url", "sms", "email", "custom"] as const) {
-      expect(registryScore(ctx({ channel })), `${channel} is scored inline`).toEqual([]);
-    }
+    // `url` is still entirely scored inline, so the registry must contribute
+    // nothing there or every signal it holds would score twice — the one way
+    // this refactor can silently change a verdict.
+    //
+    // sms, email and custom have left this list: ClickFix is converted on all
+    // three, so "the registry scores nothing here" stopped being true of them.
+    // Their equivalent is the pinned characterisation test, which asserts the
+    // scores themselves rather than their absence.
+    expect(registryScore(ctx({ channel: "url" }))).toEqual([]);
   });
 
   it("has no phone signal left scoring inline", async () => {
@@ -271,10 +279,105 @@ describe("registryProblems asks every authoring question at once", () => {
   });
 });
 
+// `supersedes` is the one field whose effect is on ANOTHER signal's score, so
+// it is the one whose authoring errors are silent — a signal that quietly never
+// fires, or a pair that silence each other and both stay quiet. Each shape below
+// is asserted to be reported rather than merely documented: writing a type is
+// not enforcing it, and this file's own history is the reason that sentence is
+// here.
+describe("supersedes silences a redundant reading of one fact", () => {
+  const winner = (over: Partial<SignalDef> = {}): SignalDef =>
+    fires({ id: "pair.winner", channels: ["sms"], supersedes: ["pair.loser"], ...over });
+  const loser = (over: Partial<SignalDef> = {}): SignalDef =>
+    fires({ id: "pair.loser", channels: ["sms"], ...over });
+
+  it("scores only the superseding signal when both would fire", () => {
+    const rows = registryScore(ctx(), [winner(), loser()]);
+    expect(rows.map((r) => r.id)).toEqual(["pair.winner"]);
+  });
+
+  it("scores the superseded signal when the superseding one stays quiet", () => {
+    // The direction that matters most, and the one a declaration-only
+    // implementation gets wrong: silencing from the declaration alone would
+    // delete the macOS reading on every message, including the ones where the
+    // Windows cue is absent and macOS is the only reading there is.
+    const rows = registryScore(ctx(), [
+      winner({ evaluate: () => [] }),
+      loser(),
+    ]);
+    expect(rows.map((r) => r.id)).toEqual(["pair.loser"]);
+  });
+
+  it("does not depend on registration order for the outcome", () => {
+    // Listed in either order, the superseding signal wins. If this failed, the
+    // order of a file would be a scoring rule — the implicit-in-control-flow
+    // property the registry exists to remove, re-entering one level down.
+    const scored = (defs: SignalDef[]) => registryScore(ctx(), defs).map((r) => r.id);
+    expect(scored([loser(), winner()])).toEqual(["pair.winner"]);
+    expect(scored([winner(), loser()])).toEqual(["pair.winner"]);
+  });
+
+  it("reports a supersedes naming an unregistered id", () => {
+    // What a rename produces. Silent at runtime: nothing is silenced, so the
+    // pair scores twice.
+    const problems = registryProblems([winner({ supersedes: ["pair.renamed"] }), loser()]);
+    expect(problems.join("\n")).toContain("supersedes pair.renamed, which is not registered");
+  });
+
+  it("reports a mutual supersession", () => {
+    const problems = registryProblems([
+      winner(),
+      loser({ supersedes: ["pair.winner"] }),
+    ]);
+    expect(problems.join("\n")).toContain("supersede each other");
+  });
+
+  it("reports a signal superseding itself", () => {
+    const problems = registryProblems([winner({ supersedes: ["pair.winner"] })]);
+    expect(problems.join("\n")).toContain("pair.winner: supersedes itself");
+  });
+
+  it("reports a supersession across channels that never meet", () => {
+    // Two signals that cannot both fire. Either a mistake about what they read,
+    // or coverage deleted on a channel where only one was going to speak.
+    const problems = registryProblems([
+      winner({ channels: ["sms"] }),
+      loser({ channels: ["custom"] }),
+    ]);
+    expect(problems.join("\n")).toContain("shares no channel with it");
+  });
+
+  it("serialises supersedes into the inventory", () => {
+    // Without it the inventory reads two signals at 50 each as 100 of score
+    // available against one lure — a wrong number item 1's margin report would
+    // then be built on.
+    const inv = signalInventory([winner(), loser()]);
+    expect(inv.find((e) => e.id === "pair.winner")?.supersedes).toEqual(["pair.loser"]);
+    expect(inv.find((e) => e.id === "pair.loser")?.supersedes).toEqual([]);
+  });
+});
+
 describe("reads makes overlap and missing inputs visible", () => {
   it("reports an input this context does not carry", () => {
     expect(missingReads(fires({ reads: ["hostname"] }), ctx())).toEqual(["hostname"]);
     expect(missingReads(fires({ reads: ["hostname"] }), ctx({ hostname: "evil.tk" }))).toEqual([]);
+  });
+
+  it("treats an unsupplied tokenisation as absent, not as empty", () => {
+    // `words` is optional so a caller that does not tokenise leaves it out
+    // rather than passing `[]`. The distinction is the difference between a
+    // signal that is correctly skipped and one that is handed a clean answer to
+    // a question nobody asked: `[]` means "tokenised, found no words", which no
+    // real input produces, so a `reads: ["words"]` signal would run, match
+    // nothing and score nothing — a silent miss from a context that looked
+    // complete. Two live callers had exactly that shape (`words: [number]` on
+    // the phone channel, `words: []` for ClickFix) before this was optional.
+    const { words: _dropped, ...noWords } = ctx();
+    expect(missingReads(fires({ reads: ["words"] }), noWords)).toEqual(["words"]);
+    expect(registryScore(noWords, [fires({ reads: ["words"] })])).toEqual([]);
+    // Supplied, it is readable on any channel — so this is about the caller, not
+    // about where the text came from.
+    expect(missingReads(fires({ reads: ["words"] }), ctx())).toEqual([]);
   });
 
   it("answers from what is present, not from the channel", () => {
@@ -339,6 +442,11 @@ describe("the inventory is the registry serialised", () => {
       channels: ["url"],
       weights: { url: 30, sms: 0, email: 0, phone: 0, custom: 0 },
       kind: "epistemic",
+      // Present and empty, never absent. A key that appears only on the
+      // signals that supersede something would make a diff of this artefact
+      // noisier than the change it is reporting, and the inventory's only job
+      // is to make a real change visible.
+      supersedes: [],
     });
   });
 
