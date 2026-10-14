@@ -4,6 +4,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { isSameOriginRead } from "@/lib/readGuard";
 import { SITE_URL } from "@/lib/siteUrl";
+import { emptyBlocklistMock } from "./fixtures/routeRequest";
 
 const SITE_ORIGIN = SITE_URL.replace(/\/+$/, "");
 
@@ -221,9 +222,7 @@ describe("POST /api/ocr", () => {
 describe("analysis cost is bounded by input length", () => {
   it("refuses content past the analysis limit rather than truncating it", async () => {
     vi.resetModules();
-    vi.doMock("@/lib/urlhausBlocklist", () => ({
-      getUrlhausBlocklist: async () => new Set<string>(),
-    }));
+    vi.doMock("@/lib/urlhausBlocklist", emptyBlocklistMock);
     vi.doMock("@/lib/reportStore", async (importOriginal) => {
       const actual = await importOriginal<typeof import("@/lib/reportStore")>();
       return { ...actual, incrementCheckCount: async () => {} };

@@ -3,9 +3,9 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@/lib/urlhausBlocklist", () => ({
-  getUrlhausBlocklist: async () => new Set<string>(),
-}));
+vi.mock("@/lib/urlhausBlocklist", async () =>
+  (await import("./fixtures/routeRequest")).emptyBlocklistMock(),
+);
 
 const recordTargetRegion = vi.fn(async () => {});
 vi.mock("@/lib/reportStore", async (importOriginal) => {
@@ -18,22 +18,9 @@ vi.mock("@/lib/reportStore", async (importOriginal) => {
 });
 
 import { POST } from "@/app/api/check/route";
-import { NextRequest } from "next/server";
 import { readFileSync } from "fs";
 import path from "path";
-
-let ipCounter = 0;
-function check(body: unknown): NextRequest {
-  ipCounter += 1;
-  return new NextRequest("http://localhost/api/check", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-forwarded-for": `10.1.0.${ipCounter % 254}`,
-    },
-    body: JSON.stringify(body),
-  });
-}
+import { checkRequest as check } from "./fixtures/routeRequest";
 
 // The route does not await the telemetry write, by design — the caller is
 // waiting on a verdict. Yield so the floated promise settles before asserting.

@@ -2,11 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { NextRequest, NextResponse } from "next/server";
-import { getPublicReports, getPublicReportsCount, SortOption } from "@/lib/reportStore";
-import { MOCK_REPORTS } from "@/lib/fixtures/mockReports";
-import { isSameOriginRead } from "@/lib/readGuard";
-import { checkAndRecordRateLimit, FEED_RATE_LIMIT } from "@/lib/reportStore";
-import { clientIpFromHeaders } from "@/lib/geo";
+import { getPublicReports, getPublicReportsCount, FEED_RATE_LIMIT, SortOption } from "@/lib/reportStore";
+import { MOCK_REPORTS, shouldUseDevFixtures } from "@/lib/fixtures/mockReports";
+import { isSameOriginRead, rateLimitRead } from "@/lib/readGuard";
 
 const VALID_SORTS = new Set<SortOption>(["desc", "asc", "most", "least"]);
 
@@ -67,25 +65,13 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Only rate-limited when the caller can actually be identified.
-  //
-  // An unidentifiable caller shares one bucket with all such callers, so
-  // keying on it would turn a cost control into an availability bug — a
-  // strictly worse failure than the one it guards against.
-  //
-  // Failing open here is safe because it is not the only control: the origin
-  // guard above still applies, and the edge cache absorbs the volume. The
-  // platform sets the header in production, so this is the degraded path
-  // rather than the normal one.
-  const ip = clientIpFromHeaders(req.headers);
-  if (ip !== "unknown" && !checkAndRecordRateLimit(`feed:${ip}`, FEED_RATE_LIMIT)) {
-    return NextResponse.json(
-      { error: "Too many requests — give it a few minutes and try again.", code: "rate_limited" },
-      // Never cached: a stored 429 would lock out every visitor behind the same
-      // CDN node, turning a per-IP limit into a site-wide outage.
-      { status: 429, headers: { "Cache-Control": "no-store" } },
-    );
-  }
+  // Layer 2, and the layer that actually bounds a determined caller. It only
+  // applies to an identified one — see rateLimitRead for why keying on
+  // "unknown" would be an availability bug. Failing open there is safe here
+  // specifically because layer 1 above still applies and the edge cache absorbs
+  // the volume.
+  const limited = rateLimitRead(req.headers, "feed", FEED_RATE_LIMIT);
+  if (limited) return limited;
 
   const { searchParams } = new URL(req.url);
   const limit  = clamp(intParam(searchParams.get("limit"),  25), 1, 100);
@@ -105,7 +91,7 @@ export async function GET(req: NextRequest) {
 
   // In development, fall back to mock data when the DB has no reports so the
   // submissions page is always populated for testing.
-  if (process.env.NODE_ENV === "development" && dbTotal === 0) {
+  if (shouldUseDevFixtures(dbTotal)) {
     let mock = MOCK_REPORTS;
     if (type && type !== "all") mock = mock.filter((r) => r.type === type);
     if (search) {

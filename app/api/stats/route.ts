@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { NextResponse } from "next/server";
-import { getStats, getCheckEvents, checkAndRecordRateLimit, FEED_RATE_LIMIT, type CheckSurface, type CheckOutcome } from "@/lib/reportStore";
-import { clientIpFromHeaders } from "@/lib/geo";
-import { isSameOriginRead } from "@/lib/readGuard";
+import { getStats, getCheckEvents, FEED_RATE_LIMIT, type CheckSurface, type CheckOutcome } from "@/lib/reportStore";
+import { isSameOriginRead, rateLimitRead } from "@/lib/readGuard";
 
 // Days of history the breakdown covers when `?days=` is omitted. Four weeks is
 // enough to read a weekly rate and see a trend.
@@ -70,14 +69,12 @@ export async function GET(request: Request) {
     );
   }
 
-  const ip = clientIpFromHeaders(request.headers);
-  if (wantsBreakdown && ip !== "unknown" && !checkAndRecordRateLimit(`stats:${ip}`, FEED_RATE_LIMIT)) {
-    return NextResponse.json(
-      { error: "Too many requests — give it a few minutes and try again.", code: "rate_limited" },
-      // Never cached: a stored 429 would lock out every visitor behind the same
-      // CDN node, turning a per-IP limit into a site-wide outage.
-      { status: 429, headers: { "Cache-Control": "no-store" } },
-    );
+  // Only the breakdown is throttled — the default counters are two public
+  // integers read on every homepage load, and the cache below already collapses
+  // them into one query per window.
+  if (wantsBreakdown) {
+    const limited = rateLimitRead(request.headers, "stats", FEED_RATE_LIMIT);
+    if (limited) return limited;
   }
 
   // Read on both paths deliberately — the breakdown response spreads `...stats`

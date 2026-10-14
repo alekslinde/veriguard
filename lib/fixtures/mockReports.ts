@@ -7,6 +7,18 @@ import { FeedStats, PublicReport } from "@/lib/reportStore";
 
 const NOW = Date.now();
 
+/**
+ * Whether a route should serve fixtures instead of its (empty) query result.
+ *
+ * Development only, and only when the database has nothing — so the feed and
+ * the stats bar are populated locally without a seed. Named rather than
+ * inlined because two routes ask it and the condition is the kind that drifts:
+ * an `||` here, or a missing NODE_ENV check, would ship fixtures as real data.
+ */
+export function shouldUseDevFixtures(total: number): boolean {
+  return process.env.NODE_ENV === "development" && total === 0;
+}
+
 // Convert relative time units to milliseconds timestamp
 function getSubmittedAt(item: {
   minutesAgo?: number;

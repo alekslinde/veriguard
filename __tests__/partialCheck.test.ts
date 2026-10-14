@@ -8,7 +8,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // gives a verdict on the part that arrived with a plain list of what was and
 // was not checked. These cover each layer of that.
 
-vi.mock("@/lib/urlhausBlocklist", () => ({ getUrlhausBlocklist: async () => new Set<string>() }));
+vi.mock("@/lib/urlhausBlocklist", async () =>
+  (await import("./fixtures/routeRequest")).emptyBlocklistMock(),
+);
 vi.mock("@/lib/reportStore", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/reportStore")>()),
   incrementCheckCount: async () => {},

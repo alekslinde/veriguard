@@ -9,6 +9,7 @@ import { clientIpFromHeaders } from "@/lib/geo";
 import { getUrlhausBlocklist } from "@/lib/urlhausBlocklist";
 import { resolveRegion } from "@/lib/regionResolver";
 import { corsHeaders, corsPreflightHeaders } from "@/lib/cors";
+import { rateLimitedResponse } from "@/lib/readGuard";
 
 // IMPORTANT: This route performs ONLY string analysis on the submitted content.
 // It must NEVER make an outbound HTTP request, DNS lookup, or socket connection
@@ -51,15 +52,13 @@ export async function POST(req: NextRequest) {
     // Throttle before parsing or analysing — this endpoint is public and
     // unauthenticated, and analysis is the expensive part. The IP is used as a
     // transient key only and is never stored.
+    //
+    // Every caller is charged, identified or not: this calls the limiter
+    // directly rather than going through rateLimitRead, which skips an
+    // "unknown" IP because a cache stands behind the feed routes. Nothing
+    // absorbs the cost here.
     if (!checkAndRecordRateLimit(`check:${clientIpFromHeaders(req.headers)}`, CHECK_RATE_LIMIT)) {
-      // `code` rather than only prose: the client distinguishes this from a
-      // generic failure to tell the reader to wait rather than to retry, and
-      // matching on a message string would break the moment it is reworded or
-      // translated.
-      return NextResponse.json(
-        { error: "Too many checks — give it a minute and try again.", code: "rate_limited" },
-        { status: 429, headers: cors },
-      );
+      return rateLimitedResponse("Too many checks — give it a minute and try again.", cors);
     }
 
     const { content, region, surface, shareRegion }: {

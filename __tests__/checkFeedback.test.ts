@@ -1,9 +1,10 @@
 // SPDX-FileCopyrightText: 2026 Aleksandr Linde
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
+import { checkRequest, emptyBlocklistMock } from "./fixtures/routeRequest";
 import { translate, type MessageKey } from "@/lib/i18n";
 import {
   checkFeedback,
@@ -203,11 +204,39 @@ describe("what the reader is told", () => {
 
 const FLOW = readFileSync(path.join(process.cwd(), "components/CheckFlow.tsx"), "utf8");
 const NOTICE = readFileSync(path.join(process.cwd(), "components/CoverageNotice.tsx"), "utf8");
-const ROUTE = readFileSync(path.join(process.cwd(), "app/api/check/route.ts"), "utf8");
 
 describe("rate limit — machine-readable, not prose-matched", () => {
-  it("travels as a code, so it survives rewording and translation", () => {
-    expect(ROUTE).toMatch(/code: "rate_limited"/);
+  it("travels as a code, so it survives rewording and translation", async () => {
+    // Driven through the route rather than grepped out of it. The 429 envelope
+    // is built by lib/readGuard now, so a source match here would pass on a
+    // route that had stopped emitting the code entirely — and this is the
+    // contract CheckFlow branches on, so it is worth proving on the wire.
+    vi.resetModules();
+    vi.doMock("@/lib/urlhausBlocklist", emptyBlocklistMock);
+    // Both telemetry writes are stubbed, not just the counter. The route
+    // floats `recordTargetRegion` without awaiting it and the helper swallows
+    // its own failures, so a real one would fire 30 un-awaited INSERTs into the
+    // dev database and report nothing — the floated promises outliving the test
+    // body is what makes that invisible rather than merely slow.
+    vi.doMock("@/lib/reportStore", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("@/lib/reportStore")>();
+      return {
+        ...actual,
+        incrementCheckCount: async () => {},
+        recordTargetRegion: async () => {},
+      };
+    });
+    const { POST } = await import("@/app/api/check/route");
+    const { CHECK_RATE_LIMIT } = await import("@/lib/reportStore");
+
+    const ip = "203.0.113.201";
+    for (let i = 0; i < CHECK_RATE_LIMIT; i++) {
+      await POST(checkRequest({ content: "hello there" }, { ip }));
+    }
+    const res = await POST(checkRequest({ content: "hello there" }, { ip }));
+    expect(res.status).toBe(429);
+    expect((await res.json()).code).toBe("rate_limited");
+
     expect(FLOW).toMatch(/body\.code === "rate_limited"/);
   });
 

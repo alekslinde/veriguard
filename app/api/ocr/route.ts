@@ -7,7 +7,7 @@ import { createWorker } from "tesseract.js";
 import path from "path";
 import { checkAndRecordRateLimit, isWithinRateLimit } from "@/lib/reportStore";
 import { clientIpFromHeaders } from "@/lib/geo";
-import { isSameOriginRead } from "@/lib/readGuard";
+import { isSameOriginRead, rateLimitedResponse } from "@/lib/readGuard";
 
 // Tesseract OCR can take 30–60 s on a cold start.
 // Default Vercel function timeout (10 s) is too short.
@@ -92,10 +92,7 @@ export async function POST(req: NextRequest) {
   const ip = clientIpFromHeaders(req.headers);
   const rateKey = ip !== "unknown" ? `ocr:${ip}` : null;
   if (rateKey && !isWithinRateLimit(rateKey, OCR_RATE_LIMIT)) {
-    return NextResponse.json(
-      { error: "Too many images — give it a few minutes and try again.", code: "rate_limited" },
-      { status: 429, headers: { "Cache-Control": "no-store" } },
-    );
+    return rateLimitedResponse("Too many images — give it a few minutes and try again.");
   }
 
   // Guard: only accept multipart uploads — direct API callers without a

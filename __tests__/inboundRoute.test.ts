@@ -5,9 +5,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Avoid any real network: the blocklist fetch and the aggregate counter are
 // stubbed so the route runs purely in memory.
-vi.mock("@/lib/urlhausBlocklist", () => ({
-  getUrlhausBlocklist: async () => new Set<string>(),
-}));
+vi.mock("@/lib/urlhausBlocklist", async () =>
+  (await import("./fixtures/routeRequest")).emptyBlocklistMock(),
+);
 const incrementCheckCount = vi.fn(async () => {});
 const recordCheckEvent = vi.fn(async () => {});
 const recordTargetRegion = vi.fn(async () => {});
