@@ -4,8 +4,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUrlhausBlocklist, BLOCKLIST_TTL_SECONDS } from "@/lib/urlhausBlocklist";
 import { hashHost, HOST_HASH_ALGORITHM, HOST_HASH_HEX_LENGTH } from "@veriguard/detect/hostHash";
-import { checkAndRecordRateLimit, FEED_RATE_LIMIT } from "@/lib/reportStore";
-import { clientIpFromHeaders } from "@/lib/geo";
+import { FEED_RATE_LIMIT } from "@/lib/reportStore";
+import { rateLimitRead } from "@/lib/readGuard";
 import { corsHeaders, corsPreflightHeaders } from "@/lib/cors";
 
 /**
@@ -56,19 +56,11 @@ export async function OPTIONS(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const cors = corsHeaders(req.headers.get("origin"));
 
-  // Throttled on the shared read budget, like the other feed endpoints. An
-  // "unknown" IP is not throttled: keying every unidentifiable caller into one
-  // bucket would take the endpoint down for all of them at once, which is the
-  // same reasoning /api/stats and /api/reports apply.
-  const ip = clientIpFromHeaders(req.headers);
-  if (ip !== "unknown" && !checkAndRecordRateLimit(`blocklist:${ip}`, FEED_RATE_LIMIT)) {
-    return NextResponse.json(
-      { error: "Too many requests — give it a few minutes and try again.", code: "rate_limited" },
-      // Never cached: a stored 429 would lock out every client behind the same
-      // CDN node, turning a per-IP limit into an outage for all of them.
-      { status: 429, headers: { ...cors, "Cache-Control": "no-store" } },
-    );
-  }
+  // Throttled on the shared read budget, like the other feed endpoints. The
+  // "unknown" IP caveat and the uncacheable 429 live in the helper, which is
+  // where /api/stats and /api/reports get the same two from.
+  const limited = rateLimitRead(req.headers, "blocklist", FEED_RATE_LIMIT, cors);
+  if (limited) return limited;
 
   const hosts = await getUrlhausBlocklist();
 

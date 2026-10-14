@@ -5,36 +5,26 @@ import { describe, it, expect, vi } from "vitest";
 
 // Avoid any real network: the blocklist fetch and the aggregate counter are
 // stubbed so the route runs purely in memory.
-vi.mock("@/lib/urlhausBlocklist", () => ({
-  getUrlhausBlocklist: async () => new Set<string>(),
-}));
+vi.mock("@/lib/urlhausBlocklist", async () =>
+  (await import("./fixtures/routeRequest")).emptyBlocklistMock(),
+);
 vi.mock("@/lib/reportStore", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/reportStore")>();
   return { ...actual, incrementCheckCount: async () => {} };
 });
 
 import { POST } from "@/app/api/check/route";
+// Imported as a value, not only a type: one test below needs a body that is
+// deliberately not JSON, which the shared builder cannot express.
 import { NextRequest } from "next/server";
 import { DEFAULT_REGION } from "@veriguard/detect/regions";
 import { CHECK_RATE_LIMIT } from "@/lib/reportStore";
+import { checkRequest } from "./fixtures/routeRequest";
 
-// The route's rate limiter is module-level state shared across this file, keyed
-// on x-forwarded-for. Each request gets a unique synthetic IP so tests can never
-// throttle each other — without this the suite would start failing on whichever
-// test happened to be the 31st. Rate-limit tests below opt into a fixed IP.
-let ipCounter = 0;
-
+// Each request gets a unique synthetic IP (see the fixture) so tests can never
+// throttle each other. The rate-limit tests below opt into a fixed IP.
 function check(body: unknown, headers: Record<string, string> = {}): NextRequest {
-  ipCounter += 1;
-  return new NextRequest("http://localhost/api/check", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-forwarded-for": `10.0.0.${ipCounter % 254}`,
-      ...headers,
-    },
-    body: JSON.stringify(body),
-  });
+  return checkRequest(body, { headers });
 }
 
 const SCAM = "ATO: your tax refund is waiting, verify now at http://ato-refund.xyz";
@@ -98,12 +88,10 @@ describe("POST /api/check region resolution", () => {
 describe("POST /api/check rate limiting", () => {
   // /api/check is public and unauthenticated. Before Phase 0 it had no limiter
   // at all, so these tests are the regression guard on that gap.
+  // A pinned IP, unlike `check` above: these tests are about the budget, so
+  // every request has to land in the same bucket.
   function checkFrom(ip: string): NextRequest {
-    return new NextRequest("http://localhost/api/check", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": ip },
-      body: JSON.stringify({ content: SCAM }),
-    });
+    return checkRequest({ content: SCAM }, { ip });
   }
 
   it("allows a normal burst of checks from one client", async () => {

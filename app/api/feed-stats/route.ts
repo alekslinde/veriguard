@@ -3,13 +3,13 @@
 
 import { NextResponse } from "next/server";
 import { getFeedStats } from "@/lib/reportStore";
-import { MOCK_FEED_STATS } from "@/lib/fixtures/mockReports";
+import { MOCK_FEED_STATS, shouldUseDevFixtures } from "@/lib/fixtures/mockReports";
 
 export async function GET() {
   const stats = await getFeedStats();
 
   // In development, fall back to mock data when the DB is empty.
-  if (process.env.NODE_ENV === "development" && stats.total === 0) {
+  if (shouldUseDevFixtures(stats.total)) {
     return NextResponse.json(MOCK_FEED_STATS, {
       headers: { "Cache-Control": "no-store" },
     });

@@ -3,15 +3,18 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-vi.mock("@/lib/urlhausBlocklist", () => ({
-  getUrlhausBlocklist: async () => new Set<string>(),
-}));
+vi.mock("@/lib/urlhausBlocklist", async () =>
+  (await import("./fixtures/routeRequest")).emptyBlocklistMock(),
+);
 vi.mock("@/lib/reportStore", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/reportStore")>();
   return { ...actual, incrementCheckCount: async () => {} };
 });
 
+// A value import, not only a type: the preflight tests build bodyless OPTIONS
+// requests, which the shared JSON builder does not cover.
 import { NextRequest } from "next/server";
+import { checkRequest } from "./fixtures/routeRequest";
 
 // Route-level wiring, distinct from lib/cors's own unit tests: those prove the
 // header logic, these prove /api/check actually calls it — on every exit path,
@@ -22,20 +25,10 @@ const EXT = "chrome-extension://abcdefghijklmnopqrstuvwxyzabcdef";
 const SITE = "https://veriguard.app";
 const ORIGINAL = { ...process.env };
 
-let ipCounter = 0;
+// Positional wrapper over the shared builder, which allocates a unique
+// synthetic IP unless one is pinned so tests cannot throttle each other.
 function req(body: unknown, origin?: string, ip?: string): NextRequest {
-  ipCounter += 1;
-  const headers: Record<string, string> = {
-    "content-type": "application/json",
-    // Unique synthetic IP per request so tests cannot throttle each other.
-    "x-forwarded-for": ip ?? `10.1.0.${ipCounter % 254}`,
-  };
-  if (origin) headers.origin = origin;
-  return new NextRequest("http://localhost/api/check", {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
+  return checkRequest(body, { origin, ip });
 }
 
 /**
