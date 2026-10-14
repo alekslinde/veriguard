@@ -1,0 +1,274 @@
+// SPDX-FileCopyrightText: 2026 Aleksandr Linde
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+import { describe, it, expect } from "vitest";
+import {
+  CHANNELS,
+  SIGNALS,
+  duplicateIds,
+  missingReads,
+  registryScore,
+  runsOn,
+  signalInventory,
+  weightFor,
+  type Channel,
+  type Context,
+  type SignalDef,
+} from "../packages/detect/src/signalRegistry";
+import { resolveRegionPack } from "@veriguard/detect/regions";
+import { checkPhone, checkSms, checkEmail, checkUrl, checkCustom } from "@veriguard/detect/scamDetector";
+
+// Step 1 of the registry extraction: the types and the scorer exist, and
+// nothing consumes them. Two things need asserting at this stage, and they pull
+// in opposite directions:
+//
+//   · The shape behaves — weighting, channel gating and the inventory are what
+//     later steps rest on, so they get pinned before anything is converted.
+//   · The engine does not move. An empty registry contributing nothing is the
+//     property that makes this step safe to ship, and "empty" is only a
+//     guarantee while a test says so.
+//
+// The second is why the registry is empty rather than partly populated: a
+// signal present both here and in scamDetector.ts would score twice.
+
+const ctx = (over: Partial<Context> = {}): Context => ({
+  channel: "sms",
+  pack: resolveRegionPack("AU"),
+  original: "Your account has been suspended",
+  body: "your account has been suspended",
+  words: ["your", "account", "has", "been", "suspended"],
+  ...over,
+});
+
+/** A signal that always fires, so weighting and gating are what varies. */
+const fires = (over: Partial<SignalDef> = {}): SignalDef => ({
+  id: "test.fires",
+  reads: ["body"],
+  channels: "all",
+  weight: 10,
+  kind: "structural",
+  evaluate: () => [{ text: "fired", source: "message" }],
+  ...over,
+});
+
+describe("the registry is declared and consuming nothing", () => {
+  it("is empty", () => {
+    // Not a to-do. An empty list is what makes step 1 observationally
+    // identical to the engine before it: registryScore returns no rows, so
+    // there is nothing for a converted signal to be double-counted against
+    // until its inline site is deleted in the same change.
+    expect(SIGNALS).toHaveLength(0);
+  });
+
+  it("scores nothing over an empty registry", () => {
+    expect(registryScore(ctx())).toEqual([]);
+  });
+
+  it("is not imported by the scorer", async () => {
+    // The strongest available statement of "convert nothing": if the scoring
+    // path cannot see this module, no verdict can depend on it, whatever the
+    // registry contains. This assertion is expected to be deleted by step 2 —
+    // deliberately, and visibly, as part of the change that wires the first
+    // signal in.
+    const { readFileSync } = await import("fs");
+    const src = readFileSync("packages/detect/src/scamDetector.ts", "utf8");
+    expect(src).not.toContain("signalRegistry");
+  });
+
+  it("leaves every entry point's verdict untouched", () => {
+    // A belt-and-braces no-op check against the four surfaces. Fixed inputs
+    // with pinned scores, so a future step that changes one of these has to
+    // say so here rather than in a diff nobody reads.
+    expect(checkPhone("1900 123 456", "AU").score).toBe(95);
+    expect(checkSms("Your parcel is held, pay the fee at http://auspost-fee.tk", undefined, "AU").verdict)
+      .toBe("likely_scam");
+    expect(checkUrl("https://ato.gov.au/mytax", undefined, "AU").verdict).toBe("safe");
+    expect(checkEmail("From: a@b.invalid\nSubject: hi\n\nhello there", undefined, "AU").score).toBe(0);
+    // Free text carries a deliberate "nothing found" floor, so 10/safe rather
+    // than 0 is the pre-registry behaviour here — pinned as found, not as
+    // assumed, since the value of this test is that it was read off the engine.
+    const custom = checkCustom("hello there", undefined, "AU");
+    expect(custom.score).toBe(10);
+    expect(custom.verdict).toBe("safe");
+  });
+});
+
+describe("channel weighting is a per-signal fact", () => {
+  it("reads a bare weight as channel-independent", () => {
+    const def = fires({ weight: 25 });
+    for (const c of CHANNELS) expect(weightFor(def, c)).toBe(25);
+  });
+
+  it("lets one channel differ without a multiplier anywhere else", () => {
+    // The shape that replaces the blanket 0.7 discount plus its exemption
+    // list: a keyword-frequency signal declares the email discount itself, at
+    // the point its author is already choosing a number.
+    const keyword = fires({ weight: { default: 30, email: 21 } });
+    expect(weightFor(keyword, "sms")).toBe(30);
+    expect(weightFor(keyword, "email")).toBe(21);
+  });
+
+  it("carries a composite at full weight on email, with no exemption list", () => {
+    // The defect this is built to make unexpressible: a composite pitched at
+    // 25 to clear `suspicious` (20) landed at 17 on the email path, so the
+    // channel where the evasion is commonest read as safe. Declared per
+    // signal, there is no second place for a multiplier to apply.
+    const composite = fires({ id: "test.composite", weight: 25 });
+    expect(weightFor(composite, "email")).toBe(25);
+    expect(weightFor(composite, "email")).toBeGreaterThanOrEqual(20);
+  });
+
+  it("applies the channel weight exactly once", () => {
+    // registryScore is the only place a weight is read, so the arithmetic that
+    // produced 17-from-25 has nowhere to happen. One scoring pass, one weight.
+    const rows = registryScore(ctx({ channel: "email" }), [fires({ weight: { default: 30, email: 21 } })]);
+    expect(rows.map((r) => r.points)).toEqual([21]);
+  });
+
+  it("scales a signal whose strength varies with what it found", () => {
+    const counted = fires({
+      weight: 10,
+      evaluate: () => [{ text: "three hits", source: "message", scale: 3 }],
+    });
+    expect(registryScore(ctx(), [counted])[0].points).toBe(30);
+  });
+
+  it("falls to zero rather than guessing when a channel has no weight", () => {
+    // No `default`, so an unlisted channel is unweighted. Zero is the safe
+    // direction: every guard here fails toward saying nothing, because a scam
+    // card on a real message teaches the user the verdicts are noise.
+    expect(weightFor(fires({ weight: { sms: 40 } }), "custom")).toBe(0);
+  });
+});
+
+describe("channel gating", () => {
+  it("runs an \"all\" signal everywhere", () => {
+    for (const c of CHANNELS) expect(runsOn(fires(), c)).toBe(true);
+  });
+
+  it("skips a signal off its declared channels rather than discounting it", () => {
+    const smsOnly = fires({ channels: ["sms"] });
+    expect(registryScore(ctx({ channel: "sms" }), [smsOnly])).toHaveLength(1);
+    expect(registryScore(ctx({ channel: "email" }), [smsOnly])).toEqual([]);
+  });
+});
+
+describe("reads makes overlap and missing inputs visible", () => {
+  it("reports an input the context cannot supply", () => {
+    // A signal reading headers on the SMS channel is an authoring error, not a
+    // signal that happens not to fire.
+    expect(missingReads(fires({ reads: ["headers"] }), ctx({ channel: "sms" }))).toEqual(["headers"]);
+    expect(missingReads(fires({ reads: ["headers"] }), ctx({ channel: "email" }))).toEqual([]);
+  });
+
+  it("treats a hostname-reading signal on text with no URL as simply absent", () => {
+    expect(missingReads(fires({ reads: ["hostname"] }), ctx())).toEqual(["hostname"]);
+    expect(missingReads(fires({ reads: ["hostname"] }), ctx({ hostname: "evil.tk" }))).toEqual([]);
+  });
+
+  it("names two signals sharing a tokeniser", () => {
+    // The double-scoring defect, as a query over declarations rather than a
+    // probe finding: one Cyrillic character scored twice because the body
+    // splice rule and the hostname script rule were handed the same token by a
+    // shared splitter, and the overlap was in neither rule. With `reads`
+    // declared, asking is a filter.
+    const defs = [
+      fires({ id: "a", reads: ["words"] }),
+      fires({ id: "b", reads: ["words", "hostname"] }),
+      fires({ id: "c", reads: ["headers"] }),
+    ];
+    const onWords = defs.filter((d) => d.reads.includes("words")).map((d) => d.id);
+    expect(onWords).toEqual(["a", "b"]);
+  });
+});
+
+describe("the inventory is the registry serialised", () => {
+  it("carries every scoring fact without running anything", () => {
+    const inv = signalInventory([
+      fires({ id: "z.structural", reads: ["original"], weight: { default: 25, email: 25 } }),
+      fires({ id: "a.epistemic", kind: "epistemic", channels: ["url"], weight: 30 }),
+    ]);
+    expect(inv.map((e) => e.id)).toEqual(["a.epistemic", "z.structural"]);
+    expect(inv[0]).toEqual({
+      id: "a.epistemic",
+      reads: ["body"],
+      channels: ["url"],
+      weights: { url: 30, sms: 0, email: 0, phone: 0, custom: 0 },
+      kind: "epistemic",
+    });
+  });
+
+  it("sorts by id so a diff shows the surface changing, not the file order", () => {
+    const ids = signalInventory([fires({ id: "c" }), fires({ id: "a" }), fires({ id: "b" })]).map((e) => e.id);
+    expect(ids).toEqual(["a", "b", "c"]);
+  });
+
+  it("separates claims about the world from rules that cannot go stale", () => {
+    // Item 1's split: an epistemic signal (a brand, an agency, an allowlist)
+    // needs re-checking against reality on a schedule; a structural one does
+    // not. Nothing owns maintaining the epistemic half today, and it is the
+    // largest by volume, so the inventory has to be able to name it.
+    const inv = signalInventory([fires({ kind: "epistemic" })]);
+    expect(inv[0].kind).toBe("epistemic");
+  });
+
+  it("omits evaluate, which is not comparable across commits", () => {
+    expect(Object.keys(signalInventory([fires()])[0])).not.toContain("evaluate");
+  });
+});
+
+describe("ids are the inventory's primary key", () => {
+  it("reports a duplicate rather than throwing at import time", () => {
+    // A throw here would take down every consumer, including the test that
+    // would name the problem.
+    expect(duplicateIds([fires({ id: "dup" }), fires({ id: "dup" }), fires({ id: "ok" })])).toEqual(["dup"]);
+  });
+
+  it("finds none in the live registry", () => {
+    expect(duplicateIds()).toEqual([]);
+  });
+});
+
+describe("evaluate scores nothing", () => {
+  it("gives the signal's declared weight to a hit, not the hit's own number", () => {
+    // A hit that carried its own points could disagree with the declared
+    // weight, which is the inline shape this replaces: a weight changed in one
+    // place and a comment describing the old one left in another.
+    const def = fires({ weight: 45 });
+    const hit = def.evaluate(ctx())[0] as { points?: number };
+    expect(hit.points).toBeUndefined();
+    expect(registryScore(ctx(), [def])[0].points).toBe(45);
+  });
+
+  it("is pure — the same context twice gives the same rows", () => {
+    const c = ctx();
+    expect(registryScore(c, [fires()])).toEqual(registryScore(c, [fires()]));
+  });
+});
+
+describe("Context carries both forms of the text", () => {
+  it("keeps the original alongside the normalised body", () => {
+    // The lossy-normalisation defect class is a missing context object:
+    // `new URL()` punycodes a non-ASCII hostname on parse, so a homoglyph
+    // domain and an ordinary internationalised one become indistinguishable to
+    // anything running after normalisation. Five defects, one root cause,
+    // three call sites. Both forms side by side is that fix stated once.
+    const c = ctx({ original: "Аccount suspended", body: "account suspended" });
+    expect(c.original).not.toBe(c.body);
+    expect(c.original).toMatch(/А/); // Cyrillic А, still present
+  });
+
+  it("exposes one tokenisation, so no signal re-derives it", () => {
+    expect(ctx().words).toContain("account");
+  });
+});
+
+describe("every channel is named", () => {
+  it("covers the four published entry points plus free text", () => {
+    // checkUrl / checkSms / checkEmail / checkPhone / checkCustom. The
+    // published API does not change to suit this design; each becomes a
+    // channel preset over one list.
+    const expected: Channel[] = ["url", "sms", "email", "phone", "custom"];
+    expect([...CHANNELS]).toEqual(expected);
+  });
+});
