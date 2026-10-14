@@ -29,21 +29,23 @@
 // a signal declare its channels, its weight and its inputs, and all three defect
 // classes stop being expressible.
 //
-// ## Status: declared, consuming nothing
+// ## Status: the phone channel is converted
 //
-// **Nothing in this file is wired into scoring yet, and that is deliberate.**
-// It is step 1 of an incremental extraction: define the shape, convert nothing,
-// so the shape can be reviewed against the existing engine before any scoring
-// path moves. The region-pack language axis landed the same way — the type and
-// its reasoning first, its first consumer a release later — and that ordering is
-// what made the axis cheap to get right.
+// Incremental extraction, smallest surface first. Done:
 //
-// The conversion order after this, smallest surface first:
+//   1. The types and the scorer, consuming nothing.
+//   2. `checkPhone` — 10 inline sites, now `signals/phone.ts`. The proof the
+//      shape holds, and the step that found its first limit: see the note at
+//      the end of that file. The registry holds independent weighted
+//      observations cleanly and has no shape yet for a signal whose weight
+//      depends on the rest of the evidence list.
 //
-//   2. `checkPhone` (88 lines, 10 sites) — the proof the shape holds.
+// Remaining:
+//
 //   3. The gated composites, where the channel-multiplier defects live. Each
 //      entry's signal declares its own channel weight, and the exemption list is
-//      deleted rather than extended.
+//      deleted rather than extended. **Blocked on the order-dependence question
+//      above** — at least one composite will force it.
 //   4. The remaining single-condition signals, mechanically.
 //   5. Serialise the registry in CI as the signal inventory.
 //
@@ -65,6 +67,7 @@ import type { EmailHeaders } from "./emailHeaders";
 import type { SignalSource } from "./engineTypes";
 import type { PhoneIntel } from "./phoneIntel";
 import type { RegionPack } from "./regions";
+import { PHONE_SIGNALS } from "./signals/phone";
 
 /**
  * Which surface the text arrived on.
@@ -341,14 +344,16 @@ export function unsatisfiableReads(def: SignalDef): Reads[] {
 /**
  * The registry: every signal, by id.
  *
- * **Empty, and the type is what matters until step 2.** A signal is registered
- * here only once its scoring has moved out of `scamDetector.ts` — a signal
- * present in both places would score twice, which is the defect class this
- * exists to prevent. The emptiness is therefore load-bearing, not a to-do:
- * `registryScore` over an empty list returns 0 and contributes nothing, so
- * results are identical to today's by construction.
+ * A signal is registered here only once its scoring has moved out of
+ * `scamDetector.ts`. A signal present in both places would score twice, which
+ * is the defect class this exists to prevent, so the two halves of each
+ * conversion — the registration and the deletion of the inline site — belong in
+ * one commit.
+ *
+ * Converted so far: the phone channel. `scamDetector.ts` still owns the url,
+ * sms, email and custom channels' scoring.
  */
-export const SIGNALS: readonly SignalDef[] = [];
+export const SIGNALS: readonly SignalDef[] = [...PHONE_SIGNALS];
 
 /**
  * Ids registered more than once.

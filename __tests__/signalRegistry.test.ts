@@ -56,28 +56,45 @@ const fires = (over: Partial<SignalDef> = {}): SignalDef => ({
   ...over,
 });
 
-describe("the registry is declared and consuming nothing", () => {
-  it("is empty", () => {
-    // Not a to-do. An empty list is what makes step 1 observationally
-    // identical to the engine before it: registryScore returns no rows, so
-    // there is nothing for a converted signal to be double-counted against
-    // until its inline site is deleted in the same change.
-    expect(SIGNALS).toHaveLength(0);
+describe("the registry holds what has been converted, and only that", () => {
+  it("holds the phone channel", () => {
+    // Step 1's "is empty" assertion lived here and was deleted by this
+    // conversion — deliberately and visibly, as that test's own comment said
+    // it would be. What replaces it is the invariant that actually matters
+    // from here on: each channel's signals are registered exactly when their
+    // inline sites are gone.
+    expect(SIGNALS.length).toBeGreaterThan(0);
+    expect(SIGNALS.every((d) => d.channels !== "all" && d.channels.includes("phone"))).toBe(true);
   });
 
-  it("scores nothing over an empty registry", () => {
-    expect(registryScore(ctx())).toEqual([]);
+  it("scores nothing on a channel not yet converted", () => {
+    // url, sms, email and custom are still scored inline, so the registry must
+    // contribute nothing there or every signal it holds would score twice —
+    // the one way this refactor can silently change a verdict.
+    for (const channel of ["url", "sms", "email", "custom"] as const) {
+      expect(registryScore(ctx({ channel })), `${channel} is scored inline`).toEqual([]);
+    }
   });
 
-  it("is not imported by the scorer", async () => {
-    // The strongest available statement of "convert nothing": if the scoring
-    // path cannot see this module, no verdict can depend on it, whatever the
-    // registry contains. This assertion is expected to be deleted by step 2 —
-    // deliberately, and visibly, as part of the change that wires the first
-    // signal in.
+  it("has no phone signal left scoring inline", async () => {
+    // The other half of the same invariant, asserted against the source: a
+    // converted rule deleted from the registry's side but left in the scorer
+    // would pass every behavioural test here while scoring from the old path.
     const { readFileSync } = await import("fs");
     const src = readFileSync("packages/detect/src/scamDetector.ts", "utf8");
-    expect(src).not.toContain("signalRegistry");
+    const phoneChecker = src.slice(src.indexOf("export function checkPhone"));
+    const body = phoneChecker.slice(0, phoneChecker.indexOf("\n}"));
+    for (const fragment of [
+      "Premium rate number",
+      "VoIP / virtual number",
+      "Wangiri scam",
+      "frequently used as a base for scam operations",
+      "Free-call numbers are routinely spoofed",
+      "Shared-cost numbers are commonly spoofed",
+      "Fixed-line area code",
+    ]) {
+      expect(body, `checkPhone still scores "${fragment}" inline`).not.toContain(fragment);
+    }
   });
 
   it("leaves every entry point's verdict untouched", () => {
