@@ -123,7 +123,9 @@ export function ManagerTabs({
           tabIndex={active === manager ? 0 : -1}
           onClick={() => onChange(manager)}
           onKeyDown={(e) => onKeyDown(e, i)}
-          className={`rounded-md px-2.5 py-1 text-[12px] font-semibold transition-colors ${
+          // Explicit ring, as on the email guide's tabs: the roving tabindex
+          // makes the focused tab the only tab stop, so it must say so.
+          className={`rounded-md px-2.5 py-1 text-[12px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--clear)] ${
             active === manager
               ? "bg-[var(--ink-2)] text-[var(--clear)]"
               : "text-[var(--faint)] hover:text-[var(--text-dim)]"
