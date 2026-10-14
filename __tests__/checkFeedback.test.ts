@@ -213,9 +213,18 @@ describe("rate limit — machine-readable, not prose-matched", () => {
     // contract CheckFlow branches on, so it is worth proving on the wire.
     vi.resetModules();
     vi.doMock("@/lib/urlhausBlocklist", emptyBlocklistMock);
+    // Both telemetry writes are stubbed, not just the counter. The route
+    // floats `recordTargetRegion` without awaiting it and the helper swallows
+    // its own failures, so a real one would fire 30 un-awaited INSERTs into the
+    // dev database and report nothing — the floated promises outliving the test
+    // body is what makes that invisible rather than merely slow.
     vi.doMock("@/lib/reportStore", async (importOriginal) => {
       const actual = await importOriginal<typeof import("@/lib/reportStore")>();
-      return { ...actual, incrementCheckCount: async () => {} };
+      return {
+        ...actual,
+        incrementCheckCount: async () => {},
+        recordTargetRegion: async () => {},
+      };
     });
     const { POST } = await import("@/app/api/check/route");
     const { CHECK_RATE_LIMIT } = await import("@/lib/reportStore");

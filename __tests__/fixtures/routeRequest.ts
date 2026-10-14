@@ -6,16 +6,19 @@
 // Every route test needs the same two things before it can assert anything: a
 // NextRequest it can hand the handler, and a caller identity the route's
 // module-level rate limiter will not throttle. Both were hand-rolled per file —
-// ten copies of `new NextRequest(...)` and four of an `ipCounter` — and the
-// copies had drifted: three files allocated from the same `10.1.0.x` prefix,
-// which is only safe while vitest isolates module registries per file. That is
-// the default, so it was not a live bug, but it was a property no file stated
-// and none owned. Allocating from one place removes the question.
+// ten copies of `new NextRequest(...)` and four of an `ipCounter`, three of
+// them drawing from the same `10.1.0.x` prefix.
+//
+// What is shared here is the construction and the reasoning, not the address
+// space: vitest gives each file its own module registry, so each file still
+// gets its own counter and its own copy of the limiter. That per-file isolation
+// is what keeps these addresses from meeting, both before this fixture and
+// after it — see nextTestIp.
 
 import { NextRequest } from "next/server";
 
 /**
- * Synthetic client IPs, one per request, never reused.
+ * Synthetic client IPs, one per request within a test file.
  *
  * The routes key their limiter on `x-forwarded-for`, and that limiter is
  * module-level state shared by every test in a file. A fixed IP therefore makes
@@ -24,18 +27,27 @@ import { NextRequest } from "next/server";
  * cannot throttle each other, and the ones that *are* about throttling opt into
  * a fixed IP explicitly.
  *
- * Drawn from 198.18.0.0/15 — reserved for benchmarking by RFC 2544, so it can
- * never collide with a real address a fixture might also carry. The counter is
- * module-scoped, so files sharing this helper draw from one sequence rather
- * than from overlapping guesses.
+ * Drawn from 198.18.0.0/15 — reserved for benchmarking by RFC 2544, so these
+ * can never collide with a real address a fixture might also carry.
+ *
+ * **This does not make the sequence unique across files.** vitest isolates
+ * module registries per file by default, so every file that imports this helper
+ * gets its own `ipCounter` starting at 0 and draws the identical sequence. That
+ * is harmless for the same reason the per-file duplicates it replaced were
+ * harmless — each file also gets its own copy of the route's limiter, so the
+ * addresses never meet. What this helper fixes is the arithmetic and the
+ * documentation being in one place instead of four; it is not a substitute for
+ * that isolation, and a move to `isolate: false` would need the limiter reset
+ * between files regardless of how these addresses are allocated.
  */
 let ipCounter = 0;
 export function nextTestIp(): string {
   ipCounter += 1;
-  // /15 gives 131072 addresses; far more than any suite allocates, and the
-  // wrap is harmless because a repeat only matters within one rate window.
+  // The /15 spans 198.18.0.0–198.19.255.255: 17 bits of host space, so bit 16
+  // selects the second octet. Masking it off would fold the range back onto
+  // 198.18.x.y and make counters 1 and 65537 the same address.
   const n = ipCounter % 131_072;
-  return `198.18.${(n >> 8) & 0xff}.${n & 0xff}`;
+  return `198.${18 + ((n >> 16) & 1)}.${(n >> 8) & 0xff}.${n & 0xff}`;
 }
 
 /** Options for {@link jsonRequest}, mirroring what the route tests vary. */
