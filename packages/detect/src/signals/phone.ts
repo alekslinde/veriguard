@@ -190,8 +190,24 @@ export const PHONE_SIGNALS: readonly SignalDef[] = [
 ];
 
 // ────────────────────────────────────────────────────────────────────────────
-// What step 3 has to answer first
+// What step 3 had to answer first — answered, 2026-10-15
 // ────────────────────────────────────────────────────────────────────────────
+//
+// **(b), with the criterion written down.** The three cases below stay in the
+// entry point, and the line is drawn by the question a rule asks rather than by
+// how hard it is to convert: a signal reports an observation about the input and
+// declares its own weight; pass-level policy answers a question about the
+// *finished* evidence list and owns no row of its own. The deferred
+// authority-mention rule keeps `addDeferred`, which was built for exactly its
+// question. The full statement, and (b)'s own risk taken seriously, is in the
+// header of `signalRegistry.ts`.
+//
+// What step 3 then needed turned out to be narrower than the question asked
+// here, and separating the two is the finding: the ClickFix variants are not
+// order-dependent, they are two readings of **one fact**, where scoring both
+// counts one lure twice. That is precedence — each weight still declared, each
+// `evaluate` still pure — so it is the `supersedes` field, not a second kind of
+// signal. The original note is kept below as the question's provenance.
 //
 // A signal whose weight depends on the rest of the evidence list has no shape
 // here yet. Three live instances, all pass-level:
@@ -216,5 +232,6 @@ export const PHONE_SIGNALS: readonly SignalDef[] = [
 //       page's own ordering warns about for A, 1 and 4.
 //   (c) Extend `Hit` with the deferred shape the engine already has.
 //
-// Not decided here. Step 3 converts the composites, where the channel-weight
-// payoff is, and at least one of them will force this.
+// Answered as (b) above. Recorded rather than deleted because the reason step 2
+// was worth doing at the smallest surface was that it surfaced this cheaply, and
+// a question that leaves no trace of having been asked gets asked again.
