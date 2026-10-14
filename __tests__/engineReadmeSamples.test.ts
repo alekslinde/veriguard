@@ -124,6 +124,30 @@ describe("engine README — the samples it shows", () => {
     }
   });
 
+  it("lists every source DIRECTORY in its layout block", () => {
+    // Files only was the same gap one level up: `signals/` was added as a new
+    // source directory and a published subpath, and this suite passed because
+    // it enumerated `.ts` files at the top level and nothing else. A new
+    // directory is the more significant drift of the two — it is a whole area
+    // of the package a reader cannot find — so it is the one that should fail
+    // the loudest.
+    //
+    // Named, not enumerated: each directory is listed as a directory, on the
+    // same terms as regions/, because enumerating what is inside goes stale.
+    const layout = /```\n(src\/[\s\S]*?)```/.exec(README)?.[1];
+    const dirs = readdirSync(path.join(process.cwd(), "packages/detect/src"), {
+      withFileTypes: true,
+    })
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name);
+
+    expect(dirs.length, "no engine source directories found").toBeGreaterThan(0);
+    for (const dir of dirs) {
+      expect(layout, `the layout block does not mention the ${dir}/ directory`)
+        .toContain(`${dir}/`);
+    }
+  });
+
   it("imports only symbols the package actually exports", async () => {
     // A sample importing a renamed or removed export fails for the reader on
     // their first copy-paste, and nothing else in the suite would see it.

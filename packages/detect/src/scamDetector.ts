@@ -12,6 +12,8 @@ import { detectType } from "./detectType";
 import { analysePhone, type PhoneIntel } from "./phoneIntel";
 import { isShortened, expandUrl, type ExpandFetch } from "./urlExpander";
 import { resolveRegionPack, supportedRegions, DEFAULT_REGION, type RegionInput, type RegionCoverage, type RegionPack } from "./regions";
+import { registryScore } from "./signalRegistry";
+import { PHONE_SIGNALS, SPOOFING_POINTS, NOTHING_FOUND_POINTS } from "./signals/phone";
 import { KEYS_BY_POST_PHRASES, FAMILY_RELATION_TERMS, NEW_NUMBER_PRETEXT_PHRASES, SCAM_COACHING_PHRASES } from "./regions/base";
 import type { CheckResult, HostLookup, Signal, SignalSource } from "./engineTypes";
 
@@ -2866,41 +2868,32 @@ export function checkPhone(number: string, region?: RegionInput): CheckResult {
   const intel = analysePhone(number, region);
   const sig = new Signals();
 
-  // Translate intel into score/flags
-  const riskScores: Record<PhoneIntel["spoofingRisk"], number> = {
-    low: 15, medium: 30, high: 55, very_high: 75,
-  };
-  const spoofPoints = riskScores[intel.spoofingRisk];
+  const spoofPoints = SPOOFING_POINTS[intel.spoofingRisk];
 
-  if (intel.lineType === "premium") {
-    sig.add("phone", "Premium rate number — never call or text back, you'll be charged", 20);
-  }
-
-  if (intel.lineType === "voip_likely") {
-    sig.add("phone", "VoIP / virtual number — trivially easy to spoof; real caller identity is hidden", 10);
-  }
-
-  if (intel.wangiriRisk) {
-    sig.add("phone", "Wangiri scam: one-ring trick from a premium-rate international number — do NOT call back", 20);
-  }
-
-  if (intel.highScamCountry && !intel.wangiriRisk) {
-    sig.add("phone", `Call originates from ${intel.country} — frequently used as a base for scam operations targeting your region`);
-  }
-
-  // Toll-free and shared-cost wording is authored per region on the pack's
-  // phonePlan, since the number ranges and impersonated bodies differ; it
-  // reaches the user via intel.spoofingNotes below.
-  if (intel.lineType === "freecall") {
-    sig.add("phone", "Free-call numbers are routinely spoofed by scammers impersonating banks and government agencies");
-  }
-
-  if (intel.lineType === "shared_cost") {
-    sig.add("phone", "Shared-cost numbers are commonly spoofed by scammers impersonating government agencies");
-  }
-
-  if (intel.lineType === "fixed") {
-    sig.add("phone", "Fixed-line area code — easy to spoof; a local-looking number doesn't mean a local caller");
+  // The observations about this number, scored from the registry rather than
+  // from ten inline branches. Each is an independent weighted fact — a line
+  // type, wangiri, the originating country — which is exactly what a SignalDef
+  // holds, and the order is preserved because the evidence list is rendered in
+  // the order it was found.
+  //
+  // What stays below is pass-level and genuinely not a signal: the spoofing
+  // assessment belongs to the number rather than to any observation and gets no
+  // row of its own, the floor's weight depends on whether anything else fired,
+  // and the note-coverage filter asks about rows already collected. See the
+  // note at the end of signals/phone.ts for why those were not forced into the
+  // registry's shape during a conversion meant to change nothing observable.
+  for (const row of registryScore(
+    {
+      channel: "phone",
+      pack: PACK,
+      original: number,
+      body: number.toLowerCase(),
+      words: [number],
+      phone: intel,
+    },
+    PHONE_SIGNALS,
+  )) {
+    sig.add(row.source, row.text, row.points);
   }
 
   // The spoofing assessment is a property of the number itself rather than of
@@ -2928,7 +2921,9 @@ export function checkPhone(number: string, region?: RegionInput): CheckResult {
     sig.add(
       "phone",
       "No obvious red flags from the number format alone — caller ID can always be spoofed, so stay cautious",
-      fresh.length ? Math.max(spoofPoints, 15) - spoofPoints : Math.max(spoofPoints, 15),
+      fresh.length
+        ? Math.max(spoofPoints, NOTHING_FOUND_POINTS) - spoofPoints
+        : Math.max(spoofPoints, NOTHING_FOUND_POINTS),
     );
   }
   if (fresh.length) {
