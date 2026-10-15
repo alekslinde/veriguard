@@ -81,7 +81,13 @@ jobs:
       # The whole suite, not just the engine's own tests. The package is
       # consumed by the app and the extension in this same tree, so a break in
       # either is a break in what is about to be published.
+      # VERIGUARD_REQUIRE_BUILT names only the engine: it is the one artifact
+      # built above, so its publish-surface checks must run here rather than
+      # skip. The MCP and extension bundles are not built in this job, and
+      # their suites skip and report, as they do locally.
       - name: Typecheck, lint and test
+        env:
+          VERIGUARD_REQUIRE_BUILT: enginePublish
         run: |
           npm run typecheck
           npm run lint

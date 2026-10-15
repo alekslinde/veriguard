@@ -76,6 +76,107 @@ function stubMatchMedia() {
   });
 }
 
+// jsdom has no canvas, and axe's label-content-name-mismatch rule reaches for
+// one on every text node it reads: it calls visibleVirtual with
+// ignoreIconLigature hardcoded true, which rasterises the first character to
+// decide whether the text is an icon font's ligature and should be ignored as
+// decorative. Without a 2d context jsdom throws "Not implemented", printing a
+// stack trace on a passing run — noise that trains a reader to skip stack
+// traces in test output.
+//
+// That rule is impact: "serious", so it is inside this suite's gate. Disabling
+// it to silence the trace would widen what passes, and so would a lazy stub:
+// the ligature path treats a zero-width glyph, or two draws that rasterise
+// identically, AS a ligature and drops the text — and visibleVirtual returning
+// "" makes the rule pass unconditionally. Every assertion about a visible
+// label matching its accessible name would then hold vacuously.
+//
+// So the stub answers the way an ordinary, non-ligature glyph would: a
+// non-zero advance width per character, and pixel data that differs between
+// the first-character draw and the full-string draw. isIconLigature returns
+// false, the text stays visible to the rule, and the rule keeps deciding.
+function stubCanvas() {
+  // One draw's worth of state: fillText records what was asked for, and
+  // getImageData answers from that, so the two comparison draws differ.
+  let drawn = "";
+  const context = {
+    canvas: { width: 0, height: 0 },
+    font: "",
+    textAlign: "",
+    textBaseline: "",
+    // 10px per character: non-zero, and linear so that the rule's
+    // expectedWidth (sum of per-character widths) matches its actualWidth
+    // (the whole string) — a size difference of 0, as a real proportional
+    // font without ligatures gives.
+    measureText: (text: string) => ({ width: text.length * 10 }),
+    fillText: (text: string) => {
+      drawn = text;
+    },
+    clearRect: () => {
+      drawn = "";
+    },
+    // A deterministic pattern seeded by what was drawn, so the first
+    // character and the full string produce different buffers and the rule
+    // sees a pixel difference rather than a blank canvas.
+    //
+    // Every byte of a drawn canvas is forced into 1..255. axe reads an
+    // all-zero buffer as "nothing rendered" and counts that as a ligature, and
+    // it tests the buffer as Uint32Array — so four consecutive zero bytes
+    // anywhere are enough to look blank in that word. A modulo pattern can
+    // land on zero for some inputs, which would make the stub's behaviour
+    // depend on which characters a component happens to render. Staying off
+    // zero entirely removes that coupling.
+    //
+    // Sized from the requested rectangle, as the real API is: the rule reads
+    // getImageData(0, 0, width, fontSize) and compares the two buffers
+    // index-by-index, so a buffer of the wrong length would compare against
+    // undefined and count differences that are an artefact of the stub.
+    getImageData: (_x: number, _y: number, w: number, h: number) => {
+      const width = Math.max(1, Math.ceil(w));
+      const height = Math.max(1, Math.ceil(h));
+      const data = new Uint8ClampedArray(width * height * 4);
+      for (let i = 0; i < data.length; i++) {
+        data[i] =
+          drawn.length === 0 ? 0 : ((drawn.charCodeAt(i % drawn.length) + i) % 255) + 1;
+      }
+      // A real 2d context returns an ImageData, whose width/height axe does
+      // not read but a future caller might.
+      return { data, width, height, colorSpace: "srgb" as const };
+    },
+  };
+  // Patched on the prototype, so it has to be put back by hand: this is not a
+  // global binding, and vi.unstubAllGlobals only tracks vi.stubGlobal. Left in
+  // place it would outlive this suite's own cases and leak into any later file
+  // sharing the worker.
+  //
+  // Answers only for "2d", which is the context axe asks for. Anything else
+  // gets jsdom's own answer — a null from the real implementation, or its "not
+  // implemented" error for webgl — rather than a 2d stub pretending to be a
+  // context it is not.
+  const real = window.HTMLCanvasElement.prototype.getContext;
+  const patched = vi.fn(function (
+    this: HTMLCanvasElement,
+    kind: string,
+    ...rest: unknown[]
+  ) {
+    if (kind === "2d") return context;
+    return (real as (...a: unknown[]) => unknown).call(this, kind, ...rest);
+  });
+  Object.defineProperty(window.HTMLCanvasElement.prototype, "getContext", {
+    writable: true,
+    configurable: true,
+    value: patched,
+  });
+
+  return () => {
+    Object.defineProperty(window.HTMLCanvasElement.prototype, "getContext", {
+      writable: true,
+      configurable: true,
+      value: real,
+    });
+  };
+}
+
 // ReportForm fetches a form token and a report count on mount. Swallowed by
 // its own .catch, but a stub keeps the test output quiet and the run hermetic.
 function stubFetch() {
@@ -88,14 +189,21 @@ function stubFetch() {
   );
 }
 
+// stubCanvas patches a prototype method rather than a global, so it hands back
+// its own undo and this suite calls it — see the note there.
+let restoreCanvas: (() => void) | undefined;
+
 beforeEach(() => {
   stubMatchMedia();
   stubFetch();
+  restoreCanvas = stubCanvas();
 });
 
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  restoreCanvas?.();
+  restoreCanvas = undefined;
 });
 
 /**
@@ -266,6 +374,33 @@ describe("accessibility baseline (axe, serious/critical)", () => {
 
   it("passes the mobile tab bar", async () => {
     await expectNoSeriousOrCritical(<MobileTabBar />, "MobileTabBar");
+  });
+
+  it("still catches a visible label missing from its accessible name", async () => {
+    // Guards stubCanvas, not a component. The canvas stub exists to keep
+    // axe's label-content-name-mismatch rule working under jsdom, and the
+    // ways it could go wrong all make the rule pass rather than fail: a
+    // zero-width glyph, or two draws that rasterise alike, read as an icon
+    // ligature, the visible text is dropped as decorative, and the rule
+    // returns true for everything. Nothing above would notice — the suite
+    // asserts an empty violation list, which is what a dead rule produces.
+    //
+    // So this feeds it a button whose aria-label omits its visible text,
+    // which is the violation the rule is for, and requires it to be found.
+    // If the stub ever starts reporting ligatures, this fails.
+    render(
+      <button type="button" aria-label="Submit">
+        Send report
+      </button>,
+    );
+    const { violations } = await axe.run(document.body, {
+      runOnly: { type: "rule", values: ["label-content-name-mismatch"] },
+    });
+    expect(
+      violations.map((v) => v.id),
+      "the canvas stub has disabled label-content-name-mismatch: axe is " +
+        "reading visible text as an icon ligature and ignoring it",
+    ).toEqual(["label-content-name-mismatch"]);
   });
 });
 

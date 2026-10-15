@@ -5,6 +5,7 @@ import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
+import { describeWhenBuilt } from "./fixtures/builtArtifact";
 
 // What the published package does, as opposed to what the workspace does.
 //
@@ -56,19 +57,26 @@ function published(target: string): { types: string; default: string } {
   return { types: js.replace(/\.js$/, ".d.ts"), default: js };
 }
 
-const built = existsSync(DIST);
-
-// Skips visibly rather than silently, on the same terms as the extension's
-// bundle test: a suite that quietly passes when it checked nothing is worse
-// than one that is absent, because it reads as coverage on a release checklist.
-const whenBuilt = built ? describe : describe.skip;
-
-if (!built) {
-  console.warn(
-    "[enginePublish] packages/detect/dist is absent — skipping. " +
-      "Run `npm run build:engine` before trusting a green run on a publish change.",
-  );
-}
+// Skips visibly rather than silently, as extensionBundle.test.ts and
+// mcpPublish.test.ts also do: a suite that quietly passes when it checked
+// nothing is worse than one that is absent, because it reads as coverage on a
+// release checklist.
+//
+// This used a top-level `console.warn` for that, which vitest swallows — so it
+// printed nothing and the skip was as silent as the bare `skipIf` the other
+// two used. The shared helper reports it through a case that always runs.
+//
+// Probes an emitted file rather than dist/ itself: tsc creates the directory
+// before it finishes writing, so an interrupted or failed build leaves an
+// empty or partial dist/ behind. A directory probe calls that "built", and the
+// cases below then fail on individually missing files instead of reporting the
+// build as absent. scamDetector.js is the engine's main entry, so if the build
+// emitted anything at all it emitted this.
+const whenBuilt = describeWhenBuilt(
+  "enginePublish",
+  path.join(DIST, "scamDetector.js"),
+  "npm run build:engine",
+);
 
 describe("engine publish surface (no build required)", () => {
   it("resolves to source in the repo, so no build stands between an edit and a test", () => {

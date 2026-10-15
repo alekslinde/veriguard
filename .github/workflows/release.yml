@@ -144,7 +144,15 @@ jobs:
       - name: Build and pack
         run: npm run ext:pack
 
+      # VERIGUARD_REQUIRE_BUILT arms the bundle's gate, which is the point of
+      # this step: `ext:pack` ran above, so extensionBundle.test.ts must assert
+      # the one-network-call property rather than skip. A skip here would mean
+      # the zips are about to be attached to a Release with that claim
+      # unchecked — which is exactly what a bare skip did silently before.
+      # The published packages are not built in this job, so their suites skip.
       - name: Test against the built bundle
+        env:
+          VERIGUARD_REQUIRE_BUILT: extensionBundle
         run: npm test
 
       - name: Attach the zips to the Release

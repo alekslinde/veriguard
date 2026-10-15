@@ -26,17 +26,21 @@
 // Requires a build. `npm run build:mcp` produces it; this suite skips rather
 // than fails when dist/ is absent, so a fresh clone running `npm test` is not
 // blocked on a build step — the same contract as extensionBundle.test.ts. The
-// skip is visible in the output, which is the honest failure mode: a silent
-// pass would make this test evidence of something it never checked.
+// skip reports itself through a case that always runs, and fails outright in
+// CI where a build always precedes it: a silent pass would make this test
+// evidence of something it never checked.
 
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync, statSync } from "node:fs";
 import path from "node:path";
+import { describeWhenBuilt } from "./fixtures/builtArtifact";
 
 const PKG_DIR = path.join(process.cwd(), "packages/mcp");
 const DIST = path.join(PKG_DIR, "dist");
 const CLI = path.join(DIST, "cli.js");
-const built = existsSync(CLI);
+
+// Gated on the build, with the gate reporting itself — see the shared helper.
+const whenBuilt = describeWhenBuilt("mcpPublish", CLI, "npm run build:mcp");
 
 const pkg = JSON.parse(readFileSync(path.join(PKG_DIR, "package.json"), "utf8"));
 
@@ -68,7 +72,7 @@ function bundledSource(): string {
     .join("\n");
 }
 
-describe.skipIf(!built)("MCP package — published artifact", () => {
+whenBuilt("MCP package — published artifact", () => {
   it("ships an executable bin entry with a shebang", () => {
     // tsup does both on its own. Asserted anyway, because the failure mode is
     // `npx @veriguard/mcp` dying on the user's very first command, and nothing
