@@ -477,6 +477,41 @@ describe("reads makes overlap and missing inputs visible", () => {
     expect(missingReads(fires({ reads: ["words"] }), ctx())).toEqual([]);
   });
 
+  it("treats an unsupplied pack-entry matcher the same way", () => {
+    // `matches` carries the engine's shared matcher to a signal that consults a
+    // pack list, and it is the input most of the registry will declare once the
+    // 75 keyword rules are converted.
+    //
+    // It was NOT a `Reads` in the first draft, on the argument that it is a
+    // capability rather than an input — a signal using it still reads `body`,
+    // and this names the rule by which an entry is found there. Review measured
+    // the consequence: a signal needing it and a caller omitting it type-checked
+    // clean, `registryProblems` reported nothing, `missingReads` reported
+    // nothing, and a real scam scored ZERO rows with nothing saying why. Inert
+    // coverage that the inventory reports as real, which is what this file
+    // exists to make inexpressible — so it is declared, and the input gate
+    // decides, not each `evaluate` remembering to guard.
+    const reader = fires({ reads: ["matches"] });
+    expect(missingReads(reader, ctx())).toEqual(["matches"]);
+    expect(registryScore(ctx(), [reader])).toEqual([]);
+    // Supplied, it reads on any channel that has prose.
+    const matches = (text: string, entry: string) => text.includes(entry);
+    expect(missingReads(reader, ctx({ matches }))).toEqual([]);
+    expect(registryScore(ctx({ matches }), [reader])).toHaveLength(1);
+  });
+
+  it("knows a pack-entry match needs prose to match against", () => {
+    // Unlike `words`, this is answerable from the channel: every message entry
+    // point already holds the matcher — it is the engine's own, not something a
+    // caller has to build — so the only channel that can never carry it is the
+    // one whose input is a number.
+    expect(unsatisfiableReads(fires({ reads: ["matches"], channels: ["sms"] }))).toEqual([]);
+    expect(unsatisfiableReads(fires({ reads: ["matches"], channels: ["custom"] }))).toEqual([]);
+    expect(unsatisfiableReads(fires({ reads: ["matches"], channels: ["phone"] }))).toEqual([
+      "matches",
+    ]);
+  });
+
   it("answers from what is present, not from the channel", () => {
     // An SMS carrying a link has a hostname, and an email whose headers failed
     // to parse does not have headers. Inferring either from the channel would
@@ -665,4 +700,94 @@ describe("every channel is named", () => {
     const expected: Channel[] = ["url", "sms", "email", "phone", "custom"];
     expect([...CHANNELS]).toEqual(expected);
   });
+});
+
+// A declared channel with no entry point calling it is inert coverage.
+//
+// `registryScore` enforces a channel declaration in one direction only: it
+// skips a signal on a channel the signal does not declare, so NARROWING a
+// declaration fails loudly — 32 pinned cases, measured. WIDENING one is silent.
+// Each converted signal reaches the scorer through a helper in the entry point,
+// and the helper is called once per channel the signal is meant to run on, so a
+// channel listed in `channels` with no call site scores nothing while the
+// inventory reads it as coverage.
+//
+// Found by injection, as the thing an injection that PASSES is: widening the
+// family gate's `channels` to `"all"` changed no score and failed no test,
+// although the gate genuinely does not run on the free-text channel. The pin for
+// that conversion asserts the `custom` zeros, and they passed either way —
+// because what decides where the signal runs is which entry point calls the
+// helper, not what the signal declares. A scoring fact declared in one place and
+// decided in another is the exact defect class the registry exists to delete, so
+// it is checked here rather than left to the next conversion to rediscover.
+//
+// Structural, like `emailDiscount`'s list check and for the same reason: the
+// claim is about the entry point's source, and the alternative is a comment.
+describe("a declared channel is a channel some entry point actually scores", () => {
+  /**
+   * Which channels each conversion helper is called with, read out of the
+   * scorer.
+   *
+   * Matched on the call rather than on a channel list, because the call is the
+   * thing that makes a channel real. A helper invoked with a variable (`channel`
+   * inside `checkSms`, which also serves the email pass) contributes the
+   * channels that variable can hold, which is why those are named per helper
+   * below rather than inferred.
+   */
+  const helpers: Array<{
+    /** The converted signals' shared prefix, as `id` spells it. */
+    idPrefix: string;
+    helper: string;
+    /**
+     * Channels reachable through a call the regex cannot read as a literal —
+     * `checkSms`'s `channel` parameter, which is `"sms"` or `"email"`. Stated
+     * here with the reason, so a reader can check it against the signature.
+     */
+    viaVariable: Channel[];
+  }> = [
+    { idPrefix: "clickfix.", helper: "addClickFixSignals", viaVariable: ["sms", "email"] },
+    { idPrefix: "splice.", helper: "addSplicedWordingSignals", viaVariable: ["sms", "email"] },
+    {
+      idPrefix: "family.",
+      helper: "addFamilyImpersonationSignals",
+      viaVariable: ["sms", "email"],
+    },
+  ];
+
+  it.each(helpers)(
+    "$helper is called on exactly the channels $idPrefix signals declare",
+    async ({ idPrefix, helper, viaVariable }) => {
+      const { readFileSync } = await import("fs");
+      const src = readFileSync("packages/detect/src/scamDetector.ts", "utf8");
+
+      // Call sites, excluding the declaration and any mention in a comment.
+      const calls = [...src.matchAll(new RegExp(`^\\s*${helper}\\(([^)]*)\\)`, "gm"))];
+      expect(calls.length, `${helper} is never called`).toBeGreaterThan(0);
+
+      const scored = new Set<Channel>();
+      for (const call of calls) {
+        const last = call[1].split(",").pop()?.trim() ?? "";
+        const literal = last.match(/^"(url|sms|email|phone|custom)"$/);
+        if (literal) {
+          scored.add(literal[1] as Channel);
+        } else {
+          // A non-literal argument is the channel parameter — the one case the
+          // source cannot answer, declared above with its reason.
+          for (const c of viaVariable) scored.add(c);
+        }
+      }
+
+      const declared = new Set<Channel>();
+      for (const def of SIGNALS.filter((d) => d.id.startsWith(idPrefix))) {
+        for (const c of CHANNELS) if (runsOn(def, c)) declared.add(c);
+      }
+      expect(declared.size, `no signals found for ${idPrefix}`).toBeGreaterThan(0);
+
+      const sort = (s: Set<Channel>) => [...s].sort();
+      // Both directions. A declared channel nobody calls is inert coverage; a
+      // called channel nobody declares is a helper doing nothing, which
+      // `registryScore` makes silent in the other direction.
+      expect(sort(declared)).toEqual(sort(scored));
+    },
+  );
 });

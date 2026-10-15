@@ -125,6 +125,7 @@ import type { SignalSource } from "./engineTypes";
 import type { PhoneIntel } from "./phoneIntel";
 import type { RegionPack } from "./regions";
 import { CLICKFIX_SIGNALS } from "./signals/clickfix";
+import { FAMILY_IMPERSONATION_SIGNALS } from "./signals/familyImpersonation";
 import { PHONE_SIGNALS } from "./signals/phone";
 import { SPLICED_WORDING_SIGNALS } from "./signals/splicedWording";
 
@@ -173,7 +174,27 @@ export type Reads =
   /** Parsed From / Reply-To / Return-Path. */
   | "headers"
   /** The phone number and its libphonenumber-derived intel. */
-  | "phone";
+  | "phone"
+  /**
+   * The engine's shared pack-entry matcher, for a signal that consults a pack
+   * list rather than its own regex.
+   *
+   * The odd one out on this axis, and listed anyway. Every other member names
+   * *text*; this names the rule by which an entry is found in text. It is here
+   * because the alternative was measured and was worse: as a bare optional field
+   * off this union, a signal needing it and a caller omitting it type-checked,
+   * `registryProblems` reported nothing, `missingReads` reported nothing, and a
+   * real scam scored **zero rows** with nothing anywhere saying why. That is
+   * inert coverage the inventory reports as real — the exact shape this file
+   * exists to make inexpressible, and the shape the channel-call check catches
+   * in the other dimension.
+   *
+   * Declared, `registryScore`'s input gate skips the signal the same way it does
+   * for a message with no hostname, and the omission is visible where an author
+   * is already looking. Step 4 converts 75 keyword rules that all consult a pack
+   * list, so this is the input most of the registry will end up declaring.
+   */
+  | "matches";
 
 /**
  * A signal's weight, per channel where it differs.
@@ -245,6 +266,53 @@ export interface Context {
   headers?: EmailHeaders;
   /** The number and its libphonenumber-derived intel. Absent off the phone channel. */
   phone?: PhoneIntel;
+
+  /**
+   * How a pack entry is matched against text — the engine's shared matcher,
+   * supplied rather than reimplemented.
+   *
+   * **Declared in `reads` as `"matches"`, and the first draft did not declare
+   * it.** The argument then was that this is a capability rather than an input:
+   * a signal using it still reads `body`, and what this names is the *rule* by
+   * which an entry is found there. That reasoning is still why it sits oddly on
+   * that union — but it was wrong about the consequence, and review measured it.
+   * Undeclared, a signal needing the matcher and a caller omitting it
+   * type-checked, `registryProblems` reported nothing, `missingReads` reported
+   * nothing, and a real scam scored **zero rows** with nothing saying why.
+   * Inert coverage the inventory reports as real, which is the shape this file
+   * exists to make inexpressible — so the taxonomy bends and the input gate
+   * holds. See `Reads`.
+   *
+   * It is a function on the context for one reason: the matcher it carries
+   * (`mentions`) is ~250 lines in the entry point, memoises per message, and is
+   * consulted by nearly every rule in the engine. A signal module cannot import
+   * it without a cycle, and the third option — restating the rule locally — is
+   * the single most expensive pattern in this repo, eight defects across three
+   * rules. The rule itself is not restatable: it switches on whether the entry
+   * is a single token, tolerates a closed set of inflections above a length
+   * threshold, folds accents on both sides, and falls back to a stemmer on
+   * English only. Every pack entry the family gate matches is multi-word
+   * *today*, so the multi-word branch alone would pass every test here — and a
+   * pack author adding a one-word pretext would silently cross into a branch the
+   * copy never had. That is a rule with a silent expiry date, which this repo
+   * has paid for four times.
+   *
+   * Step 4 converts 75 single-condition keyword rules, and all of them need this
+   * same answer, so deciding it at one gate is the cheap place to decide it.
+   * Passing the matcher keeps the alternative — moving the engine's most
+   * load-bearing matcher in the same change as a composite conversion — out of a
+   * step whose whole safety argument is one change at a time.
+   *
+   * Optional, and absent rather than a permissive stub where the caller has not
+   * supplied it, for the reason `words` is: a stub that always returned false
+   * would answer a question nobody asked and score nothing, which is a silent
+   * miss from a context that looked complete.
+   *
+   * A signal that needs it declares `reads: ["matches", …]`, so `registryScore`
+   * skips it on a context without one. The guard inside `evaluate` stays, and is
+   * not redundant: it is what narrows the type, and deleting it is a type error.
+   */
+  matches?: (text: string, entry: string) => boolean;
 }
 
 /**
@@ -260,6 +328,7 @@ export interface Context {
 function available(ctx: Context): Set<Reads> {
   const set = new Set<Reads>(["original", "body"]);
   if (ctx.words !== undefined) set.add("words");
+  if (ctx.matches !== undefined) set.add("matches");
   if (ctx.hostname !== undefined) set.add("hostname");
   if (ctx.url !== undefined) set.add("url");
   if (ctx.headers !== undefined) set.add("headers");
@@ -456,6 +525,15 @@ export function unsatisfiableReads(
         return true;
       case "words":
         return channels.some((c) => tokenisedChannels.includes(c));
+      // A pack-entry match needs prose to match against, which every channel
+      // but `phone` has. Answered from the channel rather than deferred to a
+      // caller-supplied list the way `words` is, and the difference is that
+      // every message entry point already holds this matcher — it is the engine's
+      // own, not something a caller has to build — so "can a context on this
+      // channel carry it" really is a fact about the channel. A signal declaring
+      // it on `phone` alone can never fire.
+      case "matches":
+        return channels.some((c) => c !== "phone");
       // A link can appear in an SMS, an email or free text, and is the whole
       // input on the url channel. Never on the phone channel.
       case "hostname":
@@ -479,14 +557,15 @@ export function unsatisfiableReads(
  * conversion — the registration and the deletion of the inline site — belong in
  * one commit.
  *
- * Converted so far: the phone channel, and the ClickFix pair and the
- * spliced-wording rule on the sms, email and custom channels. `scamDetector.ts`
- * still owns the rest.
+ * Converted so far: the phone channel; the ClickFix pair and the spliced-wording
+ * rule on the sms, email and custom channels; and the family-impersonation gate
+ * on sms and email. `scamDetector.ts` still owns the rest.
  */
 export const SIGNALS: readonly SignalDef[] = [
   ...PHONE_SIGNALS,
   ...CLICKFIX_SIGNALS,
   ...SPLICED_WORDING_SIGNALS,
+  ...FAMILY_IMPERSONATION_SIGNALS,
 ];
 
 /**
