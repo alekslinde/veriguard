@@ -57,7 +57,24 @@ const FORWARD_SCAFFOLD: RegExp[] = [
   HEADER_LINE,
   /^\s*on .+ wrote:\s*$/i,
   // Chat-export line: "02/09/2026, 10:42 - Unknown: <body>"
-  /^\s*\[?\d{1,2}[:/]\d{2}.*?\]?\s*[-–]\s*[^:]{0,40}:\s*/i,
+  //
+  // The middle is `[^-–\]]{0,40}` and not `.*?`, and the bound is what makes
+  // this linear. The lazy form was quadratic: `.*?` could end anywhere, `\]?`
+  // and both `\s*` could each absorb the same run of spaces, so on a line whose
+  // trailing `:` never arrives the engine re-tried every split. Measured
+  // through the public `checkSms` API — 8 KB of `"12:34" + " "*n + "-" + " "*n`
+  // took 1.4s and 16 KB took 5s, growing with the square of the length, on a
+  // path that scores attacker-supplied text in a request, in a browser
+  // extension and in the inbound-email worker.
+  //
+  // Excluding the dashes is what removes the ambiguity rather than merely
+  // bounding it: the separator can no longer be consumed by the middle, so
+  // there is exactly one way to split a candidate line. The cap matches the
+  // sender field's own `{0,40}` below it, and a real export line — a timestamp,
+  // an optional bracket, a separator, a short display name — fits well inside
+  // it. A line that does not is left for the other shapes to claim, which is
+  // the direction this list already fails in.
+  /^\s*\[?\d{1,2}[:/]\d{2}[^-–\]]{0,40}\]?\s*[-–]\s*[^:]{0,40}:\s*/i,
 ];
 
 /**
