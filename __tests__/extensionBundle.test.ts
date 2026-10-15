@@ -13,18 +13,25 @@
 //
 // Requires a build. `npm run ext` produces it; the suite skips rather than fails
 // when `dist/` is absent, so a fresh clone running `npm test` is not blocked on
-// a build step. The skip is visible in the output, which is the honest failure
-// mode — a silent pass would make this test evidence of something it never
-// checked.
+// a build step. The skip reports itself through a case that always runs, and
+// fails outright in CI where a build always precedes it — a silent pass would
+// make this test evidence of something it never checked.
 
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { buildManifest } from "../extension/src/manifest";
+import { describeWhenBuilt } from "./fixtures/builtArtifact";
 
 const DIST = path.join(process.cwd(), "extension/dist");
 const CHROME = path.join(DIST, "chrome");
-const built = existsSync(path.join(CHROME, "popup.js"));
+// Gated on the build, and the gate reports itself — see the shared helper for
+// why a bare `describe.skipIf` made the header's claim above untrue.
+const whenBuilt = describeWhenBuilt(
+  "extensionBundle",
+  path.join(CHROME, "popup.js"),
+  "npm run ext",
+);
 
 /**
  * Network primitives that must not appear at all.
@@ -60,7 +67,7 @@ const INJECTION_SINKS = ["innerHTML", "outerHTML", "document.write", "eval(", "n
  */
 const ENTRIES = ["popup.js", "background.js", "onboarding.js"] as const;
 
-describe.skipIf(!built)("built extension bundle", () => {
+whenBuilt("built extension bundle", () => {
   const read = (file: string) => readFileSync(path.join(CHROME, file), "utf8");
   const everything = () => ENTRIES.map(read).join("\n");
 

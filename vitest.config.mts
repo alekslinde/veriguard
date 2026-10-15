@@ -8,6 +8,28 @@ export default defineConfig({
     environment: "node",
     // workers/** has its own deps and runs under node:test, not vitest.
     exclude: ["**/node_modules/**", "workers/**"],
+
+    // Isolation stays ON, against vitest's own advice.
+    //
+    // Every run prints a hint that `isolate: false` would be "at least ~1.21s
+    // faster" by reusing workers across files. Measured, it is not: 6.25s
+    // against 6.25-6.29s isolated, because this suite is CPU-bound across all
+    // cores (~600% CPU, 34s of user time in a 6.6s wall clock), not bound by
+    // the ~77ms per-file startup the hint adds up. The arithmetic assumes
+    // startup is serial; here it overlaps the work.
+    //
+    // It also breaks the suite. Sharing a worker leaks module state between
+    // files: runs failed 11 tests across 2 files and 5 files in another, a
+    // different set each time, because the failures depend on the order files
+    // land in a worker. Among them was the suite guarding the no-network-call
+    // property — a test that must never be flaky, since a flake there gets
+    // re-run rather than read.
+    //
+    // So the hint is trading a reliable 6.6s suite for an unreliable 6.6s one.
+    // Revisit only if the suite's own runtime becomes the bottleneck, which at
+    // this size it is not — CI spends its minutes on install, typecheck, lint
+    // and two package builds.
+    isolate: true,
   },
   // The extension's build-time constant, which its Vite config injects and
   // `extension/src/env.d.ts` declares. A test that imports an extension entry
