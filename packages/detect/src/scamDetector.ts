@@ -15,14 +15,23 @@ import { isShortened, expandUrl, type ExpandFetch } from "./urlExpander";
 import { resolveRegionPack, supportedRegions, DEFAULT_REGION, type RegionInput, type RegionCoverage, type RegionPack } from "./regions";
 import { registryScore, type Channel } from "./signalRegistry";
 import { CLICKFIX_SIGNALS } from "./signals/clickfix";
+import { FAMILY_IMPERSONATION_SIGNALS } from "./signals/familyImpersonation";
 import { PHONE_SIGNALS, SPOOFING_POINTS, NOTHING_FOUND_POINTS } from "./signals/phone";
 import { SPLICED_WORDING_SIGNALS } from "./signals/splicedWording";
-// Re-exported rather than moved out of reach: the constant was already
-// reachable through this module's subpath, and the conversion is meant to be
+// Re-exported rather than moved out of reach: each was already reachable
+// through this module's subpath, and the conversion is meant to be
 // observationally identical at the API boundary as well as in the scores. The
 // ClickFix flags needed no such line because they were never exported.
 export { SPLICED_WORDING_FLAG } from "./signals/splicedWording";
-import { KEYS_BY_POST_PHRASES, FAMILY_RELATION_TERMS, NEW_NUMBER_PRETEXT_PHRASES, SCAM_COACHING_PHRASES } from "./regions/base";
+export { FAMILY_IMPERSONATION_FLAG } from "./signals/familyImpersonation";
+// The anchor's two guards, now `messageBody.ts` for the reason the bare-host
+// guard became its own module: a signal module cannot reach the entry point.
+// Re-exported because the tests and one app-side caller import them from here.
+// Both are re-exported and neither is imported: the family gate was the only
+// caller of either, and it now reaches them through `anchorText`, which is where
+// "the start of the message" is decided once for every rule that asks.
+export { stripForwardingPrefix, bodyAfterHeaders } from "./messageBody";
+import { KEYS_BY_POST_PHRASES, SCAM_COACHING_PHRASES } from "./regions/base";
 import type { CheckResult, HostLookup, Signal, SignalSource } from "./engineTypes";
 
 // ScamType and CheckResult live in engineTypes.ts to break the import cycle
@@ -1256,130 +1265,6 @@ function isOwnDomainSender(
   return onAllowlist || onNationalSuffix;
 }
 
-/**
- * An RFC 5322-shaped header line.
- *
- * Broader than a named list, which missed "Cc:", "Bcc:" and every "X-" header a
- * client adds — and one unmatched line stops the scaffold loop, so an ordinary
- * Gmail forward left "Cc: …" in front of the body and the family anchor failed
- * on exactly the case the stripper exists for.
- *
- * Only counted after a forwarding marker, because this shape cannot be told
- * from prose: "Note: they told me to check this" matches it exactly. See the
- * guard in stripForwardingPrefix.
- */
-const HEADER_LINE = /^\s*(?:[A-Za-z][A-Za-z0-9-]{1,40})\s*:\s.*$/;
-
-/**
- * Scaffolding a forwarded or quoted message carries ahead of its real body.
- *
- * Each entry matches a whole line, except the inline forms (Fwd:, a chat
- * export's timestamp) which prefix the body on the same line and are stripped
- * in place. A closed list of recognised shapes rather than "skip anything
- * before the first blank line": arbitrary prose must NOT be skipped, or the
- * family gate's opener anchor stops meaning anything.
- */
-const FORWARD_SCAFFOLD: RegExp[] = [
-  /^\s*-{2,}\s*forwarded message\s*-{2,}\s*$/i,
-  /^\s*begin forwarded message:?\s*$/i,
-  /^\s*(?:fwd|fw|re)\s*:\s*/i,
-  HEADER_LINE,
-  /^\s*on .+ wrote:\s*$/i,
-  // Chat-export line: "02/09/2026, 10:42 - Unknown: <body>"
-  /^\s*\[?\d{1,2}[:/]\d{2}.*?\]?\s*[-–]\s*[^:]{0,40}:\s*/i,
-];
-
-/**
- * How many scaffold lines to skip before giving up and treating it as body.
- *
- * An ordinary Gmail forward runs to nine or more — marker, From, Date, Subject,
- * To, Cc, Reply-To, X-Mailer, Sent — and at 8 the leftovers stayed in front of
- * the body, so the family anchor failed on exactly the forwards this was built
- * to handle. Raised with room to spare; the loop stops at the first line that is
- * not recognised scaffolding, so the cap only bounds the pathological case
- * rather than deciding the common one.
- */
-const MAX_SCAFFOLD_LINES = 25;
-
-/**
- * Strip forwarding and quoting scaffolding from the front of a message.
- *
- * Forwarding is how people ask "is this real?", so a rule that anchors on the
- * start of a message has to see past the wrapper the forward added. Before
- * this, "---------- Forwarded message ----------" ahead of the "Hi Mum" script
- * took it from likely_scam to safe — the single most likely way for that text
- * to arrive here was also the one way it went unscored.
- *
- * Only leading scaffolding is removed, and only shapes on the list above. A
- * message that opens with ordinary prose is returned untouched.
- */
-export function stripForwardingPrefix(text: string): string {
-  // Quote markers come off first and per-line, because the two wrappers nest:
-  // forwarding a message someone already forwarded you quote-marks the whole
-  // thing, so the scaffold lines arrive as "> ---------- Forwarded message ---".
-  // Stripping quotes only at the end left that shape unmatched, and each
-  // wrapper worked alone while the pair — the commonest real case — did not.
-  const lines = text.split(/\r?\n/).map((l) => l.replace(/^[ \t]*(?:>[ \t]?)+/, ""));
-  let i = 0;
-  let sawForwardMarker = false;
-  let headersSeen = 0;
-  while (i < lines.length && i < MAX_SCAFFOLD_LINES) {
-    const line = lines[i];
-    if (line.trim() === "") {
-      i++;
-      continue;
-    }
-    const hit = FORWARD_SCAFFOLD.find((re) => re.test(line));
-    if (!hit) break;
-    // A lone header-shaped line is not scaffolding. "Note: they told me to
-    // check this" and "Warning: this looks dodgy" match the header pattern
-    // exactly — syntax cannot separate them — so stripping on one line would let
-    // any scam buy immunity by opening with a word and a colon. What a real
-    // forward always has is a RUN: either an explicit marker/attribution, or
-    // several consecutive headers. One line of either is ambiguous; two is not.
-    if (hit === HEADER_LINE && !sawForwardMarker) {
-      // Part of a run, looking either way: the last header in a block has no
-      // header after it, so a forward-only test stripped every line but that
-      // one and left it in front of the body.
-      const next = lines[i + 1];
-      const inRun =
-        headersSeen > 0 || (next !== undefined && HEADER_LINE.test(next));
-      if (!inRun) break;
-      headersSeen++;
-    }
-    if (hit !== HEADER_LINE) sawForwardMarker = true;
-    // An inline prefix leaves the body on the same line; a whole-line one does
-    // not. Stripping in place keeps "Fwd: Hi Mum, …" anchorable.
-    const remainder = line.replace(hit, "").trim();
-    if (remainder) {
-      lines[i] = remainder;
-      break;
-    }
-    i++;
-  }
-  return lines.slice(i).join("\n").replace(/^\s+/, "");
-}
-
-/**
- * The body of an RFC 5322-ish message, or the whole string if it has no header
- * block. Used only for signals that care WHERE in the message something sits.
- *
- * Deliberately minimal — the real MIME walk lives in lib/emailDistiller, which
- * the engine cannot import and which prepends the headers it keeps anyway. All
- * this does is find the blank line ending the header block, and only when what
- * precedes it actually looks like headers, so a plain body whose second
- * paragraph follows a blank line is left alone.
- */
-export function bodyAfterHeaders(raw: string): string {
-  const split = raw.search(/\r?\n\r?\n/);
-  if (split === -1) return raw;
-  const head = raw.slice(0, split);
-  const looksLikeHeaders = head
-    .split(/\r?\n/)
-    .some((line) => /^[A-Za-z][A-Za-z0-9-]{1,40}:\s/.test(line));
-  return looksLikeHeaders ? raw.slice(split).replace(/^\s+/, "") : raw;
-}
-
 export interface MessageCheckOptions {
   /** Where the text came from. Defaults to "sms", preserving prior behaviour. */
   channel?: "sms" | "email";
@@ -1392,22 +1277,6 @@ export interface MessageCheckOptions {
    */
   senderDomain?: string;
 }
-
-/**
- * Grammar that marks a relation term as the SUBJECT of a sentence rather than
- * the person being addressed.
- *
- * The opener anchor used to test position alone, which is not the same thing:
- * "Dad said he'd lend me 500 … when I get my new number sorted" satisfied it
- * and scored likely_scam (45), calling a real family message a scam. "Mother of
- * all storms", "Son of a gun" and "Mum's phone broke" satisfied it too.
- *
- * A possessive or a following verb is what separates the two readings.
- * Punctuation does not: the corpus carries "mum send me 400 my phone broke" and
- * "Hi Dad I dropped my phone" with no comma at all, and requiring one would
- * drop both.
- */
-const RELATION_AS_SUBJECT = String.raw`(?:'s|s'|\s+(?:said|says|is|was|of|will|has|had|and|or|thinks|told|wants|needs))\b`;
 
 /** Opening words of the task-payment composite, shared so checkEmail can find it. */
 const TASK_PAYMENT_FLAG =
@@ -1442,11 +1311,45 @@ function serviceNames(pack: RegionPack): Set<string> {
 }
 
 /**
- * Opening words of the family-impersonation flag, shared so checkEmail can
- * recognise the signal in a merged sub-result without re-running the match.
+ * Score the family-impersonation gate from the registry, on whichever channel
+ * is asking.
+ *
+ * One helper rather than a branch per entry point, matching
+ * `addSplicedWordingSignals` and `addClickFixSignals`. The gate had one call
+ * site, in `checkSms`, which `checkEmail` merged — so unlike those two there was
+ * no second copy to reconcile, and the thing this helper replaces is not
+ * duplication but the merge: the declared 45 arrived as 31 on email until the
+ * flag was named in an exemption list somewhere the author was not looking.
+ *
+ * Scoring it in the caller, outside `merge`, is what keeps "a weight read from
+ * the registry is the weight that reaches the score" true.
+ *
+ * `matches` carries the engine's shared pack-entry matcher to the signal, which
+ * cannot import it without a cycle — see the note on `Context.matches` for why
+ * it is passed rather than moved or restated.
  */
-export const FAMILY_IMPERSONATION_FLAG =
-  'Reads as the "Hi Mum" family-impersonation script';
+function addFamilyImpersonationSignals(
+  sig: Signals,
+  text: string,
+  pack: RegionPack,
+  channel: Channel,
+): void {
+  // No `words`: this signal reads `original` and `body`, and does its own
+  // anchoring, so the field is left absent rather than filled with a plausible
+  // `[]`. See the note on `Context.words`.
+  for (const row of registryScore(
+    {
+      channel,
+      pack,
+      original: text,
+      body: text.toLowerCase(),
+      matches: mentions,
+    },
+    FAMILY_IMPERSONATION_SIGNALS,
+  )) {
+    sig.add(row.source, row.text, row.points);
+  }
+}
 
 /**
  * Score homoglyph splicing in a message body from the registry, on whichever
@@ -1742,91 +1645,21 @@ export function checkSms(
     sig.add("message", "Veterans-benefit lure — scammers impersonate VA programmes to collect personal details or up-front fees. The VA never charges to file a claim and never asks for your details by text; check your claim at va.gov or call the VA on 1-800-827-1000.", 25);
   }
 
-  // Family impersonation, the "Hi Mum" script (D2 / #251). A stranger opens as
-  // your child, explains away the unknown number, and asks for money — the
-  // most-reported scam text in AU, and it scored nothing at all before this.
+  // Family impersonation, the "Hi Mum" script (D2 / #251). Scored from the
+  // registry — see `signals/familyImpersonation` for the three halves, why the
+  // pretext is required rather than one of two ways in, and why the weight is
+  // 45 on both channels it runs on rather than 45 here and a name in a list
+  // over there.
   //
-  // Gated, in the shape of the composites above, because every half is
-  // innocent alone: "mum" is ordinary address, "my phone broke" is ordinary
-  // news, and a family member really does sometimes ask you to transfer money.
-  // What is not ordinary is all three at once — an unrecognised sender
-  // accounting for why you don't recognise them, then asking for a payment in
-  // the same breath.
-  //
-  // The relation term must open the message rather than appear anywhere in it,
-  // so "I'll ask mum about the weekend" doesn't match. The money ask accepts a
-  // bare amount ("send me 400") because the script usually omits the currency
-  // symbol, and requiring one missed the live sample this rule was written for.
-  //
-  // "Opens" has to mean the start of the BODY, not of the text handed to us.
-  // On the email path the caller passes the whole message, headers and all, so
-  // the first line is "From:" and an anchor on the raw text can never match —
-  // the rule silently did nothing for every real email until this skipped the
-  // header block. Only the anchor needs the body; every other signal here is
-  // positional-agnostic and reads the full text as before.
-  const anchorText = stripForwardingPrefix(
-    (channel === "email" ? bodyAfterHeaders(text) : text),
-  ).trim();
-  // Two ways to be addressed, because neither alone covers the script.
-  //
-  //   · opening — the term starts the body, with or without a greeting. This is
-  //     the classic shape and carries the cases with no comma at all: the corpus
-  //     holds "mum send me 400 my phone broke" and "Hi Dad I dropped my phone".
-  //   · vocative — the term is addressed anywhere in the message, marked by a
-  //     following comma or exclamation after a sentence break.
-  //
-  // Position alone was scoring a live scam safe: "Just letting you know, I got a
-  // new number after my phone broke. Mum, can you transfer $200 for the rego?"
-  // has all three halves and went undetected purely because the term is not
-  // first. That is also what the benign-padding metamorphic relation was
-  // reporting — prepending prose moved the opener out of range.
-  //
-  // Both branches exclude the subject reading, so "Mum's phone broke" and
-  // "dad said he'd transfer the 300" stay out. The remaining protection against
-  // an ordinary family text is the pretext requirement below, which is the half
-  // a real family member never writes.
-  const opensWithRelation = FAMILY_RELATION_TERMS.some((r) => {
-    const opening = new RegExp(
-      `^\\W{0,3}(?:(?:hi|hey|hello|good\\s+\\w+)[\\s,!.]*)?\\b${r}\\b(?!${RELATION_AS_SUBJECT})`,
-      "i",
-    );
-    const vocative = new RegExp(
-      `(?:^|[.!?]\\s+|\\n\\s*)(?:(?:hi|hey|hello|good\\s+\\w+)[\\s,!.]*)?\\b${r}\\b(?!${RELATION_AS_SUBJECT})\\s*[,!]`,
-      "i",
-    );
-    return opening.test(anchorText) || vocative.test(anchorText);
-  });
-  const hasNumberPretext = NEW_NUMBER_PRETEXT_PHRASES.some((p) => mentions(lower, p));
-  const hasMoneyAsk =
-    /\b(?:send|transfer|pay|lend|e-?transfer|etransfer|deposit|spot)\b[^.!?]{0,40}?(?:\b(?:me|us|it)\b[^.!?]{0,20})?[$£€]?\s?\d{2,6}\b/i.test(text) ||
-    /[$£€]\s?\d{2,6}\b/.test(text) ||
-    /\b(?:send|transfer|lend|pay)\s+(?:me|us)\b[^.!?]{0,30}\b(?:money|cash|funds)\b/i.test(text) ||
-    /\b(?:can|could)\s+you\s+(?:please\s+)?(?:send|transfer|lend|pay)\b/i.test(text) ||
-    /\bneed\s+(?:you\s+to\s+)?(?:send|transfer|pay|lend)\b/i.test(text);
-
-  // The pretext is required, not merely one of two ways in. An earlier version
-  // accepted "any other signal present" as the third half, which sounds like
-  // corroboration and isn't: a single urgency word satisfied it, and urgency is
-  // ordinary in real family texts. "Mum, don't forget to pay the school fees of
-  // 250 before Friday, it's urgent!" scored 55 and called a parent's own child
-  // a scammer — the one false positive this rule must never produce, since it
-  // teaches the reader to distrust the verdict and the family member at once.
-  //
-  // What makes the script detectable is not that it is urgent; it is that the
-  // sender has to explain why they are contacting you from a number you don't
-  // recognise. A real family member never needs that sentence.
-  if (opensWithRelation && hasMoneyAsk && hasNumberPretext) {
-    // +45 lands on the "likely_scam" boundary on its own. That is deliberate
-    // and unlike the +20 composites above: those pair two innocent halves into
-    // a suspicion, whereas this is a complete scam script end to end, and the
-    // whole cost of the attack falls in the minutes before the victim thinks
-    // to ring the real number. Warning quietly here would be the same as not
-    // warning. A genuine family member is inconvenienced by one verification
-    // call; a victim is not made whole.
-    sig.add("message",
-      `${FAMILY_IMPERSONATION_FLAG} — an unexpected message opening as your child or parent, explaining away an unfamiliar number, and asking for money. The broken-phone or new-number line is the load-bearing part: it exists to explain why the voice and number are both wrong, and to stop you ringing the number you already have. Call your family member on their usual number before sending anything. If they don't pick up, ask them something only they could answer.`,
-      45,
-    );
+  // Skipped on the email channel and scored by `checkEmail` instead, for the
+  // reason the splice rule and ClickFix are: `checkEmail` merges this whole
+  // sub-result at 0.7, a multiplier downstream of a weight the signal declared
+  // and that never knew the signal existed. The declared 45 arrived as 31 —
+  // "a bit sus" for a complete scam script — which is the same arithmetic that
+  // cut ClickFix's 50 to 35 and the splice rule's 25 to 17, found the same way
+  // all three times: by pinning the scores before converting.
+  if (channel !== "email") {
+    addFamilyImpersonationSignals(sig, text, PACK, channel);
   }
 
   // Payment details presented as *changed* — the core of redirect fraud (D5 /
@@ -2447,23 +2280,28 @@ export function checkSms(
  * loudly rather than quietly scoring a tier low.
  */
 const UNDISCOUNTED_COMPOSITES: string[] = [
-  FAMILY_IMPERSONATION_FLAG,
   TASK_PAYMENT_FLAG,
   MESSAGING_HIJACK_FLAG,
-  // The ClickFix pair and the splice rule are NOT here, and their absence is the
-  // point rather than an omission: each now declares its own channel weight — 50
-  // and 25 — on every channel it runs on, so the email path never discounts them
-  // and has nothing to restore.
+  // The ClickFix pair, the splice rule and the family gate are NOT here, and
+  // their absence is the point rather than an omission: each now declares its
+  // own channel weight — 50, 25 and 45 — on every channel it runs on, so the
+  // email path never discounts them and has nothing to restore.
   //
-  // The splice rule is the entry this list could least afford to lose and the
+  // The splice rule was the entry this list could least afford to lose and the
   // clearest case for the field that replaced it. It is not a two-condition gate
-  // like the three above; it was here because its gate is *structural*, and
+  // like the two above; it was here because its gate is *structural*, and
   // script-mixing inside a word does not become likelier in a longer email.
   // Discounted it scored 17 — below the 20 the rule is deliberately pitched at —
   // so an email carrying the evasion read "safe" while the SMS with the same body
   // read "suspicious", on the channel where homoglyph phishing is commonest. The
   // declaration says that where the author picks the number; the list said it
   // somewhere the author was not looking.
+  //
+  // The family gate was this list's FIRST entry and the reason it became a list:
+  // the previous shape covered that one script, and every composite added since
+  // inherited a discount nobody decided to give it. So the entry whose incident
+  // created the list is now the third to leave it by declaring its own weight,
+  // which is the shape of the argument rather than a coincidence worth noting.
   //
   // Each composite converted to the registry leaves this list the same way, and
   // the list is deleted when the last one does.
@@ -2512,9 +2350,11 @@ export function checkEmail(text: string, blocklist?: HostLookup, region?: Region
   //
   // The splice rule goes first, which is the order `checkSms` scores them in and
   // so the order a reader saw: it is the row that explains why the keyword rows
-  // below it found nothing.
+  // below it found nothing. The family gate goes last for the same reason — it
+  // sits after the keyword rules in `checkSms`.
   addSplicedWordingSignals(sig, text, PACK, "email");
   addClickFixSignals(sig, text, PACK, "email");
+  addFamilyImpersonationSignals(sig, text, PACK, "email");
 
   // …but not for the gated composites. The 0.7 discount is right for what it
   // was written for — urgency and reward keywords really are weaker evidence in

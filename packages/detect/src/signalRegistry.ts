@@ -125,6 +125,7 @@ import type { SignalSource } from "./engineTypes";
 import type { PhoneIntel } from "./phoneIntel";
 import type { RegionPack } from "./regions";
 import { CLICKFIX_SIGNALS } from "./signals/clickfix";
+import { FAMILY_IMPERSONATION_SIGNALS } from "./signals/familyImpersonation";
 import { PHONE_SIGNALS } from "./signals/phone";
 import { SPLICED_WORDING_SIGNALS } from "./signals/splicedWording";
 
@@ -245,6 +246,47 @@ export interface Context {
   headers?: EmailHeaders;
   /** The number and its libphonenumber-derived intel. Absent off the phone channel. */
   phone?: PhoneIntel;
+
+  /**
+   * How a pack entry is matched against text — the engine's shared matcher,
+   * supplied rather than reimplemented.
+   *
+   * **This is a capability, not an input**, and the distinction is why it is not
+   * a `Reads`. A signal using it still reads `body` or `original`; what this
+   * says is which *rule* decides whether an entry appears there. `reads` exists
+   * to make overlap visible, and two signals matching entries against the same
+   * text through the same matcher is exactly the overlap it should keep
+   * declaring — so the text they consume is what they declare, and this is how
+   * they consume it.
+   *
+   * It is a function on the context for one reason: the matcher it carries
+   * (`mentions`) is ~250 lines in the entry point, memoises per message, and is
+   * consulted by nearly every rule in the engine. A signal module cannot import
+   * it without a cycle, and the third option — restating the rule locally — is
+   * the single most expensive pattern in this repo, eight defects across three
+   * rules. The rule itself is not restatable: it switches on whether the entry
+   * is a single token, tolerates a closed set of inflections above a length
+   * threshold, folds accents on both sides, and falls back to a stemmer on
+   * English only. Every pack entry the family gate matches is multi-word
+   * *today*, so the multi-word branch alone would pass every test here — and a
+   * pack author adding a one-word pretext would silently cross into a branch the
+   * copy never had. That is a rule with a silent expiry date, which this repo
+   * has paid for four times.
+   *
+   * Step 4 converts 75 single-condition keyword rules, and all of them need this
+   * same answer, so deciding it at one gate is the cheap place to decide it.
+   * Passing the matcher keeps the alternative — moving the engine's most
+   * load-bearing matcher in the same change as a composite conversion — out of a
+   * step whose whole safety argument is one change at a time.
+   *
+   * Optional, and absent rather than a permissive stub where the caller has not
+   * supplied it, for the reason `words` is: a stub that always returned false
+   * would answer a question nobody asked and score nothing, which is a silent
+   * miss from a context that looked complete. A signal needing it guards on it,
+   * and `registryProblems` has nothing to say about it — it is not a `Reads`, so
+   * there is no claim here for an authoring check to verify.
+   */
+  matches?: (text: string, entry: string) => boolean;
 }
 
 /**
@@ -479,14 +521,15 @@ export function unsatisfiableReads(
  * conversion — the registration and the deletion of the inline site — belong in
  * one commit.
  *
- * Converted so far: the phone channel, and the ClickFix pair and the
- * spliced-wording rule on the sms, email and custom channels. `scamDetector.ts`
- * still owns the rest.
+ * Converted so far: the phone channel; the ClickFix pair and the spliced-wording
+ * rule on the sms, email and custom channels; and the family-impersonation gate
+ * on sms and email. `scamDetector.ts` still owns the rest.
  */
 export const SIGNALS: readonly SignalDef[] = [
   ...PHONE_SIGNALS,
   ...CLICKFIX_SIGNALS,
   ...SPLICED_WORDING_SIGNALS,
+  ...FAMILY_IMPERSONATION_SIGNALS,
 ];
 
 /**

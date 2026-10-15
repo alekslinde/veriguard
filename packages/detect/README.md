@@ -9,7 +9,7 @@ a message without sending it anywhere.
 
 Documentation: [veriguard.app/packages](https://veriguard.app/packages).
 
-*Last reviewed: 2026-10-15.*
+*Last reviewed: 2026-10-16.*
 
 ```bash
 npm install @veriguard/detect
@@ -89,11 +89,14 @@ src/
   detectType.ts       ← input classification
   engineTypes.ts      ← shared value types (breaks the scorer ↔ detectType cycle)
   signalRegistry.ts   ← a signal as a value: channels, weight and inputs as fields
-  signals/            ← the converted signals: the phone channel, and the ClickFix
-                        pair and the splice rule across sms, email and custom.
+  signals/            ← the converted signals: the phone channel; the ClickFix
+                        pair and the splice rule across sms, email and custom;
+                        the family-impersonation gate on sms and email.
                         Everything else is still scored in scamDetector.ts
   bareHost.ts         ← where a hostname ends in prose; shared by the URL card and
                         the splice rule's strip, so the two cannot disagree
+  messageBody.ts      ← where a message's real body starts, past the header block
+                        and any forwarding or quoting wrapper
   urlSanitizer.ts     ← defanging, refanging, tracking-param stripping
   emailHeaders.ts     ← header parsing and SPF/DKIM/DMARC summarising
   phoneIntel.ts       ← number intelligence (the one external dep)

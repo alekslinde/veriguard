@@ -23,21 +23,22 @@ const asEmail = (body: string) =>
  * engine without being listed there scores a tier low on the email path, and
  * this is what fails when that happens.
  *
- * **ClickFix and the splice rule are no longer here, and their absence is the
- * point.** Each left `UNDISCOUNTED_COMPOSITES` when it moved into the signal
- * registry and declared its own channel weight — so there is no discount applied
- * to it and nothing to restore. ClickFix's case stayed in this table for one
- * commit and still passed, by the new mechanism, which is exactly the kind of row
- * that makes a table lie: anyone auditing this file against that list would have
- * found an entry here with no counterpart there. A converted composite leaves
- * this table as it leaves that list, and `clickFixPinned.test.ts` and
- * `splicedWordingPinned.test.ts` are where their email weights are asserted now.
+ * **ClickFix, the splice rule and the family gate are no longer here, and their
+ * absence is the point.** Each left `UNDISCOUNTED_COMPOSITES` when it moved into
+ * the signal registry and declared its own channel weight — so there is no
+ * discount applied to it and nothing to restore. ClickFix's case stayed in this
+ * table for one commit and still passed, by the new mechanism, which is exactly
+ * the kind of row that makes a table lie: anyone auditing this file against that
+ * list would have found an entry here with no counterpart there. A converted
+ * composite leaves this table as it leaves that list, and `clickFixPinned`,
+ * `splicedWordingPinned` and `familyImpersonationPinned` are where their email
+ * weights are asserted now.
+ *
+ * The family gate is worth a line of its own: it was this list's first entry and
+ * the incident that turned a single special case into a list. Two entries remain,
+ * and when the last one leaves, the list and this table go with it.
  */
 const composites: Array<[string, string]> = [
-  [
-    "family impersonation",
-    "Hi Mum, I dropped my phone in the sink and this is my new number. Can you transfer $850 today?",
-  ],
   [
     "task payment",
     "Congratulations, your account has earned $340. To withdraw your commission you must first complete a $50 deposit task.",
@@ -81,7 +82,8 @@ describe("the table and the list it claims to mirror", () => {
     expect(entries).not.toContain("WIN_CLICKFIX_FLAG");
     expect(entries).not.toContain("MAC_CLICKFIX_FLAG");
     expect(entries).not.toContain("SPLICED_WORDING_FLAG");
-    expect(composites.map(([label]) => label).join(" ")).not.toMatch(/clickfix|splic/i);
+    expect(entries).not.toContain("FAMILY_IMPERSONATION_FLAG");
+    expect(composites.map(([label]) => label).join(" ")).not.toMatch(/clickfix|splic|family/i);
   });
 });
 
@@ -146,6 +148,13 @@ describe("keyword signals stay discounted", () => {
   });
 });
 
+// Kept here, outside the table, for the reason the splice-rule block above is:
+// it asks a different question of the family gate than
+// `familyImpersonationPinned` does. That file pins the row at 45 on both
+// channels; this asserts the property the row exists for — forwarding is how
+// this script most often reaches a checker, and the wrapper must not change the
+// verdict. The gate's weight is now its own declaration, so what is at risk here
+// is the anchor rather than the arithmetic.
 describe("forwarding does not defuse a composite", () => {
   const core =
     "Hi Mum, I dropped my phone in the sink and this is my new number. Can you transfer $850 today?";

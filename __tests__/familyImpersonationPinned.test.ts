@@ -47,6 +47,12 @@ import { checkSms, checkEmail, checkCustom } from "@veriguard/detect/scamDetecto
 //     from it where an SMS scores 45. Pinned as it stands, so widening it later
 //     is a decision someone makes and sees in this file's diff — the conversion
 //     is not the place to make it.
+//   · **The pretext half goes through the engine's shared pack-entry matcher.**
+//     Added after an injection measured that nothing held it there: swapping the
+//     matcher for a bare `includes()` changed no score and failed no test,
+//     because every pretext phrase is multi-word with single spaces and every
+//     other fixture here is well-formed prose. The whitespace block below is the
+//     one that separates them, and it is the case the matcher was written for.
 
 /** How a reader identifies the row. Deliberately the prose, not an id. */
 const FLAG = 'Reads as the "Hi Mum" family-impersonation script';
@@ -225,6 +231,55 @@ const cases: Array<{
   {
     label: "a currency amount with no verb",
     text: "Mum, phone broke, new number. $450 would really help",
+    fires: true,
+    sms: 45,
+    email: 45,
+    custom: 10,
+  },
+
+  // ── The gate fires: the pretext phrase with its whitespace varied ────────
+  //
+  // These are what make the shared pack-entry matcher load-bearing rather than
+  // merely preferred, and they were added after an injection measured that it
+  // was not: replacing the matcher with a bare `includes()` changed no score and
+  // failed no test, because every pretext phrase is multi-word with single
+  // spaces and every fixture above is well-formed prose.
+  //
+  // `includes()` misses all four. The matcher relaxes the gap between a phrase's
+  // words to any run of whitespace, which is the fix for a silent failure
+  // measured across ~65% of every region pack: a doubled space, a tab, a hard
+  // wrap mid-phrase, or the non-breaking space a mail client leaves behind when
+  // text is pasted out of Word. The family gate is the rule that found it —
+  // "Hi Mum, I dropped  my phone …" dropped from likely_scam to safe with no
+  // flags at all, because the gate needs its pretext and had no other way to
+  // see one.
+  {
+    label: "a doubled space inside the pretext",
+    text: "Hi Mum, I dropped  my phone and this is my new number. Can you transfer $850 today?",
+    fires: true,
+    sms: 45,
+    email: 45,
+    custom: 10,
+  },
+  {
+    label: "a hard wrap inside the pretext",
+    text: "Hi Mum, this is my new\nnumber. Can you send $400?",
+    fires: true,
+    sms: 45,
+    email: 45,
+    custom: 10,
+  },
+  {
+    label: "a non-breaking space inside the pretext",
+    text: "Hi Mum, I dropped my phone. Can you send $400?",
+    fires: true,
+    sms: 45,
+    email: 45,
+    custom: 10,
+  },
+  {
+    label: "a tab inside the pretext",
+    text: "Hi Mum, this is my\tnew number. Can you send $400?",
     fires: true,
     sms: 45,
     email: 45,
