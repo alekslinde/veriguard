@@ -3035,11 +3035,21 @@ const PROSE_LEFT_LABELS = new Set([
 // "uspost-redelivery.bond/pay": a different domain from the one in the message,
 // scored and shown to the user as though it were the link they were sent.
 //
-// The ranges mirror CONFUSABLE_SCRIPTS in urlSanitizer — the scripts that
-// supply Latin homoglyphs, which are the ones an evader reaches for. Kept
-// narrow rather than \p{L}: this pattern also decides what counts as a host in
-// ordinary prose, and matching every letter in every script would turn far more
-// sentences into candidate URLs.
+// The ranges cover the same SCRIPTS as urlSanitizer's confusable sets —
+// Cyrillic and Greek, the ones that supply Latin homoglyphs — but deliberately
+// at block granularity, where `CONFUSABLE_LETTERS` enumerates Greek down to the
+// individual lookalikes. Not a mirror, and must not become one: the two answer
+// opposite questions. That one asks "is this character a disguise", so a
+// non-confusable letter is correctly excluded; this asks "where does the
+// hostname end", and excluding one would TRUNCATE the host rather than decline
+// it — narrowing to the enumerated set extracts "elta-billing.bond" from
+// "Δelta-billing.bond", a different domain from the one in the message, which
+// is the defect described above. Over-inclusion here is safe because the prose
+// guard below rejects the false candidates ("Θ.Then we stopped").
+//
+// Still kept to these scripts rather than \p{L}: this pattern also decides what
+// counts as a host in ordinary prose, and matching every letter in every script
+// would turn far more sentences into candidate URLs.
 const HOST_LABEL_CHAR = "a-z0-9\\u0370-\\u03FF\\u0400-\\u04FF\\u0500-\\u052F";
 
 const BARE_HOST_GLOBAL = new RegExp(

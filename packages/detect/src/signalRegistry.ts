@@ -527,21 +527,6 @@ export function supersessionProblems(defs: readonly SignalDef[] = SIGNALS): stri
 }
 
 /**
- * Supersession cycles, of any length.
- *
- * The first version of this check compared each pair and so saw only direct
- * mutual supersession, while its own comment claimed to catch cyclic. A
- * three-signal cycle passed clean and made `registryScore` return **nothing** —
- * every member silenced by the one before it, so a lure every signal in the
- * cycle fired on scored zero. That is total, silent loss of coverage, which is
- * precisely the failure the check exists to prevent, and a two-member special
- * case was the shape of the bug rather than a short version of the fix.
- *
- * Reported as the cycle's members, sorted, once per cycle: the fault belongs to
- * the set of declarations, and naming one member as the culprit would send a
- * reader to whichever file happened to be first.
- */
-/**
  * Every id that lies on a supersession cycle, of any length.
  *
  * Shared by the authoring check and the scorer so the two cannot disagree about
@@ -587,6 +572,21 @@ function cyclicMembers(edges: ReadonlyMap<SignalId, readonly SignalId[]>): Set<S
 const edgesOf = (defs: readonly SignalDef[]): Map<SignalId, readonly SignalId[]> =>
   new Map(defs.map((d) => [d.id, (d.supersedes ?? []).filter((id) => defs.some((o) => o.id === id))]));
 
+/**
+ * Supersession cycles, of any length.
+ *
+ * The first version compared each pair and so saw only direct mutual
+ * supersession, while its own comment claimed to catch cyclic. A three-signal
+ * cycle passed clean and made `registryScore` return **nothing** — every member
+ * silenced by the one before it, so a lure every signal in the cycle fired on
+ * scored zero. Total, silent loss of coverage, which is precisely what the
+ * check exists to prevent; the two-member special case was the shape of the bug
+ * rather than a short version of the fix.
+ *
+ * Reported as the cycle's members, sorted, once per cycle: the fault belongs to
+ * the set of declarations, and naming one member as the culprit would send a
+ * reader to whichever file happened to be first.
+ */
 function supersessionCycles(defs: readonly SignalDef[]): string[] {
   const members = cyclicMembers(edgesOf(defs));
   if (members.size === 0) return [];

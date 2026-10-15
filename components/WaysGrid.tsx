@@ -246,19 +246,6 @@ function ForwardBody() {
 }
 
 /**
- * One channel, as a tile.
- *
- * The closed state is a glyph, a name and a half-line — enough to scan a shelf
- * of them without reading any. Opening one reveals the same body the stacked
- * rows used to show; nothing is lost, it is just no longer all on screen at
- * once.
- *
- * Still a <details>, deliberately. The disclosure is free, keyboard-operable
- * and open-by-default-printable, and replacing it with React state would mean
- * re-implementing all three. What changed is the SHAPE it presents when closed,
- * not the mechanism.
- */
-/**
  * The shared face of a tile — glyph, name, half-line — so the pending and
  * interactive shapes cannot drift apart while being two different elements.
  */
@@ -311,26 +298,6 @@ function TileFace({ way, pending }: { way: WayIn; pending: boolean }) {
 }
 
 /**
- * A surface that is built but not distributed.
- *
- * A plain <div>, NOT a <details> that refuses to open — which is what this was
- * and why it is being written out again. A `<summary>` is focusable whatever
- * you do to it, so preventing the click only stopped the mouse: a keyboard
- * reader still tabbed to it, still got a focus ring, and pressing Enter or
- * Space toggled an element whose body renders nothing. That is a dead stop in
- * the tab order, offered to the reader least able to guess why it did nothing.
- * `open: false` as a prop with no onToggle could also desync from the DOM's own
- * state, which is the bug CheckStage's keyed wrapper exists to avoid elsewhere.
- *
- * The original PendingRow was a <div> for exactly this reason, and turning the
- * rows into tiles lost the reason along with the shape. Restored: a row that
- * cannot act says so on its face and is not a control.
- *
- * It still renders, deliberately — the package is real and the shelf would
- * misrepresent what exists by omitting it. Dimmed to the weight of what it is:
- * an announcement, not an option.
- */
-/**
  * How the shelf is mounted.
  *
  * "cards" — three separate rounded rows, each its own object. This is the
@@ -351,6 +318,26 @@ function rowShell(variant: WaysVariant): string {
     : "rounded-xl border border-[var(--rule)] bg-[var(--ink-2)] overflow-hidden transition-colors hover:border-[var(--ink-3)]";
 }
 
+/**
+ * A surface that is built but not distributed.
+ *
+ * A plain <div>, NOT a <details> that refuses to open — which is what this was
+ * and why it is being written out again. A `<summary>` is focusable whatever
+ * you do to it, so preventing the click only stopped the mouse: a keyboard
+ * reader still tabbed to it, still got a focus ring, and pressing Enter or
+ * Space toggled an element whose body renders nothing. That is a dead stop in
+ * the tab order, offered to the reader least able to guess why it did nothing.
+ * `open: false` as a prop with no onToggle could also desync from the DOM's own
+ * state, which is the bug CheckStage's keyed wrapper exists to avoid elsewhere.
+ *
+ * The original PendingRow was a <div> for exactly this reason, and turning the
+ * rows into tiles lost the reason along with the shape. Restored: a row that
+ * cannot act says so on its face and is not a control.
+ *
+ * It still renders, deliberately — the package is real and the shelf would
+ * misrepresent what exists by omitting it. Dimmed to the weight of what it is:
+ * an announcement, not an option.
+ */
 function PendingTile({ way, variant }: { way: WayIn; variant: WaysVariant }) {
   return (
     <div className={`${rowShell(variant)} opacity-70`}>
@@ -364,6 +351,19 @@ function PendingTile({ way, variant }: { way: WayIn; variant: WaysVariant }) {
   );
 }
 
+/**
+ * One channel, as a tile.
+ *
+ * The closed state is a glyph, a name and a half-line — enough to scan a shelf
+ * of them without reading any. Opening one reveals the same body the stacked
+ * rows used to show; nothing is lost, it is just no longer all on screen at
+ * once.
+ *
+ * Still a <details>, deliberately. The disclosure is free, keyboard-operable
+ * and open-by-default-printable, and replacing it with React state would mean
+ * re-implementing all three. What changed is the SHAPE it presents when closed,
+ * not the mechanism.
+ */
 function Tile({ way, variant }: { way: WayIn; variant: WaysVariant }) {
   const { t } = useLang();
 
