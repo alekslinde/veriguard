@@ -324,17 +324,95 @@ describe("supersedes silences a redundant reading of one fact", () => {
     expect(problems.join("\n")).toContain("supersedes pair.renamed, which is not registered");
   });
 
-  it("reports a mutual supersession", () => {
-    const problems = registryProblems([
-      winner(),
-      loser({ supersedes: ["pair.winner"] }),
+  it("reports a cycle of any length, not just a mutual pair", () => {
+    // A two-member check was the first version here, and it was the bug rather
+    // than a short form of the fix: a three-signal cycle passed clean while
+    // every member silenced the one before it, so a lure they ALL fired on
+    // scored nothing at all. Both lengths are asserted, in one test, because
+    // what matters is that length is not what the check keys off.
+    const mutual = registryProblems([winner(), loser({ supersedes: ["pair.winner"] })]);
+    expect(mutual.join("\n")).toContain("supersession cycle");
+
+    const three = registryProblems([
+      fires({ id: "c.x", channels: ["sms"], supersedes: ["c.y"] }),
+      fires({ id: "c.y", channels: ["sms"], supersedes: ["c.z"] }),
+      fires({ id: "c.z", channels: ["sms"], supersedes: ["c.x"] }),
     ]);
-    expect(problems.join("\n")).toContain("supersede each other");
+    expect(three.join("\n")).toContain("supersession cycle");
+    // Named by its members, sorted, so a reader is not sent to whichever file
+    // happened to be declared first — the fault is the set, not one entry.
+    expect(three.join("\n")).toContain("c.x → c.y → c.z");
   });
 
-  it("reports a signal superseding itself", () => {
+  it("reports a cycle once, not once per member", () => {
+    // Walked from every signal, so the same cycle is reachable three ways.
+    const problems = registryProblems([
+      fires({ id: "c.x", channels: ["sms"], supersedes: ["c.y"] }),
+      fires({ id: "c.y", channels: ["sms"], supersedes: ["c.z"] }),
+      fires({ id: "c.z", channels: ["sms"], supersedes: ["c.x"] }),
+    ]);
+    expect(problems.filter((p) => p.includes("supersession cycle"))).toHaveLength(1);
+  });
+
+  it("reports a signal superseding itself, as the cycle it is", () => {
     const problems = registryProblems([winner({ supersedes: ["pair.winner"] })]);
-    expect(problems.join("\n")).toContain("pair.winner: supersedes itself");
+    // Once, and under one name. Reported separately as well, it would be the
+    // same fault twice — and the cross-channel check below is vacuously true of
+    // a self-loop, so it must not fall through to it either.
+    expect(problems.filter((p) => p.includes("pair.winner"))).toHaveLength(1);
+    expect(problems.join("\n")).toContain("supersession cycle");
+  });
+
+  it.each([
+    ["a 3-cycle", [["c.x", "c.y"], ["c.y", "c.z"], ["c.z", "c.x"]]],
+    ["a mutual pair", [["c.x", "c.y"], ["c.y", "c.x"]]],
+    ["a self-loop", [["c.x", "c.x"]]],
+  ] as Array<[string, Array<[string, string]>]>)(
+    "silences every member of %s, at any length and in any order",
+    (_label, pairs) => {
+      // The runtime half of the finding, asserted rather than described, and the
+      // reason the answer must not come from cutting a recursion on re-entry:
+      // that gives whichever member the walk entered from a pass, so the
+      // declaration order would pick the winner. Cycle members are identified
+      // before scoring and all silenced — nothing scores rather than something
+      // arbitrary scoring, which is the direction every guard here fails in.
+      const defs = pairs.map(([id, target]) =>
+        fires({ id, channels: ["sms"], supersedes: [target] }),
+      );
+      expect(registryScore(ctx(), defs)).toEqual([]);
+      expect(registryScore(ctx(), [...defs].reverse())).toEqual([]);
+    },
+  );
+
+  it("revives a signal whose only claimant is itself silenced", () => {
+    // The diamond: `a` silences `b` and `c`, both of which claim `d`. With both
+    // claimants out, `d` comes back. Asserted because it is the case where
+    // "silence everything a silenced signal named" and "silence nothing a
+    // silenced signal named" give different answers, and only the second is the
+    // rule as written.
+    const defs = [
+      fires({ id: "d.a", channels: ["sms"], supersedes: ["d.b", "d.c"] }),
+      fires({ id: "d.b", channels: ["sms"], supersedes: ["d.d"] }),
+      fires({ id: "d.c", channels: ["sms"], supersedes: ["d.d"] }),
+      fires({ id: "d.d", channels: ["sms"] }),
+    ];
+    expect(registryScore(ctx(), defs).map((r) => r.id)).toEqual(["d.a", "d.d"]);
+  });
+
+  it("does not let a silenced signal silence its own target", () => {
+    // `a supersedes b`, `b supersedes c`, all three firing. Silencing straight
+    // from the fired set let `b` suppress `c` while being suppressed itself, so
+    // one hit was deduplicated into zero by a signal the reader never sees.
+    // A silenced signal is the reading the engine discarded; it gets no say in
+    // what else is redundant.
+    const chain = [
+      fires({ id: "ch.a", channels: ["sms"], supersedes: ["ch.b"] }),
+      fires({ id: "ch.b", channels: ["sms"], supersedes: ["ch.c"] }),
+      fires({ id: "ch.c", channels: ["sms"] }),
+    ];
+    expect(registryScore(ctx(), chain).map((r) => r.id)).toEqual(["ch.a", "ch.c"]);
+    // And in the other declaration order, since resolution must not depend on it.
+    expect(registryScore(ctx(), [...chain].reverse()).map((r) => r.id)).toEqual(["ch.c", "ch.a"]);
   });
 
   it("reports a supersession across channels that never meet", () => {
@@ -410,7 +488,23 @@ describe("reads makes overlap and missing inputs visible", () => {
     expect(unsatisfiableReads(fires({ reads: ["url"], channels: ["phone"] }))).toEqual(["url"]);
     expect(unsatisfiableReads(fires({ reads: ["url"], channels: "all" }))).toEqual([]);
     // Text is available everywhere, including as a phone number.
-    expect(unsatisfiableReads(fires({ reads: ["body", "words", "original"], channels: "all" }))).toEqual([]);
+    expect(unsatisfiableReads(fires({ reads: ["body", "original"], channels: "all" }))).toEqual([]);
+  });
+
+  it("will not vouch for `words` on a channel nothing tokenises", () => {
+    // This assertion used to read `words` as reachable everywhere, which was
+    // true when `Context.words` was required. It became false the moment the
+    // field went optional and both production callers stopped supplying one —
+    // and a stale "reachable everywhere" is worse than no check, because a
+    // `reads: ["words"]` signal would then pass authoring, never fire, and sit
+    // in the serialised inventory looking like coverage. The default is the
+    // strict answer; reachability is a fact about the caller now, not the
+    // channel, so a caller has to say so.
+    expect(unsatisfiableReads(fires({ reads: ["words"], channels: "all" }))).toEqual(["words"]);
+    expect(unsatisfiableReads(fires({ reads: ["words"], channels: ["sms"] }))).toEqual(["words"]);
+    expect(unsatisfiableReads(fires({ reads: ["words"], channels: ["sms"] }), ["sms"])).toEqual([]);
+    // A caller that tokenises a DIFFERENT channel vouches for nothing here.
+    expect(unsatisfiableReads(fires({ reads: ["words"], channels: ["sms"] }), ["custom"])).toEqual(["words"]);
   });
 
   it("names two signals sharing a tokeniser", () => {

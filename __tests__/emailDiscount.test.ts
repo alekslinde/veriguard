@@ -22,6 +22,16 @@ const asEmail = (body: string) =>
  * One case per entry in UNDISCOUNTED_COMPOSITES. A composite added to the
  * engine without being listed there scores a tier low on the email path, and
  * this is what fails when that happens.
+ *
+ * **ClickFix is no longer here, and its absence is the point.** It left
+ * `UNDISCOUNTED_COMPOSITES` when it moved into the signal registry and declared
+ * `weight: 50` on every channel it runs on — so there is no discount applied to
+ * it and nothing to restore. Its case stayed in this table for one commit and
+ * still passed, by the new mechanism, which is exactly the kind of row that
+ * makes a table lie: anyone auditing this file against that list would have
+ * found an entry here with no counterpart there. A converted composite leaves
+ * this table as it leaves that list, and `clickFixPinned.test.ts` is where its
+ * email weight is asserted now.
  */
 const composites: Array<[string, string]> = [
   [
@@ -36,11 +46,45 @@ const composites: Array<[string, string]> = [
     "messaging hijack",
     "WhatsApp: your account has been flagged for unusual activity and will be restricted within 24 hours.",
   ],
-  [
-    "ClickFix (Windows)",
-    "Your browser needs a security fix. Press Win+R, paste the command below and hit Enter to verify you are human.",
-  ],
 ];
+
+describe("the table and the list it claims to mirror", () => {
+  it("has one case per entry, and no case for an entry that has gone", async () => {
+    // The header above says "one case per entry in UNDISCOUNTED_COMPOSITES",
+    // and for one commit that sentence was false: ClickFix left the list and
+    // its case stayed, still passing by a different mechanism. A claim about
+    // another file that nothing checks is a comment, not a rule — this repo has
+    // already paid for that — so the claim is asserted against the source.
+    //
+    // Read as text because the list is deliberately module-private: exporting
+    // it to satisfy a test would widen the engine's API for an internal fact.
+    // The splice entry is carried as a named constant like the others, so the
+    // count below is the number of entries, not of composites in the engine.
+    const { readFileSync } = await import("fs");
+    const src = readFileSync("packages/detect/src/scamDetector.ts", "utf8");
+    const list = src.slice(
+      src.indexOf("const UNDISCOUNTED_COMPOSITES"),
+      src.indexOf("];", src.indexOf("const UNDISCOUNTED_COMPOSITES")),
+    );
+    expect(list, "UNDISCOUNTED_COMPOSITES not found — did it move or get deleted?").toBeTruthy();
+
+    // Entries are bare constant references, one per line; comments are not.
+    const entries = list
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => /^[A-Z][A-Z0-9_]*,$/.test(l))
+      .map((l) => l.replace(/,$/, ""));
+
+    // The splice rule is tested in its own describe below, pitched deliberately
+    // under likely_scam, so it is an entry without a row in `composites`.
+    expect(entries).toContain("SPLICED_WORDING_FLAG");
+    expect(composites).toHaveLength(entries.length - 1);
+    // And the one that left: a case for it here would be the drift this asserts.
+    expect(entries).not.toContain("WIN_CLICKFIX_FLAG");
+    expect(entries).not.toContain("MAC_CLICKFIX_FLAG");
+    expect(composites.map(([label]) => label).join(" ")).not.toMatch(/clickfix/i);
+  });
+});
 
 describe("gated composites survive the email discount", () => {
   it.each(composites)("keeps the %s verdict on the email path", (_label, body) => {

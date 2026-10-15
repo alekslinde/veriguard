@@ -396,8 +396,29 @@ export function missingReads(def: SignalDef, ctx: Context): Reads[] {
  * reaches the phone channel, where there is no body to match against — hence
  * `phone`-only reads being satisfiable only where the phone channel is among
  * those declared.
+ *
+ * **`words` is the one input the channel cannot answer for**, and that is new:
+ * it became optional when both production callers turned out to supply a
+ * plausible fake (`[number]`, `[]`) rather than a real tokenisation. Whether it
+ * is available is now a fact about the *caller*, not the channel, so claiming
+ * here that every channel can carry it would make this function assert
+ * reachability it cannot see — the "partial check reporting a clean sweep"
+ * shape, in the function whose whole job is to catch that. `tokenisedChannels`
+ * is the parameter that lets a caller state what it actually supplies, and
+ * `unsuppliedReads` is what holds the real call sites to it.
  */
-export function unsatisfiableReads(def: SignalDef): Reads[] {
+export function unsatisfiableReads(
+  def: SignalDef,
+  /**
+   * Channels on which some caller really does supply `words`.
+   *
+   * Defaults to none, which is the truth today: no production call site
+   * tokenises. The default is deliberately the strict one — a signal declaring
+   * `reads: ["words"]` is reported until a caller exists to feed it, rather
+   * than passing quietly and sitting in the inventory looking like coverage.
+   */
+  tokenisedChannels: readonly Channel[] = [],
+): Reads[] {
   const channels = def.channels === "all" ? CHANNELS : def.channels;
   /** Could a context on ANY declared channel carry this input? */
   const reachable = (r: Reads): boolean => {
@@ -405,8 +426,9 @@ export function unsatisfiableReads(def: SignalDef): Reads[] {
       // Every channel has text, even if the phone channel's is a number.
       case "original":
       case "body":
-      case "words":
         return true;
+      case "words":
+        return channels.some((c) => tokenisedChannels.includes(c));
       // A link can appear in an SMS, an email or free text, and is the whole
       // input on the url channel. Never on the phone channel.
       case "hostname":
@@ -457,20 +479,20 @@ export function duplicateIds(defs: readonly SignalDef[] = SIGNALS): SignalId[] {
 /**
  * Ways a `supersedes` declaration can be wrong.
  *
- * The field buys precedence without order-dependence, and these are the three
- * shapes that would spend that back. Every one is silent at runtime — a signal
- * that quietly never scores, or a pair that silence each other — which is the
- * failure mode this repo keeps paying for: a partial check reporting a clean
- * sweep it never performed.
+ * The field buys precedence without order-dependence, and these are the shapes
+ * that would spend that back. Every one is silent at runtime — a signal that
+ * quietly never scores, or a set that silence each other and all stay quiet —
+ * which is the failure mode this repo keeps paying for: a partial check
+ * reporting a clean sweep it never performed.
  *
  *   · **A dangling id.** Supersession that names nothing silences nothing, so
  *     the pair scores twice. This is what a rename produces, and renaming an
  *     id is cheap precisely because the registry made ids addressable.
- *   · **Mutual or cyclic supersession.** Two signals each declaring the other
- *     resolve by registration order, which makes the order of a list the
- *     scoring rule — the implicit-in-control-flow property this whole item
- *     exists to delete, re-entering one level down. The first-listed would win
- *     silently and reordering the file would change a verdict.
+ *   · **A cycle, of any length** — including a signal superseding itself, and
+ *     including the mutual pair that was once the only case checked here. Every
+ *     member is silenced by another, so none of them scores: a lure they all
+ *     fire on scores zero. See `supersessionCycles`, and note that the
+ *     two-member version is not a shorter form of this check — it was the bug.
  *   · **Supersession across channels.** Two signals that never run on the same
  *     channel cannot both fire, so the declaration is either a mistake about
  *     what the signals read or coverage being deleted on a channel where only
@@ -488,22 +510,94 @@ export function supersessionProblems(defs: readonly SignalDef[] = SIGNALS): stri
         problems.push(`${def.id}: supersedes ${id}, which is not registered`);
         continue;
       }
-      if (id === def.id) {
-        problems.push(`${def.id}: supersedes itself`);
-        continue;
-      }
-      if ((target.supersedes ?? []).includes(def.id)) {
-        problems.push(
-          `${def.id} and ${id}: supersede each other, so registration order decides the score`,
-        );
-      }
+      // Self-supersession is a cycle of length one and is reported as one, by
+      // `supersessionCycles` alone — not here as well. The channel check below
+      // would also be vacuously true of it (a signal always shares every
+      // channel with itself), so letting it fall through would report the same
+      // fault twice and under the wrong name.
+      if (id === def.id) continue;
       const shared = CHANNELS.filter((c) => runsOn(def, c) && runsOn(target, c));
       if (shared.length === 0) {
         problems.push(`${def.id}: supersedes ${id}, which shares no channel with it`);
       }
     }
   }
+  problems.push(...supersessionCycles(defs));
   return problems;
+}
+
+/**
+ * Supersession cycles, of any length.
+ *
+ * The first version of this check compared each pair and so saw only direct
+ * mutual supersession, while its own comment claimed to catch cyclic. A
+ * three-signal cycle passed clean and made `registryScore` return **nothing** —
+ * every member silenced by the one before it, so a lure every signal in the
+ * cycle fired on scored zero. That is total, silent loss of coverage, which is
+ * precisely the failure the check exists to prevent, and a two-member special
+ * case was the shape of the bug rather than a short version of the fix.
+ *
+ * Reported as the cycle's members, sorted, once per cycle: the fault belongs to
+ * the set of declarations, and naming one member as the culprit would send a
+ * reader to whichever file happened to be first.
+ */
+/**
+ * Every id that lies on a supersession cycle, of any length.
+ *
+ * Shared by the authoring check and the scorer so the two cannot disagree about
+ * what a cycle is — the scorer silences exactly the set this names, and
+ * `supersessionProblems` reports exactly the same set as a fault. Two
+ * independent notions of "cyclic" is how a guard ends up reporting a clean sweep
+ * of something the runtime handled differently.
+ *
+ * Takes the edges as a map so both callers can pass what they have: the whole
+ * registry when authoring, only the signals that fired when scoring. Each
+ * caller drops edges to ids its own map does not hold — a dangling target is
+ * reported separately and silences nothing.
+ */
+function cyclicMembers(edges: ReadonlyMap<SignalId, readonly SignalId[]>): Set<SignalId> {
+  // An id is on a cycle exactly when it can reach itself. Computed as
+  // reachability rather than by a depth-first walk carrying its path: the walk
+  // needs a "already explored, skip" rule to stay cheap, and that rule is what
+  // makes it miss a cycle reachable only through an already-finished node. The
+  // registry is tens of signals with at most a couple of edges each, so the
+  // direct formulation is both correct and free.
+  const reach = new Map<SignalId, Set<SignalId>>();
+  for (const id of edges.keys()) reach.set(id, new Set(edges.get(id) ?? []));
+  // Transitive closure. Repeats until nothing new appears, which is bounded by
+  // the number of pairs.
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const targets of reach.values()) {
+      for (const via of [...targets]) {
+        for (const onward of reach.get(via) ?? []) {
+          if (!targets.has(onward)) {
+            targets.add(onward);
+            grew = true;
+          }
+        }
+      }
+    }
+  }
+  return new Set([...reach.keys()].filter((id) => reach.get(id)?.has(id)));
+}
+
+/** The edges `cyclicMembers` walks, as the authoring check sees them. */
+const edgesOf = (defs: readonly SignalDef[]): Map<SignalId, readonly SignalId[]> =>
+  new Map(defs.map((d) => [d.id, (d.supersedes ?? []).filter((id) => defs.some((o) => o.id === id))]));
+
+function supersessionCycles(defs: readonly SignalDef[]): string[] {
+  const members = cyclicMembers(edgesOf(defs));
+  if (members.size === 0) return [];
+  // Named as one finding listing every id involved, sorted. The fault belongs to
+  // the set of declarations, so singling out a member would send a reader to
+  // whichever file happened to be declared first — and reporting once per
+  // member would make one mistake look like three.
+  const named = [...members].sort((a, b) => a.localeCompare(b, "en")).join(" → ");
+  return [
+    `${named}: supersession cycle, so every member silences another and none can score`,
+  ];
 }
 
 /**
@@ -585,15 +679,70 @@ export function registryScore(ctx: Context, defs: readonly SignalDef[] = SIGNALS
     if (hits.length > 0) fired.set(def.id, { def, hits });
   }
 
-  // Only a signal that actually fired gets to silence another. A signal that
-  // did not fire has made no claim about the fact, so silencing from the
-  // declaration alone would delete coverage rather than deduplicate it — the
-  // Windows variant staying quiet is exactly when the macOS reading is the one
-  // that should score.
-  const silenced = new Set<SignalId>();
-  for (const { def } of fired.values()) {
-    for (const id of def.supersedes ?? []) silenced.add(id);
-  }
+  // Only a signal that fired AND survived gets to silence another.
+  //
+  // "Fired" alone is not enough, and the difference is a real loss of coverage
+  // rather than a tidiness point. With `a supersedes b` and `b supersedes c` all
+  // firing, silencing straight from the fired set lets `b` suppress `c` even
+  // though `b` was itself suppressed and scores nothing — so one hit is
+  // deduplicated into zero hits by a signal the reader never sees. A silenced
+  // signal is one the engine decided was the redundant reading; it does not then
+  // get a say in what else is redundant.
+  //
+  const silencedBy = (id: SignalId): readonly SignalId[] => fired.get(id)?.def.supersedes ?? [];
+  /** Who, among the fired, declares they supersede this one. */
+  const claimants = (id: SignalId): SignalId[] =>
+    [...fired.keys()].filter((other) => silencedBy(other).includes(id));
+
+  // Resolved by memoised recursion on the one-sentence rule, so the answer is a
+  // property of the declarations and not of the order they are visited in:
+  //
+  //   survives(x)  ⟺  no claimant of x survives
+  //
+  // A signal nothing claims survives (the base case, vacuously). Otherwise it
+  // survives exactly when every signal declaring it redundant has itself been
+  // ruled out. Memoised per call, so each signal is decided once.
+  //
+  // A cycle has no base case to unwind to, so its members are identified first
+  // and all of them silenced, before the recursion runs. Cutting the recursion
+  // instead — answering "does not survive" on re-entry — gives an answer that
+  // depends on which member the walk happened to start from, which is the exact
+  // property this field was added to avoid. `supersessionProblems` rejects every
+  // cycle so none reaches production; this is deterministic anyway, because "the
+  // other check prevents it" is the kind of rule stated in a comment that this
+  // file exists to stop relying on.
+  //
+  // Two earlier formulations were wrong in ways worth not repeating. Sweeping
+  // the silenced set off repeatedly oscillated on a cycle's parity — a 3-cycle
+  // resolved to "all score", a 2-cycle to "none". Growing a surviving set
+  // greedily ("nothing surviving claims it *yet*") let whichever cycle member
+  // was visited first survive, and broke the chain case in reverse declaration
+  // order.
+  const inCycle = cyclicMembers(
+    new Map([...fired].map(([id, { def }]) => [
+      id,
+      (def.supersedes ?? []).filter((target) => fired.has(target)),
+    ])),
+  );
+  const decided = new Map<SignalId, boolean>();
+  const survives = (id: SignalId): boolean => {
+    const memo = decided.get(id);
+    if (memo !== undefined) return memo;
+    // Settled before recursing, so a cycle can neither be entered nor
+    // contribute: silenced is the conservative direction, scoring nothing
+    // rather than twice.
+    if (inCycle.has(id)) {
+      decided.set(id, false);
+      return false;
+    }
+    // Provisional entry guards nothing here — the graph is acyclic once cycle
+    // members are out — but keeps a malformed graph from recursing forever.
+    decided.set(id, false);
+    const answer = !claimants(id).some(survives);
+    decided.set(id, answer);
+    return answer;
+  };
+  const silenced = new Set([...fired.keys()].filter((id) => !survives(id)));
 
   const rows: ScoredHit[] = [];
   // Scored in registration order, which is the order the evidence list renders
