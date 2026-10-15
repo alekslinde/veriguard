@@ -41,14 +41,54 @@
 //      depends on the rest of the evidence list — which is why the other 3 of
 //      the function's 10 sites stayed in the entry point.
 //
+//   3. The gated composites, in progress. Each entry's signal declares its own
+//      channel weight, and `UNDISCOUNTED_COMPOSITES` loses an entry rather than
+//      gaining one. The ClickFix pair converted first, as the smallest.
+//
 // Remaining:
 //
-//   3. The gated composites, where the channel-multiplier defects live. Each
-//      entry's signal declares its own channel weight, and the exemption list is
-//      deleted rather than extended. **Blocked on the order-dependence question
-//      above** — at least one composite will force it.
 //   4. The remaining single-condition signals, mechanically.
 //   5. Serialise the registry in CI as the signal inventory.
+//
+// ## The order-dependence question, answered
+//
+// Step 2 ended by recording that the registry had no shape for a signal whose
+// weight depends on the rest of the evidence list, and three live instances.
+// The answer, settled before converting anything in step 3 rather than during:
+//
+// **Those three stay in the entry point, and the field below is not for them.**
+// The spoofing assessment, the "nothing found" floor and the clamp are
+// pass-level policy — facts about a finished evidence list, not observations
+// about the input — and `checkSms`'s deferred authority-mention rule already has
+// a mechanism built for exactly its question (`addDeferred`/`resolveDeferred`,
+// which settles once, after every rule has run, because asking mid-scan answers
+// a different question and that distinction already cost a defect).
+//
+// This is option (b) from the note at the end of `signals/phone.ts`, with the
+// risk that note names taken seriously rather than waved at: *the risk is that
+// it becomes the default and the registry ends up holding only the easy half.*
+// So the criterion is written down, and it is about the question a rule asks,
+// not about how hard it is to convert:
+//
+//   · **A signal** reports an observation about the input. Its weight is a fact
+//     it declares. It can be read, scored and inventoried without knowing what
+//     else fired. → the registry.
+//   · **Pass-level policy** answers a question about the finished list: what the
+//     ceiling is, what the floor is, whether anything corroborated anything.
+//     It owns no row of its own and cannot declare a weight. → the entry point,
+//     and if it needs corroboration, `addDeferred` already exists.
+//
+// A signal that wants to know what else scored is one of those two things
+// mislabelled, and the test for which is whether it has a weight of its own.
+//
+// What step 3 *did* need was narrower than the question step 2 asked, and it is
+// worth separating because conflating them is how (b) becomes a dumping ground:
+// the ClickFix variants are not order-dependent, they are **two readings of one
+// fact**, where scoring both counts one lure twice. That is precedence, each
+// weight still a declared fact — see `supersedes`. Had it been folded into the
+// deferred mechanism it would have made a pure, inventoriable signal look like
+// a rule that reads the scored rows, which is the opposite of the property this
+// file is buying.
 //
 // Every step is pinned by test before it is made, and verified by injecting the
 // defect it should now prevent. A green suite is not evidence here: the splice
@@ -68,6 +108,7 @@ import type { EmailHeaders } from "./emailHeaders";
 import type { SignalSource } from "./engineTypes";
 import type { PhoneIntel } from "./phoneIntel";
 import type { RegionPack } from "./regions";
+import { CLICKFIX_SIGNALS } from "./signals/clickfix";
 import { PHONE_SIGNALS } from "./signals/phone";
 
 /**
@@ -164,8 +205,20 @@ export interface Context {
   original: string;
   /** Normalised and lowercased, for keyword matching. */
   body: string;
-  /** `body` split on the shared tokeniser. One source, so overlap is declarable. */
-  words: readonly string[];
+  /**
+   * `body` split on the shared tokeniser. One source, so overlap is declarable.
+   *
+   * Optional, and absent rather than `[]` where the caller has not tokenised.
+   * The distinction is load-bearing: an empty array says "tokenised, found no
+   * words", which no real input produces, so a signal declaring `reads:
+   * ["words"]` would be handed a clean answer to a question nobody asked and
+   * score nothing — a silent miss, from a context that looked complete. Absent
+   * means "not supplied here", and `registryScore` skips the signal, the same
+   * way it does for a message with no hostname. Every other optional field on
+   * this object already works that way; this one was a required field a caller
+   * could satisfy with a plausible lie.
+   */
+  words?: readonly string[];
 
   /** Lowercased, trailing root dot stripped. Absent when there is no URL. */
   hostname?: string;
@@ -188,7 +241,8 @@ export interface Context {
  * approximated somewhere else.
  */
 function available(ctx: Context): Set<Reads> {
-  const set = new Set<Reads>(["original", "body", "words"]);
+  const set = new Set<Reads>(["original", "body"]);
+  if (ctx.words !== undefined) set.add("words");
   if (ctx.hostname !== undefined) set.add("hostname");
   if (ctx.url !== undefined) set.add("url");
   if (ctx.headers !== undefined) set.add("headers");
@@ -232,6 +286,31 @@ export interface SignalDef {
   /** Channels this signal runs on. `"all"` is every channel in `CHANNELS`. */
   channels: readonly Channel[] | "all";
   weight: Weight;
+  /**
+   * Ids this signal silences when it fires.
+   *
+   * For two signals that are readings of the SAME underlying fact, where firing
+   * both would score one thing twice. The ClickFix pair is the case that forced
+   * it: the Windows and macOS variants are one campaign described twice, and
+   * campaigns ship per-OS instructions on one page, so a lure naming both is
+   * the normal shape rather than a contrived input. Inline that was an
+   * `else if`; two independent signals would both fire and score 100 for one
+   * lure.
+   *
+   * **This is precedence, not order-dependence, and the distinction is the
+   * whole reason it is a field.** A superseding signal's weight is still its
+   * own declared fact — it does not change based on what else scored, so
+   * `evaluate` stays pure and the inventory stays readable without running
+   * anything. What is declared here is that two ids describe one fact and the
+   * named one is the redundant reading. Resolved in `registryScore` from the
+   * declarations, so the relationship is visible in the inventory instead of
+   * living in the shape of an `if`/`else` chain somebody has to read.
+   *
+   * It is deliberately NOT the answer to the deferred-row question — see the
+   * note below — and `registryProblems` rejects the shapes that would let it
+   * drift into one.
+   */
+  supersedes?: readonly SignalId[];
   /**
    * Whether this signal is a claim about the world (a brand name, an agency, an
    * allowlist, a trusted suffix) or a rule that cannot go stale (character
@@ -317,8 +396,29 @@ export function missingReads(def: SignalDef, ctx: Context): Reads[] {
  * reaches the phone channel, where there is no body to match against — hence
  * `phone`-only reads being satisfiable only where the phone channel is among
  * those declared.
+ *
+ * **`words` is the one input the channel cannot answer for**, and that is new:
+ * it became optional when both production callers turned out to supply a
+ * plausible fake (`[number]`, `[]`) rather than a real tokenisation. Whether it
+ * is available is now a fact about the *caller*, not the channel, so claiming
+ * here that every channel can carry it would make this function assert
+ * reachability it cannot see — the "partial check reporting a clean sweep"
+ * shape, in the function whose whole job is to catch that. `tokenisedChannels`
+ * is the parameter that lets a caller state what it actually supplies, and
+ * `unsuppliedReads` is what holds the real call sites to it.
  */
-export function unsatisfiableReads(def: SignalDef): Reads[] {
+export function unsatisfiableReads(
+  def: SignalDef,
+  /**
+   * Channels on which some caller really does supply `words`.
+   *
+   * Defaults to none, which is the truth today: no production call site
+   * tokenises. The default is deliberately the strict one — a signal declaring
+   * `reads: ["words"]` is reported until a caller exists to feed it, rather
+   * than passing quietly and sitting in the inventory looking like coverage.
+   */
+  tokenisedChannels: readonly Channel[] = [],
+): Reads[] {
   const channels = def.channels === "all" ? CHANNELS : def.channels;
   /** Could a context on ANY declared channel carry this input? */
   const reachable = (r: Reads): boolean => {
@@ -326,8 +426,9 @@ export function unsatisfiableReads(def: SignalDef): Reads[] {
       // Every channel has text, even if the phone channel's is a number.
       case "original":
       case "body":
-      case "words":
         return true;
+      case "words":
+        return channels.some((c) => tokenisedChannels.includes(c));
       // A link can appear in an SMS, an email or free text, and is the whole
       // input on the url channel. Never on the phone channel.
       case "hostname":
@@ -351,10 +452,10 @@ export function unsatisfiableReads(def: SignalDef): Reads[] {
  * conversion — the registration and the deletion of the inline site — belong in
  * one commit.
  *
- * Converted so far: the phone channel. `scamDetector.ts` still owns the url,
- * sms, email and custom channels' scoring.
+ * Converted so far: the phone channel, and the ClickFix pair on the sms, email
+ * and custom channels. `scamDetector.ts` still owns the rest.
  */
-export const SIGNALS: readonly SignalDef[] = [...PHONE_SIGNALS];
+export const SIGNALS: readonly SignalDef[] = [...PHONE_SIGNALS, ...CLICKFIX_SIGNALS];
 
 /**
  * Ids registered more than once.
@@ -376,12 +477,137 @@ export function duplicateIds(defs: readonly SignalDef[] = SIGNALS): SignalId[] {
 }
 
 /**
+ * Ways a `supersedes` declaration can be wrong.
+ *
+ * The field buys precedence without order-dependence, and these are the shapes
+ * that would spend that back. Every one is silent at runtime — a signal that
+ * quietly never scores, or a set that silence each other and all stay quiet —
+ * which is the failure mode this repo keeps paying for: a partial check
+ * reporting a clean sweep it never performed.
+ *
+ *   · **A dangling id.** Supersession that names nothing silences nothing, so
+ *     the pair scores twice. This is what a rename produces, and renaming an
+ *     id is cheap precisely because the registry made ids addressable.
+ *   · **A cycle, of any length** — including a signal superseding itself, and
+ *     including the mutual pair that was once the only case checked here. Every
+ *     member is silenced by another, so none of them scores: a lure they all
+ *     fire on scores zero. See `supersessionCycles`, and note that the
+ *     two-member version is not a shorter form of this check — it was the bug.
+ *   · **Supersession across channels.** Two signals that never run on the same
+ *     channel cannot both fire, so the declaration is either a mistake about
+ *     what the signals read or coverage being deleted on a channel where only
+ *     one of them was ever going to speak.
+ *
+ * Reported rather than thrown, on the same terms as `duplicateIds`.
+ */
+export function supersessionProblems(defs: readonly SignalDef[] = SIGNALS): string[] {
+  const problems: string[] = [];
+  const byId = new Map(defs.map((d) => [d.id, d]));
+  for (const def of defs) {
+    for (const id of def.supersedes ?? []) {
+      const target = byId.get(id);
+      if (!target) {
+        problems.push(`${def.id}: supersedes ${id}, which is not registered`);
+        continue;
+      }
+      // Self-supersession is a cycle of length one and is reported as one, by
+      // `supersessionCycles` alone — not here as well. The channel check below
+      // would also be vacuously true of it (a signal always shares every
+      // channel with itself), so letting it fall through would report the same
+      // fault twice and under the wrong name.
+      if (id === def.id) continue;
+      const shared = CHANNELS.filter((c) => runsOn(def, c) && runsOn(target, c));
+      if (shared.length === 0) {
+        problems.push(`${def.id}: supersedes ${id}, which shares no channel with it`);
+      }
+    }
+  }
+  problems.push(...supersessionCycles(defs));
+  return problems;
+}
+
+/**
+ * Supersession cycles, of any length.
+ *
+ * The first version of this check compared each pair and so saw only direct
+ * mutual supersession, while its own comment claimed to catch cyclic. A
+ * three-signal cycle passed clean and made `registryScore` return **nothing** —
+ * every member silenced by the one before it, so a lure every signal in the
+ * cycle fired on scored zero. That is total, silent loss of coverage, which is
+ * precisely the failure the check exists to prevent, and a two-member special
+ * case was the shape of the bug rather than a short version of the fix.
+ *
+ * Reported as the cycle's members, sorted, once per cycle: the fault belongs to
+ * the set of declarations, and naming one member as the culprit would send a
+ * reader to whichever file happened to be first.
+ */
+/**
+ * Every id that lies on a supersession cycle, of any length.
+ *
+ * Shared by the authoring check and the scorer so the two cannot disagree about
+ * what a cycle is — the scorer silences exactly the set this names, and
+ * `supersessionProblems` reports exactly the same set as a fault. Two
+ * independent notions of "cyclic" is how a guard ends up reporting a clean sweep
+ * of something the runtime handled differently.
+ *
+ * Takes the edges as a map so both callers can pass what they have: the whole
+ * registry when authoring, only the signals that fired when scoring. Each
+ * caller drops edges to ids its own map does not hold — a dangling target is
+ * reported separately and silences nothing.
+ */
+function cyclicMembers(edges: ReadonlyMap<SignalId, readonly SignalId[]>): Set<SignalId> {
+  // An id is on a cycle exactly when it can reach itself. Computed as
+  // reachability rather than by a depth-first walk carrying its path: the walk
+  // needs a "already explored, skip" rule to stay cheap, and that rule is what
+  // makes it miss a cycle reachable only through an already-finished node. The
+  // registry is tens of signals with at most a couple of edges each, so the
+  // direct formulation is both correct and free.
+  const reach = new Map<SignalId, Set<SignalId>>();
+  for (const id of edges.keys()) reach.set(id, new Set(edges.get(id) ?? []));
+  // Transitive closure. Repeats until nothing new appears, which is bounded by
+  // the number of pairs.
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const targets of reach.values()) {
+      for (const via of [...targets]) {
+        for (const onward of reach.get(via) ?? []) {
+          if (!targets.has(onward)) {
+            targets.add(onward);
+            grew = true;
+          }
+        }
+      }
+    }
+  }
+  return new Set([...reach.keys()].filter((id) => reach.get(id)?.has(id)));
+}
+
+/** The edges `cyclicMembers` walks, as the authoring check sees them. */
+const edgesOf = (defs: readonly SignalDef[]): Map<SignalId, readonly SignalId[]> =>
+  new Map(defs.map((d) => [d.id, (d.supersedes ?? []).filter((id) => defs.some((o) => o.id === id))]));
+
+function supersessionCycles(defs: readonly SignalDef[]): string[] {
+  const members = cyclicMembers(edgesOf(defs));
+  if (members.size === 0) return [];
+  // Named as one finding listing every id involved, sorted. The fault belongs to
+  // the set of declarations, so singling out a member would send a reader to
+  // whichever file happened to be declared first — and reporting once per
+  // member would make one mistake look like three.
+  const named = [...members].sort((a, b) => a.localeCompare(b, "en")).join(" → ");
+  return [
+    `${named}: supersession cycle, so every member silences another and none can score`,
+  ];
+}
+
+/**
  * Every authoring error in a signal list, as one answer.
  *
- * The three questions a registry entry can get wrong — a duplicate id, a read
- * nothing can satisfy, a channel with no weight — asked together, because a
- * caller that has to remember three calls will eventually make two. A test
- * asserts this is empty, so step 2 onward cannot register a broken signal.
+ * The questions a registry entry can get wrong — a duplicate id, a read nothing
+ * can satisfy, a channel with no weight, a supersession that silences the wrong
+ * thing or nothing — asked together, because a caller that has to remember four
+ * calls will eventually make three. A test asserts this is empty, so no step
+ * from 2 onward can register a broken signal.
  */
 export function registryProblems(defs: readonly SignalDef[] = SIGNALS): string[] {
   const problems: string[] = [];
@@ -396,6 +622,7 @@ export function registryProblems(defs: readonly SignalDef[] = SIGNALS): string[]
       problems.push(`${def.id}: runs on ${unweighted.join(", ")} with no weight declared`);
     }
   }
+  problems.push(...supersessionProblems(defs));
   return problems;
 }
 
@@ -413,13 +640,31 @@ export interface ScoredHit extends Hit {
  * a multiplier to be applied and no list of signals to exempt from one. Signals
  * that do not run on this channel are skipped, not discounted.
  *
+ * Evaluate everything, then resolve supersession, then score — so that neither
+ * what fires nor what it is worth depends on where a signal sits in the list.
+ *
  * Returns rows rather than a total. The caller clamps — the ceiling is each
  * entry point's policy, not collection's — and records the clamp as its own
  * visible row, because evidence that does not sum to the headline score reads as
  * a bug to anyone checking our arithmetic, and we invite them to.
  */
 export function registryScore(ctx: Context, defs: readonly SignalDef[] = SIGNALS): ScoredHit[] {
-  const rows: ScoredHit[] = [];
+  // Which signals fired, evaluated once, before anything is scored.
+  //
+  // **Two passes, and the second one is not an optimisation to collapse.** The
+  // first version resolved supersession inline, in registration order, and a
+  // test caught what the behavioural pin could not: a superseded signal listed
+  // BEFORE the one superseding it had already scored by the time the winner was
+  // reached. That makes the order of a list a scoring rule — the
+  // implicit-in-control-flow property this whole file exists to delete,
+  // reappearing one level down, and invisible because the live registry's order
+  // happened to be the safe one. Deciding from the finished set of hits is what
+  // makes `supersedes` a declaration rather than a side effect of where a
+  // signal was declared.
+  //
+  // `evaluate` is called exactly once per signal, here, so a pure function is
+  // never run twice for one check and a silenced signal costs one call, not two.
+  const fired = new Map<SignalId, { def: SignalDef; hits: Hit[] }>();
   for (const def of defs) {
     if (!runsOn(def, ctx.channel)) continue;
     // An input the context cannot supply means the signal cannot have looked,
@@ -430,9 +675,84 @@ export function registryScore(ctx: Context, defs: readonly SignalDef[] = SIGNALS
     // the kind of rule stated in a comment that this file exists to turn into
     // something the code enforces.
     if (missingReads(def, ctx).length > 0) continue;
-
-    const weight = weightFor(def, ctx.channel);
     const hits = def.evaluate(ctx);
+    if (hits.length > 0) fired.set(def.id, { def, hits });
+  }
+
+  // Only a signal that fired AND survived gets to silence another.
+  //
+  // "Fired" alone is not enough, and the difference is a real loss of coverage
+  // rather than a tidiness point. With `a supersedes b` and `b supersedes c` all
+  // firing, silencing straight from the fired set lets `b` suppress `c` even
+  // though `b` was itself suppressed and scores nothing — so one hit is
+  // deduplicated into zero hits by a signal the reader never sees. A silenced
+  // signal is one the engine decided was the redundant reading; it does not then
+  // get a say in what else is redundant.
+  //
+  const silencedBy = (id: SignalId): readonly SignalId[] => fired.get(id)?.def.supersedes ?? [];
+  /** Who, among the fired, declares they supersede this one. */
+  const claimants = (id: SignalId): SignalId[] =>
+    [...fired.keys()].filter((other) => silencedBy(other).includes(id));
+
+  // Resolved by memoised recursion on the one-sentence rule, so the answer is a
+  // property of the declarations and not of the order they are visited in:
+  //
+  //   survives(x)  ⟺  no claimant of x survives
+  //
+  // A signal nothing claims survives (the base case, vacuously). Otherwise it
+  // survives exactly when every signal declaring it redundant has itself been
+  // ruled out. Memoised per call, so each signal is decided once.
+  //
+  // A cycle has no base case to unwind to, so its members are identified first
+  // and all of them silenced, before the recursion runs. Cutting the recursion
+  // instead — answering "does not survive" on re-entry — gives an answer that
+  // depends on which member the walk happened to start from, which is the exact
+  // property this field was added to avoid. `supersessionProblems` rejects every
+  // cycle so none reaches production; this is deterministic anyway, because "the
+  // other check prevents it" is the kind of rule stated in a comment that this
+  // file exists to stop relying on.
+  //
+  // Two earlier formulations were wrong in ways worth not repeating. Sweeping
+  // the silenced set off repeatedly oscillated on a cycle's parity — a 3-cycle
+  // resolved to "all score", a 2-cycle to "none". Growing a surviving set
+  // greedily ("nothing surviving claims it *yet*") let whichever cycle member
+  // was visited first survive, and broke the chain case in reverse declaration
+  // order.
+  const inCycle = cyclicMembers(
+    new Map([...fired].map(([id, { def }]) => [
+      id,
+      (def.supersedes ?? []).filter((target) => fired.has(target)),
+    ])),
+  );
+  const decided = new Map<SignalId, boolean>();
+  const survives = (id: SignalId): boolean => {
+    const memo = decided.get(id);
+    if (memo !== undefined) return memo;
+    // Settled before recursing, so a cycle can neither be entered nor
+    // contribute: silenced is the conservative direction, scoring nothing
+    // rather than twice.
+    if (inCycle.has(id)) {
+      decided.set(id, false);
+      return false;
+    }
+    // Provisional entry guards nothing here — the graph is acyclic once cycle
+    // members are out — but keeps a malformed graph from recursing forever.
+    decided.set(id, false);
+    const answer = !claimants(id).some(survives);
+    decided.set(id, answer);
+    return answer;
+  };
+  const silenced = new Set([...fired.keys()].filter((id) => !survives(id)));
+
+  const rows: ScoredHit[] = [];
+  // Scored in registration order, which is the order the evidence list renders
+  // in and the order the inline branches this replaces were written in.
+  for (const def of defs) {
+    const entry = fired.get(def.id);
+    if (!entry) continue;
+    if (silenced.has(def.id)) continue;
+    const { hits } = entry;
+    const weight = weightFor(def, ctx.channel);
     // Rounded once over the signal's whole contribution, with each row taking
     // the running remainder, so the rows sum to the rounded total exactly.
     // Rounding per row instead let a fractional `scale` drift off the declared
@@ -468,6 +788,16 @@ export interface SignalInventoryEntry {
   channels: Channel[];
   weights: Record<Channel, number>;
   kind: SignalDef["kind"];
+  /**
+   * Always present, `[]` where nothing is superseded.
+   *
+   * Serialised because without it the inventory reads two ClickFix signals at
+   * 50 each as 100 of available score against one lure, which is the kind of
+   * wrong number item 1's margin report would then build on. A key that appears
+   * only sometimes also makes a diff of this artefact noisier than the change
+   * it is reporting.
+   */
+  supersedes: SignalId[];
 }
 
 export function signalInventory(defs: readonly SignalDef[] = SIGNALS): SignalInventoryEntry[] {
@@ -482,6 +812,10 @@ export function signalInventory(defs: readonly SignalDef[] = SIGNALS): SignalInv
           CHANNELS.map((c) => [c, channels.includes(c) ? weightFor(def, c) : 0]),
         ) as Record<Channel, number>,
         kind: def.kind,
+        // Sorted for the same reason the entries are: this file exists to be
+        // diffed, and a list whose order follows the declaration would report a
+        // change when a declaration was merely reordered.
+        supersedes: [...(def.supersedes ?? [])].sort((a, b) => a.localeCompare(b, "en")),
       };
     })
     // Collation pinned, not defaulted. This artefact exists to be diffed
