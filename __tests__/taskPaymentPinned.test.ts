@@ -339,6 +339,29 @@ const cases: Array<{
     email: 14,
     custom: 10,
   },
+  // Branch 1 has four bounded gaps and every one of them refuses to cross a
+  // sentence boundary. These two isolate the FIRST gap — between the action verb
+  // and the task noun — which the case above does not reach: loosening only that
+  // gap failed nothing while loosening all four failed two cases, so the guard
+  // was real and unpinned. Each of these is an ordinary two-sentence message
+  // whose words pair into the branch only if the first gap is allowed to span
+  // them.
+  {
+    label: "an unrelated instruction in the sentence before the task noun",
+    text: "Please complete this. Your tasks must be done to withdraw your earnings.",
+    fires: false,
+    sms: 0,
+    email: 0,
+    custom: 10,
+  },
+  {
+    label: "an exclamation before the task noun",
+    text: "Activate now! The tasks need doing to claim your commission.",
+    fires: false,
+    sms: 12,
+    email: 8,
+    custom: 8,
+  },
   {
     label: "too much text between the halves",
     text: "Complete the task that the supervisor assigned you last week to withdraw your earnings.",
