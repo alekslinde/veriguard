@@ -238,6 +238,94 @@ const cases: Array<{
     svgRow: false,
     attachRow: false,
   },
+
+  // ── Silent: cases that isolate ONE guard each ────────────────────────────
+  //
+  // Added after injections measured that most of the guards were unprotected:
+  // deleting the absolute-URL exclusion, the end-anchors, the line scoping or
+  // the payload window each changed nothing any test could see. Every case
+  // above was covered by some *other* guard too, so each injection fell through
+  // to a second net. These are the ones that flip.
+  //
+  // A bare absolute URL with no attribute, so only the scheme exclusion can
+  // reject it — the quoted-attribute arm catches `src="https://…"` on its own,
+  // which is why none of the cases above separated the two.
+  {
+    label: "bare absolute URL, payload noun in the path",
+    text: "See https://cdn.example.com/invoice/logo.svg for details",
+    score: 10,
+    svgRow: false,
+    attachRow: false,
+  },
+  {
+    label: "bare absolute URL, attachment word in the path",
+    text: "See https://cdn.example.com/attached/logo.svg for details",
+    score: 10,
+    svgRow: false,
+    attachRow: false,
+  },
+  {
+    label: "bare absolute URL after a payload noun",
+    text: "Statement: https://e.co/statement-logo.svg",
+    score: 10,
+    svgRow: false,
+    attachRow: false,
+  },
+  // The payload window is 20 and the attachment window 40, and the difference
+  // is deliberate: a payload noun is weaker evidence, so it must sit closer.
+  // Widening it to 40 made this ordinary sentence a phishing hit.
+  {
+    label: "payload noun further from the file than its window allows",
+    text: "Your invoice is ready for you now logo.svg",
+    score: 0,
+    svgRow: false,
+    attachRow: false,
+  },
+  // The cue must share a LINE with the file. The original patterns used `[^\n]`
+  // for the gap, which made this true incidentally; it is load-bearing, because
+  // the standard marketing header puts "View in browser" and a logo reference on
+  // one line and the real body below. Scanning the whole text instead flags all
+  // three of these.
+  {
+    label: "attachment word on the line above a loose token",
+    text: "Please see the attached.\nlogo.svg",
+    score: 0,
+    svgRow: false,
+    attachRow: false,
+  },
+  {
+    label: "payload noun on the line above a loose token",
+    text: "Your invoice.\nlogo.svg",
+    score: 0,
+    svgRow: false,
+    attachRow: false,
+  },
+  {
+    label: "loose token on the line above a payload noun",
+    text: "logo.svg\nYour invoice is ready.",
+    score: 0,
+    svgRow: false,
+    attachRow: false,
+  },
+];
+
+/**
+ * Cases where a `.svg` is NOT in an attribute, although an attribute appears
+ * earlier on the line.
+ *
+ * These pin the other direction of the asset-reference guard: it asks what sits
+ * *immediately* before the token, so each shape is anchored at the end of the
+ * slice with `$`. Unanchored, these two would be excluded — a real attachment
+ * silently losing its flag because the email happened to contain an image
+ * somewhere to its left, which is most HTML mail.
+ *
+ * Separate from the table because they FIRE, and they fire by the same
+ * arithmetic as the dedup cases above, so they are asserted on the flag rather
+ * than threaded through a score column that would need its own explanation.
+ */
+const firesDespiteEarlierAttribute = [
+  'src="a.png" the attached invoice.svg',
+  'src="a.png" your statement detail.svg',
 ];
 
 const rowsWith = (
@@ -261,6 +349,14 @@ describe("SVG-attachment scoring, pinned before the pattern rewrite", () => {
 
     expect(rowsWith(r, ATTACH_FLAG)).toHaveLength(attachRow ? 1 : 0);
   });
+
+  it.each(firesDespiteEarlierAttribute)(
+    "still flags a real attachment when an image appears earlier on the line: %s",
+    (text) => {
+      const r = checkEmail(text, undefined, "AU");
+      expect(rowsWith(r, SVG_FLAG)).toHaveLength(1);
+    },
+  );
 
   it("keeps the evidence summing to the score on every case", () => {
     // The dedup suppresses a charge rather than adding a negative row, so the

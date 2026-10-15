@@ -2315,6 +2315,122 @@ const UNDISCOUNTED_COMPOSITES: string[] = [
   // the list is deleted when the last one does.
 ];
 
+// ── The SVG-attachment guard ───────────────────────────────────────────────
+//
+// Find the `.svg` token, then ask what precedes it. The previous shape asked
+// both questions in one pattern, with three variable-length lookbehinds
+// (`{0,200}`) in front of the token — and a lookbehind of variable length is
+// re-tried at every position in the text, so the cost grew with the SQUARE of
+// the message length. Measured through `checkEmail`: 169ms at 16 KB, 2.1s at
+// 64 KB, 8.1s at 128 KB, with profiling putting 1757 of ~1850 samples in two of
+// those four patterns. This entry point is the one behind forward-to-check, so
+// the text is attacker-chosen by construction — it is whatever was in the mail
+// somebody forwarded.
+//
+// Splitting the two questions is what makes it linear, and it is also the
+// clearer statement of the rule: *is this token an attachment, and is it near
+// attachment language*. `bareHost.ts` went the same way for the same class of
+// question about hostnames — find the candidate, then decide with a guard.
+//
+// Every exclusion below is a measured false positive rather than a precaution.
+
+/** Attachment language proper, not a bare verb — see `isAssetReference`. */
+const ATTACH_WORD = String.raw`attach(?:ment|ments|ed|ing)?|enclosed`;
+/** Payload framing, which stands in for an attachment word. */
+const PAYLOAD_NOUN = String.raw`invoice|statement|receipt|remittance`;
+
+/** A filename ending `.svg`. Found first, judged second. */
+const SVG_TOKEN = /\b[\w.-]+\.svg\b/gi;
+
+/** How far either side of the token the attachment language may sit. */
+const ATTACH_WINDOW = 40;
+const PAYLOAD_WINDOW = 20;
+
+/**
+ * How far back to look for the attribute or scheme that would make this token
+ * an asset reference.
+ *
+ * The old lookbehinds used 200, and the bound is kept: a `src="…"` whose value
+ * runs longer than this before reaching the filename is not a shape real mail
+ * produces. Bounded here it costs one fixed-size slice per token rather than a
+ * re-scan of the whole message per position.
+ */
+const ASSET_CONTEXT = 200;
+
+/**
+ * Is this `.svg` an asset reference — a logo, a tracking pixel — rather than a
+ * file being sent?
+ *
+ * `.svg` is an everyday asset suffix, sitting in the image references at the
+ * foot of most marketing mail, which is precisely the mail this app is handed.
+ * Three shapes, each one a flag a real email used to get:
+ *
+ *   · an absolute URL (`https://cdn.example.com/logo.svg`);
+ *   · a quoted attribute value (`<img src="/assets/logo.svg">`);
+ *   · an unquoted or root-relative one (`<img src=/assets/logo.svg>`,
+ *     `<img src=logo.svg>`), which the quoted shape alone misses.
+ *
+ * Asked of the text immediately before the token, so each is a fixed-cost test
+ * anchored at the end of a short slice rather than a lookbehind the engine
+ * re-tries from every position.
+ */
+function isAssetReference(before: string): boolean {
+  // Anchored at the END of the slice with `$`, which is what makes these
+  // equivalent to the lookbehinds they replace: the question is what sits
+  // immediately before this token, not whether the shape appears anywhere.
+  return (
+    /https?:\/\/[^\s"']*$/i.test(before) ||
+    /(?:src|href)\s*=\s*["'][^"']*$/i.test(before) ||
+    /(?:src|href)\s*=\s*[^\s"'<>]*$/i.test(before)
+  );
+}
+
+/**
+ * Does the message present a `.svg` as something it is sending?
+ *
+ * Returns the token, so the caller's dedup against the generic
+ * open-attachment rule keeps working unchanged.
+ *
+ * Both orders are checked for each cue, which is what the four patterns did:
+ * the attachment word may precede the filename ("the attached invoice.svg") or
+ * follow it ("statement.svg is attached"). The windows differ between the two
+ * cue kinds and are preserved exactly — a payload noun is weaker evidence than
+ * an attachment word, so it has to sit closer.
+ */
+function hasAttachedSvg(text: string): string | null {
+  // Line-scoped, because the original patterns used `[^\n]` for the gap and so
+  // never matched across a newline. That was load-bearing rather than
+  // incidental: the standard marketing header puts "View in browser" and a logo
+  // reference on one line and the body below, and matching across lines made
+  // every such email a phishing hit.
+  for (const line of text.split(/\r?\n/)) {
+    SVG_TOKEN.lastIndex = 0;
+    for (let m = SVG_TOKEN.exec(line); m !== null; m = SVG_TOKEN.exec(line)) {
+      const start = m.index;
+      const end = start + m[0].length;
+      if (isAssetReference(line.slice(Math.max(0, start - ASSET_CONTEXT), start))) continue;
+
+      // The window INCLUDES the token, which is deliberate and was measured
+      // rather than chosen: the cue is allowed to sit inside the filename, and
+      // the old patterns allowed it because their gap was lazy and could be
+      // empty. `remittance-advice.svg` on its own is a hit today, and so is
+      // `receipt-8821.svg` — which is the common real shape, since the attacker
+      // names the file to look like the document it claims to be.
+      //
+      // Excluding the token looked tidier and dropped a pinned case, which is
+      // the whole reason the pin was written first.
+      const near = (window: number, cue: string): boolean => {
+        const re = new RegExp(String.raw`\b(?:${cue})\b`, "i");
+        return re.test(line.slice(Math.max(0, start - window), end + window));
+      };
+      if (near(ATTACH_WINDOW, ATTACH_WORD) || near(PAYLOAD_WINDOW, PAYLOAD_NOUN)) {
+        return m[0];
+      }
+    }
+  }
+  return null;
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Email checker
 // ────────────────────────────────────────────────────────────────────────────
@@ -2459,21 +2575,7 @@ export function checkEmail(text: string, blocklist?: HostLookup, region?: Region
   //
   // Scored below likely_scam on purpose: this is a delivery-mechanism signal,
   // not proof of intent — see the +25 interaction note at the scoring line.
-  const ATTACH_WORD = String.raw`attach(?:ment|ments|ed|ing)?|enclosed`;
-  const PAYLOAD_NOUN = String.raw`invoice|statement|receipt|remittance`;
-  // .svg not sitting in a URL or an HTML attribute value. The three lookbehinds
-  // cover, in order: an absolute URL; a quoted attribute value; and an unquoted
-  // or root-relative attribute value (`src=/assets/logo.svg`, `src=logo.svg`),
-  // which the quoted pattern alone misses.
-  const svgFile = String.raw`(?<!https?:\/\/[^\s"']{0,200})(?<!(?:src|href)\s*=\s*["'][^"']{0,200})(?<!(?:src|href)\s*=\s*[^\s"'<>]{0,200})\b[\w.-]+\.svg\b`;
-  const svgPatterns = [
-    new RegExp(String.raw`\b(?:${ATTACH_WORD})\b[^\n]{0,40}?${svgFile}`, "i"),
-    new RegExp(String.raw`${svgFile}[^\n]{0,40}?\b(?:${ATTACH_WORD})\b`, "i"),
-    new RegExp(String.raw`\b(?:${PAYLOAD_NOUN})\b[^\n]{0,20}?${svgFile}`, "i"),
-    new RegExp(String.raw`${svgFile}[^\n]{0,20}?\b(?:${PAYLOAD_NOUN})\b`, "i"),
-  ];
-  const svgMatch = svgPatterns.reduce<RegExpMatchArray | null>(
-    (found, re) => found ?? text.match(re), null);
+  const svgMatch = hasAttachedSvg(text);
   if (svgMatch) {
     sig.add("sender", "SVG file attached — SVG attachments are a known phishing delivery trick: the file looks like an image but can carry hidden code that opens a fake login page in your browser. Legitimate invoices and statements are not sent as .svg.");
     // De-duplicated against the generic open-attachment rule above, but only

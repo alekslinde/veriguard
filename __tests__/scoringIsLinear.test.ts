@@ -96,29 +96,23 @@ const MAX_GROWTH = 8;
 /** Below this, the ratio is measuring timer noise rather than the algorithm. */
 const FLOOR_MS = 2;
 
-// `checkEmail` is deliberately absent, and it is absent because it FAILS.
+// All three message entry points, `checkEmail` included.
 //
-// It carries a second, unrelated polynomial blowup that predates this file: the
-// four SVG-attachment patterns each use three variable-length lookbehinds
-// (`{0,200}`), re-evaluated at every position in the text. Measured from source
-// on the same inputs — 169ms at 16 KB, 2.1s at 64 KB, 8.1s at 128 KB — and
-// confirmed by profiling, where those two patterns take 1757 of ~1850 samples
-// while the pattern this file was written for takes 75.
+// It was excluded for one commit, because it carried a *second* polynomial
+// blowup of its own: the four SVG-attachment patterns, each using three
+// variable-length lookbehinds (`{0,200}`) re-evaluated at every position —
+// 169ms at 16 KB, 2.1s at 64 KB, 8.1s at 128 KB, with profiling putting 1757 of
+// ~1850 samples in two of them against this file's own pattern at 75. Finding it
+// is what this suite is for; the ratio assertion failed on `checkEmail` at
+// 9–12.6× the first time it ran.
 //
-// Not fixed here. Those patterns have a documented false-positive history (an
-// `.svg` in an `href`/`src` is an ordinary marketing-email logo, which is most
-// of the mail this app is handed), so rewriting them needs its own pin and its
-// own measurement, and folding a second security fix into a refactor is what
-// makes the refactor hard to verify. Listing the entry point here and letting it
-// fail would make the ratio assertion read as this change's problem.
-//
-// **The gap is named rather than silently narrowed**, because a test file that
-// quietly covers two of three entry points is the "partial check reporting a
-// clean sweep" shape. `checkEmail` joins this list when those patterns are
-// fixed, and the last case below asserts the one property that does hold for it
-// today.
+// Both are fixed, so the list is whole. That matters more than it sounds: a test
+// file quietly covering two of three entry points is the "partial check
+// reporting a clean sweep" shape, and the engine's one remaining `.*?` and every
+// variable-length lookbehind in the scoring path are now gone.
 const entryPoints: Array<[string, (t: string) => unknown]> = [
   ["checkSms", (t) => checkSms(t, undefined, "AU")],
+  ["checkEmail", (t) => checkEmail(t, undefined, "AU")],
   ["checkCustom", (t) => checkCustom(t, undefined, "AU")],
 ];
 
@@ -150,18 +144,18 @@ describe("scoring cost grows linearly in the length of the input", () => {
     expect(medianMs(() => checkSms(text, undefined, "AU"))).toBeLessThan(2_000);
   });
 
-  // The forwarding scaffolding is shared by every channel, so the fix above has
-  // to hold on the email path too — even though that path has its own separate
-  // blowup and so cannot be ratio-tested yet (see the note by `entryPoints`).
+  // The email path does strictly more work than the SMS path — it runs the SMS
+  // pass and then its own sender, link and attachment rules — but "more" should
+  // be a constant factor, not a different curve.
   //
-  // Asserted at a size below where the SVG patterns dominate, which is what
-  // makes this about the scaffolding rather than about them: at 4 KB the email
-  // path matches the SMS path (19ms vs 18ms measured), and before the fix it was
-  // seconds. A loose multiple of the SMS cost rather than a duration, so the
-  // machine is divided out — and so this case starts failing if the scaffolding
-  // regresses on email alone.
-  it("does not reintroduce the scaffolding cost on the email path", () => {
-    const text = "12:34" + " ".repeat(2_000) + "-" + " ".repeat(2_000) + "x";
+  // This is the case that would have caught the SVG blowup on its own, and it is
+  // kept as a ratio between the two channels rather than a duration for the same
+  // reason the rest of this file is. Measured after both fixes, the two are
+  // within noise of each other at every size: 22ms vs 23ms at 16 KB, 89ms vs
+  // 88ms at 64 KB, 178ms vs 176ms at 128 KB. Before them, email was 8.1s against
+  // SMS's 193ms at 128 KB.
+  it("does not cost disproportionately more than the SMS path", () => {
+    const text = "12:34" + " ".repeat(16_000) + "-" + " ".repeat(16_000) + "x";
     const sms = medianMs(() => checkSms(text, undefined, "AU"));
     const email = medianMs(() => checkEmail(text, undefined, "AU"));
     expect(
