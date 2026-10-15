@@ -209,7 +209,13 @@ export const FAMILY_IMPERSONATION_SIGNALS: readonly SignalDef[] = [
     // decisions about the text's shape, and `body` is lowercased and normalised.
     // The pretext half reads `body`, which is what the inline version matched
     // against and what `mentions` expects for a pack entry.
-    reads: ["original", "body"],
+    //
+    // `matches` is declared too, so the input gate — not this signal's own
+    // body — is what keeps it from scoring on a context that cannot supply the
+    // matcher. Undeclared, a caller omitting it got zero rows on a real scam
+    // with every authoring check clean: coverage the inventory reported as real
+    // and nothing could fire. See `Reads` in `signalRegistry.ts`.
+    reads: ["original", "body", "matches"],
     channels: ["sms", "email"],
     weight: 45,
     kind: "structural",

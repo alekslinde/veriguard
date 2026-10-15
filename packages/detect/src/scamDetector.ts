@@ -138,10 +138,18 @@ class Signals {
   /**
    * Lift one already-merged row back to its full pre-discount weight.
    *
-   * Exists for signals that a channel-wide multiplier should not apply to (see
-   * the family-impersonation floor in checkEmail). Deliberately narrow: it
-   * raises a single row it can identify by its opening text, never the total,
-   * so the evidence list still sums to the score the reader is shown.
+   * Exists for signals that a channel-wide multiplier should not apply to —
+   * `UNDISCOUNTED_COMPOSITES` and its two remaining entries, the task-payment
+   * and messaging-hijack gates. Deliberately narrow: it raises a single row it
+   * can identify by its opening text, never the total, so the evidence list
+   * still sums to the score the reader is shown.
+   *
+   * **This method is on its way out, and identifying a row by its prose is the
+   * reason.** A signal converted to the registry declares its own per-channel
+   * weight, so there is no discount to undo and nothing to look up by prefix;
+   * each conversion removes an entry from that list, and the list and this
+   * method go when the last one does. The example this comment used to cite was
+   * the family-impersonation floor, which is now one of those conversions.
    */
   restore(prefix: string, points: number): void {
     const row = this.list.find((s) => s.text.startsWith(prefix));
@@ -2348,13 +2356,20 @@ export function checkEmail(text: string, blocklist?: HostLookup, region?: Region
   // Placed immediately after the merge so the evidence keeps the order a reader
   // saw before the conversion: body rows, then the sender and link analysis.
   //
-  // The splice rule goes first, which is the order `checkSms` scores them in and
-  // so the order a reader saw: it is the row that explains why the keyword rows
-  // below it found nothing. The family gate goes last for the same reason — it
-  // sits after the keyword rules in `checkSms`.
+  // Ordered as `checkSms` scores them — splice, family, ClickFix — so the
+  // evidence list reads the same whichever channel the text arrived on. The
+  // splice rule first is the load-bearing part: it is the row that explains why
+  // the keyword rows found nothing.
+  //
+  // Worth stating as a rule rather than a preference, because getting it wrong
+  // is invisible. Nothing here asserts an order, every pin asserts points and
+  // row counts, and a reader comparing an SMS verdict with the email verdict for
+  // the same text is the only one who would notice. The first version of this
+  // block had ClickFix and the family gate the other way round, under a comment
+  // claiming it matched `checkSms`.
   addSplicedWordingSignals(sig, text, PACK, "email");
-  addClickFixSignals(sig, text, PACK, "email");
   addFamilyImpersonationSignals(sig, text, PACK, "email");
+  addClickFixSignals(sig, text, PACK, "email");
 
   // …but not for the gated composites. The 0.7 discount is right for what it
   // was written for — urgency and reward keywords really are weaker evidence in

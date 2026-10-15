@@ -2,7 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { describe, it, expect } from "vitest";
-import { checkSms, checkEmail, checkCustom } from "@veriguard/detect/scamDetector";
+import { checkSms, checkEmail, checkCustom, mentions } from "@veriguard/detect/scamDetector";
+import { FAMILY_IMPERSONATION_SIGNALS } from "@veriguard/detect/signals/familyImpersonation";
+import {
+  missingReads,
+  registryProblems,
+  registryScore,
+} from "@veriguard/detect/signalRegistry";
+import { resolveRegionPack } from "@veriguard/detect/regions";
 
 // Every score the family-impersonation gate produces today, pinned before its
 // scoring moves into the signal registry.
@@ -457,6 +464,45 @@ describe("family-impersonation scoring, pinned before the registry conversion", 
     const r = checkCustom(text, undefined, "AU");
     expect(r.score).toBe(custom);
     expect(familyRows(r)).toEqual([]);
+  });
+});
+
+// The matcher the gate consults is an input it declares, not something its own
+// body remembers to check.
+//
+// Asserted against the registry rather than through an entry point, because no
+// entry point can produce the omission: each passes the matcher unconditionally.
+// That is exactly why it needs a test — review found that a caller omitting it
+// type-checked clean, every authoring check reported nothing, and a real scam
+// scored zero rows with nothing saying why. Step 4 converts 75 rules that all
+// consult a pack list, so a helper forgetting this field is the likely shape of
+// the next instance.
+describe("the gate declares the matcher it needs", () => {
+  const scam = "Hi Mum, this is my new number, my phone broke. Can you send $400?";
+  const base = {
+    channel: "sms" as const,
+    pack: resolveRegionPack("AU"),
+    original: scam,
+    body: scam.toLowerCase(),
+  };
+
+  it("scores nothing on a context that cannot supply it", () => {
+    expect(registryScore(base, FAMILY_IMPERSONATION_SIGNALS)).toEqual([]);
+  });
+
+  it("scores 45 once the matcher is there", () => {
+    const rows = registryScore({ ...base, matches: mentions }, FAMILY_IMPERSONATION_SIGNALS);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].points).toBe(45);
+  });
+
+  it("names the matcher among its inputs, so the gate decides rather than evaluate", () => {
+    // The declaration is what makes `registryScore` skip it. Without this the
+    // guard inside `evaluate` is the only thing standing between a matcher-less
+    // caller and a silent zero, and nothing reports that the input was needed.
+    expect(FAMILY_IMPERSONATION_SIGNALS[0].reads).toContain("matches");
+    expect(missingReads(FAMILY_IMPERSONATION_SIGNALS[0], base)).toEqual(["matches"]);
+    expect(registryProblems(FAMILY_IMPERSONATION_SIGNALS)).toEqual([]);
   });
 });
 

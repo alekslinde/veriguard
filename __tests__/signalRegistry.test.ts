@@ -477,6 +477,41 @@ describe("reads makes overlap and missing inputs visible", () => {
     expect(missingReads(fires({ reads: ["words"] }), ctx())).toEqual([]);
   });
 
+  it("treats an unsupplied pack-entry matcher the same way", () => {
+    // `matches` carries the engine's shared matcher to a signal that consults a
+    // pack list, and it is the input most of the registry will declare once the
+    // 75 keyword rules are converted.
+    //
+    // It was NOT a `Reads` in the first draft, on the argument that it is a
+    // capability rather than an input — a signal using it still reads `body`,
+    // and this names the rule by which an entry is found there. Review measured
+    // the consequence: a signal needing it and a caller omitting it type-checked
+    // clean, `registryProblems` reported nothing, `missingReads` reported
+    // nothing, and a real scam scored ZERO rows with nothing saying why. Inert
+    // coverage that the inventory reports as real, which is what this file
+    // exists to make inexpressible — so it is declared, and the input gate
+    // decides, not each `evaluate` remembering to guard.
+    const reader = fires({ reads: ["matches"] });
+    expect(missingReads(reader, ctx())).toEqual(["matches"]);
+    expect(registryScore(ctx(), [reader])).toEqual([]);
+    // Supplied, it reads on any channel that has prose.
+    const matches = (text: string, entry: string) => text.includes(entry);
+    expect(missingReads(reader, ctx({ matches }))).toEqual([]);
+    expect(registryScore(ctx({ matches }), [reader])).toHaveLength(1);
+  });
+
+  it("knows a pack-entry match needs prose to match against", () => {
+    // Unlike `words`, this is answerable from the channel: every message entry
+    // point already holds the matcher — it is the engine's own, not something a
+    // caller has to build — so the only channel that can never carry it is the
+    // one whose input is a number.
+    expect(unsatisfiableReads(fires({ reads: ["matches"], channels: ["sms"] }))).toEqual([]);
+    expect(unsatisfiableReads(fires({ reads: ["matches"], channels: ["custom"] }))).toEqual([]);
+    expect(unsatisfiableReads(fires({ reads: ["matches"], channels: ["phone"] }))).toEqual([
+      "matches",
+    ]);
+  });
+
   it("answers from what is present, not from the channel", () => {
     // An SMS carrying a link has a hostname, and an email whose headers failed
     // to parse does not have headers. Inferring either from the channel would
