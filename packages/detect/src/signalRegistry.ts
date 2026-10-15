@@ -43,7 +43,23 @@
 //
 //   3. The gated composites, in progress. Each entry's signal declares its own
 //      channel weight, and `UNDISCOUNTED_COMPOSITES` loses an entry rather than
-//      gaining one. The ClickFix pair converted first, as the smallest.
+//      gaining one — four entries down to three. The ClickFix pair went first as
+//      the smallest; the splice rule second, because it is the one whose scoring
+//      shape does NOT fit the default. It finds a SET and scores it once, where
+//      `registryScore` scores each hit at the declared weight, so the obvious
+//      conversion turns a three-word splice into 75 points. One hit carrying the
+//      word list in its prose is the answer, and the general lesson is that
+//      `scale` is for a signal whose strength varies with what it found — not
+//      every signal that finds more than one thing. See `signals/splicedWording`.
+//
+//      Both conversions hit the SAME defect, and neither was visible in the
+//      code: `checkEmail` merges the whole SMS sub-result at 0.7, so a weight
+//      the signal declared arrived multiplied by something that never knew the
+//      signal existed — ClickFix's 50 as 35, the splice rule's 25 as 17. Found
+//      both times by pinning the scores first and reading the failure. The fix
+//      is for the entry point to score the registry's share outside the merge,
+//      which is what keeps "a weight read from the registry is the weight that
+//      reaches the score" true rather than merely intended.
 //
 // Remaining:
 //
@@ -110,6 +126,7 @@ import type { PhoneIntel } from "./phoneIntel";
 import type { RegionPack } from "./regions";
 import { CLICKFIX_SIGNALS } from "./signals/clickfix";
 import { PHONE_SIGNALS } from "./signals/phone";
+import { SPLICED_WORDING_SIGNALS } from "./signals/splicedWording";
 
 /**
  * Which surface the text arrived on.
@@ -452,10 +469,15 @@ export function unsatisfiableReads(
  * conversion — the registration and the deletion of the inline site — belong in
  * one commit.
  *
- * Converted so far: the phone channel, and the ClickFix pair on the sms, email
- * and custom channels. `scamDetector.ts` still owns the rest.
+ * Converted so far: the phone channel, and the ClickFix pair and the
+ * spliced-wording rule on the sms, email and custom channels. `scamDetector.ts`
+ * still owns the rest.
  */
-export const SIGNALS: readonly SignalDef[] = [...PHONE_SIGNALS, ...CLICKFIX_SIGNALS];
+export const SIGNALS: readonly SignalDef[] = [
+  ...PHONE_SIGNALS,
+  ...CLICKFIX_SIGNALS,
+  ...SPLICED_WORDING_SIGNALS,
+];
 
 /**
  * Ids registered more than once.
