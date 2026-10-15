@@ -161,10 +161,13 @@ describe("an undistributed surface is not interactive", () => {
   // again, as PendingRow was, and for the reason that shape existed: it must
   // not be a <details> at all.
   const grid = read("components/WaysGrid.tsx");
-  const pending = grid.slice(
-    grid.indexOf("function PendingTile("),
-    grid.indexOf("function Tile("),
-  );
+  // Ends at the function's own closing brace, NOT at the next `function` — the
+  // gap between the two holds Tile's doc comment, which describes the
+  // <details> that Tile legitimately is. Slicing to the next declaration put
+  // that prose inside the window and failed the assertions below on a comment.
+  // The subject here is PendingTile's body; nothing outside it is evidence.
+  const pendingStart = grid.indexOf("function PendingTile(");
+  const pending = grid.slice(pendingStart, grid.indexOf("\n}", pendingStart));
 
   it("finds the pending tile to assert against", () => {
     // The assertions below slice the source, and a failed indexOf returns -1 —
@@ -173,7 +176,12 @@ describe("an undistributed surface is not interactive", () => {
     // rename turning the rest of this block into a silent pass.
     expect(grid).toContain("function PendingTile(");
     expect(grid).toContain("function Tile(");
+    expect(pendingStart).toBeGreaterThan(-1);
+    expect(grid.indexOf("\n}", pendingStart)).toBeGreaterThan(pendingStart);
     expect(pending.length).toBeGreaterThan(200);
+    // The window stops before the next declaration, so a later component's
+    // source can never satisfy or break the assertions below.
+    expect(pending).not.toContain("function Tile(");
   });
 
   it("routes a pending entry away from the disclosure entirely", () => {

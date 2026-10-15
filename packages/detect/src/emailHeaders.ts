@@ -32,8 +32,16 @@ export interface EmailHeaders {
 }
 
 // Brand/identity words that, when they appear in a display name but not in the
-// actual sending domain, indicate impersonation. Mirrors the lists used in
-// scamDetector (kept local here to avoid a circular import).
+// actual sending domain, indicate impersonation.
+//
+// Its own list, NOT a mirror of the region packs, and the comment here used to
+// claim otherwise. Two ways it differs by design, both worth keeping straight
+// before anyone "resyncs" them: this list is AU-only and unconditional, where
+// every pack list is region-resolved per check; and 14 of these entries
+// (commonwealth bank, paypal, apple, microsoft, google, the loyalty programmes,
+// the super funds…) appear in no AU pack list at all, because a display name
+// is a different surface from message prose — a sender can impersonate a brand
+// the body never names. Kept local also avoids a circular import.
 const IMPERSONATED_BRANDS = [
   "ato", "mygov", "centrelink", "medicare", "services australia",
   "commbank", "commonwealth bank", "westpac", "anz", "nab", "paypal",

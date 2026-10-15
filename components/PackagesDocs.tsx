@@ -23,7 +23,7 @@
 // read in pieces and quoted in support threads: "see the coverage caveat"
 // should be a link, not an instruction to scroll.
 //
-// The samples below are real. __tests__/npmDocs.test.ts runs the library
+// The samples below are real. __tests__/packagesDocs.test.ts runs the library
 // quickstart against the engine and fails if the verdict it claims stops being
 // true; the MCP samples are checked against the server's own tool registry and
 // CLI, so a renamed tool or flag fails there rather than in someone's config.

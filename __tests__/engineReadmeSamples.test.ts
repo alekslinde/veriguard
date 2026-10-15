@@ -4,7 +4,8 @@
 // The engine README's code samples, checked against the engine.
 //
 // Code in a README is a claim about the API, and this one had no test while the
-// website's equivalent samples did — __tests__/npmDocs.test.ts runs those,
+// website's equivalent samples did — __tests__/packagesDocs.test.ts runs
+// those,
 // which is why the same mistake was caught there and sat here instead:
 // `await checkUrl(...)` on a synchronous function, plus prose claiming every
 // check hides sync work "behind an async signature", which describes

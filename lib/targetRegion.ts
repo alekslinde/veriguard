@@ -52,16 +52,6 @@ export interface TargetInference {
 const NO_INFERENCE: TargetInference = { region: "", confidence: "none" };
 
 /**
- * National suffixes, per region, excluding any that more than one pack claims.
- *
- * `brandSuffixes` is not usable directly: every pack lists `com`, `net` and
- * `org` because its brands register there, so a naive read makes every `.com`
- * look like evidence for whichever pack was checked first. Only a suffix that
- * exactly one region claims carries national information.
- *
- * Computed once. The packs are static, so this cannot drift at runtime.
- */
-/**
  * Suffixes that exactly one pack claims but which carry no national meaning.
  *
  * Uniqueness of claim is necessary but NOT sufficient, which the derivation
@@ -81,6 +71,16 @@ const NO_INFERENCE: TargetInference = { region: "", confidence: "none" };
  */
 const NON_NATIONAL_SUFFIXES = new Set(["co", "io", "me", "gov", "mil"]);
 
+/**
+ * National suffixes, per region, excluding any that more than one pack claims.
+ *
+ * `brandSuffixes` is not usable directly: every pack lists `com`, `net` and
+ * `org` because its brands register there, so a naive read makes every `.com`
+ * look like evidence for whichever pack was checked first. Only a suffix that
+ * exactly one region claims carries national information.
+ *
+ * Computed once. The packs are static, so this cannot drift at runtime.
+ */
 const NATIONAL_SUFFIXES: ReadonlyMap<string, string> = (() => {
   const claims = new Map<string, string[]>();
   for (const code of supportedRegions()) {
@@ -159,22 +159,6 @@ function hostnames(haystack: string): string[] {
 }
 
 /**
- * Agency and brand names that exactly one pack claims but which are ordinary
- * English, or generic across countries.
- *
- * Uniqueness of claim is necessary but NOT sufficient — the same lesson as
- * `NON_NATIONAL_SUFFIXES`, which this file learned once and did not generalise.
- * Every entry below was a real misattribution: "revenue figures are up" read as
- * Ireland, "the reserve bank said" as New Zealand, "postal service update" and
- * "the sheriff called" as the US.
- *
- * The tell is that the phrase describes a KIND of institution rather than
- * naming one. Every country has a revenue office, a central bank, a postal
- * service and local councils; only some have an "HMRC" or a "Centrelink". A
- * name that could complete the sentence "every country has a ___" carries no
- * national information no matter which pack happens to list it.
- */
-/**
  * Brand names that are also ordinary English words.
  *
  * Word boundaries fix collisions INSIDE other words — "chase" no longer matches
@@ -197,6 +181,22 @@ const AMBIGUOUS_BRAND_WORDS = new Set([
   "fidelity", "regions", "target", "revenue", "interac",
 ]);
 
+/**
+ * Agency and brand names that exactly one pack claims but which are ordinary
+ * English, or generic across countries.
+ *
+ * Uniqueness of claim is necessary but NOT sufficient — the same lesson as
+ * `NON_NATIONAL_SUFFIXES`, which this file learned once and did not generalise.
+ * Every entry below was a real misattribution: "revenue figures are up" read as
+ * Ireland, "the reserve bank said" as New Zealand, "postal service update" and
+ * "the sheriff called" as the US.
+ *
+ * The tell is that the phrase describes a KIND of institution rather than
+ * naming one. Every country has a revenue office, a central bank, a postal
+ * service and local councils; only some have an "HMRC" or a "Centrelink". A
+ * name that could complete the sentence "every country has a ___" carries no
+ * national information no matter which pack happens to list it.
+ */
 const GENERIC_INSTITUTION_TERMS = new Set([
   "revenue", "inland revenue", "revenue service", "central bank",
   "reserve bank", "national bank", "postal service", "post office",

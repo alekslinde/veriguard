@@ -249,74 +249,27 @@ class Signals {
 // unrecognised, so omitting the argument preserves the original AU behaviour.
 
 /**
- * Match a pack entry against text: word boundaries for single tokens,
- * substring for multi-word phrases.
- *
- * Agency lists (`authorityMentions`, `noLinkSenders`, `foreignAuthorityMentions`)
- * are plain string arrays rather than a BrandSet, so they have no explicit
- * substring/word split — and national agency acronyms are overwhelmingly three
- * letters. Plain `includes()` therefore fires inside ordinary English, which is
- * not a theoretical risk: it was found flagging "your account is fine" as
- * government impersonation (NZ "acc" ⊂ "account") and would have read "message"
- * as the SSA, "security" as the SEC, and "weird"/"third" as the IRD.
- *
- * That protection used to stop at 4 characters, which left the same failure
- * mode wide open one letter further up (#233): "claim" fired inside
- * "unclaimed" and "reclaiming", "prize" inside "prizewinning", "voucher"
- * inside "voucherless". "Unclaimed baggage goes to the storage room" reached
- * suspicious (24) on nothing but ordinary English. Length was never the real
- * distinction — token-ness is. A single token has boundaries to respect; a
- * multi-word phrase is already specific enough that its own spaces do the work,
- * and anchoring it would break the punctuation-tolerant matching it relies on.
- *
- * Boundary matching is *not* the same as exact matching, which is why this is
- * safe for the domain and hyphen entries the packs are full of: \b sits at any
- * non-word character, so "medicare" still matches "medicare.gov.au", "gov.au"
- * still matches "ato.gov.au", and "target" still matches "target-shop".
- *
- * What it does drop is letter-adjacent compounds — "garda" no longer fires
- * inside "gardai", nor "crypto" inside "easycrypto". Every such compound in the
- * packs today is already listed as its own entry, so this costs no coverage.
- * The one deliberate exception was AU's "mygov" ⊂ "mygovid" (see the note in
- * au.ts REQUEST_WORDS); myGovID lures are still carried by identityRereg and
- * authorityMentions, which name the rebrand explicitly.
- *
- * The rule is structural rather than a curated list because the failure mode is
- * mechanical: any token collides eventually, and a new pack should inherit the
- * protection without anyone remembering to opt in.
- */
-/**
- * Inflectional endings tolerated after a long single-token entry. Deliberately
- * a closed set of grammatical suffixes rather than "any letters": the point is
- * to follow a word into its own inflections without letting it wander into a
- * different word ("voucher" must not reach "voucherless").
+ * Inflectional endings tolerated after a long single-token entry. A closed set
+ * of grammatical suffixes rather than "any letters", so a word can reach its
+ * own inflections without wandering into a different word ("voucher" must not
+ * reach "voucherless").
  */
 const INFLECTION = "(?:s|es|ed|d|ing|ly)?";
 
 /**
  * Entries this long or shorter get no inflection tolerance.
  *
- * The suffix allowance was originally unconditional, which quietly undid the
- * #196 protection from the other end: "pin" reached "pins", "free" reached
- * "freed", "cash" reached "cashed". Those stack — "The pins fell over and the
- * cheque was cashed and the prisoner freed" scored 39 (suspicious) on three
- * fragments of ordinary English, worse than the behaviour #233 set out to fix.
- *
- * The threshold is the one #196 established, kept deliberately: at four
- * characters and under, every entry across the packs is a standalone word or
- * identifier (tfn, ppsn, nino, $500, 401k, ato, pin, free, cash) whose
- * inflections are either meaningless or someone else's word. Above it, entries
- * are real words that inflect — "urgent"/"urgently", "claim"/"claiming".
+ * Unconditional suffix tolerance undid the short-entry protection from the
+ * other end: "pin" reached "pins", "free" reached "freed", "cash" reached
+ * "cashed", and those stack — "The pins fell over and the cheque was cashed and
+ * the prisoner freed" scored 39/suspicious on ordinary English. At four
+ * characters and under every pack entry is a standalone word or identifier
+ * (tfn, ppsn, nino, $500, 401k, ato, pin, free, cash) whose inflections are
+ * meaningless or someone else's word; above it, entries are real words that
+ * inflect ("urgent"/"urgently").
  */
 const INFLECTION_MIN_LEN = 4;
 
-/**
- * How a pack entry is matched against text.
- *
- * Exported so the pack guards in __tests__ can model matching with the engine's
- * own rule instead of a hand-copied mirror — three copies of this logic drifted
- * apart once already (#233 review).
- */
 /**
  * Substring match, tolerant of whitespace variation but WITHOUT word boundaries.
  *
@@ -367,6 +320,36 @@ function foldMessage(text: string): string {
 }
 let lastFoldedMessage = { input: "", folded: "" };
 
+/**
+ * Match a pack entry against text: word boundaries for single tokens,
+ * substring for multi-word phrases.
+ *
+ * Agency lists are plain string arrays with no substring/word split of their
+ * own, and national agency acronyms are overwhelmingly three letters, so plain
+ * `includes()` fires inside ordinary English: it flagged "your account is fine"
+ * as government impersonation (NZ "acc" ⊂ "account"), and would read "message"
+ * as the SSA and "security" as the SEC. Capping the protection by length left
+ * the same failure one letter up — "claim" inside "unclaimed", "prize" inside
+ * "prizewinning" — so "Unclaimed baggage goes to the storage room" reached
+ * suspicious (24). **Length was never the distinction; token-ness is.** A
+ * single token has boundaries to respect; a multi-word phrase is specific
+ * enough that its own spaces do the work, and anchoring it would break the
+ * punctuation-tolerant matching it relies on.
+ *
+ * Boundary matching is not exact matching, which is what makes it safe for the
+ * domain and hyphen entries the packs are full of: \b sits at any non-word
+ * character, so "medicare" still matches "medicare.gov.au" and "target" still
+ * matches "target-shop". What it drops is letter-adjacent compounds ("garda"
+ * no longer fires inside "gardai"), each already listed as its own entry.
+ *
+ * Structural rather than a curated list because the failure mode is mechanical:
+ * any token collides eventually, and a new pack should inherit the protection
+ * without anyone remembering to opt in.
+ *
+ * Exported so the pack guards in `__tests__` model matching with the engine's
+ * own rule rather than a hand-copied mirror — three copies of this logic
+ * drifted apart once already.
+ */
 export function mentions(text: string, entry: string): boolean {
   const needle = foldAccents(entry.toLowerCase());
   text = foldMessage(text);
@@ -467,30 +450,21 @@ function mentionsAny(text: string, entries: string[]): boolean {
   return entries.some((entry) => mentions(text, entry));
 }
 
-/**
- * Short agency acronyms that are also ordinary words, matched on CASE.
- *
- * The collision these solve: "sec", "ice", "sars", "police" and the like are
- * real agency names and ordinary vocabulary at once. mentions() is
- * case-insensitive and anchors on word boundaries, so it cannot separate them —
- * it matches "grab some ice" exactly as it matches "ICE:". Dropping the entry
- * loses the acronym-only lure, which is the common SMS form ("SEC NOTICE: your
- * brokerage account…"); keeping it flags innocent text, and that flag then
- * supplies the authority half of a composite. Neither side is acceptable.
- *
- * Case carries the distinction that spelling does not. Agencies are written in
- * caps in the impersonation scripts; the ordinary word is not. So these entries
- * match only when the token appears in caps AND the message is not itself
- * mostly caps — the second condition is what stops a shouty but innocent
- * "GRAB SOME ICE ON THE WAY HOME" from reading as an agency.
- *
- * This is a narrow exception, not a general rule: it applies only to entries a
- * pack marks as colliding, because every other entry is safer
- * case-insensitive. A scammer typing "sec notice" in lower case defeats this
- * one signal, which is the accepted cost — the alternative is a false
- * accusation against ordinary messages, and the other signals in a real lure
- * (a link, an urgency phrase, a credential ask) do not depend on it.
- */
+// ── Short agency acronyms that are also ordinary words, matched on CASE ─────
+//
+// "sec", "ice", "sars", "police" are agency names and ordinary vocabulary at
+// once, and mentions() is case-insensitive, so it matches "grab some ice" as
+// readily as "ICE:". Dropping the entry loses the acronym-only lure ("SEC
+// NOTICE: your brokerage account…"), the common SMS form; keeping it flags
+// innocent text, and that flag then supplies the authority half of a composite.
+//
+// Case carries the distinction spelling cannot: these entries match only when
+// the token is in caps AND the message is not itself mostly caps, the second
+// condition being what stops "GRAB SOME ICE ON THE WAY HOME" reading as an
+// agency. A narrow exception applying only to entries a pack marks as
+// colliding. A scammer typing "sec notice" in lower case defeats this one
+// signal — the accepted cost, since the alternative is a false accusation and a
+// real lure's other signals do not depend on it.
 const MOSTLY_CAPS_RATIO = 0.7;
 
 function messageIsMostlyCaps(text: string): boolean {
@@ -802,90 +776,41 @@ export function checkUrl(
     // letting the brand own the label and silently exempting itself.
     const registrable = registrableLabel(hostname);
 
-    // The brand-owns-the-label exemption applies only on a suffix this region's
-    // brands actually use.
+    // Whether owning the registrable label proves ownership depends on the
+    // SHAPE of the suffix, so this is a denylist, not an allowlist.
     //
-    // This is the half of the old hand-written suffix list that the PSL does
-    // NOT replace, and dropping it silently reopened a real gap. `gov.co` is a
-    // genuine public suffix, so the PSL correctly makes "barclays" the
-    // registrable label of "barclays.gov.co" — at which point the brand owns
-    // the label and the squat exempts itself. The old list only avoided that by
-    // omitting `.gov.co` entirely, i.e. by being wrong about structure in a way
-    // that happened to be right about intent.
-    //
-    // Separating the two questions keeps both answers: the PSL says where the
-    // registration boundary is, and `brandSuffixes` says whether a UK bank
-    // would be registering in Colombia's government namespace. It would not.
-    // Whether owning the label proves ownership depends on the SHAPE of the
-    // suffix, and the rule has to be a denylist rather than an allowlist.
-    //
-    // A single-label suffix — `.com`, `.de`, `.fr`, `.tv`, `.info` — is where
-    // brands register worldwide. `amazon.de` is Amazon's real German site, and
-    // there are far more such TLDs than any list could enumerate, so the
-    // exemption applies by default. An earlier version gated on a 45-entry
-    // union of the packs' own suffixes, which inverted this: every TLD outside
-    // the list lost the exemption, and a sweep of US-pack brands across
-    // ordinary TLDs flagged 216 of 216 real sites. That is the
-    // false-positive-on-a-real-brand direction, and the costlier one.
-    //
-    // A MULTI-label suffix is a national namespace, and there the country
-    // matters: `barclays.co.uk` is Barclays, while `barclays.gov.co` is a squat
-    // under Colombia's government namespace, which is sold openly and is not
-    // somewhere a UK bank registers. So for those, the suffix must be one a
-    // covered region actually uses.
+    // Single-label (`.com`, `.de`, `.tv`) is where brands register worldwide,
+    // so the exemption applies by default — there are more such TLDs than any
+    // list could enumerate. Gating on a 45-entry union of the packs' own
+    // suffixes inverted that and flagged 216 of 216 real sites in a sweep.
+    // Multi-label is a national namespace where the country matters:
+    // `barclays.co.uk` is Barclays, `barclays.gov.co` is a squat in Colombia's
+    // government namespace, which is sold openly. The PSL cannot answer this
+    // alone — `gov.co` is a genuine public suffix, so it correctly makes
+    // "barclays" the registrable label and the squat would exempt itself.
     const suffix = publicSuffix(hostname);
     const onBrandSuffix = !suffix.includes(".") || BRAND_SUFFIXES.has(suffix);
 
     // A GLOBAL brand inverts the multi-label default, and has to.
     //
-    // The rule above asks "would a covered region's brands be on this suffix",
-    // answered from the union of the authored packs. That reading holds only
-    // while every brand is authored in the pack whose national suffixes it
-    // registers under — and the global brand floor is exactly the set of brands
-    // for which that is false. PayPal registers in every country's commercial
-    // namespace, so `paypal.com.br`, `paypal.co.jp` and `amazon.co.za` are real
-    // sites, and the union flagged all three as impersonation because no
-    // authored pack lists `.com.br`, `.co.jp` or `.co.za`. A sweep of the six
-    // global brands across 18 national suffixes produced 96 such flags.
+    // The pack union only reads correctly while every brand is authored in the
+    // pack whose national suffixes it registers under, and the global floor is
+    // exactly the set where that is false: no pack lists `.com.br`, `.co.jp` or
+    // `.co.za`, so `paypal.com.br` and `amazon.co.za` were flagged — 96 such
+    // flags across six brands and 18 national suffixes. Enumerating the world's
+    // commercial namespaces is the "scoped to what we cover today" mistake the
+    // PSL adoption already unpicked, and an attempt to enumerate the squat
+    // namespaces instead shipped two regressions on contact. So
+    // `isNationalCommercialSuffix` answers it from the PSL's own data.
     //
-    // Enumerating the world's commercial namespaces is not the fix — that is
-    // the "scoped to the ccTLDs the packs actually cover" mistake the PSL
-    // adoption already had to unpick. So the exemption applies on any ordinary
-    // NATIONAL COMMERCIAL namespace, and `isNationalCommercialSuffix` answers
-    // that from the PSL's own data plus one small judgement (see there) rather
-    // than from a list someone remembered to enumerate. `barclays.gov.co`,
-    // `chase.co.io` and `paypal.com.np` keep scoring.
-    //
-    // An earlier cut DID enumerate the squat namespaces, and shipped two
-    // regressions on contact — `paypal.gov.io` and `paypal.com.np`, both
-    // already pinned by tests from the last time this reasoning was got wrong.
-    // Same trap, one level up.
-    //
-    // The single-label default carries over untouched, because `onBrandSuffix`
-    // already holds it: `.com`, `.de`, `.fr` are where brands register
-    // worldwide. `isNationalCommercialSuffix` answers only the multi-label
-    // question and returns false for a bare TLD, so it could never have carried
-    // that default on its own — as the whole condition it flagged `paypal.com`
-    // in every region.
-    //
-    // WIDENS the existing test rather than replacing it. The two answer
-    // different questions — "is this an ordinary national commercial namespace"
-    // and "does some authored pack put its brands here" — and a global brand
-    // owning its label is genuine if EITHER says so. Writing this as a switch
-    // (`global ? a : b`) instead discarded the pack union for exactly the six
-    // brands, and flagged `amazon.org.uk`, `paypal.me.uk` and `netflix.org.au`
-    // as impersonation at 45/likely_scam where `main` scored them 0/safe. Nine
-    // of the 31 multi-label suffixes the packs author are second levels outside
-    // the commercial set — `org.uk`, `ltd.uk`, `plc.uk`, `me.uk`, `org.au`,
-    // `id.au`, `asn.au`, `org.nz`, `org.sg` — and a national brand on the same
-    // suffix (`tesco.org.uk`) stayed clean throughout, which is what isolated
-    // it to the global path.
-    //
-    // Widening cannot reopen the squat cases: those suffixes are in no pack's
-    // `brandSuffixes` either, so the union rejects them too.
-    // Written as `onBrandSuffix || extra` rather than as a ternary between two
-    // whole conditions, so that the widening is visible at a glance and cannot
-    // silently become a switch again.
+    // WIDENS rather than replaces, and must stay `||`: the two conditions ask
+    // different questions, and a global brand owning its label is genuine if
+    // either says so. As a ternary it discarded the pack union for those six
+    // brands and scored `amazon.org.uk`, `paypal.me.uk` and `netflix.org.au`
+    // 45/likely_scam where main scored 0/safe — nine of the 31 multi-label
+    // suffixes the packs author sit outside the commercial set (`org.uk`,
+    // `me.uk`, `asn.au`…). Widening cannot reopen the squats: those suffixes
+    // are in no pack's `brandSuffixes` either.
     const brandOwnsLabel = (brand: string) =>
       registrable === brand
       && (onBrandSuffix
@@ -915,64 +840,40 @@ export function checkUrl(
 
     // ── Keyboard-adjacency typosquat ───────────────────────────────────────
     //
-    // The rules above need the brand to APPEAR in the label. A squat that
-    // misspells it — "payppal.com", "wsstpac.com" — contains no brand string at
-    // all and scored nothing, which is the whole point of registering one.
+    // The rules above need the brand to APPEAR in the label; a squat that
+    // misspells it ("payppal.com", "wsstpac.com") contains no brand string and
+    // scored nothing. Structural by construction — it is about keystrokes, so
+    // it needs no per-country research and improves every region including `ZZ`.
     //
-    // Structural by construction: the check is about keystrokes, so it needs no
-    // per-country research and improves every region at once, including `ZZ`.
-    // The brand list still comes from the pack, so a region with no brands
-    // authored simply gets no hits rather than a wrong one.
+    // Scored BELOW the substring rules (35 vs 45): a visible brand is
+    // unambiguous, a near-miss is inference. Enough to reach `suspicious`
+    // alone, not `likely_scam` without corroboration.
     //
-    // Scored BELOW the substring rules (35 vs 45). A visible brand in a domain
-    // is unambiguous; a near-miss is inference, and the shorter the brand the
-    // more it is inference — hence the length floor inside the module. Enough
-    // to reach `suspicious` on its own, not enough to reach `likely_scam`
-    // without corroboration, which is the right failure direction for a rule
-    // that can in principle land on an innocent label.
-    //
-    // Only ever consulted when the brand is NOT present verbatim, so a real
-    // site can never be scored by both this and the substring rule.
-    // Both brand lists feed this, unlike the rules above.
-    //
-    // The substring/word split exists to stop a SHORT brand matching inside a
-    // longer unrelated word — "nib" in "nibble", "agl" in "bagel". That hazard
-    // is specific to substring containment and cannot arise here: two of the
-    // three shapes below preserve length exactly and the third adds one
-    // character, so a candidate is always within one character of the brand.
-    // "velocityglobal" — the real business that got the bare "velocity" removed
-    // from the substring list — is fourteen characters against eight and is
-    // rejected on length before anything else runs.
-    //
-    // Excluding the word list was the first cut and it was wrong for a reason
-    // worth recording: it silently dropped every brand whose only listing is
-    // there, so "startrackk.com" scored nothing. The six-character floor
-    // already removes the genuinely short ones ("agl", "nib", "hcf"), which is
-    // the same hazard handled at the right layer. Verified across all packs:
-    // with the word lists included, no brand is a keyboard-typo of any other.
+    // Both brand lists feed this, unlike the rules above. The substring/word
+    // split guards against a short brand matching inside a longer word ("nib"
+    // in "nibble"), which cannot arise here — every candidate is within one
+    // character of the brand, so the length floor rejects it first. Excluding
+    // the word list was the first cut and dropped every brand listed only
+    // there, so "startrackk.com" scored nothing. Verified across all packs: no
+    // brand is a keyboard-typo of any other.
     const typo = findKeyboardTypo(registrable, [
       ...TYPOSQUAT_BRANDS.substring,
       ...TYPOSQUAT_BRANDS.word,
     ]);
     //
-    // The suppression condition is whether the SUBSTRING RULE ALREADY SCORED
-    // this brand, which is not the same as whether the hostname contains it.
-    // Testing containment directly — `!hostname.includes(typo)` — silently
-    // disabled the entire doubling shape: doubling a letter leaves the brand
-    // intact as a substring ("startrackk" contains "startrack"), so every
-    // doubled squat of a substring-listed brand suppressed itself. It survived
-    // review because the worked example, "payppal", doubles a letter in the
-    // MIDDLE and so happens not to contain "paypal".
+    // Suppress only where the SUBSTRING RULE ALREADY SCORED this brand, which
+    // is NOT the same as whether the hostname contains it. Testing containment
+    // (`!hostname.includes(typo)`) silently disabled the whole doubling shape,
+    // since doubling leaves the brand intact ("startrackk" contains
+    // "startrack"). It survived review because the worked example, "payppal",
+    // doubles a letter mid-word and so happens not to contain "paypal".
     //
-    // A brand that is present but exempt (the brand owning the label, or a
-    // trusted suffix) scored nothing from the substring rule, so there is
-    // nothing to double-score against — but those hosts are the real site and
-    // must not be flagged here either. `brandOwnsLabel` is what separates
-    // them, and it is the same test the substring rule uses.
-    // Mirrors the two rules above exactly, rather than approximating them with
-    // raw containment. `startrack` is a WORD brand, so the substring rule never
-    // looked at it — but "startrackk.com" contains it, and a containment test
-    // therefore suppressed a flag that nothing had actually scored.
+    // So this mirrors the two rules above exactly rather than approximating
+    // them: `startrack` is a WORD brand the substring rule never looked at, so
+    // a containment test suppressed a flag nothing had scored. A brand present
+    // but exempt (owning the label, or on a trusted suffix) scored nothing to
+    // double against — and is the real site, so must not be flagged here
+    // either, which is what `brandOwnsLabel` separates.
     const scoredBySubstringRule =
       typo !== null
       && TYPOSQUAT_BRANDS.substring.includes(typo)
@@ -996,43 +897,24 @@ export function checkUrl(
 
   // ── Punycode / internationalised domain ──────────────────────────────────
   //
-  // `new URL()` converts a non-ASCII hostname to its punycode form, so a
-  // homoglyph domain arrives here already encoded: "commbаnk.com" with a
-  // Cyrillic а becomes "xn--commbnk-6fg.com". Two consequences, both bugs
-  // before this block existed.
+  // `new URL()` punycodes a non-ASCII hostname, so a homoglyph domain arrives
+  // already encoded — "commbаnk.com" (Cyrillic а) becomes "xn--commbnk-6fg.com".
+  // Two bugs before this block existed: nothing scored it (a Cyrillic lookalike
+  // of a major bank scored 30, because urlSanitizer deliberately does not fold
+  // homoglyphs to Latin and left the signal to the scorer), and the hyphen rule
+  // counted hyphens in the ENCODED form, reporting "Heaps of hyphens in the
+  // domain (3)" for a hostname displaying none. A false explanation on a real
+  // detection is worse than a miss — the teaching layer is the product.
   //
-  // First, nothing scored it. urlSanitizer deliberately does NOT fold Cyrillic
-  // or Greek homoglyphs to Latin — rewriting them would make the engine report
-  // the real brand's hostname while describing the scammer's site — and its
-  // comment says a mixed-script hostname "is a signal to raise, not a string to
-  // rewrite, and that belongs in the scorer". This is the scorer, and the
-  // signal was never added: a Cyrillic lookalike of a major bank scored 30.
+  // An encoded label is NOT automatically an attack. "münchen.de" and a wholly
+  // Japanese domain are ordinary internationalised names, and scoring them
+  // suspicious would punish non-Latin scripts for being non-Latin — a false
+  // positive aimed at people whose language is not English. What separates an
+  // attack is MIXED SCRIPT WITHIN ONE LABEL, because a homoglyph only has value
+  // if the rest of the word still reads as the brand being impersonated.
   //
-  // Second, and worse, the hyphen rule below counted hyphens in the ENCODED
-  // form. Punycode uses hyphens structurally, so "commbаnk.com" — a hostname
-  // displaying no hyphens at all — was reported as "Heaps of hyphens in the
-  // domain (3)". A false explanation attached to a real detection is worse than
-  // a miss here: the teaching layer is the product, and this taught a pattern
-  // that is not there.
-  //
-  // An encoded label is NOT automatically an attack, and this is the line the
-  // rule has to walk. "münchen.de", "bücher.de" and a wholly Japanese domain
-  // are ordinary internationalised names, and scoring them as suspicious would
-  // punish non-Latin scripts for being non-Latin — a false positive aimed
-  // squarely at people whose language is not English, which is the worst
-  // possible place for this engine to be wrong.
-  //
-  // What separates an attack is MIXED SCRIPT WITHIN ONE LABEL: Latin letters
-  // sitting beside Cyrillic or Greek characters that render identically to
-  // them. "commbаnk" (Cyrillic а) and "рaypal" (Cyrillic р) are mixed; "münchen"
-  // and "bücher" are Latin throughout, and "日本語" carries no Latin at all.
-  // None of the legitimate forms mix a confusable script into a Latin word,
-  // because there is no reason to — the homoglyph only has value if the rest of
-  // the word reads as the brand being impersonated.
-  //
-  // Scored against the PRE-ENCODING hostname, recovered from the raw input:
-  // `new URL()` has already punycoded it by the time `hostname` is read, and
-  // the encoded form has no script information left in it.
+  // Scored against the PRE-ENCODING hostname from the raw input: the encoded
+  // form has no script information left in it.
   const punycodeLabels = hostname.split(".").filter((l) => l.startsWith("xn--"));
   const isPunycode = punycodeLabels.length > 0;
   if (isPunycode) {
@@ -1150,61 +1032,6 @@ export function checkUrl(
 // ────────────────────────────────────────────────────────────────────────────
 
 /**
- * Options for the shared message-body scoring in checkSms.
- *
- * `channel` exists because checkEmail reuses this function for body content.
- * Almost every signal is channel-agnostic — urgency, reward bait, payment
- * requests read the same in either — but a few are specifically about SMS, and
- * firing those on an email produces a confident, wrongly-worded verdict.
- */
-/**
- * Whether an email genuinely came from the organisation it talks about.
- *
- * The impersonation signals exist to catch a message that NAMES an agency while
- * arriving from somewhere else. When the sender is the agency's own domain the
- * premise fails, and the advice ("verify directly via official channels") is
- * wrong for mail that arrived through the official channel.
- *
- * Deliberately strict, because a false positive here means a real scam scores
- * lower:
- *   · email only — an SMS has no verifiable sender, and the "From" of a text is
- *     trivially spoofed, so the same reasoning does not transfer
- *   · the domain must equal an allowlisted domain or be a subdomain of one.
- *     `auspost.com.au` and `track.auspost.com.au` qualify;
- *     `auspost.com.au.evil.tk` and `notauspost.com.au` do not
- *   · it consults the region's own allowlists only, so an unrecognised domain
- *     is treated as untrusted rather than assumed fine
- *
- * NOT a claim that the sender is authentic — nothing here verifies SPF or DKIM.
- * A spoofed From would pass this check, which is why it only ever suppresses a
- * signal that would otherwise misfire, and never lowers a score by itself.
- * Header-based spoofing is caught separately by analyseEmailIdentities.
- */
-/**
- * Do all the links in this message point at the region's own allowlisted
- * agency/brand domains?
- *
- * The companion to isOwnDomainSender, for the case that has no sender metadata
- * to trust. An SMS carries no verified sender domain, so the only thing the
- * engine can check is where the message actually sends you — and a link to the
- * agency's real domain is the one thing a phishing SMS cannot fake.
- *
- * Requires EVERY link to be allowlisted, not merely one: the standard evasion
- * is to pad a message with a legitimate link alongside the payload one, so a
- * .some() test here would hand attackers the exemption for free.
- *
- * Checks both allowlists the packs maintain. legitDomains is the broad
- * region-wide list; authorityOwnDomains is the narrower set of organisations
- * whose real mail demonstrably comes from a non-government domain
- * (auspost.com.au), and its comment describes precisely this case. Consulting
- * only the first left a real Australia Post tracking SMS scoring 55.
- *
- * Matching is exact-or-subdomain, identical to the allowlist branch in
- * checkUrl, so "revenue.ie.evil.tk" does not qualify. Returns false when there
- * are no links at all — the caller's rules are about links, and "no links"
- * is not "safe links".
- */
-/**
  * A clause that WARNS against sharing something, rather than asking for it.
  *
  * Module-scoped because two rules need it: the verification-code harvest rule,
@@ -1277,6 +1104,26 @@ function authorityMatchesHost(authority: string, haystack: string): boolean {
   return true;
 }
 
+/**
+ * Do all the links in this message point at the region's own allowlisted
+ * agency/brand domains?
+ *
+ * The companion to isOwnDomainSender for the case with no sender metadata to
+ * trust: an SMS carries no verified sender, so the only checkable thing is
+ * where the message actually sends you, and a link to the agency's real domain
+ * is the one thing a phishing SMS cannot fake.
+ *
+ * Requires EVERY link to be allowlisted, not merely one — the standard evasion
+ * pads a message with a legitimate link alongside the payload, so a `.some()`
+ * test would hand attackers the exemption for free. Checks both allowlists:
+ * consulting `legitDomains` alone left a real Australia Post tracking SMS
+ * scoring 55, because `authorityOwnDomains` is where organisations whose real
+ * mail comes from a non-government domain are listed.
+ *
+ * Matching is exact-or-subdomain, identical to checkUrl's allowlist branch, so
+ * "revenue.ie.evil.tk" does not qualify. Returns false when there are no links
+ * at all — "no links" is not "safe links".
+ */
 function allLinksOnLegitDomains(
   urls: string[] | null,
   pack: { legitDomains: string[]; authorityOwnDomains: string[]; trustedHostSuffixes: string[] },
@@ -1363,6 +1210,26 @@ function allLinksOnLegitDomains(
   });
 }
 
+/**
+ * Whether an email genuinely came from the organisation it talks about.
+ *
+ * The impersonation signals catch a message that NAMES an agency while arriving
+ * from somewhere else. When the sender is the agency's own domain that premise
+ * fails, and the advice ("verify via official channels") is wrong for mail that
+ * arrived through one.
+ *
+ * Deliberately strict, because a false positive here means a real scam scores
+ * lower: email only (an SMS "From" is trivially spoofed, so the reasoning does
+ * not transfer); the domain must equal an allowlisted domain or be a subdomain
+ * of one (`track.auspost.com.au` qualifies, `auspost.com.au.evil.tk` and
+ * `notauspost.com.au` do not); and it consults the region's own allowlists only,
+ * so an unrecognised domain is untrusted rather than assumed fine.
+ *
+ * NOT a claim that the sender is authentic — nothing here verifies SPF or DKIM,
+ * and a spoofed From would pass. That is why it only ever suppresses a signal
+ * that would otherwise misfire and never lowers a score by itself; header-based
+ * spoofing is caught separately by analyseEmailIdentities.
+ */
 function isOwnDomainSender(
   channel: "sms" | "email",
   senderDomain: string | undefined,
@@ -1383,25 +1250,6 @@ function isOwnDomainSender(
 }
 
 /**
- * The body of an RFC 5322-ish message, or the whole string if it has no header
- * block. Used only for signals that care WHERE in the message something sits.
- *
- * Deliberately minimal — the real MIME walk lives in lib/emailDistiller, which
- * the engine cannot import and which prepends the headers it keeps anyway. All
- * this needs to do is find the blank line that ends the header block, and only
- * when what precedes it actually looks like headers, so a plain body whose
- * second paragraph happens to follow a blank line is left alone.
- */
-/**
- * Scaffolding a forwarded or quoted message carries ahead of its real body.
- *
- * Each entry matches a whole line, except the inline forms (Fwd:, a chat
- * export's timestamp) which prefix the body on the same line and are stripped
- * in place. Deliberately a closed list of recognised shapes rather than "skip
- * anything before the first blank line": arbitrary prose must NOT be skipped,
- * or the family gate's opener anchor stops meaning anything at all.
- */
-/**
  * An RFC 5322-shaped header line.
  *
  * Broader than a named list, which missed "Cc:", "Bcc:" and every "X-" header a
@@ -1415,6 +1263,15 @@ function isOwnDomainSender(
  */
 const HEADER_LINE = /^\s*(?:[A-Za-z][A-Za-z0-9-]{1,40})\s*:\s.*$/;
 
+/**
+ * Scaffolding a forwarded or quoted message carries ahead of its real body.
+ *
+ * Each entry matches a whole line, except the inline forms (Fwd:, a chat
+ * export's timestamp) which prefix the body on the same line and are stripped
+ * in place. A closed list of recognised shapes rather than "skip anything
+ * before the first blank line": arbitrary prose must NOT be skipped, or the
+ * family gate's opener anchor stops meaning anything.
+ */
 const FORWARD_SCAFFOLD: RegExp[] = [
   /^\s*-{2,}\s*forwarded message\s*-{2,}\s*$/i,
   /^\s*begin forwarded message:?\s*$/i,
@@ -1496,6 +1353,16 @@ export function stripForwardingPrefix(text: string): string {
   return lines.slice(i).join("\n").replace(/^\s+/, "");
 }
 
+/**
+ * The body of an RFC 5322-ish message, or the whole string if it has no header
+ * block. Used only for signals that care WHERE in the message something sits.
+ *
+ * Deliberately minimal — the real MIME walk lives in lib/emailDistiller, which
+ * the engine cannot import and which prepends the headers it keeps anyway. All
+ * this does is find the blank line ending the header block, and only when what
+ * precedes it actually looks like headers, so a plain body whose second
+ * paragraph follows a blank line is left alone.
+ */
 export function bodyAfterHeaders(raw: string): string {
   const split = raw.search(/\r?\n\r?\n/);
   if (split === -1) return raw;
@@ -1519,10 +1386,6 @@ export interface MessageCheckOptions {
   senderDomain?: string;
 }
 
-/**
- * Opening words of the family-impersonation flag, shared so checkEmail can
- * recognise the signal in a merged sub-result without re-running the match.
- */
 /**
  * Grammar that marks a relation term as the SUBJECT of a sentence rather than
  * the person being addressed.
@@ -1571,6 +1434,10 @@ function serviceNames(pack: RegionPack): Set<string> {
   ]);
 }
 
+/**
+ * Opening words of the family-impersonation flag, shared so checkEmail can
+ * recognise the signal in a merged sub-result without re-running the match.
+ */
 export const FAMILY_IMPERSONATION_FLAG =
   'Reads as the "Hi Mum" family-impersonation script';
 
@@ -1748,27 +1615,20 @@ export function checkSms(
 
   // Address correction presented as blocking a delivery (D1 / 2026-08-29
   // sweep). AusPost names this as the dominant live AU parcel lure, but the
-  // phrases are ordinary retail commerce on their own — "please confirm your
-  // address for our records before we ship" is a legitimate dispatch message.
-  //
-  // So the phrase never scores alone: it needs a parcel/delivery signal
-  // already present, which is what turns "confirm your address" from a
+  // phrases are ordinary retail commerce alone — "confirm your address for our
+  // records before we ship" is a legitimate dispatch message. So the phrase
+  // needs a delivery signal already present, which is what turns it from a
   // shipping formality into the thing standing between you and your goods.
-  // Same shape as the keys-by-post gate below, and for the same reason — a flat
-  // urgencyWords entry cannot express a condition, since every urgency group is
-  // flattened into one union and scored by hit count.
   //
-  // Scored at +20 rather than the +10 an urgency hit carries: on its own the
-  // pairing is the complete lure, and the delivery half has usually contributed
-  // only a single generic hit. It reaches "suspicious" (20-44) without reaching
-  // "likely_scam" (45+), which is the right ceiling for a signal whose
-  // components are each individually innocent.
-  // The context is a plain delivery noun, not a hit in the parcel urgency list.
-  // Gating on the latter was the first attempt and it almost never fired: these
-  // messages are engineered to sound routine, so they carry no urgency phrase
-  // at all — "Your parcel is waiting. Update your address to complete delivery"
-  // produces zero urgency hits. Requiring one meant the gate could only open
-  // for messages that were already scoring, which is precisely backwards.
+  // +20 rather than an urgency hit's +10: the pairing is the complete lure, and
+  // it reaches `suspicious` without reaching `likely_scam`, the right ceiling
+  // when each component is individually innocent.
+  //
+  // The context is a plain delivery NOUN, not a hit in the parcel urgency list.
+  // Gating on the latter almost never fired — these messages are engineered to
+  // sound routine, so "Your parcel is waiting. Update your address to complete
+  // delivery" produces zero urgency hits, meaning the gate could only open for
+  // messages that were already scoring.
   const hasDeliveryContext = /\b(parcels?|packages?|shipments?|deliver\w*|courier|consignment|tracking)\b/i.test(text);
   const addressPhraseHit = PACK.parcelAddressPhrases.find((p) => mentions(lower, p));
   if (addressPhraseHit && hasDeliveryContext) {
@@ -1779,22 +1639,18 @@ export function checkSms(
   }
 
   // "claim" is a prize word in "claim your prize" and an ordinary noun in "your
-  // claim has been processed" — a Medicare or insurance claim, which is exactly
-  // what the real sender writes. Dropped only when it appears as that noun, so
-  // the verb sense every reward lure uses still scores.
-  // Per occurrence, not per message. A whole-text test let one appended
-  // sentence defuse a live lure — "Congratulations! Claim your $1000 prize now.
-  // Your claim is ready." dropped from 40 to 24, a one-sentence evasion. The
-  // word only stops counting when EVERY occurrence reads as the noun.
+  // claim has been processed" — a Medicare or insurance claim, which is what the
+  // real sender writes. Dropped only as that noun, so the verb sense every
+  // reward lure uses still scores, and counted PER OCCURRENCE: a whole-text
+  // test let one appended sentence defuse a live lure, dropping
+  // "Congratulations! Claim your $1000 prize now. Your claim is ready." from 40
+  // to 24.
   //
-  // The determiner and verb forms above miss the COMPOUND-NOUN use, where
-  // "claim" modifies another noun with nothing in front of it: "benefits claim
-  // assistance", "claim status", "claim number". That is administrative
-  // vocabulary — a benefits or insurance office writing about a case — and it
-  // was scoring +12 on ordinary VA correspondence ("Your VA benefits claim
-  // assistance appointment is confirmed for Tuesday" reached 37/suspicious
-  // alongside the authority mention). The following noun is what disambiguates:
-  // a reward lure says "claim your prize", never "claim assistance".
+  // The compound-noun use ("benefits claim assistance", "claim status") needs
+  // the trailing noun to disambiguate — it is administrative vocabulary, and it
+  // scored +12 on ordinary VA correspondence, reaching 37/suspicious alongside
+  // the authority mention. A reward lure says "claim your prize", never "claim
+  // assistance".
   const CLAIM_AS_NOUN =
     /\b(?:your|the|this|a|my|their|our)\s+claims?\b|\bclaims?\s+(?:has|have|was|were|is|are)\b|\bclaims?\s+(?:assistance|status|number|reference|form|history|decision|department|centre|center|processing|adjuster|handler|id)\b/gi;
   const claimIsAlwaysNoun =
@@ -1809,16 +1665,13 @@ export function checkSms(
 
   // Service names are matched but not counted as an ask.
   //
-  // "medicare", "mygov", "ato" and friends sit in requestWords because naming
-  // one is part of the impersonation, not because the message asked for
-  // anything. The flag said "Asks for sensitive info: mygov" about a message
-  // whose whole content was "you have a new myGov message, sign in to read it",
-  // which is a false statement about the text in front of the reader as well as
-  // a false positive: every genuine myGov notification names myGov.
-  //
-  // They still contribute through the authority-mention rule below, which is
-  // where "this message is about a government service" belongs. Here they are
-  // separated so the remaining hits are things actually being requested.
+  // "medicare", "mygov", "ato" sit in requestWords because naming one is part
+  // of the impersonation, not because anything was asked for. The flag said
+  // "Asks for sensitive info: mygov" about a message reading "you have a new
+  // myGov message, sign in to read it" — a false statement about the text in
+  // front of the reader, since every genuine myGov notification names myGov.
+  // They still contribute via the authority-mention rule below, which is where
+  // "this message is about a government service" belongs.
   // A credential term inside a "never share your …" clause is anti-fraud
   // advice, not an ask. Ledger, exchanges and banks all publish exactly this
   // wording, and it scored 30/suspicious — flagging the warning that protects
@@ -2178,38 +2031,28 @@ export function checkSms(
   // Verification-code harvesting — messaging-app account takeover (D3 / #227 /
   // FBI IC3 PSA260320, updated June 2026).
   //
-  // The signal is not the code. Every legitimate 2FA message contains one, and
+  // The signal is not the code — every legitimate 2FA message contains one, and
   // "your verification code is 482910" must stay silent. The signal is being
-  // asked to SEND one somewhere — forward it, reply with it, share it, read it
-  // out. No service that issues a code ever asks for it back through the same
-  // channel; the whole point of the code is that only you see it, which is why
-  // every legitimate one carries "don't share this with anyone".
+  // asked to SEND one on. No service that issues a code asks for it back
+  // through the same channel, which is why every legitimate one says "don't
+  // share this with anyone". Requires the verb and the code noun in ONE CLAUSE,
+  // so a delivery has no verb and "reply STOP" has no code noun.
   //
-  // Requires the send verb and the code noun in one clause, so a delivery
-  // ("123456 is your WhatsApp code") has no verb to latch onto and a bare
-  // "reply STOP" has no code noun.
-  // A negated ask is the opposite signal, and it is what every legitimate 2FA
-  // message and bank fraud warning actually says. "Never share your
-  // verification code with anyone" measured likely_scam (45) against a rule
-  // that only looked for the verb — the single worst false positive available
-  // here, since it flags the anti-fraud advice itself.
+  // A negated ask is the opposite signal, and is what every real 2FA message
+  // and bank fraud warning says: "Never share your verification code with
+  // anyone" measured likely_scam (45) against a verb-only rule — the worst
+  // false positive available here, since it flags the anti-fraud advice itself.
+  // Evaluated PER CLAUSE, because scoped to the whole text it was a bypass:
+  // "Send me the verification code that just arrived. Never share it with
+  // anyone else." scored 0, and smishing routinely carries that trailing
+  // boilerplate, copied from the notices it imitates.
   //
-  // The negation is evaluated PER CLAUSE, not across the message. Scoped to the
-  // whole text it was a bypass: appending one reassurance sentence disarmed the
-  // signal entirely, and "Send me the verification code that just arrived.
-  // Never share it with anyone else." scored 0. Smishing routinely carries that
-  // kind of trailing boilerplate — it is copied from the real notices it
-  // imitates — so the guard has to ask whether *this* clause is a warning, not
-  // whether the message contains one anywhere.
-  // "confirm" is deliberately absent from the verbs: confirming a code you
-  // hold is what legitimate flows ask for ("confirm the security code on
-  // your statement"). The scam asks you to TRANSMIT it onward.
-  //
-  // The code noun must be one that only a service issues. "security code" and
-  // "access code" are excluded: they are the ordinary words for a door, gate or
-  // alarm code, and "forward me the security code for the gate" scored
-  // likely_scam — the engine's top severity — on an entirely benign message.
-  // They are still reachable via the app-context branch below.
+  // "confirm" is deliberately absent from the verbs — confirming a code you
+  // hold is what legitimate flows ask for. And the code noun must be one only a
+  // service issues: "security code" and "access code" are excluded as the
+  // ordinary words for a door or alarm code, after "forward me the security
+  // code for the gate" scored likely_scam on a benign message. Both stay
+  // reachable via the app-context branch below.
   const CODE_ASK =
     /\b(forward|send|share|reply\s+with|text\s+(?:me|us)|give\s+(?:me|us)|read\s+(?:me|us)\s+out)\b[^.!?]{0,40}\b(?:the\s+|your\s+|that\s+|this\s+|a\s+)?(?:\d[\s-]?)?(?:verification|authentication|login|one[\s-]?time|activation|otp|6[\s-]?digit|4[\s-]?digit)\b[^.!?]{0,20}\bcode\b/i;
   const CODE_RETURN =
@@ -2673,31 +2516,24 @@ export function checkEmail(text: string, blocklist?: HostLookup, region?: Region
   // saw before the conversion: body rows, then the sender and link analysis.
   addClickFixSignals(sig, text, PACK, "email");
 
-  // …but not for the gated composites. The 0.7 discount is right for the
-  // signals it was written for — urgency and reward keywords really are weaker
-  // evidence in a long email than in a 160-character text, because a long
-  // message has more room to say an ordinary word. That reasoning is about
-  // keyword FREQUENCY, and it does not transfer to a rule that already requires
-  // several independent halves to line up: those do not become more likely to
-  // misfire because the message is longer, and every one of these scripts runs
-  // by email as readily as by SMS.
+  // …but not for the gated composites. The 0.7 discount is right for what it
+  // was written for — urgency and reward keywords really are weaker evidence in
+  // a long email, which has more room to say an ordinary word. That reasoning is
+  // about keyword FREQUENCY and does not transfer to a rule already requiring
+  // several independent halves to line up.
   //
-  // Left alone the discount demoted them across the verdict boundary, which is
-  // the part that reaches the reader: the family script went 45 → 31, the
-  // task-payment composite 52 → 36 and the messaging-hijack lure 60 → 42, each
-  // landing on "something's a bit sus" — advice that reads as permission to
-  // keep reading.
+  // Left alone it demoted them across the verdict boundary, the part that
+  // reaches the reader: the family script 45 → 31, task-payment 52 → 36,
+  // messaging-hijack 60 → 42, each landing on "a bit sus" — advice that reads
+  // as permission to keep reading.
   //
-  // A list rather than one special case, because the previous shape covered
-  // only the family script and every composite added since silently inherited a
-  // discount nobody decided to give it. The entry test is structural: a signal
-  // belongs here when its gate requires two or more independent conditions, so
-  // it is not the loose keyword hit the discount exists to soften. Keyword-count
-  // signals (urgency, reward, sensitive-info, generic keywords) stay discounted.
-  //
-  // Each is restored by lifting the signal's OWN row back to its pre-discount
-  // weight rather than adding a separate one: flags are rendered straight from
-  // signal text, so a padding row would show the reader a blank bullet.
+  // A list rather than one special case, because the previous shape covered only
+  // the family script and every composite added since silently inherited a
+  // discount nobody decided to give it. The entry test is structural: a gate
+  // requiring two or more independent conditions is not the loose keyword hit
+  // the discount exists to soften. Restored by lifting the signal's OWN row
+  // rather than adding one — flags render straight from signal text, so a
+  // padding row would show the reader a blank bullet.
   for (const flag of UNDISCOUNTED_COMPOSITES) {
     const hit = (smsCheck.signals ?? []).find((x) => x.text.startsWith(flag));
     if (hit) sig.restore(flag, hit.points);
@@ -2744,40 +2580,30 @@ export function checkEmail(text: string, blocklist?: HostLookup, region?: Region
   }
 
   // SVG phishing attachment (D6 / 2026-08-09 roadmap / APWG Q2 2026, Proofpoint,
-  // Any.run). SVG attachments carry embedded JavaScript that redirects to a
-  // credential-harvest page, and they slip past scanners that only inspect
-  // Office and PDF formats while rendering directly in the browser when opened.
+  // Any.run). SVG attachments carry embedded JavaScript redirecting to a
+  // credential-harvest page, slip past scanners that only inspect Office and
+  // PDF, and render directly in the browser when opened.
   //
-  // The hard part is that .svg is also an utterly ordinary asset extension: it
-  // appears in the logo and tracking-pixel references at the foot of most
-  // marketing email, which is precisely the mail this app is handed. Matching a
-  // bare ".svg" would flag a newsletter footer.
+  // The hard part: .svg is also an ordinary asset extension, appearing in the
+  // logo and tracking-pixel references at the foot of most marketing email —
+  // precisely the mail this app is handed. So it only counts when it is the
+  // thing being *sent*, via two narrow halves, both learned from review:
   //
-  // So the extension only counts when it is the thing being *sent*. Two
-  // deliberately narrow halves, both learned from review:
+  //   - The cue must be attachment language proper, not a bare verb. Accepting
+  //     see/open/download/view made "View in browser <img …/logo.svg>" — the
+  //     standard marketing header — a phishing hit. Those verbs count only when
+  //     they govern an attachment noun.
+  //   - The trailing half must not accept bare "file"/"document": "our logo.svg
+  //     file lives in the shared drive" is office chatter. It needs an explicit
+  //     attachment word, or a payload-framing noun (invoice, statement,
+  //     receipt, remittance).
   //
-  //   - The cue must be attachment language proper ("attached", "attachment",
-  //     "enclosed"), not a bare verb. An earlier version accepted
-  //     see/open/download/view, which made "View in browser <img …/logo.svg>" —
-  //     the standard marketing header — a phishing hit. Those verbs only count
-  //     when they govern an attachment noun ("open the attached …").
-  //   - The trailing half must not accept bare "file"/"document" as evidence
-  //     either: "our logo.svg file lives in the shared drive" is ordinary
-  //     office chatter. It needs an explicit attachment word, or a
-  //     document-type noun that is itself the payload framing (invoice,
-  //     statement, receipt, remittance).
-  //
-  // A footer logo reference has no such wording anywhere near it, on one line or
-  // several, so it stays unflagged.
-  //
-  // The URL guard matters independently: an .svg inside an href/src is an asset
-  // reference, not an attachment. Scheme-prefixed URLs and attribute values are
-  // both excluded — quoted or not, absolute or root-relative, since
+  // The URL guard is independent: an .svg in an href/src is an asset reference,
+  // so scheme-prefixed URLs and attribute values are excluded, quoted or not —
   // `<img src=/assets/logo.svg>` is as ordinary as the quoted absolute form.
   //
-  // Scored below the likely_scam threshold on purpose: an SVG attachment is a
-  // delivery-mechanism signal, not proof of intent — see the +25 interaction
-  // note at the scoring line below.
+  // Scored below likely_scam on purpose: this is a delivery-mechanism signal,
+  // not proof of intent — see the +25 interaction note at the scoring line.
   const ATTACH_WORD = String.raw`attach(?:ment|ments|ed|ing)?|enclosed`;
   const PAYLOAD_NOUN = String.raw`invoice|statement|receipt|remittance`;
   // .svg not sitting in a URL or an HTML attribute value. The three lookbehinds
@@ -3025,21 +2851,17 @@ export function checkCustom(text: string, blocklist?: HostLookup, region?: Regio
 // everywhere, so anything they caught is reported as found, regardless of
 // coverage.
 //
-// The test is "not full" rather than a list of the tiers that downgrade, which
-// is why adding `minimal` needed no change here. That is deliberate and worth
-// keeping: a new tier must opt *in* to asserting safety by being `full`, never
-// inherit it by being absent from an enumeration someone forgot to update.
-// Defaulting a new tier to the honest behaviour is the whole point.
+// The test is "not full" rather than an enumeration of the tiers that
+// downgrade, which is why adding `minimal` needed no change here: a new tier
+// must opt *in* to asserting safety by being `full`, never inherit it by being
+// absent from a list someone forgot to update.
 //
-// `languageUncertain` is the same honesty mechanism applied to a second axis
-// RegionCoverage cannot see: every keyword list here is English regardless of
-// region, so a `full` AU pack reading non-English text has no more right to
-// assert "safe" than a `none` pack reading English — the rules it would need
-// to have found something simply do not exist for that text. It downgrades
-// independently of `coverage`, which is why it is checked even when coverage
-// is `full`. Passed as `undefined` by callers with no prose to judge (checkUrl,
-// checkPhone) rather than `false`, so "not applicable" never reads as "checked
-// and it's English".
+// `languageUncertain` applies the same honesty to an axis RegionCoverage cannot
+// see: every keyword list is English regardless of region, so a `full` AU pack
+// reading non-English text has no more right to assert "safe" than a `none`
+// pack reading English. It downgrades independently of `coverage`, hence the
+// check even at `full`. Callers with no prose to judge pass `undefined` rather
+// than `false`, so "not applicable" never reads as "checked, and it's English".
 function downgradeForCoverage(
   result: CheckResult,
   coverage: RegionCoverage,
@@ -3213,11 +3035,21 @@ const PROSE_LEFT_LABELS = new Set([
 // "uspost-redelivery.bond/pay": a different domain from the one in the message,
 // scored and shown to the user as though it were the link they were sent.
 //
-// The ranges mirror CONFUSABLE_SCRIPTS in urlSanitizer — the scripts that
-// supply Latin homoglyphs, which are the ones an evader reaches for. Kept
-// narrow rather than \p{L}: this pattern also decides what counts as a host in
-// ordinary prose, and matching every letter in every script would turn far more
-// sentences into candidate URLs.
+// The ranges cover the same SCRIPTS as urlSanitizer's confusable sets —
+// Cyrillic and Greek, the ones that supply Latin homoglyphs — but deliberately
+// at block granularity, where `CONFUSABLE_LETTERS` enumerates Greek down to the
+// individual lookalikes. Not a mirror, and must not become one: the two answer
+// opposite questions. That one asks "is this character a disguise", so a
+// non-confusable letter is correctly excluded; this asks "where does the
+// hostname end", and excluding one would TRUNCATE the host rather than decline
+// it — narrowing to the enumerated set extracts "elta-billing.bond" from
+// "Δelta-billing.bond", a different domain from the one in the message, which
+// is the defect described above. Over-inclusion here is safe because the prose
+// guard below rejects the false candidates ("Θ.Then we stopped").
+//
+// Still kept to these scripts rather than \p{L}: this pattern also decides what
+// counts as a host in ordinary prose, and matching every letter in every script
+// would turn far more sentences into candidate URLs.
 const HOST_LABEL_CHAR = "a-z0-9\\u0370-\\u03FF\\u0400-\\u04FF\\u0500-\\u052F";
 
 const BARE_HOST_GLOBAL = new RegExp(
@@ -3225,12 +3057,6 @@ const BARE_HOST_GLOBAL = new RegExp(
   "gi",
 );
 
-/**
- * Schemeless hostnames in free text that are worth analysing as URLs.
- *
- * `suspiciousTlds` comes from the resolved region pack, so a host is picked up
- * when its TLD is either mainstream or already flagged as abuse-prone.
- */
 /**
  * Whether one BARE_HOST_GLOBAL match is a hostname rather than prose.
  *

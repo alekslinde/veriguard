@@ -31,6 +31,11 @@
 
 import { SITE_URL } from "@/lib/siteUrl";
 
+/** Serialised-origin form: no trailing slash, which is what a browser sends. */
+function normalise(origin: string): string {
+  return origin.replace(/\/+$/, "");
+}
+
 /**
  * Origins permitted to call the CORS-enabled routes, lowest-friction first:
  *
@@ -44,11 +49,6 @@ import { SITE_URL } from "@/lib/siteUrl";
  * change between requests, and re-parsing per request would be wasted work on
  * the hot path.
  */
-/** Serialised-origin form: no trailing slash, which is what a browser sends. */
-function normalise(origin: string): string {
-  return origin.replace(/\/+$/, "");
-}
-
 function parseAllowedOrigins(): Set<string> {
   const configured = (process.env.CORS_ALLOWED_ORIGINS ?? "")
     .split(",")

@@ -1987,9 +1987,11 @@ describe("the clamp row", () => {
 
 // ── Verdict-artifact gap work ────────────────────────────────────────────────
 //
-// Three rules the design artifact promised that the engine did not produce.
-// The fixture is the artifact's own sample, so the totals here are the ones the
-// verdict card was designed around; see docs/verdict-artifact-gap-plan.md.
+// Three rules the verdict card's design promised that the engine did not
+// produce, numbered as the gaps below name them: the small-fee payment lure
+// (2), Australia Post brand impersonation from a subdomain (3) and
+// return-threat urgency phrasing (4). The fixture is that design's own worked
+// sample, so the totals pinned here are the ones the card was laid out around.
 
 const ARTIFACT_SAMPLE =
   "AusPost: your parcel is held pending a $2.15 customs fee. " +
