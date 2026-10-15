@@ -561,6 +561,69 @@ describe("reads makes overlap and missing inputs visible", () => {
     expect(unsatisfiableReads(fires({ reads: ["words"], channels: ["sms"] }), ["custom"])).toEqual(["words"]);
   });
 
+  // Reading an input without declaring it is silent, and that is the same
+  // one-directional gate the channel declaration has.
+  //
+  // `registryScore` skips a signal whose declared inputs the context cannot
+  // supply, so OVER-declaring fails loudly — adding `"headers"` to a signal on
+  // the sms channel failed 46 pinned cases, measured. UNDER-declaring is
+  // invisible: a signal reading `ctx.original` while declaring `reads: []`
+  // scores identically, because nothing compares the declaration with the body.
+  // Found by injection on the task-payment conversion, as the thing an injection
+  // that passes is.
+  //
+  // For `original` and `body` the omission costs nothing today, since every
+  // context carries both. It is checked anyway because the input it will cost
+  // something for is the one this item has already paid for once: `ctx.matches`
+  // shipped undeclared, a caller omitting it type-checked clean, every authoring
+  // check reported nothing, and a real scam scored zero rows with nothing saying
+  // why. `reads` is how that is now prevented, and a declaration nothing
+  // cross-checks against the code is half a rule. Step 4 converts 75 signals
+  // that all consult a pack list.
+  //
+  // Structural, like the channel check and for the same reason: the claim is
+  // about what the module's source touches, and the alternative is a comment.
+  it("declares every context field its module actually reads", async () => {
+    const { readFileSync, readdirSync } = await import("fs");
+    /** Context fields that are inputs, by the name a signal reads them under. */
+    const asRead: Record<string, string> = {
+      original: "original",
+      body: "body",
+      words: "words",
+      hostname: "hostname",
+      url: "url",
+      headers: "headers",
+      phone: "phone",
+      matches: "matches",
+    };
+    const dir = "packages/detect/src/signals";
+    const modules = readdirSync(dir).filter((f) => f.endsWith(".ts"));
+    expect(modules.length).toBeGreaterThan(0);
+
+    for (const file of modules) {
+      const src = readFileSync(`${dir}/${file}`, "utf8");
+      // `ctx.x`, and the destructured local the family gate uses
+      // (`const matches = ctx.matches`) reads as `ctx.matches` too.
+      const touched = new Set(
+        [...src.matchAll(/\bctx\.([a-zA-Z]+)/g)]
+          .map((m) => asRead[m[1]])
+          .filter((r): r is string => r !== undefined),
+      );
+      // Ids in this module, so the declaration compared against is this
+      // module's own rather than the whole registry's.
+      const ids = [...src.matchAll(/^\s*id: "([^"]+)"/gm)].map((m) => m[1]);
+      const declared = new Set(
+        SIGNALS.filter((d) => ids.includes(d.id)).flatMap((d) => [...d.reads]),
+      );
+      for (const read of touched) {
+        expect(
+          declared.has(read as never),
+          `${file} reads ctx.${read} without declaring it in reads`,
+        ).toBe(true);
+      }
+    }
+  });
+
   it("names two signals sharing a tokeniser", () => {
     // The double-scoring defect, as a query over declarations rather than a
     // probe finding: one Cyrillic character scored twice because the body
@@ -721,6 +784,15 @@ describe("every channel is named", () => {
 // decided in another is the exact defect class the registry exists to delete, so
 // it is checked here rather than left to the next conversion to rediscover.
 //
+// **The next conversion rediscovered it anyway, one level up.** Task payment
+// widened its `channels` to `"all"`, changed no score and failed nothing —
+// because this check's coverage was a hand-maintained list of helpers and the new
+// signal had no row in it, so it was never asked. The check was right about the
+// channels it checked and silent about the one it did not know existed, which is
+// the "partial check reporting a clean sweep" shape with the registry's own
+// guard as the partial check. The row-per-signal assertion below is the fix, and
+// it is the half that generalises: step 4 converts 75 rules.
+//
 // Structural, like `emailDiscount`'s list check and for the same reason: the
 // claim is about the entry point's source, and the alternative is a comment.
 describe("a declared channel is a channel some entry point actually scores", () => {
@@ -752,7 +824,28 @@ describe("a declared channel is a channel some entry point actually scores", () 
       helper: "addFamilyImpersonationSignals",
       viaVariable: ["sms", "email"],
     },
+    { idPrefix: "task.", helper: "addTaskPaymentSignals", viaVariable: ["sms", "email"] },
   ];
+
+  // A row per converted signal, or the check does not run on it.
+  //
+  // The list above is opt-in, which made it the shape it was written to catch:
+  // the task-payment conversion widened its `channels` to `"all"`, changed no
+  // score, and failed nothing — not because the check was wrong about the
+  // channels, but because the signal had no row and so was never asked. A guard
+  // whose coverage is a list somebody has to remember to extend reports a clean
+  // sweep of whatever is in the list.
+  //
+  // Phone signals are excluded deliberately rather than forgotten: `checkPhone`
+  // scores them directly rather than through a named helper, so there is no call
+  // site to read, and the phone channel is the only one they can run on. Named
+  // here so the exclusion is a decision a reader can check rather than a gap.
+  it("has a row for every converted signal, so none goes unchecked", () => {
+    const prefixes = new Set(
+      SIGNALS.map((d) => `${d.id.split(".")[0]}.`).filter((p) => p !== "phone."),
+    );
+    expect([...prefixes].sort()).toEqual(helpers.map((h) => h.idPrefix).sort());
+  });
 
   it.each(helpers)(
     "$helper is called on exactly the channels $idPrefix signals declare",

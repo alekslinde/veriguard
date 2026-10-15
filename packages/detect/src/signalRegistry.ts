@@ -29,7 +29,7 @@
 // a signal declare its channels, its weight and its inputs, and all three defect
 // classes stop being expressible.
 //
-// ## Status: the phone channel is converted
+// ## Status: the phone channel and four of five gated composites
 //
 // Incremental extraction, smallest surface first. Done:
 //
@@ -43,26 +43,40 @@
 //
 //   3. The gated composites, in progress. Each entry's signal declares its own
 //      channel weight, and `UNDISCOUNTED_COMPOSITES` loses an entry rather than
-//      gaining one — four entries down to three. The ClickFix pair went first as
-//      the smallest; the splice rule second, because it is the one whose scoring
-//      shape does NOT fit the default. It finds a SET and scores it once, where
+//      gaining one — six entries down to one, with the list, `Signals.restore`
+//      and the table mirroring it all due to go when the last one converts. The
+//      ClickFix pair went first as the smallest; the splice rule second, because
+//      it is the one whose scoring shape does NOT fit the default. It finds a
+//      SET and scores it once, where
 //      `registryScore` scores each hit at the declared weight, so the obvious
 //      conversion turns a three-word splice into 75 points. One hit carrying the
 //      word list in its prose is the answer, and the general lesson is that
 //      `scale` is for a signal whose strength varies with what it found — not
 //      every signal that finds more than one thing. See `signals/splicedWording`.
 //
-//      Both conversions hit the SAME defect, and neither was visible in the
-//      code: `checkEmail` merges the whole SMS sub-result at 0.7, so a weight
-//      the signal declared arrived multiplied by something that never knew the
-//      signal existed — ClickFix's 50 as 35, the splice rule's 25 as 17. Found
-//      both times by pinning the scores first and reading the failure. The fix
-//      is for the entry point to score the registry's share outside the merge,
-//      which is what keeps "a weight read from the registry is the weight that
-//      reaches the score" true rather than merely intended.
+//      The family-impersonation gate went third, and brought the question of how
+//      an outside capability reaches a signal: it needs `mentions`, the engine's
+//      shared pack-entry matcher, which no signal module can import without a
+//      cycle. It arrives as `Context.matches` — passed, not moved or restated —
+//      and the reasoning is on that field. Task payment went fourth precisely
+//      because it needs no capability at all, which leaves the messaging-hijack
+//      gate as the only remaining place a new question can come from.
+//
+//      EVERY conversion so far hit the SAME defect, and none of it was visible
+//      in the code: `checkEmail` merges the whole SMS sub-result at 0.7, so a
+//      weight the signal declared arrived multiplied by something that never
+//      knew the signal existed — ClickFix's 50 as 35, the splice rule's 25 as
+//      17, the family gate's 45 as 31, task payment's 40 as 28. The first three
+//      were found by pinning the scores first and reading the failure; the
+//      fourth was written correctly from the start and the pin confirmed it. The
+//      fix is for the entry point to score the registry's share outside the
+//      merge, which is what keeps "a weight read from the registry is the weight
+//      that reaches the score" true rather than merely intended.
 //
 // Remaining:
 //
+//   3b. The messaging-hijack gate — the last `UNDISCOUNTED_COMPOSITES` entry, so
+//       that list and `Signals.restore` go with it.
 //   4. The remaining single-condition signals, mechanically.
 //   5. Serialise the registry in CI as the signal inventory.
 //
@@ -128,6 +142,7 @@ import { CLICKFIX_SIGNALS } from "./signals/clickfix";
 import { FAMILY_IMPERSONATION_SIGNALS } from "./signals/familyImpersonation";
 import { PHONE_SIGNALS } from "./signals/phone";
 import { SPLICED_WORDING_SIGNALS } from "./signals/splicedWording";
+import { TASK_PAYMENT_SIGNALS } from "./signals/taskPayment";
 
 /**
  * Which surface the text arrived on.
@@ -558,14 +573,15 @@ export function unsatisfiableReads(
  * one commit.
  *
  * Converted so far: the phone channel; the ClickFix pair and the spliced-wording
- * rule on the sms, email and custom channels; and the family-impersonation gate
- * on sms and email. `scamDetector.ts` still owns the rest.
+ * rule on the sms, email and custom channels; and the family-impersonation and
+ * task-payment gates on sms and email. `scamDetector.ts` still owns the rest.
  */
 export const SIGNALS: readonly SignalDef[] = [
   ...PHONE_SIGNALS,
   ...CLICKFIX_SIGNALS,
   ...SPLICED_WORDING_SIGNALS,
   ...FAMILY_IMPERSONATION_SIGNALS,
+  ...TASK_PAYMENT_SIGNALS,
 ];
 
 /**

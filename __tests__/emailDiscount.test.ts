@@ -11,7 +11,7 @@ import { checkSms, checkEmail } from "@veriguard/detect/scamDetector";
 // become likelier to misfire because the text is longer.
 //
 // Before this, the discount demoted composites across the verdict boundary:
-// the family script 45 → 31, task-payment 52 → 36, messaging-hijack 60 → 42.
+// the family script 45 → 31, task-payment 40 → 28, messaging-hijack 60 → 42.
 // Each landed on "something's a bit sus", which reads as permission to keep
 // reading. Found by the metamorphic eval's forwarded-prefix transform.
 
@@ -23,26 +23,23 @@ const asEmail = (body: string) =>
  * engine without being listed there scores a tier low on the email path, and
  * this is what fails when that happens.
  *
- * **ClickFix, the splice rule and the family gate are no longer here, and their
- * absence is the point.** Each left `UNDISCOUNTED_COMPOSITES` when it moved into
- * the signal registry and declared its own channel weight — so there is no
- * discount applied to it and nothing to restore. ClickFix's case stayed in this
- * table for one commit and still passed, by the new mechanism, which is exactly
- * the kind of row that makes a table lie: anyone auditing this file against that
- * list would have found an entry here with no counterpart there. A converted
- * composite leaves this table as it leaves that list, and `clickFixPinned`,
- * `splicedWordingPinned` and `familyImpersonationPinned` are where their email
+ * **ClickFix, the splice rule, the family gate and the task-payment gate are no
+ * longer here, and their absence is the point.** Each left
+ * `UNDISCOUNTED_COMPOSITES` when it moved into the signal registry and declared
+ * its own channel weight — so there is no discount applied to it and nothing to
+ * restore. ClickFix's case stayed in this table for one commit and still passed,
+ * by the new mechanism, which is exactly the kind of row that makes a table lie:
+ * anyone auditing this file against that list would have found an entry here with
+ * no counterpart there. A converted composite leaves this table as it leaves that
+ * list, and `clickFixPinned`, `splicedWordingPinned`,
+ * `familyImpersonationPinned` and `taskPaymentPinned` are where their email
  * weights are asserted now.
  *
  * The family gate is worth a line of its own: it was this list's first entry and
- * the incident that turned a single special case into a list. Two entries remain,
- * and when the last one leaves, the list and this table go with it.
+ * the incident that turned a single special case into a list. **One entry
+ * remains, and when it leaves, the list and this table go with it.**
  */
 const composites: Array<[string, string]> = [
-  [
-    "task payment",
-    "Congratulations, your account has earned $340. To withdraw your commission you must first complete a $50 deposit task.",
-  ],
   [
     "messaging hijack",
     "WhatsApp: your account has been flagged for unusual activity and will be restricted within 24 hours.",
@@ -83,7 +80,10 @@ describe("the table and the list it claims to mirror", () => {
     expect(entries).not.toContain("MAC_CLICKFIX_FLAG");
     expect(entries).not.toContain("SPLICED_WORDING_FLAG");
     expect(entries).not.toContain("FAMILY_IMPERSONATION_FLAG");
-    expect(composites.map(([label]) => label).join(" ")).not.toMatch(/clickfix|splic|family/i);
+    expect(entries).not.toContain("TASK_PAYMENT_FLAG");
+    expect(composites.map(([label]) => label).join(" ")).not.toMatch(
+      /clickfix|splic|family|task/i,
+    );
   });
 });
 

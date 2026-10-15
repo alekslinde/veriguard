@@ -18,6 +18,7 @@ import { CLICKFIX_SIGNALS } from "./signals/clickfix";
 import { FAMILY_IMPERSONATION_SIGNALS } from "./signals/familyImpersonation";
 import { PHONE_SIGNALS, SPOOFING_POINTS, NOTHING_FOUND_POINTS } from "./signals/phone";
 import { SPLICED_WORDING_SIGNALS } from "./signals/splicedWording";
+import { TASK_PAYMENT_SIGNALS } from "./signals/taskPayment";
 // Re-exported rather than moved out of reach: each was already reachable
 // through this module's subpath, and the conversion is meant to be
 // observationally identical at the API boundary as well as in the scores. The
@@ -139,17 +140,18 @@ class Signals {
    * Lift one already-merged row back to its full pre-discount weight.
    *
    * Exists for signals that a channel-wide multiplier should not apply to —
-   * `UNDISCOUNTED_COMPOSITES` and its two remaining entries, the task-payment
-   * and messaging-hijack gates. Deliberately narrow: it raises a single row it
-   * can identify by its opening text, never the total, so the evidence list
-   * still sums to the score the reader is shown.
+   * `UNDISCOUNTED_COMPOSITES` and its one remaining entry, the messaging-hijack
+   * gate. Deliberately narrow: it raises a single row it can identify by its
+   * opening text, never the total, so the evidence list still sums to the score
+   * the reader is shown.
    *
    * **This method is on its way out, and identifying a row by its prose is the
    * reason.** A signal converted to the registry declares its own per-channel
    * weight, so there is no discount to undo and nothing to look up by prefix;
    * each conversion removes an entry from that list, and the list and this
-   * method go when the last one does. The example this comment used to cite was
-   * the family-impersonation floor, which is now one of those conversions.
+   * method go when the last one does — which is now one conversion away. The
+   * examples this comment has cited in turn, the family-impersonation floor and
+   * then the task-payment gate, are both among those conversions.
    */
   restore(prefix: string, points: number): void {
     const row = this.list.find((s) => s.text.startsWith(prefix));
@@ -1286,11 +1288,7 @@ export interface MessageCheckOptions {
   senderDomain?: string;
 }
 
-/** Opening words of the task-payment composite, shared so checkEmail can find it. */
-const TASK_PAYMENT_FLAG =
-  "Earnings held behind a task you must pay to complete";
-
-/** Opening words of the messaging-hijack composite, shared for the same reason. */
+/** Opening words of the messaging-hijack composite, shared so checkEmail can find it. */
 const MESSAGING_HIJACK_FLAG =
   "Claims a messaging account has been flagged or restricted";
 
@@ -1354,6 +1352,39 @@ function addFamilyImpersonationSignals(
       matches: mentions,
     },
     FAMILY_IMPERSONATION_SIGNALS,
+  )) {
+    sig.add(row.source, row.text, row.points);
+  }
+}
+
+/**
+ * Score the task-payment gate from the registry, on whichever channel is asking.
+ *
+ * One helper rather than a branch per entry point, matching the three
+ * conversions before it. Like the family gate it had one call site, in
+ * `checkSms`, which `checkEmail` merged — so the thing this helper replaces is
+ * not duplication but the merge: the declared 40 arrived as 28 on email until the
+ * flag was named in an exemption list somewhere the author was not looking.
+ *
+ * Scoring it in the caller, outside `merge`, is what keeps "a weight read from
+ * the registry is the weight that reaches the score" true.
+ *
+ * No `matches`: unlike the family gate this rule consults no pack list at all,
+ * so the capability the previous conversion added to the context is one this one
+ * does not take. It reads `original` and nothing else.
+ */
+function addTaskPaymentSignals(
+  sig: Signals,
+  text: string,
+  pack: RegionPack,
+  channel: Channel,
+): void {
+  // No `words`: this signal reads `original` with its own regexes, so the field
+  // is left absent rather than filled with a plausible `[]`. See the note on
+  // `Context.words`.
+  for (const row of registryScore(
+    { channel, pack, original: text, body: text.toLowerCase() },
+    TASK_PAYMENT_SIGNALS,
   )) {
     sig.add(row.source, row.text, row.points);
   }
@@ -1829,36 +1860,32 @@ export function checkSms(
     sig.add("message", "Task/job recruitment pattern — a common funnel into 'pig-butchering' investment scams; real employers don't recruit this way", 25);
   }
 
-  // The task-scam payment gate (D2 / #226 / Scamwatch alert, 7 Aug 2026).
+  // The task-scam payment gate — the step that takes the money (D2 / #226 /
+  // Scamwatch alert, 7 Aug 2026).
   //
-  // jobSignals above already catches the recruitment half — the e-commerce
-  // assistant lure measured suspicious (25) before this, which is why the
-  // issue's proposed REWARD_WORDS entries were dropped: "rate products to earn
-  // commission" would have double-scored against the composite's own regex.
+  // `jobSignals` above catches the recruitment half of the same funnel, and the
+  // two are deliberately separate rules rather than one composite: the payment
+  // demand is the tell on its own, since no employer has ever required payment to
+  // release wages. That separation is also why the issue's proposed REWARD_WORDS
+  // entries were dropped — "rate products to earn commission" would have
+  // double-scored against the recruitment composite's own regex.
   //
-  // What was uncovered is the step that takes the money. After some real
-  // payouts the victim is told their earnings are locked behind a deposit —
-  // "complete the task to withdraw", "your account is frozen, top up to
-  // continue". That inverts the employment relationship, and it is scored
-  // separately rather than as another jobSignal because it is the tell on its
-  // own: no employer has ever required payment to release wages. Measured at
-  // safe (0) before this.
-  const taskPaymentGate =
-    // "receive" is deliberately absent from the outcome verbs, and the outcome
-    // must name money. "Complete the task to receive your certificate" is
-    // ordinary compliance-training mail and measured 40 against a looser form.
-    /\b(complete|finish|unlock|activate)\b[^.!?]{0,30}\btasks?\b[^.!?]{0,30}\b(to|before|and)\b[^.!?]{0,20}\b(withdraw|withdrawal|release|unlock|claim)\b[^.!?]{0,30}\b(earnings?|commission|balance|funds|payment|money|salary|wages?|\$\d)/i.test(text) ||
-    /\b(withdraw|release|unlock)\b[^.!?]{0,40}\b(earnings|commission|balance|funds)\b[^.!?]{0,40}\b(complete|finish|deposit|top\s?up|recharge|prepay|pre-?fund)\b/i.test(text) ||
-    /\b(deposit|top\s?up|recharge|prepay|pre-?fund)\b[^.!?]{0,40}\b(to|before)\b[^.!?]{0,30}\b(unlock|withdraw|release|continue)\b[^.!?]{0,30}\b(earnings|commission|tasks?|balance|funds)\b/i.test(text) ||
-    // "You have unfinished tasks" is the scam's own phrasing, but it is also
-    // exactly what a project tracker sends — "Reminder from Asana: you have 3
-    // unfinished tasks" scored 40 while this branch stood alone, telling the
-    // reader their money was gone. Unlike the three above it carries no payment
-    // half of its own, so it needs the money context the others state outright.
-    (/\byou\s+have\s+(?:\d+\s+)?unfinished\s+tasks?\b/i.test(text) &&
-      /\b(withdraw|withdrawal|earnings?|commission|balance|deposit|top\s?up|recharge|unlock|frozen|payout)\b/i.test(text));
-  if (taskPaymentGate) {
-    sig.add("message", TASK_PAYMENT_FLAG + " — this is the moment a task-scam takes the money. A real employer never asks you to deposit funds to release your own wages, and the small payouts that came before exist to make this step feel safe. Anything sent here is gone, and the 'balance' on screen is not real.", 40);
+  // Scored from the registry, which owns its weight on this channel and the
+  // reasoning for the number. See `signals/taskPayment` for why it returns one
+  // row rather than one per matching branch, and for the dead currency
+  // alternative the conversion carried across rather than revived.
+  //
+  // **Skipped on the email channel, and scored by `checkEmail` itself instead.**
+  // That reads like an exception and is the opposite of one, for the reason
+  // `addClickFixSignals` and the two conversions after it are: `checkEmail`
+  // analyses the body by running this function and merging the result at 0.7, so
+  // a registry row scored here would be weighted twice — once by its own declared
+  // channel weight, and again by a blanket multiplier applied to the sub-result
+  // afterwards. The declared 40 arrived as 28, which is the defect class the
+  // registry exists to delete, reaching the row through the merge instead of
+  // through the exemption list.
+  if (channel !== "email") {
+    addTaskPaymentSignals(sig, text, PACK, channel);
   }
 
   // Verification-code harvesting — messaging-app account takeover (D3 / #227 /
@@ -2288,12 +2315,12 @@ export function checkSms(
  * loudly rather than quietly scoring a tier low.
  */
 const UNDISCOUNTED_COMPOSITES: string[] = [
-  TASK_PAYMENT_FLAG,
   MESSAGING_HIJACK_FLAG,
-  // The ClickFix pair, the splice rule and the family gate are NOT here, and
-  // their absence is the point rather than an omission: each now declares its
-  // own channel weight — 50, 25 and 45 — on every channel it runs on, so the
-  // email path never discounts them and has nothing to restore.
+  // The ClickFix pair, the splice rule, the family gate and the task-payment
+  // gate are NOT here, and their absence is the point rather than an omission:
+  // each now declares its own channel weight — 50, 25, 45 and 40 — on every
+  // channel it runs on, so the email path never discounts them and has nothing
+  // to restore.
   //
   // The splice rule was the entry this list could least afford to lose and the
   // clearest case for the field that replaced it. It is not a two-condition gate
@@ -2472,10 +2499,10 @@ export function checkEmail(text: string, blocklist?: HostLookup, region?: Region
   // Placed immediately after the merge so the evidence keeps the order a reader
   // saw before the conversion: body rows, then the sender and link analysis.
   //
-  // Ordered as `checkSms` scores them — splice, family, ClickFix — so the
-  // evidence list reads the same whichever channel the text arrived on. The
-  // splice rule first is the load-bearing part: it is the row that explains why
-  // the keyword rows found nothing.
+  // Ordered as `checkSms` scores them — splice, family, ClickFix, task payment —
+  // so the evidence list reads the same whichever channel the text arrived on.
+  // The splice rule first is the load-bearing part: it is the row that explains
+  // why the keyword rows found nothing.
   //
   // Worth stating as a rule rather than a preference, because getting it wrong
   // is invisible. Nothing here asserts an order, every pin asserts points and
@@ -2483,9 +2510,15 @@ export function checkEmail(text: string, blocklist?: HostLookup, region?: Region
   // the same text is the only one who would notice. The first version of this
   // block had ClickFix and the family gate the other way round, under a comment
   // claiming it matched `checkSms`.
+  //
+  // Task payment comes last because that is where `checkSms` scores it: after
+  // the ClickFix call and the recruitment composite, not with the other two gates
+  // at the top of the function. Checked against the call order in `checkSms`
+  // rather than assumed from this list's history.
   addSplicedWordingSignals(sig, text, PACK, "email");
   addFamilyImpersonationSignals(sig, text, PACK, "email");
   addClickFixSignals(sig, text, PACK, "email");
+  addTaskPaymentSignals(sig, text, PACK, "email");
 
   // …but not for the gated composites. The 0.7 discount is right for what it
   // was written for — urgency and reward keywords really are weaker evidence in
@@ -2494,7 +2527,7 @@ export function checkEmail(text: string, blocklist?: HostLookup, region?: Region
   // several independent halves to line up.
   //
   // Left alone it demoted them across the verdict boundary, the part that
-  // reaches the reader: the family script 45 → 31, task-payment 52 → 36,
+  // reaches the reader: the family script 45 → 31, task-payment 40 → 28,
   // messaging-hijack 60 → 42, each landing on "a bit sus" — advice that reads
   // as permission to keep reading.
   //
@@ -2505,6 +2538,9 @@ export function checkEmail(text: string, blocklist?: HostLookup, region?: Region
   // the discount exists to soften. Restored by lifting the signal's OWN row
   // rather than adding one — flags render straight from signal text, so a
   // padding row would show the reader a blank bullet.
+  //
+  // One entry left. Each converted composite declares its own channel weight
+  // instead, which is the same statement made where its author picks the number.
   for (const flag of UNDISCOUNTED_COMPOSITES) {
     const hit = (smsCheck.signals ?? []).find((x) => x.text.startsWith(flag));
     if (hit) sig.restore(flag, hit.points);
