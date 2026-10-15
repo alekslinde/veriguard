@@ -43,7 +43,23 @@
 //
 //   3. The gated composites, in progress. Each entry's signal declares its own
 //      channel weight, and `UNDISCOUNTED_COMPOSITES` loses an entry rather than
-//      gaining one. The ClickFix pair converted first, as the smallest.
+//      gaining one — four entries down to three. The ClickFix pair went first as
+//      the smallest; the splice rule second, because it is the one whose scoring
+//      shape does NOT fit the default. It finds a SET and scores it once, where
+//      `registryScore` scores each hit at the declared weight, so the obvious
+//      conversion turns a three-word splice into 75 points. One hit carrying the
+//      word list in its prose is the answer, and the general lesson is that
+//      `scale` is for a signal whose strength varies with what it found — not
+//      every signal that finds more than one thing. See `signals/splicedWording`.
+//
+//      Both conversions hit the SAME defect, and neither was visible in the
+//      code: `checkEmail` merges the whole SMS sub-result at 0.7, so a weight
+//      the signal declared arrived multiplied by something that never knew the
+//      signal existed — ClickFix's 50 as 35, the splice rule's 25 as 17. Found
+//      both times by pinning the scores first and reading the failure. The fix
+//      is for the entry point to score the registry's share outside the merge,
+//      which is what keeps "a weight read from the registry is the weight that
+//      reaches the score" true rather than merely intended.
 //
 // Remaining:
 //
@@ -110,6 +126,7 @@ import type { PhoneIntel } from "./phoneIntel";
 import type { RegionPack } from "./regions";
 import { CLICKFIX_SIGNALS } from "./signals/clickfix";
 import { PHONE_SIGNALS } from "./signals/phone";
+import { SPLICED_WORDING_SIGNALS } from "./signals/splicedWording";
 
 /**
  * Which surface the text arrived on.
@@ -405,7 +422,17 @@ export function missingReads(def: SignalDef, ctx: Context): Reads[] {
  * reachability it cannot see — the "partial check reporting a clean sweep"
  * shape, in the function whose whole job is to catch that. `tokenisedChannels`
  * is the parameter that lets a caller state what it actually supplies, and
- * `unsuppliedReads` is what holds the real call sites to it.
+ * `registryProblems` forwards it, so the escape hatch is reachable from the
+ * check that is actually asserted rather than from this function alone.
+ *
+ * That forwarding was missing for one commit, and the gap is worth keeping a
+ * note of because of its shape rather than its cost: this comment named a
+ * `unsuppliedReads` that was never written, so the parameter had no production
+ * route and the first `reads: ["words"]` signal would have been rejected with no
+ * way to declare otherwise. **A comment naming the thing that enforces a rule is
+ * not that thing** — the defect this file's own header is about, reproduced in
+ * the file, two paragraphs below a warning about it. Nothing failed, because a
+ * prose reference type-checks perfectly.
  */
 export function unsatisfiableReads(
   def: SignalDef,
@@ -452,10 +479,15 @@ export function unsatisfiableReads(
  * conversion — the registration and the deletion of the inline site — belong in
  * one commit.
  *
- * Converted so far: the phone channel, and the ClickFix pair on the sms, email
- * and custom channels. `scamDetector.ts` still owns the rest.
+ * Converted so far: the phone channel, and the ClickFix pair and the
+ * spliced-wording rule on the sms, email and custom channels. `scamDetector.ts`
+ * still owns the rest.
  */
-export const SIGNALS: readonly SignalDef[] = [...PHONE_SIGNALS, ...CLICKFIX_SIGNALS];
+export const SIGNALS: readonly SignalDef[] = [
+  ...PHONE_SIGNALS,
+  ...CLICKFIX_SIGNALS,
+  ...SPLICED_WORDING_SIGNALS,
+];
 
 /**
  * Ids registered more than once.
@@ -609,11 +641,28 @@ function supersessionCycles(defs: readonly SignalDef[]): string[] {
  * calls will eventually make three. A test asserts this is empty, so no step
  * from 2 onward can register a broken signal.
  */
-export function registryProblems(defs: readonly SignalDef[] = SIGNALS): string[] {
+export function registryProblems(
+  defs: readonly SignalDef[] = SIGNALS,
+  /**
+   * Channels on which some caller really does supply `words`.
+   *
+   * Forwarded to `unsatisfiableReads`, which is the only way a `reads:
+   * ["words"]` signal can ever pass authoring — reachability for that one input
+   * is a fact about the caller, not the channel, so somebody has to state it.
+   * Omitted, it is the strict `[]`, which is the truth today: no production call
+   * site tokenises.
+   *
+   * Step 4 of the conversion is where this gets an argument, from whichever
+   * entry point first builds a real `Context.words`. Until then the default is
+   * what should be passed, and a signal reading `words` is correctly reported
+   * rather than sitting in the inventory looking like coverage.
+   */
+  tokenisedChannels: readonly Channel[] = [],
+): string[] {
   const problems: string[] = [];
   for (const id of duplicateIds(defs)) problems.push(`${id}: registered more than once`);
   for (const def of defs) {
-    const unreachable = unsatisfiableReads(def);
+    const unreachable = unsatisfiableReads(def, tokenisedChannels);
     if (unreachable.length) {
       problems.push(`${def.id}: reads ${unreachable.join(", ")}, unreachable on its channels`);
     }

@@ -277,6 +277,25 @@ describe("registryProblems asks every authoring question at once", () => {
   it("passes a well-formed signal", () => {
     expect(registryProblems([fires()])).toEqual([]);
   });
+
+  it("forwards tokenisedChannels, so a `words` signal can be vouched for", () => {
+    // `unsatisfiableReads` has had the escape hatch for `words` since the field
+    // went optional, and its own tests cover it — but for one commit this
+    // function did not forward it, and a comment here named an
+    // `unsuppliedReads` that was never written as the thing that held callers to
+    // it. So the parameter existed with no production route: the first signal
+    // declaring `reads: ["words"]` would be reported as unreachable by the one
+    // check that is actually asserted, with no way to declare otherwise, and
+    // step 4 would have had to discover that rather than read it.
+    //
+    // Both directions, because a forwarded argument that is ignored and a
+    // default that is strict look identical from the passing side alone.
+    const reader = fires({ id: "tok", reads: ["words"], channels: ["sms"] });
+    expect(registryProblems([reader]).join("\n")).toContain("tok: reads words");
+    expect(registryProblems([reader], ["sms"])).toEqual([]);
+    // A caller tokenising a different channel vouches for nothing here.
+    expect(registryProblems([reader], ["custom"]).join("\n")).toContain("tok: reads words");
+  });
 });
 
 // `supersedes` is the one field whose effect is on ANOTHER signal's score, so
