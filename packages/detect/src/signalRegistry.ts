@@ -422,7 +422,17 @@ export function missingReads(def: SignalDef, ctx: Context): Reads[] {
  * reachability it cannot see — the "partial check reporting a clean sweep"
  * shape, in the function whose whole job is to catch that. `tokenisedChannels`
  * is the parameter that lets a caller state what it actually supplies, and
- * `unsuppliedReads` is what holds the real call sites to it.
+ * `registryProblems` forwards it, so the escape hatch is reachable from the
+ * check that is actually asserted rather than from this function alone.
+ *
+ * That forwarding was missing for one commit, and the gap is worth keeping a
+ * note of because of its shape rather than its cost: this comment named a
+ * `unsuppliedReads` that was never written, so the parameter had no production
+ * route and the first `reads: ["words"]` signal would have been rejected with no
+ * way to declare otherwise. **A comment naming the thing that enforces a rule is
+ * not that thing** — the defect this file's own header is about, reproduced in
+ * the file, two paragraphs below a warning about it. Nothing failed, because a
+ * prose reference type-checks perfectly.
  */
 export function unsatisfiableReads(
   def: SignalDef,
@@ -631,11 +641,28 @@ function supersessionCycles(defs: readonly SignalDef[]): string[] {
  * calls will eventually make three. A test asserts this is empty, so no step
  * from 2 onward can register a broken signal.
  */
-export function registryProblems(defs: readonly SignalDef[] = SIGNALS): string[] {
+export function registryProblems(
+  defs: readonly SignalDef[] = SIGNALS,
+  /**
+   * Channels on which some caller really does supply `words`.
+   *
+   * Forwarded to `unsatisfiableReads`, which is the only way a `reads:
+   * ["words"]` signal can ever pass authoring — reachability for that one input
+   * is a fact about the caller, not the channel, so somebody has to state it.
+   * Omitted, it is the strict `[]`, which is the truth today: no production call
+   * site tokenises.
+   *
+   * Step 4 of the conversion is where this gets an argument, from whichever
+   * entry point first builds a real `Context.words`. Until then the default is
+   * what should be passed, and a signal reading `words` is correctly reported
+   * rather than sitting in the inventory looking like coverage.
+   */
+  tokenisedChannels: readonly Channel[] = [],
+): string[] {
   const problems: string[] = [];
   for (const id of duplicateIds(defs)) problems.push(`${id}: registered more than once`);
   for (const def of defs) {
-    const unreachable = unsatisfiableReads(def);
+    const unreachable = unsatisfiableReads(def, tokenisedChannels);
     if (unreachable.length) {
       problems.push(`${def.id}: reads ${unreachable.join(", ")}, unreachable on its channels`);
     }
