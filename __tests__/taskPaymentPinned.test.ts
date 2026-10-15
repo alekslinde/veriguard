@@ -14,7 +14,12 @@ import { checkSms, checkEmail, checkCustom } from "@veriguard/detect/scamDetecto
 // and only the first is a refactor's safety net. Every expectation below was read
 // off the running engine across all three message channels, not derived from what
 // the code ought to do — including the two places where what it does today is
-// not what the code reads as doing.
+// not what the code reads as doing. Both of those are asymmetries a reader will
+// guess wrong from one side: branch 4's money context is scoped to the whole text
+// where branches 1-3 bound theirs within a sentence, and the money noun's
+// currency alternative is reachable from `AU$500` but not from `$500`. Each is
+// pinned on both sides, because a half-pinned asymmetry is what produced the
+// wrong note this file first carried about the second one.
 //
 // Four properties this file exists to hold, each a way the conversion can go
 // wrong while every decision still looks right:
@@ -370,14 +375,16 @@ const cases: Array<{
     email: 0,
     custom: 10,
   },
-  // **A dead alternative, pinned as dead.** The money-noun group ends in
-  // `\b(…|\$\d)`, and a word boundary before `$` can only hold where `$` follows
-  // a word character — `a$5` matches, ` $5` does not — so no ordinary prose can
-  // reach it. Written down here rather than fixed, because fixing it is a
-  // detection change and this file's whole job is to hold the conversion to
-  // today's behaviour. The conversion must carry the alternative across exactly
-  // as dead as it is now; whoever revives it does so in a commit that says so and
-  // watches this case flip.
+  // The money-noun group ends in `\b(…|\$\d)`, and a word boundary before `$`
+  // holds only where `$` follows a word CHARACTER. So this alternative is
+  // reachable from a currency-prefixed amount and not from a bare one, and both
+  // sides of that boundary are pinned here — the bare form below, the prefixed
+  // forms in the block that follows.
+  //
+  // Pinned on both sides because the asymmetry is surprising enough that a future
+  // reader will reach one of two wrong conclusions from seeing only half of it:
+  // that the alternative is dead (and deletable), or that it covers amounts
+  // generally. The first is the mistake this file's own earlier note made.
   {
     label: "a bare amount cannot satisfy the money noun",
     text: "Complete the task to withdraw $900.",
@@ -385,6 +392,43 @@ const cases: Array<{
     sms: 0,
     email: 0,
     custom: 10,
+  },
+
+  // ── The money noun satisfied by a currency-prefixed amount ──────────────
+  //
+  // `AU$500` is the ordinary Australian written form, so in an AU-focused
+  // detector this is the common shape of the alternative rather than an edge
+  // case: the prefix supplies the word character the boundary needs. These are
+  // the only cases here that reach the `\$\d` alternative at all, which is why
+  // each currency prefix gets its own rather than one standing for the group —
+  // a conversion that trimmed the alternative would otherwise fail nothing.
+  //
+  // Their SMS totals are 52 against email totals of 48, so they also hold the
+  // "surrounding body still discounted" property on the one branch where the
+  // money noun is an amount.
+  {
+    label: "money noun: an AU-prefixed amount",
+    text: "Complete the task to withdraw AU$500.",
+    fires: true,
+    sms: 52,
+    email: 48,
+    custom: 8,
+  },
+  {
+    label: "money noun: a US-prefixed amount",
+    text: "Complete the task to withdraw US$500.",
+    fires: true,
+    sms: 52,
+    email: 48,
+    custom: 8,
+  },
+  {
+    label: "money noun: an NZ-prefixed amount",
+    text: "Complete the task to claim NZ$300 now.",
+    fires: true,
+    sms: 52,
+    email: 48,
+    custom: 8,
   },
   // Same shape in the recruitment half's vocabulary rather than this gate's: the
   // phrasing reads like branch 1 and satisfies neither the money noun nor the

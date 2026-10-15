@@ -21,20 +21,28 @@
 // settled; taking the capability-free composite next means the remaining one
 // (messaging hijack) is the only place a new question can come from.
 //
-// What it did surface is a defect the conversion must NOT fix, and the
-// distinction is the point rather than a hedge. The money-noun group ends
-// `\b(earnings?|…|\$\d)`, and a word boundary before `$` can hold only where `$`
-// follows a word character: `a$5` matches, ` $5` does not. So the currency
-// alternative is unreachable from any ordinary prose and has never fired. It is
-// carried across below exactly as dead as it was, and pinned as dead
-// (`__tests__/taskPaymentPinned.test.ts`, "a bare amount cannot satisfy the money
-// noun"), because reviving it is a detection change and this step's whole safety
-// argument is one change at a time. Whoever revives it watches that case flip.
+// What it did surface is an asymmetry in the money-noun group, and the first
+// note written here got it wrong in a way worth recording. The group ends
+// `\b(earnings?|…|\$\d)`, and a word boundary before `$` holds only where `$`
+// follows a word CHARACTER. From that it is easy to conclude the alternative can
+// never match — ` $5` does not — and that conclusion was written down, pinned
+// against a bare `$900`, and was false: `AU$500`, `US$500` and `NZ$300` all
+// reach it, because the currency prefix supplies the word character. In an
+// AU-focused detector `AU$500` is the ordinary written form, so the alternative
+// is not merely live but commonly so.
 //
-// The shape is worth naming beyond this instance: an alternative authored in a
-// form that can never match is the P14 defect — a rule authored so it never
-// fired, invisible because breaking it changed nothing observable. Here the
-// conversion is what found it, because moving a regex means reading it.
+// Both sides are now pinned, which is the actual lesson rather than the regex
+// trivia. **A half-pinned asymmetry reads as a rule**: one fixture showing the
+// bare form silent was taken as the alternative's whole behaviour, and that note
+// would have invited a later author to delete a branch that is scoring. The
+// generalisable version: when a boundary condition surprises you, find the input
+// on the OTHER side of it before writing down what it means — an unreachable
+// branch and a branch reachable only from inputs you did not try look identical
+// from one fixture.
+//
+// The regexes are carried across from the entry point unchanged either way, so
+// no score moved; what was wrong was the reasoning about them and the coverage
+// it claimed.
 //
 // ## Why 40, and why it declines the email discount
 //
@@ -91,8 +99,10 @@ export const TASK_PAYMENT_FLAG = "Earnings held behind a task you must pay to co
  * compliance-training mail and measured 40 against a looser form, telling the
  * reader their money was gone.
  *
- * The trailing `\$\d` alternative is dead — see the note at the top of this file.
- * Carried across unchanged because the conversion is not the place to revive it.
+ * The trailing `\$\d` alternative matches a currency-PREFIXED amount (`AU$500`)
+ * and not a bare one (`$500`), because the word boundary needs a word character
+ * before the symbol. Pinned on both sides — see the note at the top of this file
+ * for why one side alone was read as the alternative being dead.
  */
 const COMPLETE_THEN_WITHDRAW =
   /\b(complete|finish|unlock|activate)\b[^.!?]{0,30}\btasks?\b[^.!?]{0,30}\b(to|before|and)\b[^.!?]{0,20}\b(withdraw|withdrawal|release|unlock|claim)\b[^.!?]{0,30}\b(earnings?|commission|balance|funds|payment|money|salary|wages?|\$\d)/i;
