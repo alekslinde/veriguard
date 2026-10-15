@@ -81,7 +81,12 @@ jobs:
       # The whole suite, not just this package's tests. It shares the engine
       # with the app and the extension in this same tree, so a break in either
       # is a break in what is about to be published.
+      # Both packages were built above, so both publish-surface gates are
+      # armed and a skip in either is a failure. The extension bundle is not
+      # built here, and its suite skips and reports.
       - name: Typecheck, lint and test
+        env:
+          VERIGUARD_REQUIRE_BUILT: enginePublish,mcpPublish
         run: |
           npm run typecheck
           npm run lint

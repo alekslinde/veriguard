@@ -65,9 +65,16 @@ function published(target: string): { types: string; default: string } {
 // This used a top-level `console.warn` for that, which vitest swallows — so it
 // printed nothing and the skip was as silent as the bare `skipIf` the other
 // two used. The shared helper reports it through a case that always runs.
+//
+// Probes an emitted file rather than dist/ itself: tsc creates the directory
+// before it finishes writing, so an interrupted or failed build leaves an
+// empty or partial dist/ behind. A directory probe calls that "built", and the
+// cases below then fail on individually missing files instead of reporting the
+// build as absent. scamDetector.js is the engine's main entry, so if the build
+// emitted anything at all it emitted this.
 const whenBuilt = describeWhenBuilt(
   "enginePublish",
-  DIST,
+  path.join(DIST, "scamDetector.js"),
   "npm run build:engine",
 );
 

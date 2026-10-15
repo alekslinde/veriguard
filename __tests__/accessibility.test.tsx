@@ -117,23 +117,64 @@ function stubCanvas() {
     },
     // A deterministic pattern seeded by what was drawn, so the first
     // character and the full string produce different buffers and the rule
-    // sees a pixel difference below its threshold rather than a blank canvas
-    // (which it reads as a ligature).
+    // sees a pixel difference rather than a blank canvas.
+    //
+    // Every byte of a drawn canvas is forced into 1..255. axe reads an
+    // all-zero buffer as "nothing rendered" and counts that as a ligature, and
+    // it tests the buffer as Uint32Array — so four consecutive zero bytes
+    // anywhere are enough to look blank in that word. A modulo pattern can
+    // land on zero for some inputs, which would make the stub's behaviour
+    // depend on which characters a component happens to render. Staying off
+    // zero entirely removes that coupling.
+    //
+    // Sized from the requested rectangle, as the real API is: the rule reads
+    // getImageData(0, 0, width, fontSize) and compares the two buffers
+    // index-by-index, so a buffer of the wrong length would compare against
+    // undefined and count differences that are an artefact of the stub.
     getImageData: (_x: number, _y: number, w: number, h: number) => {
-      const data = new Uint8ClampedArray(
-        Math.max(1, Math.ceil(w) * Math.ceil(h) * 4),
-      );
+      const width = Math.max(1, Math.ceil(w));
+      const height = Math.max(1, Math.ceil(h));
+      const data = new Uint8ClampedArray(width * height * 4);
       for (let i = 0; i < data.length; i++) {
-        data[i] = drawn.length === 0 ? 0 : (drawn.charCodeAt(i % drawn.length) + i) % 256;
+        data[i] =
+          drawn.length === 0 ? 0 : ((drawn.charCodeAt(i % drawn.length) + i) % 255) + 1;
       }
-      return { data };
+      // A real 2d context returns an ImageData, whose width/height axe does
+      // not read but a future caller might.
+      return { data, width, height, colorSpace: "srgb" as const };
     },
   };
+  // Patched on the prototype, so it has to be put back by hand: this is not a
+  // global binding, and vi.unstubAllGlobals only tracks vi.stubGlobal. Left in
+  // place it would outlive this suite's own cases and leak into any later file
+  // sharing the worker.
+  //
+  // Answers only for "2d", which is the context axe asks for. Anything else
+  // gets jsdom's own answer — a null from the real implementation, or its "not
+  // implemented" error for webgl — rather than a 2d stub pretending to be a
+  // context it is not.
+  const real = window.HTMLCanvasElement.prototype.getContext;
+  const patched = vi.fn(function (
+    this: HTMLCanvasElement,
+    kind: string,
+    ...rest: unknown[]
+  ) {
+    if (kind === "2d") return context;
+    return (real as (...a: unknown[]) => unknown).call(this, kind, ...rest);
+  });
   Object.defineProperty(window.HTMLCanvasElement.prototype, "getContext", {
     writable: true,
     configurable: true,
-    value: vi.fn(() => context),
+    value: patched,
   });
+
+  return () => {
+    Object.defineProperty(window.HTMLCanvasElement.prototype, "getContext", {
+      writable: true,
+      configurable: true,
+      value: real,
+    });
+  };
 }
 
 // ReportForm fetches a form token and a report count on mount. Swallowed by
@@ -148,15 +189,21 @@ function stubFetch() {
   );
 }
 
+// stubCanvas patches a prototype method rather than a global, so it hands back
+// its own undo and this suite calls it — see the note there.
+let restoreCanvas: (() => void) | undefined;
+
 beforeEach(() => {
   stubMatchMedia();
   stubFetch();
-  stubCanvas();
+  restoreCanvas = stubCanvas();
 });
 
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  restoreCanvas?.();
+  restoreCanvas = undefined;
 });
 
 /**

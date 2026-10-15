@@ -56,9 +56,15 @@ jobs:
       # kept extensionless imports (ERR_MODULE_NOT_FOUND on first import),
       # declarations kept them too (TS2835 for any consumer on nodenext), and
       # the region packs emitted declarations with no JavaScript behind them.
+      # VERIGUARD_REQUIRE_BUILT arms the suite's build gate: it names the
+      # artifacts this step has built, so an absent one fails instead of
+      # skipping. Without it the suite skips and says so, which is what the
+      # `npm test` above — which runs before any build here — should get.
       - name: Build the published engine
         run: npm run build:engine
       - name: Publish-surface tests
+        env:
+          VERIGUARD_REQUIRE_BUILT: enginePublish
         run: npx vitest run __tests__/enginePublish.test.ts
 
       # The MCP server is published too, and mcpPublish.test.ts skips without a
@@ -70,6 +76,8 @@ jobs:
       - name: Build the published MCP server
         run: npm run build:mcp
       - name: MCP publish-surface tests
+        env:
+          VERIGUARD_REQUIRE_BUILT: mcpPublish
         run: npx vitest run __tests__/mcpPublish.test.ts
 
       # The Worker is outside the npm workspaces and vitest excludes workers/**,
@@ -124,6 +132,10 @@ jobs:
           npm run build:engine
           npm run build:mcp
       # The publish-surface suites, which load the built artifacts through
-      # Node's real resolver rather than the workspace's source mapping.
+      # Node's real resolver rather than the workspace's source mapping. Both
+      # builds ran above, so both gates are armed: a skip here would mean a
+      # build step stopped emitting, not that a build was skipped on purpose.
       - name: Publish-surface tests
+        env:
+          VERIGUARD_REQUIRE_BUILT: enginePublish,mcpPublish
         run: npx vitest run __tests__/enginePublish.test.ts __tests__/mcpPublish.test.ts
