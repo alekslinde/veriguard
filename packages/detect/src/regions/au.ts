@@ -472,7 +472,14 @@ const TYPOSQUAT_BRANDS = [
 // aupostal-services.com). Boundary matching still catches the squat shape —
 // "startrack-delivery.top", "aupost-redelivery.cyou" — which is what the lure
 // actually registers.
-const TYPOSQUAT_WORD_BRANDS = ["agl", "nib", "hcf", "velocity", "startrack", "aupost"];
+// "netbank" is the same shape: substring matching would hit every
+// "netbanking." host, a term several non-AU banks use for their own genuine
+// logon pages. As a label word it still catches "netbank-logon.com", the form
+// the lookalike logon pages register, while netbanking.hdfcbank.com and
+// netbankingportal.com stay clean. The subdomain-only form
+// ("netbank.secure-logon-au.com") is knowingly not caught — the substring list
+// would reach it only at that worldwide cost.
+const TYPOSQUAT_WORD_BRANDS = ["agl", "nib", "hcf", "velocity", "startrack", "aupost", "netbank"];
 
 // Consumer (non-government) brands impersonated in SMS bodies.
 const BRAND_MENTIONS = [
