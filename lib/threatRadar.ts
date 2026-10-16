@@ -169,7 +169,7 @@ export function roadmapUrl(entry: ThreatEntry): string {
 
 // ── Australia ───────────────────────────────────────────────────────────────
 //
-// Promoted from docs/threat-intel/2026-06-21 through 2026-09-27. Ordered
+// Promoted from docs/threat-intel/2026-06-21 through 2026-10-16. Ordered
 // roughly by how likely someone is to meet it, not by sweep date — the reader
 // wants "what should I know", not our publication history.
 
@@ -334,29 +334,31 @@ const AU_THREATS: ThreatEntry[] = [
   {
     id: "toad-callback",
     title: "Fake subscription renewal callbacks",
-    // Now both channels: the 2026-09-27 sweep recorded the SMS-shaped sibling of
-    // this email lure ("you didn't buy this — call to reverse the payment"), and
-    // confirmed the generic "asks you to call a number" rule plus brand and
-    // authority signals already reach `suspicious` on it. No gap, so this stays
-    // `watchlist` with the channel widened.
+    // Corrected 2026-10-16: the 2026-09-27 claim below that the SMS form
+    // "already reach `suspicious`" was wrong when measured — the generic
+    // call-a-number rule needs "call back|now|us|this number", and the actual
+    // lure ("call 1800 954 112 to cancel") matches none of them. 7 of 12
+    // measured lures scored safe 0. #463 shipped the real fix: a four-part
+    // composite (transaction claim + disown clause + dialable number + no
+    // URL) that fires independently of brand or authority wording.
     channel: "mixed",
-    status: "watchlist",
+    status: "active",
     coverage: "covered",
     firstSeen: "2026-07-26",
-    lastSeen: "2026-09-27",
+    lastSeen: "2026-10-16",
     summary:
-      "A message confirms a renewal or payment you never made — Norton, McAfee, PayPal, Geek Squad — for a few hundred dollars, with a phone number to cancel or reverse it. There is no link to check, which is the point: the number is the trap, and the call ends in remote access to your computer. It now arrives by SMS as well as email.",
+      "A message confirms a payment or renewal you never made — Norton, McAfee, PayPal, a bank direct debit, Geek Squad — and gives a number to ring to cancel or reverse it. There is no link to check, which is the point: the number is the trap, and the call ends in remote access to your computer or a request for your card details. It arrives by SMS as often as email now, and banks are increasingly the cover story.",
     lures: [
-      "\"Your Norton subscription has been renewed — $499.99\"",
-      "\"To cancel this charge, call 1800 …\"",
-      "An invoice as an image or PDF with no clickable link",
-      "\"Your PayPal payment is being processed\"",
-      "\"You didn't buy this? Call us to reverse the payment\"",
+      "\"PayPal: You have been charged $1,249.00 for an Apple iPhone 17 order. If you did not make this purchase call 1800 954 112 to cancel.\"",
+      "\"CommBank: A new direct debit has been set up on your account for $249.00. If this wasn't you, call 1800 123 456 to cancel this payment.\"",
+      "\"Your Norton subscription has been renewed — $499.99. To cancel call +61 2 8005 1234\"",
+      "A text, email, app notification or calendar invite claiming a purchase you don't recognise, always with a number to \"stop or reverse the payment\"",
+      "\"Your order of $689.99 has been processed. Not you? Call 1300 852 447 within 24 hours to reverse the payment.\"",
     ],
     advice:
-      "Never ring the number in the message. Check your actual bank statement — if there's no charge, there's no problem. Reported heavily among older Australians.",
-    detection: "We flag renewal-invoice language paired with a callback number and no link, by SMS as well as email.",
-    roadmap: "2026-09-27",
+      "Never ring the number in the message. Banks and retailers don't put a number to call in an unexpected-charge text — check your actual bank statement or app instead, or call the number on the back of your card.",
+    detection: "We flag a transaction claim paired with an invitation to disown it and a number to ring, with no link — the fake-purchase callback shape, whatever brand or bank it borrows.",
+    roadmap: "2026-10-16",
   },
   {
     id: "reportcyber-cold-storage",
@@ -727,7 +729,10 @@ const AU_THREATS: ThreatEntry[] = [
     id: "voice-clone-followup-sms",
     title: "Follow-up text after a scam phone call",
     channel: "sms",
-    status: "active",
+    // Demoted 2026-10-16: neither the 09-27 nor the 10-16 sweep re-confirms
+    // this campaign, so `active` would fail the recency ratchet
+    // (threatRadar.test.ts).
+    status: "watchlist",
     coverage: "covered",
     firstSeen: "2026-09-25",
     lastSeen: "2026-09-25",
@@ -795,6 +800,26 @@ const AU_THREATS: ThreatEntry[] = [
       "Check your points balance in the app. Loyalty programs give long notice of expiry — never 48 hours. A points reminder that lands you on a bank sign-in page is after the bank account, not the points.",
     detection: "Loyalty program names paired with expiry pressure are flagged, and the bank-branded variants are caught on the brand and the link together.",
     roadmap: "2026-09-06",
+  },
+  {
+    id: "netbank-lookalike-logon",
+    title: "Fake NetBank sign-in pages",
+    channel: "mixed",
+    status: "active",
+    coverage: "covered",
+    firstSeen: "2026-10-06",
+    lastSeen: "2026-10-16",
+    summary:
+      "A link in an email or text leads to a copy of NetBank's sign-in page, on a domain built around the word \"netbank\" rather than CommBank's own. CommBank's own September 2026 alert names email and text as the delivery channels, alongside the car-giveaway social ads reported earlier.",
+    lures: [
+      "\"CommBank: Your NetBank access has been restricted. Log on to restore access: netbank-logon.com/au\"",
+      "A link reading netbank-giveaway.com or netbank-verify-au.com",
+      "A sign-in page that looks like NetBank's current design, reached by email or text link rather than the CommBank app",
+    ],
+    advice:
+      "Never use a link in an email or text to log on to NetBank — CommBank says this directly. Open the CommBank app or type the address in yourself.",
+    detection: "We flag \"netbank\" as a lookalike-domain brand, so a domain built around that word scores highly even on a TLD that looks otherwise ordinary.",
+    roadmap: "2026-10-16",
   },
   {
     id: "immigration-visa",

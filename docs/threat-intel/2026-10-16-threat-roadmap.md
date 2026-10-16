@@ -1,5 +1,22 @@
 # Threat-intelligence roadmap — 2026-10-16
 
+## Status — as at 2026-10-16
+
+| Proposal | Issue | Shipped in | Status |
+|---|---|---|---|
+| D1 — "Unrecognised transaction, call this number" SMS composite | #463 | #468 | ✅ Shipped |
+| D2 — AU `netbank` typosquat | #464 | #466 | ✅ Shipped |
+| D3 — US midterm voter-registration lures | — | — | ⬜ Outstanding (time-sensitive, human triage) |
+| D4 — MX dead `caseSensitiveAuthorities` entries | — | — | ⬜ Outstanding |
+
+Promoted to `lib/threatRadar.ts`: D1 folded into the existing `toad-callback`
+entry (its 2026-09-27 coverage claim was wrong — see Corrections below — and
+is now corrected to match the shipped composite); D2 shipped as a new
+`netbank-lookalike-logon` entry. Neither is seasonal, so neither is added to
+`lib/scamCalendar.ts` per the README's calendar/radar split; the `tax-time`
+season's `reviewed` date was bumped after re-confirming the AU-1 ATO check
+below carried nothing new.
+
 *Sweep period: 2026-10-11 – 2026-10-16 (5 days since the last sweep). Input:
 the 🧭 Weekly sweep brief, issue #447 (65 items from 10 of 14 feeds). Next
 sweep due on or around 2026-10-23.*
