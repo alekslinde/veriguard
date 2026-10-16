@@ -37,6 +37,25 @@ import type { RegionCode, RegionDefinition, RegionPack } from "./types";
 
 export type { RegionCode, RegionCoverage, RegionPack } from "./types";
 
+// The second coverage axis. `RegionCoverage` says how much a pack knows;
+// this says whether the engine can read the languages that region's people
+// receive scam messages in. Derived from the packs rather than declared on
+// them — see the module header for why the two are separate questions.
+export type { LanguageCoverage } from "./languageCoverage";
+export {
+  // Both of these are exported for the checks that hold the derivation in
+  // place rather than for callers: the table and the field list are the two
+  // hand-made judgements in it, and each was injectable without failing
+  // anything while it could only be reached through the functions that gate
+  // it. A guard reachable only in series with another guard is not checked.
+  KEYWORD_LANGUAGES,
+  PROSE_FIELDS,
+  keywordLanguages,
+  languageCoverage,
+  subtractBase,
+  unreadableLanguageShare,
+} from "./languageCoverage";
+
 /**
  * What callers may pass as a region. Deliberately wider than RegionCode: the
  * value usually originates from a request header or user setting, so it can be
