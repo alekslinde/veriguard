@@ -139,7 +139,15 @@ class Signals {
       // regardless of which rows carried it, so a corroborated brand or
       // agency mention could read at full weight on its own row while the
       // verdict it was meant to help carry still landed a tier low (#469).
-      const toShare = Math.floor(rawTotal * discount);
+      //
+      // The discountable share's own BUDGET still has to come from the
+      // sub-result's own clamped `sub.score`, not from the raw row sum —
+      // `rawTotal` is pre-clamp and can run past 100 on its own (checkSms and
+      // checkUrl both clamp with `Math.min(sig.total(), 100)`), and scaling
+      // the discount off that uncapped figure silently undid the sub-result's
+      // own ceiling on the way into the merged total.
+      const discountableBudget = Math.max(0, sub.score - fullPoints);
+      const toShare = Math.floor(discountableBudget * discount);
       const weighted = toShare + fullPoints;
       let handed = 0;
       let sharedSeen = 0;
@@ -150,8 +158,14 @@ class Signals {
         }
         sharedSeen += 1;
         // Last discounted row takes the remainder so rounding never loses or
-        // invents a point.
-        const share = sharedSeen === discounted.length ? toShare - handed : Math.round((x.points / rawTotal) * toShare);
+        // invents a point. `rawTotal` is guaranteed > 0 whenever `discounted`
+        // is non-empty — resolveDeferred only marks a row `undiscountable`
+        // when some OTHER, non-deferred row scored, and that row is itself a
+        // member of `discounted` — but the guard costs nothing and this
+        // invariant lives in a different function.
+        const share = sharedSeen === discounted.length
+          ? toShare - handed
+          : rawTotal > 0 ? Math.round((x.points / rawTotal) * toShare) : 0;
         handed += share;
         this.list.push({ text: x.text, points: share, source });
       });

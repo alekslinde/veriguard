@@ -197,6 +197,46 @@ describe("a deferred row corroborated by a plain keyword rule survives the email
   });
 });
 
+// The fix above (carrying an undiscountable row at full weight rather than
+// funding it from inside the discounted total) must still respect the SMS
+// sub-pass's OWN 100-point clamp. This body's raw signals sum past 100
+// (checkSms clamps with a visible "capped at 100" row), so the discount here
+// has to be scaled off the clamped sub.score, not off the uncapped row sum —
+// scaling off the raw sum would hand the email path points checkSms itself
+// never awarded.
+describe("the discount still respects the SMS sub-pass's own clamp", () => {
+  // Three plain keyword rules, none of them in UNDISCOUNTED_COMPOSITES and
+  // none of them `undiscountable` — chosen so nothing here is restored by a
+  // separate mechanism, and the only thing under test is whether `merge`
+  // scales the discount off checkSms's clamped score (100) or its uncapped
+  // row total (120).
+  const body =
+    "URGENT: act now, your account is suspended, verify immediately! You have been selected to WIN a $1000 prize, " +
+    "claim your reward now! CONGRATULATIONS you have won a free iPhone. Please forward the verification code you " +
+    "just received to confirm your identity.";
+
+  it("clamps the SMS total before the email path ever sees it", () => {
+    const sms = checkSms(body, undefined, "AU");
+    const rawTotal = (sms.signals ?? []).filter((s) => s.points > 0).reduce((n, s) => n + s.points, 0);
+    // The precondition this test relies on: the raw per-row sum is over 100,
+    // and finalise() already pulled the reported score back down to 100 with
+    // a visible clamp row.
+    expect(sms.score).toBe(100);
+    expect(rawTotal).toBeGreaterThan(100);
+  });
+
+  it("discounts off the clamped score, not the uncapped row total", () => {
+    const email = checkEmail(asEmail(body), undefined, "AU");
+    const summed = (email.signals ?? []).reduce((n, s) => n + s.points, 0);
+
+    // Scaling off the uncapped raw total (120) instead of the clamped
+    // sms.score (100) would inflate this to floor(120 * 0.7) = 84; the
+    // clamp-respecting figure is floor(100 * 0.7) = 70.
+    expect(summed).toBe(70);
+    expect(summed).toBe(email.score);
+  });
+});
+
 // Kept here, outside the table, for the reason the splice-rule block above is:
 // it asks a different question of the family gate than
 // `familyImpersonationPinned` does. That file pins the row at 45 on both
