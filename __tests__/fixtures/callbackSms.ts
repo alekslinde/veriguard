@@ -76,14 +76,6 @@ export const BENIGN_CALLBACK_SMS: CallbackSmsFixture[] = [
     region: "AU",
   },
   {
-    id: "au-small-business-payment-processed",
-    shape:
-      "The residual AU false-positive class the issue itself names: a small " +
-      "trader confirming a payment with a genuine callback number.",
-    text: "Riverside Plumbing: Payment of $220.00 processed for invoice #4471. If this wasn't you call us on 03 9555 0123.",
-    region: "AU",
-  },
-  {
     id: "gb-direct-debit-confirmation-octopus-energy",
     shape:
       "GB genuine recurring direct-debit confirmation from Octopus Energy, a " +
@@ -150,4 +142,22 @@ export const CALLBACK_SMS_LURE_MINIMAL_PAIR: CallbackSmsFixture = {
     "Octopus Energy: A new direct debit of £64.00 has been set up on your account. " +
     "If you did not authorise this, call us on 0808 164 1088 to cancel.",
   region: "GB",
+};
+
+/**
+ * NOT benign — a documented, accepted residual false-positive the #463
+ * roadmap names explicitly rather than excludes: "a small business texting
+ * 'payment processed — if this wasn't you call us on 03 …'. That lands at
+ * suspicious 30, not likely_scam." Kept separate from BENIGN_CALLBACK_SMS so
+ * the "no genuine message scores above suspicious" assertion does not have to
+ * carve out an exception for a case the issue itself says should fire.
+ */
+export const CALLBACK_SMS_ACCEPTED_RESIDUAL_RISK: CallbackSmsFixture = {
+  id: "au-small-business-payment-processed",
+  shape:
+    "The residual AU false-positive class the issue itself names: a small " +
+    "trader confirming a payment with a genuine callback number. Scored on " +
+    "purpose, not excluded — see #463.",
+  text: "Riverside Plumbing: Payment of $220.00 processed for invoice #4471. If this wasn't you call us on 03 9555 0123.",
+  region: "AU",
 };
