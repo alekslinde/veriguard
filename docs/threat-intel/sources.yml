@@ -77,7 +77,7 @@
 # 09-09 header.
 
 version: 1
-updated: 2026-10-06
+updated: 2026-10-16
 
 tiers:
   1:
@@ -803,6 +803,19 @@ tiers:
         interest in fraud being visible and attributed to channels they do not
         control. Useful for spotting a campaign early; corroborate against
         garda.ie or ccpc.ie before it justifies a score on its own.
+    - domain: emirates247.com
+      name: Emirates 24/7
+      url: https://www.emirates247.com/uae-guide/how-to-spot-government-impersonation-scams-in-dubai-dubai-police-shares-warning-signs/3686
+      region: AE
+      check: manual
+      note: >-
+        UAE English-language press; reported the Dubai Police eCrime Hub's
+        16 Jul 2026 statement that government-impersonation scams move victims
+        onto WhatsApp, calls or email to create false urgency. Tier 2 because
+        it is press coverage of an eCrime Hub statement rather than the
+        statement itself — ecrime.ae (tier 1) is geo-fenced from this
+        environment, so the primary source could not be read directly this
+        cycle.
     - domain: krebsonsecurity.com
       name: Krebs on Security
       url: https://krebsonsecurity.com
