@@ -731,8 +731,8 @@ named here rather than added, because each tier is a judgement:
 
 | ID | Issue | Priority |
 |---|---|---|
-| D1 | #ISSUE_D1 — BASE: "unrecognised transaction, call this number" SMS composite | HIGH |
-| D2 | #ISSUE_D2 — AU: `netbank` lookalike logon domains (2026-10-06 D3, promoted) | HIGH |
+| D1 | [#463 — BASE: "unrecognised transaction, call this number" SMS composite](https://github.com/alekslinde/veriguard/issues/463) | HIGH |
+| D2 | [#464 — AU: `netbank` lookalike logon domains (2026-10-06 D3, promoted)](https://github.com/alekslinde/veriguard/issues/464) | HIGH |
 
 D3, D4 (MEDIUM, new) and D8 (MEDIUM, carried from 2026-10-06) are not filed,
 per the HIGH-only threshold. Their full detail is above for a human to
