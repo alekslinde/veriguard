@@ -63,21 +63,22 @@ describe("the hand-maintained table and the packs agree", () => {
   // cannot read while its lists sit there working, and nothing else says so.
   it("every pack with authored prose rules names the language it is in", () => {
     const authoring = packs().filter((pack) => keywordLanguages(pack).length > 0);
-    // Seven today: the five English-speaking `full` packs, IE, and CA.
+    // Six today: the five English-speaking `full` packs (AU, GB, US, NZ, IE)
+    // and CA. An earlier version of this comment said seven and listed IE
+    // twice, over a six-element assertion — the list is the fact, the prose
+    // was decoration, and review caught the mismatch.
     expect(authoring.map((p) => p.code).sort()).toEqual(["AU", "CA", "GB", "IE", "NZ", "US"]);
   });
 
-  // The other direction, which is the one a one-sided check would miss: a row
-  // for a pack that authors nothing is inert coverage, and the derivation
-  // would report a language as readable on the strength of base's own lists.
-  it("no pack claims a keyword language without authoring prose rules", () => {
-    for (const pack of packs()) {
-      const claimed = keywordLanguages(pack);
-      if (claimed.length === 0) continue;
-      const authored = EXPECTED_PROSE_FIELDS.some((field) => authoredIn(pack, field).length > 0);
-      expect(authored, `${pack.code} claims ${claimed} but authors no prose`).toBe(true);
-    }
-  });
+  // The "other direction" is NOT tested here, and the obvious way to write it
+  // is a tautology worth naming. A test that filters to packs where
+  // `keywordLanguages(pack)` is non-empty and then asserts they author prose
+  // cannot fail: that function returns `[]` unless `hasProseRules` is true,
+  // which is the same expression the assertion recomputes. The guard that
+  // lets the body run entails what the body checks, so it passed against the
+  // inert-row injection it was written for. Review caught it.
+  //
+  // The real other direction reads the table raw, which the test below does.
 
   // THE SAME SET, computed WITHOUT going through keywordLanguages.
   //
@@ -276,6 +277,35 @@ describe("the base subtraction", () => {
     expect(languageCoverage(resolveRegionPack("ZZ"))).toBe("none");
   });
 
+  // The subtraction works by value identity, so a region authoring a string
+  // that base already has is attributed to base and vanishes from what the
+  // region is credited with. If that were a pack's ONLY authored prose it
+  // would drop to `none` — coverage it has, reported as coverage it lacks.
+  //
+  // No pack is in that state (checked across all 28 × every prose field), and
+  // the collision is an authoring smell in its own right: a duplicate entry
+  // is scored twice by rules that add one signal per match, which `regions
+  // .test.ts` already treats as a pack invariant for the brand lists. So this
+  // fails on the collision rather than on its consequence, which is the
+  // earlier and more useful place to catch it.
+  it("no pack re-authors a string base already contributes", () => {
+    const zz = resolveRegionPack("ZZ");
+    for (const pack of packs()) {
+      for (const field of PROSE_FIELDS) {
+        const seen = new Map<string, number>();
+        for (const entry of pack[field] ?? []) seen.set(entry, (seen.get(entry) ?? 0) + 1);
+        const collisions = [...seen]
+          .filter(([, n]) => n > 1)
+          .map(([entry]) => entry)
+          .filter((entry) => (zz[field] ?? []).includes(entry));
+        expect(
+          collisions,
+          `${pack.code}.${field} re-authors base entries, so they are credited to base, not to the region`,
+        ).toEqual([]);
+      }
+    }
+  });
+
   // The state the authoring gate exists for, which no real pack is in.
   //
   // Dropping the subtraction was injected and failed nothing, because the
@@ -359,6 +389,17 @@ describe("the measured gap", () => {
   // is the thing worth recording.
   it("31 of 37 language-region pairs have no prose rules", () => {
     expect(unreadableLanguageShare(packs())).toEqual({ unreadable: 31, total: 37 });
+  });
+
+  // The per-pack distribution, pinned because the module's header states it
+  // in prose and the first version of that sentence was wrong (it said 21 of
+  // 28; the answer is 22). A count asserted in a comment is a count that
+  // drifts, which is this repo's whole argument for deriving things.
+  it("22 of the 28 packs score none, 5 covered, 1 partial", () => {
+    const tally = { covered: 0, partial: 0, none: 0 };
+    for (const pack of packs()) tally[languageCoverage(pack)] += 1;
+    expect(tally).toEqual({ covered: 5, partial: 1, none: 22 });
+    expect(packs()).toHaveLength(28);
   });
 
   // The non-English half, stated separately because it is the claim item 3

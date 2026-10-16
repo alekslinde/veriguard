@@ -37,7 +37,7 @@
 // it describes, and checked against them rather than trusted.
 
 import { BASE_SIGNALS } from "./base";
-import type { LanguageCode, RegionPack } from "./types";
+import type { LanguageCode, RegionCode, RegionPack } from "./types";
 
 /**
  * How much of a region's reading population the engine's prose rules cover.
@@ -51,7 +51,9 @@ import type { LanguageCode, RegionPack } from "./types";
  * agencies, its number plan and its registry-gated suffixes — real, useful,
  * positive knowledge — and still score zero on a message written in the local
  * language, because none of that knowledge is prose matching. That combination
- * is the common case here (21 of 28 packs) and it had no way to be said.
+ * is the common case here — **22 of the 28 packs** — and it had no way to be
+ * said. That count is pinned by test, because the first version of this
+ * sentence said 21 and nothing would have failed if it stayed wrong.
  */
 export type LanguageCoverage = "covered" | "partial" | "none";
 
@@ -143,6 +145,15 @@ const BASE_PROSE: Record<ProseField, readonly string[]> = {
  * tested with a base set the packs do not currently produce. Reading it off
  * `BASE_SIGNALS` inside would make the function untestable in exactly the
  * dimension that matters.
+ *
+ * **Identity, which has one consequence worth stating.** A region authoring a
+ * string base already carries has it attributed to base and loses the credit;
+ * were that a pack's only authored prose, the pack would read `none` while
+ * genuinely having a rule. No pack is in that state, and the collision is an
+ * authoring fault anyway — the merged list is not deduplicated, so a
+ * duplicate scores twice in rules that add one signal per match. A test fails
+ * on the collision rather than on this function's reaction to it, which
+ * catches it a step earlier and for the more serious reason.
  */
 export function subtractBase(
   merged: readonly string[],
@@ -209,7 +220,7 @@ function hasProseRules(pack: RegionPack): boolean {
  * a `DE` row here passed every test until this was exported. Two gates in
  * series mask each other; the table has to be observable on its own.
  */
-export const KEYWORD_LANGUAGES: Partial<Record<string, readonly LanguageCode[]>> = {
+export const KEYWORD_LANGUAGES: Partial<Record<RegionCode, readonly LanguageCode[]>> = {
   AU: ["en"],
   GB: ["en"],
   US: ["en"],
