@@ -1292,6 +1292,9 @@ export interface MessageCheckOptions {
 const MESSAGING_HIJACK_FLAG =
   "Claims a messaging account has been flagged or restricted";
 
+/** Opening words of the callback-SMS composite, shared so checkEmail can find it. */
+const CALLBACK_SMS_FLAG = "Fake transaction callback scam";
+
 /**
  * Entries that name a service rather than request something.
  *
@@ -2226,8 +2229,97 @@ export function checkSms(
     }
   }
 
+  // Callback-SMS composite (D1 / #463 / Scamwatch "fake purchase callback
+  // scams" alert; Which? 13 May/1 Jun/26 Aug/21 Sep 2026; Kent Fraud Alert
+  // System, May 2026). The fake-purchase / unrecognised-transaction callback:
+  // a text claims a payment, order, direct debit, standing order or credit
+  // application has gone through, invites the reader to disown it, and gives
+  // a number to ring "to cancel" or "if this wasn't you". The person who
+  // answers is the scammer, posing as the bank or retailer fraud team. The
+  // email form of this has been covered since #102 (the TOAD composite,
+  // below); this is the SMS form, which measured safe(0) on 7 of 12 lures
+  // before this rule existed — the 2026-09-27 sweep recorded it as already
+  // reaching suspicious, but that was never measured against the engine.
+  //
+  // All four conditions must hold. Each alone is ordinary: receipts state
+  // transactions, helplines give numbers, and genuine fraud alerts ask "was
+  // this you?" — so the gate needs every one of the four at once, with no
+  // link and no own-channel protective wording, to separate the lure from
+  // ordinary bank, retailer and utility SMS. See
+  // __tests__/fixtures/callbackSms.ts for the corpus this was measured
+  // against, including the adversarial benign cases (a subscription renewal,
+  // a gym-membership reminder, a flight booking) that forced the completed-
+  // transaction requirement below.
+  const callbackTxnAsserted =
+    // A completed transaction: "has been charged/debited/placed/…", not a
+    // future one — "payment is due", "will be debited" without "today", are
+    // upcoming bills, not the lure's claim that money has already moved.
+    /\b(has been|have been|was|is)\s+(charged|debited|authorised|authorized|placed|processed|set up|approved)\b/i.test(text) ||
+    /\bwill be debited\b.{0,20}today\b/i.test(text) ||
+    /\b(a )?new (direct debit|standing order)\b.{0,40}(has been )?set up\b/i.test(text) ||
+    // The bare-participle form ("Payment of $220.00 processed for invoice
+    // #4471") that the auxiliary-verb branch above misses.
+    /\b(payment|purchase|order|transaction)\b.{0,10}\bof\b.{0,20}\bprocessed\b/i.test(text);
+  // Requires real disown language — "if this wasn't you", "if you did not
+  // authorise this" — not just the bare words "to cancel". A first version of
+  // this gate accepted bare "to cancel" as a stand-in, on the reasoning that
+  // the Norton fixture below ("To cancel call...") has no other disown
+  // wording to detect. That reasoning did not survive contact with real
+  // brands: "Origin Energy: Your direct debit of $142.30 was processed on 14
+  // Oct. If you have any questions, call us on 13 24 61 to cancel or change
+  // your payment plan." — an ordinary utility receipt with zero disown
+  // language — scored likely_scam 50 under it, as did a Netflix renewal, a
+  // gym-membership debit and a charity direct-debit confirmation. "To cancel"
+  // is routine language on any recurring-billing SMS that offers an opt-out;
+  // it carries none of the "was this you?" signal the gate exists to find.
+  //
+  // The cost is real and accepted: the Norton-shaped lure ("$499.99 will be
+  // debited... To cancel call...", no explicit disown clause at all) no
+  // longer fires, because nothing distinguishes it from Origin Energy's
+  // receipt — the two are the same four words apart. A composite that cannot
+  // tell them apart should fire on neither, not on both. See
+  // __tests__/fixtures/callbackSms.ts for the measured corpus, both sides.
+  const callbackDisownClause =
+    /\bif\s+(this\s+(wasn.t|was\s+not)\s+you|you\s+did\s+not\s+(make|place|authori[sz]e)\s+this|you\s+do(n.t)?\s+(not\s+)?recognise\s+this(\s+payment)?|you\s+did\s+not\s+authori[sz]e\s+this)\b/i.test(text);
+  const callbackCallVerb =
+    /\bcall\b.{0,25}\bto\s+(cancel|reverse|stop|dispute)\b/i.test(text) ||
+    /\bto\s+cancel\b.{0,15}\bcall\b/i.test(text) ||
+    /\bcall\b.{0,15}\b(us|now|back|this\s+number)\b/i.test(text) ||
+    /\bcall\b.{0,20}\d/i.test(text);
+  // Own-channel protective wording: a genuine fraud team directs the reader
+  // to their own card, app or online banking, never to a number the message
+  // supplies. Widened from the original two fixed phrases ("official app",
+  // "back of your card") after "Westpac: ... If you did not authorise this,
+  // log into internet banking to check, or call 1300 655 505 to cancel."
+  // scored suspicious 30 despite correctly directing the reader to verify
+  // through their own bank login — the exact behaviour this guard exists to
+  // exempt, just phrased differently than either literal string covered.
+  const callbackProtectiveWording =
+    /\bofficial\s+app\b|\bback\s+of\s+your\s+card\b/i.test(text) ||
+    /\b(log\s?in|log\s+into|logging\s+in)\b.{0,20}\b(internet\s+banking|the\s+app|online\s+banking|your\s+account\s+online)\b/i.test(text);
+  // Declared here rather than reusing the module's later `hasUrl`: that const
+  // is declared further down (by the crypto-TOAD composite), after this gate
+  // runs, so reusing it would be a reference to a binding that does not exist
+  // yet. Same regex, so the two never disagree about what counts as a link.
+  const callbackHasUrl = /https?:\/\/|www\.|\.[a-z]{2,}\//i.test(text);
+  const callbackComposite =
+    callbackTxnAsserted && callbackDisownClause && callbackCallVerb && !callbackHasUrl && !callbackProtectiveWording;
+
+  if (callbackComposite) {
+    sig.add("message", `${CALLBACK_SMS_FLAG} — this claims a payment or order has already gone through and invites you to ring a number to dispute it. The number reaches the scammer, not your bank or the retailer. Don't call it — contact the business directly through their official app or website instead.`, 30);
+  }
+
   // Asks to call back a number
-  if (/call\s+(back|now|us|this number)/i.test(text)) {
+  //
+  // Suppressed when the callback composite above already fired: both read the
+  // same "call ... to cancel/us/now/back" fact, so scoring both double-counts
+  // one observation. Without this, the GB Barclays acceptance case in #463
+  // would reach 50 (30 + 20) rather than the 30 the issue specifies — one row
+  // carrying the evidence once. Where the lure also names a brand the engine
+  // already defers (IE's AIB, for instance), that row is untouched by this
+  // guard and can still corroborate — see __tests__/callbackSmsBenignCorpus
+  // for the measured number and why it differs from the issue's estimate.
+  if (!callbackComposite && /call\s+(back|now|us|this number)/i.test(text)) {
     sig.add("message", "Asks you to call a number — scammers use this to run up your phone bill or gather info", 20);
   }
 
@@ -2262,7 +2354,14 @@ export function checkSms(
   const mentionsCalling = /\bcall\b|\bphone\b|\bcontact (support|us)\b|\bhelpline\b/i.test(text);
   const hasUrl = /https?:\/\/|www\.|\.[a-z]{2,}\//i.test(text);
 
-  if (cryptoToadHit && hasPhoneNumber && mentionsCalling && !hasUrl) {
+  // Suppressed when the callback composite above already fired: both reach
+  // the same conclusion from the same transaction-claim-plus-call-no-link
+  // shape when the lure happens to also name a crypto exchange — "CoinSpot:
+  // Your withdrawal of $1,249.00 was processed. If you did not authorise
+  // this, call 1800 035 544 to cancel." triple-stacked to likely_scam 80
+  // (brand mention + this row + the callback composite) before this guard,
+  // for one underlying observation.
+  if (!callbackComposite && cryptoToadHit && hasPhoneNumber && mentionsCalling && !hasUrl) {
     sig.add("message", `Crypto exchange asking you to phone them — ${cryptoToadHit} and other exchanges never ring customers or ask you to call about account security. The scam happens on the call: they'll talk you through handing over 2FA codes or moving funds to a "safe wallet". Hang up and log in through the official app instead.`, 30);
   }
 
@@ -2316,6 +2415,15 @@ export function checkSms(
  */
 const UNDISCOUNTED_COMPOSITES: string[] = [
   MESSAGING_HIJACK_FLAG,
+  // The callback-SMS composite (#463): four independent conditions — a
+  // completed-transaction claim, a disown clause, a call-to-dispute verb
+  // with a dialable number, no link, no own-channel protective wording.
+  // Discounted it scores 21 on a $1,249.00 PayPal lure that measures 30 on
+  // SMS, moving a `suspicious` verdict toward `safe` on the channel the rule
+  // exists to cover (the fake-purchase email form is a SEPARATE, stricter
+  // composite below, #102/TOAD) — the same failure mode this list exists to
+  // catch, not a hypothetical one.
+  CALLBACK_SMS_FLAG,
   // The ClickFix pair, the splice rule, the family gate and the task-payment
   // gate are NOT here, and their absence is the point rather than an omission:
   // each now declares its own channel weight — 50, 25, 45 and 40 — on every
