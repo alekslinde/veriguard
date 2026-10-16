@@ -1,14 +1,8 @@
 # Versioning
 
-Every shippable part carries its own version, and **nobody edits a version by
-hand**. release-please reads the commit messages on `main`, works out the next
-number for each part, and keeps a release pull request open per part. Merging
-that PR is what bumps the version, writes the changelog, creates the tag and
-publishes the GitHub Release.
-
-So the question this file used to answer — "which number do I bump in my PR?" —
-is now answered by the **type of your commit**. Get the type right and the
-number follows.
+Every shippable part carries its own version. **Nobody edits a version by hand**:
+`npm run release` writes it, from the type of each commit since the part's last tag.
+Get the commit type right and the number follows.
 
 Format is [semantic versioning](https://semver.org): `MAJOR.MINOR.PATCH`.
 
@@ -34,8 +28,7 @@ history, and the prefixed line starts beside them rather than replacing them.
 
 Which part a commit belongs to is decided by the **paths it touches**, not by
 its scope word. A commit editing `packages/detect/src` releases the engine; one
-editing `components/` releases the app. A commit touching both appears in both
-parts' release PRs.
+editing `components/` releases the app. A commit touching both counts toward both.
 
 ---
 
@@ -89,9 +82,9 @@ fires, the type is not the problem you have.
 
 ## How to write the commit
 
-Pull requests are **squash-merged with the PR title as the commit message**, so
-the PR title is the commit release-please parses. Get that right and there is
-nothing else to do.
+Pull requests are **squash-merged with the PR title as the commit message**, so the
+PR title is the commit the release command reads. Get that right and there is nothing
+else to do.
 
 ```
 feat(detector): score defanged URLs
@@ -99,21 +92,14 @@ fix(ui): stop the verdict card clipping on narrow screens
 chore(config): bump eslint
 ```
 
-A `pr-title.yml` check rejects a title it cannot parse. That check is
-load-bearing rather than style policing: an unparseable title produces no bump
-and no changelog entry, so the change would ship silently under whatever number
-the last release happened to set.
+A `pr-title.yml` check rejects a title it cannot parse. An unparseable title produces
+no bump and no changelog entry, so the change would ship silently under whatever
+number the last release set.
 
-Each squash-merged PR is one changelog line, under Features, Fixes or
-Performance; refactors, docs, tests and chores are left out of the notes. When
-a title alone would describe a PR poorly, put the line you want in the PR body
-before merging, and release-please uses it instead:
-
-```
-BEGIN_COMMIT_OVERRIDE
-fix(ext): store zips leave out hidden files and the Safari app icon
-END_COMMIT_OVERRIDE
-```
+Each squash-merged PR becomes one changelog line, under Features, Fixes or
+Performance. Refactors, docs, tests and chores are left out of the notes. The command
+shows the draft notes before anything is tagged, and offers to open them in `$EDITOR`,
+so a title that reads badly can be reworded there rather than in history.
 
 For a breaking change, either mark the type or add the footer:
 
@@ -121,13 +107,8 @@ For a breaking change, either mark the type or add the footer:
 feat(detector)!: withdraw the legacy verdict shape
 ```
 
-Scopes are the ones listed in `CLAUDE.md`. They do not affect the version — the
-paths decide the part, the type decides the number — but they make the changelog
-readable.
-
-**Do not run `npm version`.** The version in each `package.json` is written by
-release-please when a release PR merges. A hand-edited version will be
-overwritten, and in the meantime it disagrees with the manifest.
+Scopes are the ones listed in `CLAUDE.md`. They do not affect the version. The paths
+decide the part, and the type decides the number.
 
 ---
 
@@ -142,10 +123,10 @@ When you decide a part's v1 features are ready:
    Milestones track the plan, not code.
 2. Optionally ship previews first as pre-releases (`app-v1.0.0-rc.1`), marked as
    pre-release on GitHub.
-3. Merge a commit whose body says `Release-As: 1.0.0`. release-please then
-   proposes 1.0.0 in that part's release PR.
-4. Write the 1.0.0 Release notes as the announcement: what v1 promises.
-5. Merge the release PR. That creates `app-v1.0.0`, its Release and the deploy.
+3. Run `npm run release` and enter `1.0.0` for that part. The suggestion will be a
+   minor or patch; typing the version is how 1.0.0 is chosen.
+4. Edit the drafted notes in `$EDITOR` into the announcement: what v1 promises.
+5. Confirm. That creates `app-v1.0.0`, its Release and, if you say yes, the deploy.
 
 The parts do not have to reach 1.0 together. The engine can stay `0.x` while the
 app is 1.0, or the reverse.
@@ -154,10 +135,10 @@ app is 1.0, or the reverse.
 
 ## Tagging
 
-Tags are created by the release workflow, never by hand. A tag exists because a
-release PR merged, which means a tag always has a changelog entry and a GitHub
-Release behind it.
+Tags are created by `npm run release`, never by hand. A tag exists because a release
+was confirmed, which means every tag has a changelog entry and a GitHub Release behind
+it.
 
-A milestone is a version whose notes say so — not a separate kind of tag.
+A milestone is a version whose notes say so, not a separate kind of tag.
 
 See [`releases.md`](releases.md) for what happens after a tag is created.

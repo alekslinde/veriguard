@@ -32,7 +32,7 @@
 // is false in every workflow this repo has. `npm test` runs BEFORE any build
 // in ci.yml; publish-engine.yml builds only the engine before it;
 // publish-mcp.yml builds the engine and the MCP server but not the extension;
-// release.yml runs `ext:pack` but neither package build. Four jobs, four
+// the release command runs `ext:pack` but neither package build. Four jobs, four
 // different subsets — so `CI` cannot distinguish "the build is missing because
 // this job was meant to produce it" from "this job never builds this artifact,
 // by design". Keying on it turned a correct tree red in all four.

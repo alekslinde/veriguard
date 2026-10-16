@@ -152,8 +152,8 @@ no changelog entry.
 
 Example: `fix(ui): reveal the bug-report chip on scroll, icon-only on mobile`.
 
-**Do not bump a version in your PR.** Versions are written by the release
-tooling when a release PR merges — a hand-edited one gets overwritten. See
+**Do not bump a version in your PR.** Versions are written by `npm run release`,
+and a hand-edited one gets overwritten. See
 [`docs/versioning.md`](docs/versioning.md).
 
 ---

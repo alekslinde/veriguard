@@ -181,7 +181,7 @@ describe("MCP package — manifest", () => {
     // Release PRs bump the engine alone. Pre-1.0 a caret stops at the next
     // minor, so ^0.1.1 rejects 0.2.0: npm then wants the registry copy instead
     // of the workspace, the lockfile no longer matches, and every `npm ci` on
-    // that release PR fails before a single check runs. Raise this range (and
+    // that release fails before a single check runs. Raise this range (and
     // regenerate package-lock.json) in the same change as the engine's version.
     const range = (pkg.dependencies as Record<string, string>)["@veriguard/detect"];
     const engine = JSON.parse(

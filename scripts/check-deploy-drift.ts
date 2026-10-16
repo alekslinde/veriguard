@@ -5,7 +5,7 @@
 // has been merged but never released.
 //
 // Releasing is deliberately manual (docs/releases.md): merges to `main` do not
-// deploy, and production moves only when the release workflow fast-forwards it
+// deploy, and production moves only when `npm run release` fast-forwards it
 // to a new app release tag. That is what decouples merge frequency from deploy
 // frequency, and it has one failure mode — nothing is watching, so "I'll cut a
 // release later" decays into a month of unshipped work with no prompt.
@@ -185,8 +185,7 @@ function markdown(d: Drift): string {
     `| Last release | ${d.lastPromotion} (${d.ageDays} days ago) |`,
     `| Version | \`${d.prodVersion ?? "?"}\` → \`${d.mainVersion ?? "?"}\` |`,
     ``,
-    `Ship it by merging the open **app** release PR, which release-please keeps`,
-    `up to date. Rules: \`docs/releases.md\`.`,
+    `Ship it with \`npm run release\` and promote the app. Rules: \`docs/releases.md\`.`,
     ``,
     `Nothing here says the work is *ready* — only that it has been waiting a`,
     `while. Deferring deliberately is a fine answer; this issue closes itself`,
