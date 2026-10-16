@@ -897,7 +897,7 @@ tiers:
       check: manual
     - domain: ctm360.com
       name: CTM360
-      url: https://www.ctm360.com/reports
+      url: https://www.ctm360.com/cybersecurity-reports
       check: manual
       note: Publishes named AU-targeted campaign reports.
     - domain: hunt.io
