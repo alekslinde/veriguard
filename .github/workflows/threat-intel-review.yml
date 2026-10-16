@@ -1,0 +1,58 @@
+name: Threat-intel roadmap review
+
+# The weekly sweep routine opens a PR adding a new dated roadmap under
+# docs/threat-intel/. That file makes present-tense claims ("X has not been
+# shipped", "no interface change needed") that silently go stale if a fix
+# lands on main between the sweep's research and the PR's merge — exactly
+# what happened with the #445/#448 AE WhatsApp-flag finding. A human skimming
+# prose doesn't reliably catch that; a diff against current main does.
+#
+# Fires automatically (no label, no @claude) because the roadmap is
+# generated, not authored — there's no human in the loop yet to apply a
+# label. Scope is narrowed to docs/threat-intel/** so it never runs, and
+# never spends quota, on unrelated PRs.
+
+on:
+  pull_request:
+    paths:
+      - "docs/threat-intel/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: threat-intel-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Review roadmap PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: |
+            --allowed-tools "Read,Glob,Grep,Bash(git:*),Bash(gh pr view:*),Bash(gh pr comment:*)"
+          prompt: |
+            Run /code-review --comment against this pull request.
+
+            This PR adds or edits a dated roadmap under docs/threat-intel/.
+            Pay particular attention to claims in the roadmap about the
+            current state of the codebase (e.g. "X has not been shipped",
+            "no interface change needed", open issue references) — check
+            each one against main as it stands now, not as the sweep
+            researched it. A finding that a cited fix has already landed
+            elsewhere on main, or that an issue it opens is already closed,
+            is exactly the kind of staleness this check exists to catch.
