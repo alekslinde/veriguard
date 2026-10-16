@@ -163,6 +163,40 @@ describe("keyword signals stay discounted", () => {
   });
 });
 
+// #469: a deferred brand-mention row ("Claims to be from a well-known
+// company") settles corroborated inside the SMS sub-pass whenever anything
+// else there scores — a plain keyword rule is enough, no composite required.
+// `merge` then discounted that row at 0.7x along with everything else, even
+// though its weight already IS "something else here confirmed this": a
+// verdict about the rest of the evidence, not the keyword-frequency claim the
+// discount exists to soften. No entry in UNDISCOUNTED_COMPOSITES could have
+// caught this — the corroborator here is "Asks you to call a number", a plain
+// `sig.add`, not a composite with a row to restore by name.
+describe("a deferred row corroborated by a plain keyword rule survives the email discount", () => {
+  const body = "Medibank: you have recieve a refund, please call us to claim it kindly.";
+
+  it("keeps the SMS verdict on the email path", () => {
+    const sms = checkSms(body, undefined, "AU");
+    const email = checkEmail(asEmail(body), undefined, "AU");
+
+    expect(sms.verdict).toBe("likely_scam");
+    expect(email.verdict).toBe("likely_scam");
+  });
+
+  it("carries the brand-mention row at full weight, not 0.7x", () => {
+    const email = checkEmail(asEmail(body), undefined, "AU");
+    const brandRow = (email.signals ?? []).find((s) => s.text.startsWith("Claims to be from a well-known company"));
+
+    expect(brandRow?.points).toBe(20);
+  });
+
+  it("still sums the evidence list to the score", () => {
+    const email = checkEmail(asEmail(body), undefined, "AU");
+    const summed = (email.signals ?? []).reduce((n, s) => n + s.points, 0);
+    expect(summed).toBe(email.score);
+  });
+});
+
 // Kept here, outside the table, for the reason the splice-rule block above is:
 // it asks a different question of the family gate than
 // `familyImpersonationPinned` does. That file pins the row at 45 on both

@@ -57,7 +57,20 @@ export type { PhoneIntel };
 // collection: see finalise(), which records the clamp as its own visible row.
 
 /** A signal row plus, while scanning, its unresolved corroborated alternative. */
-type PendingSignal = Signal & { deferred?: { corroborated: string; points: number } };
+type PendingSignal = Signal & {
+  deferred?: { corroborated: string; points: number };
+  /**
+   * Set once a deferred row settles corroborated (see resolveDeferred). Its
+   * weight already encodes "something else here confirmed this" — the exact
+   * condition a channel-wide discount exists to be blind to, since that
+   * discount is calibrated for keyword FREQUENCY, not for a row that is
+   * already a verdict about the rest of the evidence. `merge` reads this to
+   * carry the row through a sub-result discount at full weight instead of a
+   * proportional share of it. Never cleared: unlike `deferred`, there is no
+   * later pass this needs to survive into, only the one merge about to read it.
+   */
+  undiscountable?: boolean;
+};
 
 /**
  * Deferred rows a sub-result was still holding when it was scored, keyed by the
@@ -93,33 +106,67 @@ class Signals {
 
   /**
    * Fold in a sub-result (the SMS pass over an email body, the header identity
-   * check). Its reasons keep their own wording, and `weight` divides the
+   * check). Its reasons keep their own wording, and `discount` divides the
    * sub-total across them in proportion to what each contributed, so the rows
    * still sum to the weighted score the caller adds. A sub-result that carries
    * no signals of its own falls back to one row holding the whole amount.
+   *
+   * A row the sub-result resolved `undiscountable` (see resolveDeferred) is
+   * carried at its full points regardless of `discount`: it already settled
+   * as "something else here corroborated this", which is a verdict about the
+   * rest of the evidence, not the keyword-frequency claim the discount is
+   * calibrated against. Without this, a brand or agency mention that settled
+   * corroborated inside the sub-pass shared the same 0.7x as everything else
+   * it was merged with, even on a channel where the row that corroborated it
+   * was itself restored to full weight afterwards (#469) — the two rows'
+   * fates diverged although one is a direct restatement of the other.
    */
-  merge(source: SignalSource, sub: { flags: string[]; signals?: Signal[] }, weighted: number): number {
+  merge(source: SignalSource, sub: { flags: string[]; signals?: Signal[]; score: number }, discount: number): number {
     const inner = sub.signals?.filter((x) => x.source !== "score") ?? [];
     // Rows the sub-result settled as uncorroborated only because its own pass
     // had nothing else to offer. Re-deferred here so the outer list decides.
     const carried = PENDING.get(sub as object);
-    const rawTotal = inner.reduce((n, x) => n + x.points, 0);
-    if (inner.length && rawTotal > 0) {
+    const undiscounted = inner.filter((x) => (x as PendingSignal).undiscountable);
+    const discounted = inner.filter((x) => !(x as PendingSignal).undiscountable);
+    const rawTotal = discounted.reduce((n, x) => n + x.points, 0);
+    const fullPoints = undiscounted.reduce((n, x) => n + x.points, 0);
+    if (inner.length && (rawTotal > 0 || fullPoints > 0)) {
+      // The discount is calibrated against keyword FREQUENCY, so it applies
+      // only to the discountable share — the undiscountable rows' points are
+      // added on top, at full weight, rather than funded out of the same
+      // capped budget. Funding them from inside `Math.floor(sub.score *
+      // discount)` kept the email TOTAL pinned to the discounted figure
+      // regardless of which rows carried it, so a corroborated brand or
+      // agency mention could read at full weight on its own row while the
+      // verdict it was meant to help carry still landed a tier low (#469).
+      const toShare = Math.floor(rawTotal * discount);
+      const weighted = toShare + fullPoints;
       let handed = 0;
-      inner.forEach((x, i) => {
-        // Last row takes the remainder so rounding never loses or invents a point.
-        const share = i === inner.length - 1 ? weighted - handed : Math.round((x.points / rawTotal) * weighted);
+      let sharedSeen = 0;
+      inner.forEach((x) => {
+        if ((x as PendingSignal).undiscountable) {
+          this.list.push({ text: x.text, points: x.points, source });
+          return;
+        }
+        sharedSeen += 1;
+        // Last discounted row takes the remainder so rounding never loses or
+        // invents a point.
+        const share = sharedSeen === discounted.length ? toShare - handed : Math.round((x.points / rawTotal) * toShare);
         handed += share;
         this.list.push({ text: x.text, points: share, source });
       });
       return weighted;
     }
-    // A sub-result with no per-signal weights of its own: its flags are the
-    // reasons and `weighted` is the whole contribution. The weight goes on the
-    // FIRST flag rather than on a row of its own, because appending a separate
-    // scoring row printed every reason twice — once at zero and once carrying
-    // the total — and the reader is invited to check that the evidence adds up.
-    // A duplicate makes it visibly not.
+    // A sub-result with no per-signal weights of its own (no `signals`, or
+    // every row filtered to "score"): its flags are the reasons, and there is
+    // no row-level total to discount a share of, so this falls back to the
+    // sub-result's own (already-clamped) score. `weighted` is the whole
+    // contribution. The weight goes on the FIRST flag rather than on a row of
+    // its own, because appending a separate scoring row printed every reason
+    // twice — once at zero and once carrying the total — and the reader is
+    // invited to check that the evidence adds up. A duplicate makes it
+    // visibly not.
+    const weighted = Math.floor(sub.score * discount);
     sub.flags.forEach((text, i) => {
       const pending = carried?.get(text);
       // A carried row keeps its deferred shape, so evidence found later in the
@@ -189,6 +236,11 @@ class Signals {
       if (scoredElsewhere) {
         row.text = row.deferred.corroborated;
         row.points = row.deferred.points;
+        // Corroborated by something else scoring, not by a keyword appearing
+        // more than once — this row's weight is already a statement about the
+        // rest of the evidence, which is what a channel-wide discount is
+        // calibrated to be blind to. See `undiscountable` and merge().
+        row.undiscountable = true;
       } else {
         // Settled uncorroborated. Remember it against the text it settled
         // under, so a caller still gathering evidence can re-defer it into a
@@ -2593,7 +2645,7 @@ export function checkEmail(text: string, blocklist?: HostLookup, region?: Region
     senderDomain: senderHeaders.fromAddress ? domainOf(senderHeaders.fromAddress) : undefined,
   });
   // Email gets a bit more lenience than the same words in an SMS.
-  sig.merge("message", smsCheck, Math.floor(smsCheck.score * 0.7));
+  sig.merge("message", smsCheck, 0.7);
 
   // The registry's share of the body, scored here rather than inside the pass
   // above — which skips it on this channel for exactly this reason.
@@ -2681,7 +2733,7 @@ export function checkEmail(text: string, blocklist?: HostLookup, region?: Region
 
   // Identity spoofing signals (display-name masking, From≠Reply-To, Return-Path)
   const identity = analyseEmailIdentities(headers);
-  sig.merge("sender", identity, identity.score);
+  sig.merge("sender", identity, 1);
 
   // Generic greeting
   if (/dear (customer|user|member|valued|account holder|sir|madam)/i.test(text)) {
@@ -2906,7 +2958,7 @@ export function checkCustom(text: string, blocklist?: HostLookup, region?: Regio
   if (urls) {
     sig.add("message", `Contains ${urls.length} link(s) — checked separately`);
     const worst = urls.map((u) => checkUrl(u, blocklist, region)).sort((a, b) => b.score - a.score)[0];
-    sig.merge("link", worst, Math.floor(worst.score * 0.5));
+    sig.merge("link", worst, 0.5);
   }
 
   // ClickFix (D3 / #74 / #143). Pasted fake-CAPTCHA page text is the likeliest
