@@ -176,7 +176,7 @@ Sources: [CAFC — impersonation fraud advisory](https://antifraudcentre-centrea
 
 ### This cycle's rotation (`minimal` coverage)
 
-#### AE — United Arab Emirates → **D1**
+#### AE — United Arab Emirates → **D1 (shipped, `133c146`)**
 
 Dubai Police's eCrime Hub, reported 16 July 2026: government-impersonation
 scams work by moving victims onto **WhatsApp, calls or email** under
@@ -191,15 +191,8 @@ translation-judgement question.
 The mechanism this needs — authority mention + "contact/message/chat us on
 WhatsApp/Telegram" → +30 — **already exists** in `scamDetector.ts`
 (shipped for AU on 2026-10-06, `8f1ec11`) and is opt-in per pack via
-`authorityMessagingAppFlag` (`types.ts`). AE simply has not set it:
-
-| Lure | Verdict |
-|---|---|
-| "Dubai Government notice: confirm your Emirates ID within 24 hours or face legal action. Contact our officer on WhatsApp +971 50 123 4567." | **unknown 10** (urgency only) |
-| "This is Dubai Police. Your case is under review. Please message us on WhatsApp to continue, or you will be fined." | **unknown 0** ("names a government agency, nothing else unusual") |
-
-No interface change needed — this is a one-line pack-data addition, the same
-shape as AU's.
+`authorityMessagingAppFlag` (`types.ts`). AE now has it set (`133c146`),
+closing #445.
 
 Source: [Emirates 24/7 — how to spot government impersonation scams in Dubai](https://www.emirates247.com/uae-guide/how-to-spot-government-impersonation-scams-in-dubai-dubai-police-shares-warning-signs/3686) (Tier 2, reporting a Dubai Police eCrime Hub statement; the primary eCrime.ae source is geo-fenced from this environment — see `sources.yml`).
 
@@ -342,7 +335,7 @@ research environment.
 
 | ID | Issue | Priority |
 |---|---|---|
-| D1 | [#445 — AE: agency moves contact to WhatsApp/Telegram](https://github.com/alekslinde/veriguard/issues/445) | HIGH |
+| D1 | [#445 — AE: agency moves contact to WhatsApp/Telegram](https://github.com/alekslinde/veriguard/issues/445) (closed, `133c146`) | HIGH |
 
 D3 and D8 (both MEDIUM, both carried forward from 2026-10-06) are not filed,
 per the HIGH-only threshold — their full detail is in the AU and IE sections
