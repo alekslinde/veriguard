@@ -36,13 +36,28 @@ const asEmail = (body: string) =>
  * weights are asserted now.
  *
  * The family gate is worth a line of its own: it was this list's first entry and
- * the incident that turned a single special case into a list. **One entry
- * remains, and when it leaves, the list and this table go with it.**
+ * the incident that turned a single special case into a list. One entry
+ * (messaging hijack) stood alone for a while, with the list due to go once it
+ * left; the callback-SMS composite (#463) then joined it as a second inline
+ * entry rather than a registry conversion — scoped deliberately narrow, next
+ * to the crypto-TOAD composite it mirrors, rather than converting an
+ * unrelated existing rule in the same change. The list stays until both
+ * entries convert.
  */
-const composites: Array<[string, string]> = [
+const composites: Array<[string, string, string]> = [
   [
     "messaging hijack",
     "WhatsApp: your account has been flagged for unusual activity and will be restricted within 24 hours.",
+    "likely_scam",
+  ],
+  [
+    "callback SMS",
+    "You have been charged $1,249.00 for an Apple iPhone 17 order. If you did not make this purchase call 1800 954 112 to cancel.",
+    // Deliberately pitched at suspicious (30), not likely_scam — see #463's
+    // acceptance criteria. A lower-weighted composite still belongs in this
+    // table: the property under test is "the same tier on both channels",
+    // not "every composite reaches likely_scam".
+    "suspicious",
   ],
 ];
 
@@ -88,17 +103,17 @@ describe("the table and the list it claims to mirror", () => {
 });
 
 describe("gated composites survive the email discount", () => {
-  it.each(composites)("keeps the %s verdict on the email path", (_label, body) => {
+  it.each(composites)("keeps the %s verdict on the email path", (_label, body, verdict) => {
     const sms = checkSms(body, undefined, "AU");
     const email = checkEmail(asEmail(body), undefined, "AU");
 
     // The composite is what the reader acts on, so the verdict must not drop a
     // tier merely because the same words arrived by email.
-    expect(sms.verdict).toBe("likely_scam");
-    expect(email.verdict).toBe("likely_scam");
+    expect(sms.verdict).toBe(verdict);
+    expect(email.verdict).toBe(verdict);
   });
 
-  it.each(composites)("restores the %s row to its full weight, not the total", (_label, body) => {
+  it.each(composites)("restores the %s row to its full weight, not the total", (_label, body, _verdict) => {
     const email = checkEmail(asEmail(body), undefined, "AU");
     const summed = (email.signals ?? []).reduce((n, s) => n + s.points, 0);
     // Restoring by lifting the signal's own row keeps the evidence list summing
