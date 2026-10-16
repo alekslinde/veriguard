@@ -2049,6 +2049,32 @@ describe("Australia Post brand impersonation (gap 3)", () => {
     expect(r.flags.some((f) => f.includes("Impersonates"))).toBe(true);
   });
 
+  it.each([
+    "https://netbank-logon.com/",
+    "https://netbank-giveaway.com/enter",
+  ])("catches a netbank lookalike logon domain: %s", (url) => {
+    const r = checkUrl(url, undefined, "AU");
+    expect(r.flags.some((f) => f.includes('Impersonates "netbank"'))).toBe(true);
+    expect(r.verdict).toBe("likely_scam");
+  });
+
+  it.each([
+    "https://netbanking.hdfcbank.com/netbanking/",
+    "https://netbankingportal.com/",
+  ])("leaves netbanking hosts alone: %s", (url) => {
+    // The reason "netbank" is word-matched rather than substring-matched:
+    // "netbanking" is what several non-AU banks call their own genuine logon.
+    const r = checkUrl(url, undefined, "AU");
+    expect(r.flags.some((f) => f.includes("Impersonates"))).toBe(false);
+    expect(r.verdict).toBe("safe");
+  });
+
+  it("leaves the real NetBank logon path alone", () => {
+    const r = checkUrl("https://www.my.commbank.com.au/netbank/Logon/Logon.aspx", undefined, "AU");
+    expect(r.flags.some((f) => f.includes("Impersonates"))).toBe(false);
+    expect(r.verdict).toBe("safe");
+  });
+
   it("does not disturb a genuine Australia Post email", () => {
     // Regression guard. Adding the brand to the URL checker's list must not
     // leak into BRAND_MENTIONS, which scores brand names in message bodies —
