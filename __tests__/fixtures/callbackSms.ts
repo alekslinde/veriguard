@@ -151,6 +151,14 @@ export const CALLBACK_SMS_LURE_MINIMAL_PAIR: CallbackSmsFixture = {
  * suspicious 30, not likely_scam." Kept separate from BENIGN_CALLBACK_SMS so
  * the "no genuine message scores above suspicious" assertion does not have to
  * carve out an exception for a case the issue itself says should fire.
+ *
+ * Not the only one. A post-implementation code review found the same class
+ * reproduces on an Origin Energy utility receipt, a Netflix subscription
+ * renewal, and a Fitness First membership debit — any genuine "X has been
+ * charged/debited. If you did not authorise this, call [number] to cancel"
+ * message. No text-only signal distinguishes these from a real scam using
+ * the identical template; see the "documented residual risk" describe block
+ * in callbackSmsBenignCorpus.test.ts for all four, asserted together.
  */
 export const CALLBACK_SMS_ACCEPTED_RESIDUAL_RISK: CallbackSmsFixture = {
   id: "au-small-business-payment-processed",

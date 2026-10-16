@@ -11,15 +11,34 @@ import {
 } from "./fixtures/callbackSms";
 
 // Issue #463's callback-SMS composite, scored inline in checkSms (the
-// "Callback-SMS composite" block): assert a transaction, invite the reader
-// to disown it, give a dialable number, with no link and no own-channel
-// protective wording. The issue's own review flagged its false-positive
-// evidence as thin — a prototype run outside the engine against six
-// hand-written benign messages — so this corpus replaces that prototype:
-// 13 benign fixtures across AU/GB/IE/US, built BEFORE the composite existed
-// (#467) and now the real negative-coverage gate for it.
+// "Callback-SMS composite" block): assert a completed transaction, invite
+// the reader to disown it with real disown language, give a dialable number
+// to call, with no link and no own-channel protective wording. The issue's
+// own review flagged its false-positive evidence as thin — a prototype run
+// outside the engine against six hand-written benign messages — and a
+// post-implementation code review went further, independently reproducing
+// four real false positives the prototype never caught: a first draft of
+// the disown-clause condition accepted the bare words "to cancel" as a
+// stand-in for actual disown language, which fired on an Origin Energy
+// utility receipt, a Netflix renewal, a Fitness First membership debit and
+// a World Vision charity confirmation — none of which disown anything.
 //
-// One of the original six, a genuine Octopus Energy direct-debit
+// The disown clause was tightened to require real disown language only
+// ("if this wasn't you", "if you did not authorise this"); the bare
+// fallback is gone. Two of those four false positives were purely bare-
+// fallback artefacts and are now clean (World Vision, Audible — see the
+// "fixed by the tightened disown clause" describe block). Two survive as a
+// genuine, accepted residual risk: a real subscription or membership
+// cancellation notice can use the identical "X has been charged/debited. If
+// you did not authorise this, call [number] to cancel" template a scam
+// uses, and no text-only signal distinguishes them. Capped at suspicious
+// (30), never likely_scam, for exactly this reason — see
+// CALLBACK_SMS_ACCEPTED_RESIDUAL_RISK and the "documented residual risk"
+// describe block below, which now covers three cases instead of one.
+//
+// This corpus is the real negative-coverage gate for the composite: 13
+// benign fixtures across AU/GB/IE/US, built BEFORE the composite existed
+// (#467). One of the original 13, a genuine Octopus Energy direct-debit
 // confirmation, already false-positived before the composite existed (two
 // generic rows compounding — a pre-existing defect, not something #463
 // introduces). The composite's own disown-clause condition does not match
@@ -50,15 +69,27 @@ describe("callback-SMS benign corpus: current engine behaviour", () => {
     },
   );
 
-  it("already false-positives on the Octopus Energy direct-debit confirmation (pre-existing, not from #463)", () => {
-    // Recorded as a probe lead in the 2026-10-16 roadmap watchlist, not a
-    // regression from this corpus. Confirmed by signal breakdown: two +20
-    // rows compound independently — the deferred "well-known company,
-    // verify via the official app" brand-mention row, and the generic
-    // "asks you to call a number" row — with no callback-SMS composite
-    // involved yet. If this assertion ever breaks because the score
-    // dropped, that is progress on the pre-existing defect — tighten the
-    // bound, don't widen it.
+  it("OPEN DEFECT, pre-existing: already false-positives on the Octopus Energy direct-debit confirmation", () => {
+    // Not introduced by #463, and not fixed by it either — flagged here
+    // rather than quietly pinned, because this composite ships in the same
+    // rule area without addressing it. Confirmed by signal breakdown: two
+    // +20 rows compound independently — the deferred "well-known company,
+    // verify via the official app" brand-mention row, and the generic "asks
+    // you to call a number" row — with no callback-SMS composite involved.
+    //
+    // A code review further confirmed this is systemic, not specific to
+    // Octopus Energy or to SMS: "Medibank: you have recieve a refund, call
+    // us to claim it kindly." reproduces the same shape (two independently-
+    // scoring generic rows corroborating a deferred brand mention) with zero
+    // code from this composite, and the SAME corroborated-brand-row-escapes-
+    // the-email-discount defect splits that message's SMS score (62,
+    // likely_scam) from its email score (43, suspicious) across the verdict
+    // boundary. Fixing it needs a change to how addDeferred corroboration
+    // interacts with UNDISCOUNTED_COMPOSITES, which is out of scope here —
+    // tracked as a separate issue, not papered over in this PR.
+    //
+    // If this assertion ever breaks because the score dropped, that is
+    // progress on the defect — tighten the bound, don't widen it.
     const r = check(byId("gb-direct-debit-confirmation-octopus-energy"));
     expect(r.verdict).toBe("suspicious");
     expect(r.score).toBe(40);
@@ -145,6 +176,21 @@ describe("callback-SMS composite: the issue's acceptance criteria", () => {
     expect(scoring.some((s) => /Claims to be from a well-known company/.test(s.text))).toBe(true);
   });
 
+  it("GB Currys lure also reaches likely_scam 50, for the same brand-corroboration reason as AIB", () => {
+    // "currys" is a GB BRAND_MENTIONS entry, the same mechanism as AIB above.
+    // Barclays, by contrast, is only in TYPOSQUAT_BRANDS (URL matching), not
+    // BRAND_MENTIONS, so a Barclays-named lure stays at 30 — the two GB
+    // acceptance cases differ from each other for a real, brand-specific
+    // reason, not an inconsistency.
+    const r = checkText(
+      "A payment of £349.00 to Currys has been authorised on your account. " +
+        "If you don't recognise this payment, call 0161 496 0011.",
+      "GB",
+    );
+    expect(r.verdict).toBe("likely_scam");
+    expect(r.score).toBe(50);
+  });
+
   it('AU "approved" purchase lure: suspicious 30 -> 40, not 60 (generic row superseded)', () => {
     const r = checkText(
       "Your $1,249.00 purchase has been approved. If this was not you, call us on 1800 954 112 immediately.",
@@ -164,5 +210,110 @@ describe("callback-SMS composite: the issue's acceptance criteria", () => {
     for (const f of BENIGN_CALLBACK_SMS) {
       expect(check(f).verdict).not.toBe("likely_scam");
     }
+  });
+});
+
+describe("false positives found by code review, fixed by tightening the disown clause", () => {
+  const checkText = (text: string, region: string) => checkSms(text, undefined, region);
+
+  it("no longer fires on a charity direct-debit confirmation with a bare 'cancel anytime' opt-out", () => {
+    // The bare `/to\s+cancel/i` fallback this composite shipped with
+    // originally treated any "to cancel" substring as disown language. This
+    // opt-out line carries none: nobody is disowning a transaction.
+    const r = checkText(
+      "World Vision: Your monthly donation of $25.00 has been set up. " +
+        "Reply STOP or call 1800 032 034 to cancel anytime.",
+      "AU",
+    );
+    expect(r.score).toBe(0);
+    expect(r.verdict).toBe("safe");
+  });
+
+  it("no longer fires on a subscription renewal that only says 'to cancel', no disown language", () => {
+    const r = checkText("Your Audible membership renewal of $16.45 has been charged. Call 1800 555 000 to cancel.", "AU");
+    expect(r.score).toBe(0);
+    expect(r.verdict).toBe("safe");
+  });
+});
+
+describe("documented residual risk: real disown language the composite cannot tell from a scam", () => {
+  // Three genuine billing messages found by code review that use the exact
+  // "X has been charged/debited. If you did not authorise this/wasn't you,
+  // call [number] to cancel/update" template a scam uses — no text-only
+  // signal separates them from a real callback lure. Accepted, not fixed:
+  // capped at suspicious (30 or 40), never likely_scam, same trade-off
+  // already accepted for CALLBACK_SMS_ACCEPTED_RESIDUAL_RISK.
+  const checkText = (text: string, region: string) => checkSms(text, undefined, region);
+
+  it("Origin Energy direct-debit receipt lands at suspicious, not likely_scam", () => {
+    const r = checkText(
+      "Origin Energy: Your direct debit of $142.30 was processed on 14 Oct. " +
+        "If you have any questions, call us on 13 24 61 to cancel or change your payment plan.",
+      "AU",
+    );
+    expect(r.verdict).not.toBe("likely_scam");
+  });
+
+  it("Netflix subscription receipt lands at suspicious, not likely_scam", () => {
+    const r = checkText(
+      "Your Netflix subscription of $19.99 has been processed. " +
+        "If you did not authorise this, call 1800 123 456 to update your payment method.",
+      "AU",
+    );
+    expect(r.verdict).not.toBe("likely_scam");
+  });
+
+  it("Fitness First membership debit lands at suspicious, not likely_scam", () => {
+    const r = checkText(
+      "Fitness First: Your membership payment of $59.00 was debited today. " +
+        "If this wasn't you, call us on 1300 555 123 to cancel your membership.",
+      "AU",
+    );
+    expect(r.verdict).not.toBe("likely_scam");
+  });
+});
+
+describe("protective-wording and crypto-TOAD fixes found by code review", () => {
+  const checkText = (text: string, region: string) => checkSms(text, undefined, region);
+
+  it("does not fire when the reader is directed to their own internet banking", () => {
+    // The original protective-wording guard recognised only "official app"
+    // and "back of your card" — this is equally protective, just phrased
+    // differently, and the guard is widened to catch it.
+    const r = checkText(
+      "Westpac: A new direct debit was set up on your account for $45.00. " +
+        "If you did not authorise this, log into internet banking to check, or call 1300 655 505 to cancel.",
+      "AU",
+    );
+    expect(r.score).toBe(0);
+    expect(r.verdict).toBe("safe");
+  });
+
+  it("does not triple-stack with the crypto-exchange TOAD composite", () => {
+    // Before the fix: brand mention (20) + this composite (30) + the
+    // crypto-TOAD composite (30) = likely_scam 80, for one underlying
+    // observation (a crypto exchange's name, a transaction claim, a call
+    // verb, no link). The crypto-TOAD row is now suppressed when this
+    // composite already fired.
+    const r = checkText(
+      "CoinSpot: Your withdrawal of $1,249.00 was processed. " +
+        "If you did not authorise this, call 1800 035 544 to cancel.",
+      "AU",
+    );
+    expect(r.verdict).toBe("likely_scam");
+    expect(r.score).toBe(50);
+    const scoring = (r.signals ?? []).filter((s) => s.points > 0);
+    expect(scoring).toHaveLength(2);
+    expect(scoring.some((s) => /Crypto exchange asking you to phone/.test(s.text))).toBe(false);
+  });
+
+  it("still catches a crypto-TOAD lure with no callback shape of its own", () => {
+    // Coverage guard: the suppression must not silently remove the
+    // crypto-TOAD composite's own coverage for the shape it alone catches —
+    // a login/security lure with no transaction or disown clause at all.
+    const r = checkText("CoinSpot: Unusual login detected. Please call us on 1800 123 456 to verify your identity.", "AU");
+    expect(r.verdict).toBe("likely_scam");
+    const scoring = (r.signals ?? []).filter((s) => s.points > 0);
+    expect(scoring.some((s) => /Crypto exchange asking you to phone/.test(s.text))).toBe(true);
   });
 });

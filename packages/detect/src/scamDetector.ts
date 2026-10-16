@@ -2260,17 +2260,43 @@ export function checkSms(
     // The bare-participle form ("Payment of $220.00 processed for invoice
     // #4471") that the auxiliary-verb branch above misses.
     /\b(payment|purchase|order|transaction)\b.{0,10}\bof\b.{0,20}\bprocessed\b/i.test(text);
+  // Requires real disown language — "if this wasn't you", "if you did not
+  // authorise this" — not just the bare words "to cancel". A first version of
+  // this gate accepted bare "to cancel" as a stand-in, on the reasoning that
+  // the Norton fixture below ("To cancel call...") has no other disown
+  // wording to detect. That reasoning did not survive contact with real
+  // brands: "Origin Energy: Your direct debit of $142.30 was processed on 14
+  // Oct. If you have any questions, call us on 13 24 61 to cancel or change
+  // your payment plan." — an ordinary utility receipt with zero disown
+  // language — scored likely_scam 50 under it, as did a Netflix renewal, a
+  // gym-membership debit and a charity direct-debit confirmation. "To cancel"
+  // is routine language on any recurring-billing SMS that offers an opt-out;
+  // it carries none of the "was this you?" signal the gate exists to find.
+  //
+  // The cost is real and accepted: the Norton-shaped lure ("$499.99 will be
+  // debited... To cancel call...", no explicit disown clause at all) no
+  // longer fires, because nothing distinguishes it from Origin Energy's
+  // receipt — the two are the same four words apart. A composite that cannot
+  // tell them apart should fire on neither, not on both. See
+  // __tests__/fixtures/callbackSms.ts for the measured corpus, both sides.
   const callbackDisownClause =
-    /\bif\s+(this\s+(wasn.t|was\s+not)\s+you|you\s+did\s+not\s+(make|place|authori[sz]e)\s+this|you\s+do(n.t)?\s+(not\s+)?recognise\s+this(\s+payment)?|you\s+did\s+not\s+authori[sz]e\s+this)\b/i.test(text) ||
-    /\bto\s+cancel\b/i.test(text);
+    /\bif\s+(this\s+(wasn.t|was\s+not)\s+you|you\s+did\s+not\s+(make|place|authori[sz]e)\s+this|you\s+do(n.t)?\s+(not\s+)?recognise\s+this(\s+payment)?|you\s+did\s+not\s+authori[sz]e\s+this)\b/i.test(text);
   const callbackCallVerb =
     /\bcall\b.{0,25}\bto\s+(cancel|reverse|stop|dispute)\b/i.test(text) ||
     /\bto\s+cancel\b.{0,15}\bcall\b/i.test(text) ||
     /\bcall\b.{0,15}\b(us|now|back|this\s+number)\b/i.test(text) ||
     /\bcall\b.{0,20}\d/i.test(text);
   // Own-channel protective wording: a genuine fraud team directs the reader
-  // to their own card or app, never to a number the message supplies.
-  const callbackProtectiveWording = /\bofficial\s+app\b|\bback\s+of\s+your\s+card\b/i.test(text);
+  // to their own card, app or online banking, never to a number the message
+  // supplies. Widened from the original two fixed phrases ("official app",
+  // "back of your card") after "Westpac: ... If you did not authorise this,
+  // log into internet banking to check, or call 1300 655 505 to cancel."
+  // scored suspicious 30 despite correctly directing the reader to verify
+  // through their own bank login — the exact behaviour this guard exists to
+  // exempt, just phrased differently than either literal string covered.
+  const callbackProtectiveWording =
+    /\bofficial\s+app\b|\bback\s+of\s+your\s+card\b/i.test(text) ||
+    /\b(log\s?in|log\s+into|logging\s+in)\b.{0,20}\b(internet\s+banking|the\s+app|online\s+banking|your\s+account\s+online)\b/i.test(text);
   // Declared here rather than reusing the module's later `hasUrl`: that const
   // is declared further down (by the crypto-TOAD composite), after this gate
   // runs, so reusing it would be a reference to a binding that does not exist
@@ -2328,7 +2354,14 @@ export function checkSms(
   const mentionsCalling = /\bcall\b|\bphone\b|\bcontact (support|us)\b|\bhelpline\b/i.test(text);
   const hasUrl = /https?:\/\/|www\.|\.[a-z]{2,}\//i.test(text);
 
-  if (cryptoToadHit && hasPhoneNumber && mentionsCalling && !hasUrl) {
+  // Suppressed when the callback composite above already fired: both reach
+  // the same conclusion from the same transaction-claim-plus-call-no-link
+  // shape when the lure happens to also name a crypto exchange — "CoinSpot:
+  // Your withdrawal of $1,249.00 was processed. If you did not authorise
+  // this, call 1800 035 544 to cancel." triple-stacked to likely_scam 80
+  // (brand mention + this row + the callback composite) before this guard,
+  // for one underlying observation.
+  if (!callbackComposite && cryptoToadHit && hasPhoneNumber && mentionsCalling && !hasUrl) {
     sig.add("message", `Crypto exchange asking you to phone them — ${cryptoToadHit} and other exchanges never ring customers or ask you to call about account security. The scam happens on the call: they'll talk you through handing over 2FA codes or moving funds to a "safe wallet". Hang up and log in through the official app instead.`, 30);
   }
 
