@@ -45,7 +45,13 @@ type Candidate = {
   suggested: string | undefined;
 };
 
-type Release = Candidate & { version: string; newTag: string; notes: string };
+type Release = Candidate & {
+  version: string;
+  newTag: string;
+  notes: string;
+  /** The release commit, filled in by commitAndTag. */
+  sha?: string;
+};
 
 // ── git, shell and file helpers ─────────────────────────────────────────────
 
@@ -224,10 +230,30 @@ function commitAndTag(r: Release, touched: string[]) {
   git("add", "--", ...touched);
   git("commit", "-m", `chore(release): ${r.part.name} ${r.version}`);
   git("tag", "-a", r.newTag, "-m", `${r.part.name} ${r.version}`);
+  // Recorded so each commit can be pushed on its own below; reading it back
+  // from the tag later would work, but this is the commit we just made.
+  r.sha = git("rev-parse", "HEAD");
 }
 
 function gh(args: string[]) {
   run("gh", args);
+}
+
+/**
+ * The conclusion of one named check on a commit: "success", "failure",
+ * "in_progress", "none" when nothing has reported yet, or "unknown" when the
+ * API could not be reached. Never throws — a deploy must not be blocked by a
+ * failed status lookup, only informed by a successful one.
+ */
+function checkState(sha: string, name: string): string {
+  const out = tryRun("gh", [
+    "api",
+    `repos/:owner/:repo/commits/${sha}/check-runs`,
+    "--jq",
+    `[.check_runs[] | select(.name == "${name}")] | if length == 0 then "none"` +
+      ` else (.[0].conclusion // .[0].status) end`,
+  ]);
+  return out || "unknown";
 }
 
 // Shipping steps. Each runs only after its own confirmation, because each one is
@@ -236,11 +262,32 @@ function gh(args: string[]) {
 async function promote(rl: ReturnType<typeof createInterface>, r: Release) {
   const { id } = r.part;
   if (id === "app") {
+    // `production` requires a passing "Lint & test" on the commit being
+    // pushed, and that run starts when the commit is pushed — so right after a
+    // release it is usually still in flight. Reported here because the push
+    // itself fails with a rule violation that does not say "not finished yet",
+    // and because as repo owner the bypass may let it through instead, moving
+    // production to an unchecked commit.
+    const state = checkState(r.sha ?? git("rev-parse", `${r.newTag}^{commit}`), "Lint & test");
+    if (state !== "success") {
+      console.log(`  CI on ${r.newTag} is ${state}. production requires a passing "Lint & test".`);
+      console.log(`  Watch it, then deploy with:`);
+      console.log(`    git push origin ${r.newTag}^{commit}:refs/heads/production`);
+      if (!(await confirm(rl, "  Push anyway?"))) return;
+    }
     if (!(await confirm(rl, `Point production at ${r.newTag}? This is the deploy.`))) return;
-    // A plain push is a fast-forward only: git refuses if production has commits
-    // the tag does not. That refusal is the safety, so there is no --force.
-    git("push", "origin", `refs/tags/${r.newTag}:refs/heads/production`);
-    console.log(`  production -> ${r.newTag}`);
+    // The tag's COMMIT, not the tag ref. These are annotated tags, so
+    // refs/tags/<tag> names a tag object rather than a commit, and a branch
+    // cannot be built from one: the push is refused server-side with
+    // "fatal error in commit_refs", which reads as an outage rather than as
+    // the wrong ref kind.
+    //
+    // A plain push is still a fast-forward only: git refuses a commit that
+    // does not contain production's tip. That refusal is the safety, so there
+    // is no --force.
+    const sha = git("rev-parse", `${r.newTag}^{commit}`);
+    git("push", "origin", `${sha}:refs/heads/production`);
+    console.log(`  production -> ${r.newTag} (${sha.slice(0, 7)})`);
     return;
   }
   if (id === "engine" || id === "mcp") {
@@ -361,8 +408,23 @@ async function main() {
       console.log(`  committed and tagged ${r.newTag}`);
     }
 
-    git("push", "origin", "main");
-    git("push", "origin", ...ordered.map((r) => r.newTag));
+    // One push per release commit, not one push for the whole branch.
+    //
+    // GitHub starts workflows for the HEAD commit of a push only, so pushing
+    // several release commits together leaves every one but the last with no
+    // check runs at all. That matters because `production` requires a passing
+    // "Lint & test": an app release that is not the final commit of its push
+    // can never satisfy that rule, and the deploy is refused (or, as owner,
+    // goes through on a bypass that records the violation). Pushing them one
+    // at a time makes each tagged commit a push head, so each gets its own CI.
+    //
+    // Each push carries its tag with it, so a tag never lands on main ahead of
+    // the commit it names.
+    for (const r of ordered) {
+      if (!r.sha) fail(`${r.part.name} was tagged but its commit was not recorded`);
+      git("push", "origin", `${r.sha}:refs/heads/main`, `refs/tags/${r.newTag}`);
+      console.log(`  pushed ${r.newTag}`);
+    }
     console.log("pushed main and tags");
 
     for (const r of ordered) {
