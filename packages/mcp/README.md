@@ -5,7 +5,7 @@ rule-based scam, phishing and impersonation checks. Paste a dodgy SMS, email,
 link or phone number into your assistant and it gets a verdict with the
 evidence behind it.
 
-Documentation: [veriguard.app/packages](https://veriguard.app/packages#mcp).
+Documentation: [veriguard.app/packages](https://veriguard.app/packages).
 
 The scoring is not done by a model. It is the same rule-based engine
 ([`@veriguard/detect`](https://www.npmjs.com/package/@veriguard/detect))
