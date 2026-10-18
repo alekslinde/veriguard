@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.41.0](https://github.com/alekslinde/veriguard/compare/app-v0.40.0...app-v0.41.0) (2026-10-18)
+
+
+### Features
+
+* **ui:** promote 2026-10-18 sweep to radar and calendar ([#480](https://github.com/alekslinde/veriguard/pull/480)) ([84e85a2](https://github.com/alekslinde/veriguard/commit/84e85a29632fd506187ab33e5df47ac8b276cd40))
+* **ui:** promote 2026-10-16 sweep to radar and calendar ([#474](https://github.com/alekslinde/veriguard/pull/474)) ([c5e18d1](https://github.com/alekslinde/veriguard/commit/c5e18d149c14e0f35a03d7435993a6f2456eb962))
+* **detector:** score the callback-SMS composite (#463) ([#468](https://github.com/alekslinde/veriguard/pull/468)) ([b721e6f](https://github.com/alekslinde/veriguard/commit/b721e6fbd8eab1e420595f72dd617b01be2c68be))
+* **detector:** catch netbank lookalike logon domains ([#466](https://github.com/alekslinde/veriguard/pull/466)) ([6b2c2f4](https://github.com/alekslinde/veriguard/commit/6b2c2f432c8b7e53dbc5eac56e14cb5bf5f4a099))
+* **detector:** separate language coverage from pack depth ([#461](https://github.com/alekslinde/veriguard/pull/461)) ([523721f](https://github.com/alekslinde/veriguard/commit/523721f4ab537111940905d51fd5e1fd8f399a29))
+* **detector:** three NLP-assessment items — confusables, language ID, stemmer ([#441](https://github.com/alekslinde/veriguard/pull/441)) ([04dbf6f](https://github.com/alekslinde/veriguard/commit/04dbf6f9f833eb07c83273e19906b7d37e18a144))
+* **detector:** flag NCSC impersonation (NZ) ([#436](https://github.com/alekslinde/veriguard/pull/436)) ([1cb4d03](https://github.com/alekslinde/veriguard/commit/1cb4d031332f5ba2fb93d821663390bbb034cf41))
+* **detector:** flag recovered funds held for a release fee ([#435](https://github.com/alekslinde/veriguard/pull/435)) ([a590e2b](https://github.com/alekslinde/veriguard/commit/a590e2bc1114c6766721b9f729ef144ce084aba8))
+* **detector:** flag scam coaching and "money laundering case" wording ([#434](https://github.com/alekslinde/veriguard/pull/434)) ([80f2761](https://github.com/alekslinde/veriguard/commit/80f2761d237f1b5d613a21d1fb5d456a42270fb7))
+* **detector:** flag AUSTRAC impersonation and agency WhatsApp hand-offs (AU) ([#433](https://github.com/alekslinde/veriguard/pull/433)) ([8f1ec11](https://github.com/alekslinde/veriguard/commit/8f1ec11d0a14fb06061ca7d8a8212ebf038b8bc7))
+
+### Fixes
+
+* **detector:** add .info/.works to SUSPICIOUS_TLDS ([#479](https://github.com/alekslinde/veriguard/pull/479)) ([e12fa47](https://github.com/alekslinde/veriguard/commit/e12fa47ce6c91f26ec2659db4ecfa18a77ac0f59))
+* **detector:** stop a corroborated deferred row escaping the email discount ([#473](https://github.com/alekslinde/veriguard/pull/473)) ([9c386e7](https://github.com/alekslinde/veriguard/commit/9c386e750332fd8e608b479b4d85a4586bb61d96))
+* **docs:** update dead CTM360 reports URL ([#462](https://github.com/alekslinde/veriguard/pull/462)) ([e036f2d](https://github.com/alekslinde/veriguard/commit/e036f2de3072b665fea9867a4a32b9e9f614b19b))
+* **ui:** make the email guide tabs keyboard-operable ([#451](https://github.com/alekslinde/veriguard/pull/451)) ([7282756](https://github.com/alekslinde/veriguard/commit/7282756347dbeaba690dc8b44c6b59e9b5e589f9))
+* **deps:** bump sharp to ^0.35.5 for GHSA-wq5f-xc86-pv6w ([#449](https://github.com/alekslinde/veriguard/pull/449)) ([189be20](https://github.com/alekslinde/veriguard/commit/189be207e04f1a8449ea399853b78124db3005c4))
+* **detector:** flag AE agency WhatsApp hand-off ([#448](https://github.com/alekslinde/veriguard/pull/448)) ([133c146](https://github.com/alekslinde/veriguard/commit/133c146bcdc320bbca3979332a214955606cf621))
+* **detector:** point NZ reporting copy at the NCSC, not CERT NZ ([#440](https://github.com/alekslinde/veriguard/pull/440)) ([b1c3b5f](https://github.com/alekslinde/veriguard/commit/b1c3b5fbc8939d6bcc9f553c186d45e872c88b10))
+* **threat-intel:** close gaps in the sweep brief and source checks ([#437](https://github.com/alekslinde/veriguard/pull/437)) ([de30c6f](https://github.com/alekslinde/veriguard/commit/de30c6f6c0c346df277fd0afcdf3c2114da3392f))
+
 ## [0.40.0](https://github.com/alekslinde/veriguard/compare/app-v0.39.3...app-v0.40.0) (2026-10-06)
 
 
