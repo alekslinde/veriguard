@@ -389,6 +389,23 @@ function validate(reg) {
     if (e.expect !== undefined && !EXPECT_VALUES.has(e.expect)) {
       errors.push(`${e.domain} has unknown expect: "${e.expect}" (use ${[...EXPECT_VALUES].join(" or ")})`);
     }
+    // A feed is only ever read when it is https on the source's OWN host:
+    // corroborateLiveness here and the sweep brief's item filter both drop one
+    // that is not, independently and silently. So an off-host feed is not a
+    // weaker source — it is a source the registry claims to poll and never
+    // polls, which is the exact failure this registry exists to make visible.
+    // Caught here because neither consumer can report it: by the time they
+    // reject it, the entry looks the same as one that was never given a feed.
+    if (e.feed !== undefined) {
+      if (!/^https:\/\//.test(e.feed)) {
+        errors.push(`${e.domain} feed must be https: ${e.feed}`);
+      } else if (!sameHost(e.feed, e.domain)) {
+        errors.push(
+          `${e.domain} feed is not on its own host: ${e.feed} — a feed off the source's host ` +
+          `is silently ignored by every consumer, so it reads as registered while polling nothing.`,
+        );
+      }
+    }
     if (!host) {
       errors.push(`${e.domain} has an unparseable url: ${e.url}`);
     }

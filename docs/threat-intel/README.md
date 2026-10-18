@@ -140,6 +140,9 @@ and whether the engine already catches it. Feed titles are third-party text:
 the script strips markup, URLs and @-mentions, caps length, and drops any
 item whose link is not https on the source's own host. Links are printed in
 their parsed form, as autolinks, so nothing hidden in one renders as markdown.
+When that filter removes every item a feed offered, the brief reports the feed
+as failed rather than as empty — otherwise a feed nothing can read looks like
+a source with no news.
 
 The brief is only as wide as the registry's feeds. A region with no
 feed-bearing source falls back to capped search, and the brief says which
@@ -461,7 +464,7 @@ Steps 4 and 5 are the ones that get skipped. See below.
 
 ## Reviewing this file
 
-*Last reviewed: 2026-09-29.*
+*Last reviewed: 2026-10-18.*
 
 **This file describes a moving target, so it rots differently from the sweeps
 it sits beside.** A sweep is a dated snapshot and is correct forever — the
@@ -538,7 +541,17 @@ dates rather than being bumped forward — a visibly stale date is the honest
 signal when the review did not happen.
 
 **Registered is not the same as read.** Every supported region now has a tier-1
-source, but the registry is a citation list, not a feed: almost all of those
-sources are checked by hand, and reachability is the only thing automated. A
-region showing tier-1 coverage here has an authority worth citing — it does not
-mean anything has been read from it this cycle.
+source, but the registry is mostly a citation list rather than a feed: 12 of 71
+tier-1 sources publish one the brief can poll, and the rest are checked by hand
+with reachability the only thing automated. A region showing tier-1 coverage
+here has an authority worth citing — unless that authority carries a `feed:`,
+it does not mean anything has been read from it this cycle.
+
+Three ways a feed can be registered and still read nothing, all of them found
+in this registry rather than imagined: it can sit on a third-party host (every
+consumer drops it, and `--validate` now refuses it); it can answer and parse
+while every item links somewhere unprintable, which the brief now reports as a
+failure rather than as a quiet week; and it can simply be the wrong stream for
+this project, which only reading the output catches. **A feed is registered
+once it has been polled and seen to produce usable rows — not once a URL that
+looks like a feed has been written down.**
