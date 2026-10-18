@@ -346,6 +346,77 @@ describe("indicator quarantine", () => {
     };
     expect(validate(good)).toEqual([]);
   });
+
+  describe("feed: must be on the source's own host", () => {
+    // Both consumers drop an off-host feed on their own: the liveness ladder
+    // requires same-host before it will treat a feed as corroboration, and the
+    // sweep brief keeps only items whose links are on the source's host, which
+    // for a mirror is none of them. Neither can report it — by the time they
+    // reject it, the entry looks exactly like one that never had a feed. So an
+    // off-host feed reads as polled forever while contributing nothing, and the
+    // registry is the only layer that can see the difference.
+    const withFeed = (feed: string): Registry => ({
+      ...reg,
+      brands: [...reg.brands, { domain: "example.test", url: "https://example.test", feed }],
+    });
+
+    it("rejects a feed on a third-party host", () => {
+      expect(
+        validate(withFeed("https://feeds.feedburner.com/Example")).some((e: string) =>
+          e.includes("not on its own host"),
+        ),
+      ).toBe(true);
+    });
+
+    it("rejects a non-https feed", () => {
+      expect(
+        validate(withFeed("http://example.test/rss.xml")).some((e: string) =>
+          e.includes("feed must be https"),
+        ),
+      ).toBe(true);
+    });
+
+    it("accepts a feed on the host itself or a subdomain", () => {
+      expect(validate(withFeed("https://example.test/rss.xml"))).toEqual([]);
+      expect(validate(withFeed("https://www.example.test/rss.xml"))).toEqual([]);
+      expect(validate(withFeed("https://alerts.example.test/rss.xml"))).toEqual([]);
+    });
+
+    it("holds for every feed in the committed registry", () => {
+      // The checks above are built from synthetic entries, so they would all
+      // pass on a registry that had quietly acquired an off-host feed. This is
+      // the one that reads the real file — a `feed:` landing here is exactly
+      // the moment the rule has to apply.
+      for (const s of allSources.filter((x) => x.feed)) {
+        expect(
+          validate({ ...reg, tiers: { 1: [s] }, brands: [] }),
+          `${s.domain} feed: ${s.feed}`,
+        ).toEqual([]);
+      }
+    });
+
+    it("has no source claiming both a feed and check: manual", () => {
+      // `check: manual` means "no feed and no stable index — a human looks".
+      // Carrying both says the source is polled and not polled at once, and
+      // whichever reader is wrong acts on it silently.
+      for (const s of allSources) {
+        expect(
+          s.feed && s.check === "manual",
+          `${s.domain} has both feed: and check: manual`,
+        ).toBeFalsy();
+      }
+    });
+
+    it("rejects a host that merely ends with the domain's text", () => {
+      // "notexample.test" ends with "example.test" as a string but is a
+      // different registrable name, so a substring check would pass it.
+      expect(
+        validate(withFeed("https://notexample.test/rss.xml")).some((e: string) =>
+          e.includes("not on its own host"),
+        ),
+      ).toBe(true);
+    });
+  });
 });
 
 describe("lookalike discipline", () => {

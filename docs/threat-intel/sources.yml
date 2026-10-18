@@ -34,6 +34,13 @@
 # `check: manual` have no feed and no stable index — a human looks, or they
 # contribute nothing.
 #
+# A `feed:` must be https on the source's OWN host, and `--validate` rejects
+# one that is not. Not a trust preference — a third-party mirror is dropped
+# unread by both consumers (the liveness ladder requires same-host; the sweep
+# brief keeps only items linking to the source's host, which is all of them or
+# none). An off-host feed is therefore indistinguishable from no feed at all,
+# except that it reads as polled, which is worse than the blank it replaces.
+#
 # Three flags the checker honours:
 #
 #   retired: true    Known-gone. Skipped by the checker but kept as a record —
@@ -77,7 +84,7 @@
 # 09-09 header.
 
 version: 1
-updated: 2026-10-16
+updated: 2026-10-18
 
 tiers:
   1:
@@ -216,11 +223,15 @@ tiers:
     - domain: ic3.gov
       name: FBI IC3
       url: https://www.ic3.gov/PSA
+      feed: https://www.ic3.gov/PSA/RSS
       region: US
-      check: manual
       note: >-
         Non-AU but authoritative. US-first tactics usually reach AU within a
         cycle or two — useful as a leading indicator, not as AU evidence.
+        Two feeds exist and only one can be registered: PSA (public service
+        announcements, the consumer-facing warnings this project cites) is
+        registered over CSA (industry advisories, mostly CVE and ransomware).
+        Both verified 2026-10-18 — parse, dated items, links on this host.
 
     # ── GB ──────────────────────────────────────────────────────────────────
     - domain: actionfraud.police.uk
@@ -238,9 +249,13 @@ tiers:
     - domain: ncsc.gov.uk
       name: NCSC — National Cyber Security Centre
       url: https://www.ncsc.gov.uk/news
+      feed: https://www.ncsc.gov.uk/api/1/services/v1/all-rss-feed.xml
       region: GB
-      check: manual
-      note: Runs the Suspicious Email Reporting Service; phishing trend reporting.
+      note: >-
+        Runs the Suspicious Email Reporting Service; phishing trend reporting.
+        The site publishes several feeds; the combined one is registered because
+        the separate news and report feeds each miss half the output (the report
+        feed had not moved in 17 months when checked). Verified 2026-10-18.
     - domain: ofcom.org.uk
       name: Ofcom — scam calls and texts
       url: https://www.ofcom.org.uk/phones-and-broadband/scam-calls-and-messages/
@@ -297,9 +312,13 @@ tiers:
     - domain: cyber.gc.ca
       name: Canadian Centre for Cyber Security
       url: https://www.cyber.gc.ca/en/alerts-advisories
+      feed: https://www.cyber.gc.ca/api/cccs/rss/v1/get?feed=alerts_advisories&lang=en
       region: CA
-      check: manual
-      note: Federal cyber advisories; phishing and smishing alerts.
+      note: >-
+        Federal cyber advisories; phishing and smishing alerts. The feed is an
+        API endpoint rather than a static file — the query string selects the
+        advisories stream and the language, so both are part of the URL rather
+        than defaults. Verified 2026-10-18.
 
     # ── IE ──────────────────────────────────────────────────────────────────
     - domain: garda.ie
@@ -385,13 +404,15 @@ tiers:
     - domain: sabric.co.za
       name: SABRIC — South African Banking Risk Information Centre
       url: https://www.sabric.co.za/
+      feed: https://www.sabric.co.za/feed/
       region: ZA
-      check: manual
       note: >-
         Bank-sector fraud body; the closest ZA equivalent to FraudSMART in IE
         for named vishing and smishing campaigns. URL updated 2026-09-29 —
         the `/media-and-news/` path 404s and no stable successor page was
-        confirmed; pointed at the homepage.
+        confirmed; pointed at the homepage. The site-wide feed is registered
+        for the same reason — it is the only stable index this source has.
+        Verified 2026-10-18; low volume, so an empty week is normal here.
 
     # ── IN ──────────────────────────────────────────────────────────────────
     - domain: cybercrime.gov.in
@@ -418,11 +439,13 @@ tiers:
     - domain: antiphishing.jp
       name: Council of Anti-Phishing Japan
       url: https://www.antiphishing.jp/news/alert/
+      feed: https://www.antiphishing.jp/atom.xml
       region: JP
-      check: manual
       note: >-
         Industry anti-phishing council; publishes per-brand phishing alerts and
-        is the most campaign-specific Japanese source.
+        is the most campaign-specific Japanese source. Verified 2026-10-18.
+        Titles are Japanese, so brief items from here are a pointer to read the
+        linked page, not something to triage from the title alone.
     - domain: caa.go.jp
       name: Consumer Affairs Agency (Japan)
       url: https://www.caa.go.jp/policies/policy/consumer_policy/caution/
@@ -456,21 +479,28 @@ tiers:
     # ── item 4 step 5 wave 2 ───────────────────────────────────────────────
     # Two entries per region for FR, ES, IT, MX, ID, NL, SE, PH, NG, KE, KR,
     # TH, VN, PL and AE — registered alongside the `minimal` packs for those
-    # regions, same discipline as the DE/ZA/IN/JP/BR block above: all
-    # `check: manual`, contributing nothing until a human opens them.
+    # regions, same discipline as the DE/ZA/IN/JP/BR block above: registered
+    # first, read later. Most are still `check: manual` and contribute nothing
+    # until a human opens them; the ones carrying a `feed:` were polled for a
+    # working one afterwards and now reach the sweep brief on their own.
 
     # ── FR ─────────────────────────────────────────────────────────────────
     - domain: cybermalveillance.gouv.fr
       name: Cybermalveillance.gouv.fr
       url: https://www.cybermalveillance.gouv.fr/
+      feed: https://www.cybermalveillance.gouv.fr/feed/atom-flux-alertes
       region: FR
-      check: manual
       note: >-
         National cybersecurity awareness platform, run jointly by the state and
         industry; publishes named campaign alerts and is the reporting
         destination named in the FR pack. URL updated 2026-09-29 — the
         actualites deep link is gone (410) and no stable successor page was
-        confirmed; pointed at the homepage.
+        confirmed; pointed at the homepage. Of the five feeds it publishes,
+        the alerts stream is registered over the much busier actualites one:
+        this registry wants named campaigns, and a feed that fills the brief
+        with awareness-campaign posts costs more attention than it returns.
+        Verified 2026-10-18 — expect single-digit items, an empty week is
+        normal.
     - domain: economie.gouv.fr
       name: DGCCRF — consumer fraud alerts
       url: https://www.economie.gouv.fr/dgccrf/alertes-consommation
@@ -486,11 +516,13 @@ tiers:
     - domain: incibe.es
       name: INCIBE — Instituto Nacional de Ciberseguridad
       url: https://www.incibe.es/ciudadania/avisos
+      feed: https://www.incibe.es/ciudadania/avisos/feed
       region: ES
-      check: manual
       note: >-
         National cybersecurity institute; publishes public advisories and is
-        the reporting destination named in the ES pack.
+        the reporting destination named in the ES pack. The feed is the
+        citizen-advisory stream specifically, not the whole site.
+        Verified 2026-10-18.
     - domain: policia.es
       name: Policía Nacional — alertas de fraude
       url: https://www.policia.es/_es/colabora_participacion_consejos_estafas.php
@@ -580,11 +612,15 @@ tiers:
     - domain: afm.nl
       name: AFM — Autoriteit Financiële Markten, investor warnings
       url: https://www.afm.nl/nl-nl/consumenten/actueel
+      feed: https://www.afm.nl/nl-nl/rss-feed/nieuws-professionals
       region: NL
-      check: manual
       note: >-
         Financial markets authority; publishes public warnings about
         unauthorised investment providers, named in the NL pack's flag copy.
+        Verified 2026-10-18. The registered feed is the professionals stream —
+        it is the one the site actually publishes; the consumer page this
+        entry's `url` points at has no feed of its own, so brief items from
+        here are wider than consumer warnings and need filtering by eye.
 
     # ── SE ──────────────────────────────────────────────────────────────────
     - domain: polisen.se
@@ -644,7 +680,6 @@ tiers:
     - domain: sec.gov.ng
       name: SEC Nigeria — investor alerts
       url: https://home.sec.gov.ng/for-investors/keep-track-of-circulars/
-      feed: https://home.sec.gov.ng/feeds/circulars.rss
       region: NG
       check: manual
       note: >-
@@ -652,8 +687,14 @@ tiers:
         investment providers ("illegal operator alert", "public notice"),
         named in the NG pack's flag copy. Retired 2026-09-29 when the old
         /category/press-release/ path 404'd; reinstated 2026-10-06 at the
-        site's new circulars index on home.sec.gov.ng, which also publishes
-        an RSS feed of the same notices.
+        site's new circulars index. It does publish an RSS feed of the same
+        notices, and that feed was registered until 2026-10-18 — but every
+        item in it links to `http://localhost/`, a misconfiguration at the
+        publisher, so no item survives the on-host link check and the feed
+        has never yielded one usable row. Registered as `check: manual`
+        instead: the feed is real, the links in it are not, and listing it
+        made the region read as polled. Re-register it if the publisher
+        fixes the links.
 
     # ── KE ──────────────────────────────────────────────────────────────────
     - domain: dci.go.ke
@@ -667,14 +708,16 @@ tiers:
     - domain: cma.or.ke
       name: Capital Markets Authority (Kenya) — investor alerts
       url: https://www.cma.or.ke/
+      feed: https://www.cma.or.ke/feed/
       region: KE
-      check: manual
       note: >-
         Capital markets regulator; publishes public warnings about
         unauthorised investment providers, named in the KE pack's flag copy.
         URL updated 2026-09-29 — the old press-releases path 404s (site
         restructured) and no stable successor page was confirmed; pointed at
-        the homepage.
+        the homepage. The site-wide feed is registered for the same reason;
+        it carries general CMA news as well as investor alerts. Verified
+        2026-10-18.
 
     # ── KR ──────────────────────────────────────────────────────────────────
     - domain: cyberbureau.police.go.kr
@@ -746,14 +789,16 @@ tiers:
     - domain: cert.pl
       name: CERT Polska
       url: https://cert.pl/
+      feed: https://cert.pl/rss.xml
       region: PL
-      check: manual
       note: >-
         National CERT, run by NASK; publishes named phishing campaign alerts
         and is the reporting destination named in the PL pack. URL updated
         2026-09-29 — the "Lista Ostrzeżeń" warnings page was retired; current
         alerts are posted under `/posts/`, but that path 403s automated
-        requests, so the registry points at the homepage instead.
+        requests, so the registry points at the homepage instead. The feed
+        carries those same posts and does answer, so it is the only automated
+        route to this source's alerts. Verified 2026-10-18.
     - domain: knf.gov.pl
       name: KNF — Komisja Nadzoru Finansowego
       url: https://www.knf.gov.pl/dla_konsumenta/ostrzezenia_publiczne
@@ -828,8 +873,14 @@ tiers:
     - domain: thehackernews.com
       name: The Hacker News
       url: https://thehackernews.com
-      feed: https://feeds.feedburner.com/TheHackersNews
-      note: High volume, 9 citations. Skews toward APT/CVE over consumer scams.
+      check: manual
+      note: >-
+        High volume, 9 citations. Skews toward APT/CVE over consumer scams.
+        Had a `feed:` on a third-party host, which every consumer drops
+        silently — so it read as polled for as long as it was listed and was
+        never once read. Removed 2026-10-18 rather than replaced: the site's
+        own feed path redirects to that same third-party host, so there is no
+        on-host feed to register.
     - domain: helpnetsecurity.com
       name: Help Net Security
       url: https://www.helpnetsecurity.com

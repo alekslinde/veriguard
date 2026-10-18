@@ -162,16 +162,32 @@ export function onSourceHost(url: string, domain: string): boolean {
 /**
  * Keep items inside the window, on the source's own host, capped per feed.
  * Each kept item's link is replaced by its serialised form (see sourceHref).
+ *
+ * `offHost` counts in-window items rejected for their LINK alone. A feed can
+ * answer, parse and date correctly while every link in it points somewhere the
+ * brief will not print — one registered source publishes `http://localhost/`
+ * for every item — and the filter is right to drop those. But dropping them
+ * silently makes an unreadable feed look like a quiet week, and the region
+ * counts as both fed and read, so nothing anywhere reports that nobody looked.
+ * Counting the drops is what lets the caller tell the two apart.
  */
-export function selectItems(items: FeedItem[], domain: string, since: string): FeedItem[] {
+export function selectItems(items: FeedItem[], domain: string, since: string): Selection {
   const kept: FeedItem[] = [];
+  let offHost = 0;
   for (const i of items) {
     if (i.date < since || !i.title) continue;
     const href = sourceHref(i.link, domain);
     if (href) kept.push({ ...i, link: href });
+    else offHost++;
     if (kept.length === MAX_ITEMS_PER_FEED) break;
   }
-  return kept;
+  return { items: kept, offHost };
+}
+
+export interface Selection {
+  items: FeedItem[];
+  /** In-window items dropped for their link alone — see selectItems. */
+  offHost: number;
 }
 
 // ── Brief ────────────────────────────────────────────────────────────────────
@@ -328,7 +344,18 @@ export async function buildBrief(opts: { since?: string; rotation: number; fetch
         const s = fed[i++];
         const base = { domain: s.domain, name: s.name ?? s.domain, region: s.region ?? "global", tier: s.tier };
         try {
-          results.push({ ...base, items: selectItems(parseFeed(await fetcher(s.feed!)), s.domain, since) });
+          const sel = selectItems(parseFeed(await fetcher(s.feed!)), s.domain, since);
+          // A feed whose every in-window item was dropped for its link is not
+          // a quiet source — it is one nothing can read. Reported as an error
+          // so it lands in the failed list and its region in `unread`, rather
+          // than passing for a week with no news.
+          results.push({
+            ...base,
+            items: sel.items,
+            ...(sel.items.length === 0 && sel.offHost > 0
+              ? { error: `${sel.offHost} item(s) dropped: links are not https on ${s.domain}` }
+              : {}),
+          });
         } catch (err) {
           results.push({ ...base, items: [], error: (err as Error).name === "AbortError" ? "timed out" : (err as Error).message });
         }
