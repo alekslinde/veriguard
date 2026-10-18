@@ -375,6 +375,40 @@ None of that was visible from the word lists alone.
 
 ---
 
+## Fetch discipline during research
+
+**Search before you fetch a full page, and never fetch the same URL twice in
+one sweep.** A 2026-10-18 sweep audit found 30 page fetches for a 10-region
+cycle, of which 12 were exact duplicates — the same ten source URLs fetched
+twice in a row with nothing between them — and zero scoped searches were used
+at all; every source, including rotation regions with a single alert page,
+was fetched as a full page. That pattern wastes tokens in direct proportion to
+how many regions a cycle covers, which is the opposite of what the rotation in
+[Region coverage](#the-region-coverage-table-and-the-rotation) is for.
+
+- **Before fetching a source's page, search for it first** — a query scoped to
+  the source's domain and a date window (e.g. `site:fi.se varningslista 2026`)
+  returns ranked snippets for a fraction of a full-page fetch. Only fetch the
+  page itself once a snippet looks dated inside the region's freshness window.
+- **Track what you've already fetched this run, and don't fetch it again.** If
+  a source's page has already been read this sweep, reuse that read rather
+  than re-requesting it — re-verifying a finding is a reason to re-read your
+  own notes, not the source.
+- **A registered `feed:` is fetched once per sweep, not once per claim it
+  supports.** If a feed confirms three separate items, that is one fetch, read
+  once.
+- **A `minimal`-tier region in rotation gets a search-first pass, not a full
+  research pass.** Full-page fetches are for sources that pass the search
+  filter, or for `full`/`partial` tier regions where deeper reading is the
+  point.
+
+This is a research-method rule, same footing as
+[Verify against the live engine](#verify-against-the-live-engine-before-filing):
+cheap to follow, and the failure mode is invisible in the roadmap itself — a
+duplicated fetch leaves no trace in the finished file, only in the token bill.
+
+---
+
 ## Workflow
 
 1. Branch `threat-intel/YYYY-MM-DD`, write the roadmap, open a docs PR.
