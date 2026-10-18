@@ -1664,6 +1664,22 @@ describe("threat-intel roadmap 2026-07-26 (#101, #103, #105)", () => {
     }
   });
 
+  // ── 2026-10-18 sweep, D1 / #475: job-interview phishing (.info/.works) ────
+  it("flags .info and .works, used by a job-interview phishing funnel (#475)", () => {
+    for (const host of ["joinquest.works", "joinconnect.info"]) {
+      const result = checkUrl(`https://${host}/`);
+      expect(result.verdict).toBe("suspicious");
+      expect(result.score).toBe(30);
+      expect(result.flags.some((f) => f.includes("Dodgy top-level domain"))).toBe(true);
+    }
+  });
+
+  it("does not flag .work as .works, or .info as a substring of other entries (#475)", () => {
+    const result = checkUrl("https://calendly.com/some-org/interview");
+    expect(result.verdict).toBe("safe");
+    expect(result.flags.some((f) => f.includes("Dodgy top-level domain"))).toBe(false);
+  });
+
   it("reaches a scam verdict when .bond compounds with other signals (Interisle 2025)", () => {
     const result = checkSms(
       "URGENT: your AusPost parcel is held pending a fee. Pay now at https://auspost-redelivery.bond/pay"
