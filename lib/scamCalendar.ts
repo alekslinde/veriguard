@@ -174,7 +174,11 @@ const AU_SEASONS: ScamSeason[] = [
     // ATO profile" / income-statement email carrying remote-access software
     // (measured likely_scam 65 on 2026-10-06) is unchanged and no newer ATO
     // alert exists. Content unchanged.
-    reviewed: "2026-10-16",
+    //
+    // Re-checked against the 2026-10-18 sweep: that cycle's AU section carried
+    // no ATO/tax-time item (its HIGH finding was BASE-level job-interview
+    // phishing). Content unchanged.
+    reviewed: "2026-10-18",
   },
   {
     id: "eofy-business",

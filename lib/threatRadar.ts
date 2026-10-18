@@ -264,7 +264,7 @@ const AU_THREATS: ThreatEntry[] = [
     id: "ato-tax-debt",
     title: "ATO tax debt and refund lures",
     channel: "mixed",
-    status: "active",
+    status: "watchlist",
     coverage: "covered",
     firstSeen: "2026-06-21",
     // Re-confirmed by the 2026-09-27 sweep: the ATO/myGov tax-time advisory is a
@@ -272,6 +272,11 @@ const AU_THREATS: ThreatEntry[] = [
     // myGov "you have a new secure message" variant that drops threat language
     // for a bland notification hook — noted in the lures below, though the
     // content-free wrapper itself is not yet a shipped signal.
+    //
+    // Downgraded to watchlist on the 2026-10-18 promotion: that cycle's AU
+    // section did not touch ATO/tax content, so lastSeen has aged outside the
+    // two-most-recent-sweeps window. Not a re-confirmation; see the authoring
+    // rule on RadarStatus.
     lastSeen: "2026-09-27",
     summary:
       "The steadiest campaign on the list. Both directions get used: a refund waiting for your bank details, or a debt with legal action attached. A September wave blends Medicare, Centrelink, JobSeeker and super into one AI-generated message so at least one benefit resonates, and threatens that payments will stop rather than just asking you to log in. The newest variant drops the threat entirely and just says a secure message is waiting.",
@@ -881,6 +886,26 @@ const AU_THREATS: ThreatEntry[] = [
     advice:
       "If your phone loses service for no reason, treat it as an emergency and ring your carrier from another phone. Set a porting PIN with your carrier now, and use an authenticator app rather than SMS codes where you can.",
     roadmap: "2026-07-26",
+  },
+  {
+    id: "job-interview-credential-phish",
+    title: "Fake job-interview booking pages",
+    channel: "web",
+    status: "active",
+    coverage: "partial",
+    firstSeen: "2026-10-18",
+    lastSeen: "2026-10-18",
+    summary:
+      "A recruiting message leads to a fake interview-booking page, then a fake CAPTCHA, then a fake Facebook and Google sign-in that asks for your password and a one-time code. The codes are relayed to the scammer in real time so they can get in before yours expires.",
+    lures: [
+      "A \"book your interview\" link on a domain starting with \"join\" (joinhire, joinquest, jointheteam)",
+      "A CAPTCHA step before you reach any real booking calendar",
+      "Being asked for your Facebook or Google password and a verification code on a page that isn't facebook.com or google.com",
+    ],
+    advice:
+      "Go to the employer's own site or a calendar link you already recognise, rather than clicking a link in a recruiting message. Never enter your Facebook or Google password, or a code sent to your phone, anywhere except facebook.com or google.com.",
+    detection: "Some of the domains these pages use are flagged as a dodgy top-level domain; not every one used by this campaign is covered yet.",
+    roadmap: "2026-10-18",
   },
 ];
 
