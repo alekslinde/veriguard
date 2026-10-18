@@ -1,5 +1,8 @@
 # Changelog
 
+## [0.2.0](https://github.com/alekslinde/veriguard/compare/mcp-v0.1.2...mcp-v0.2.0) (2026-10-18)
+
+
 ## [0.1.2](https://github.com/alekslinde/veriguard/compare/mcp-v0.1.1...mcp-v0.1.2) (2026-10-06)
 
 
