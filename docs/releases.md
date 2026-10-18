@@ -53,10 +53,23 @@ version.
 
 ## The app
 
-`production` is what users see, and only `npm run release` moves it. The push to
-`production` is a plain push of the tag, not a force-push: git refuses it if
-`production` holds a commit the tag does not. That refusal is deliberate. If someone
-committed directly to `production`, merge it back to `main` and release again.
+`production` is what users see, and only `npm run release` moves it. The push is a
+plain push of the commit the tag names, not a force-push: git refuses it if
+`production` holds a commit that commit does not contain. That refusal is
+deliberate. If someone committed directly to `production`, merge it back to `main`
+and release again.
+
+The commit, not the tag ref: these are annotated tags, so `refs/tags/app-vX.Y.Z`
+names a tag object rather than a commit, and a branch cannot be built from one.
+Pushing the tag ref is refused with `fatal error in commit_refs`, which reads as
+an outage rather than as the wrong kind of ref.
+
+`production` also requires a passing `Lint & test` on the commit being pushed, and
+that run only starts when the commit reaches `main` — so immediately after a
+release it is usually still in flight. The release command reports the check's
+state and offers to wait. Each release commit is pushed separately so it becomes a
+push head and gets its own CI; a batch push would leave every commit but the last
+with no checks at all, and the rule could never be satisfied for them.
 
 **Hotfix:** a `fix:` commit on `main`, then `npm run release`, and promote the app.
 
@@ -162,3 +175,5 @@ one shipped; the version line guarantees that.
 | `E401` after "Signed provenance statement" | OIDC worked, the registry exchange did not. No trusted publisher matches this workflow filename |
 | Registry 404 right after a successful publish | Propagation. The website leads the registry by minutes |
 | The app deploy fails on the fast-forward | `production` holds a commit `main` does not. Merge it back to `main`, then release again |
+| `Required status check "Lint & test" is expected` | CI has not finished on the release commit yet. Wait for it, then `git push origin <app tag>^{commit}:refs/heads/production` |
+| `remote: fatal error in commit_refs` | A branch was pushed from an annotated tag ref. Push the commit instead: `<tag>^{commit}:refs/heads/production` |
