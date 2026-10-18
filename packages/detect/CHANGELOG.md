@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.3.0](https://github.com/alekslinde/veriguard/compare/engine-v0.2.1...engine-v0.3.0) (2026-10-18)
+
+
+### Features
+
+* **detector:** catch netbank lookalike logon domains ([#466](https://github.com/alekslinde/veriguard/issues/466)) ([6b2c2f4](https://github.com/alekslinde/veriguard/commit/6b2c2f432c8b7e53dbc5eac56e14cb5bf5f4a099))
+* **detector:** flag AUSTRAC impersonation and agency WhatsApp hand-offs (AU) ([#433](https://github.com/alekslinde/veriguard/issues/433)) ([8f1ec11](https://github.com/alekslinde/veriguard/commit/8f1ec11d0a14fb06061ca7d8a8212ebf038b8bc7))
+* **detector:** flag NCSC impersonation (NZ) ([#436](https://github.com/alekslinde/veriguard/issues/436)) ([1cb4d03](https://github.com/alekslinde/veriguard/commit/1cb4d031332f5ba2fb93d821663390bbb034cf41))
+* **detector:** flag recovered funds held for a release fee ([#435](https://github.com/alekslinde/veriguard/issues/435)) ([a590e2b](https://github.com/alekslinde/veriguard/commit/a590e2bc1114c6766721b9f729ef144ce084aba8))
+* **detector:** flag scam coaching and "money laundering case" wording ([#434](https://github.com/alekslinde/veriguard/issues/434)) ([80f2761](https://github.com/alekslinde/veriguard/commit/80f2761d237f1b5d613a21d1fb5d456a42270fb7))
+* **detector:** score the callback-SMS composite ([#463](https://github.com/alekslinde/veriguard/issues/463)) ([#468](https://github.com/alekslinde/veriguard/issues/468)) ([b721e6f](https://github.com/alekslinde/veriguard/commit/b721e6fbd8eab1e420595f72dd617b01be2c68be))
+* **detector:** separate language coverage from pack depth ([#461](https://github.com/alekslinde/veriguard/issues/461)) ([523721f](https://github.com/alekslinde/veriguard/commit/523721f4ab537111940905d51fd5e1fd8f399a29))
+* **detector:** three NLP-assessment items — confusables, language ID, stemmer ([#441](https://github.com/alekslinde/veriguard/issues/441)) ([04dbf6f](https://github.com/alekslinde/veriguard/commit/04dbf6f9f833eb07c83273e19906b7d37e18a144))
+
+
+### Fixes
+
+* **detector:** add .info/.works to SUSPICIOUS_TLDS ([#479](https://github.com/alekslinde/veriguard/issues/479)) ([e12fa47](https://github.com/alekslinde/veriguard/commit/e12fa47ce6c91f26ec2659db4ecfa18a77ac0f59))
+* **detector:** flag AE agency WhatsApp hand-off ([#448](https://github.com/alekslinde/veriguard/issues/448)) ([133c146](https://github.com/alekslinde/veriguard/commit/133c146bcdc320bbca3979332a214955606cf621))
+* **detector:** point NZ reporting copy at the NCSC, not CERT NZ ([#440](https://github.com/alekslinde/veriguard/issues/440)) ([b1c3b5f](https://github.com/alekslinde/veriguard/commit/b1c3b5fbc8939d6bcc9f553c186d45e872c88b10))
+* **detector:** stop a corroborated deferred row escaping the email discount ([#473](https://github.com/alekslinde/veriguard/issues/473)) ([9c386e7](https://github.com/alekslinde/veriguard/commit/9c386e750332fd8e608b479b4d85a4586bb61d96))
+
 ## [0.2.1](https://github.com/alekslinde/veriguard/compare/engine-v0.2.0...engine-v0.2.1) (2026-10-06)
 
 
