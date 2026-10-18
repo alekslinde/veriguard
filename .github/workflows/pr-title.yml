@@ -3,9 +3,10 @@ name: PR title
 # Checks that a PR title is a Conventional Commit.
 #
 # This is load-bearing, not style policing. PRs are squash-merged with the title
-# as the commit message, so the title IS the commit release-please parses. A
-# title it cannot read produces no version bump and no changelog entry: the
-# change ships silently, under whatever number the last release happened to set.
+# as the commit message, so the title IS the commit the release script reads for
+# the version bump and the changelog. A title it cannot read produces no bump and
+# no changelog entry: the change ships silently, under whatever number the last
+# release happened to set.
 #
 # The type decides the bump — `fix:` patch, `feat:` minor, `!` or a
 # BREAKING CHANGE footer major (minor while a part is below 1.0). The scope is
@@ -34,7 +35,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
-          # The types release-please understands, plus the ones this repo
+          # The types the release script understands, plus the ones this repo
           # already uses. `revert` is included because reverting is a normal
           # act and a revert PR still needs a parseable title.
           types: |
