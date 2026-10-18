@@ -330,6 +330,11 @@ const SUSPICIOUS_TLDS = [
   // .XIN tops the 2025 phishing-score table (42,724 domains). Neither has
   // meaningful legitimate AU consumer use.
   ".xin", ".bond",
+  // Job-interview credential-phish funnel using "join"-prefixed domains
+  // across three TLDs, one of which (.cfd) is already listed here
+  // (Malwarebytes, Oct 2026). Rests on a single named campaign, not an
+  // independent base-rate study. See docs/threat-intel (2026-10-18 sweep).
+  ".info", ".works",
 ];
 
 // Public IPFS gateways — decentralised hosting used for takedown-resistant
