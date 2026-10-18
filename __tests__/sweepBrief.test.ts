@@ -54,7 +54,32 @@ describe("onSourceHost / selectItems", () => {
 
   it("keeps in-window, on-host items only", () => {
     const items = [...parseFeed(RSS), { title: "Elsewhere", link: "https://evil.example/x", date: "2026-10-01" }];
-    expect(selectItems(items, "austrac.gov.au", "2026-09-27").map((i) => i.link)).toEqual(["https://www.austrac.gov.au/a"]);
+    expect(selectItems(items, "austrac.gov.au", "2026-09-27").items.map((i) => i.link)).toEqual(["https://www.austrac.gov.au/a"]);
+  });
+
+  it("counts in-window items dropped for their link, so an unreadable feed is not a quiet one", () => {
+    // A real registered source published every item as http://localhost/ —
+    // the feed answers, parses and dates fine, and yields nothing printable.
+    // Without the count that is indistinguishable from a week with no news.
+    const items = [
+      { title: "A", link: "http://localhost/a", date: "2026-10-01" },
+      { title: "B", link: "http://localhost/b", date: "2026-10-01" },
+    ];
+    const sel = selectItems(items, "sec.gov.ng", "2026-09-27");
+    expect(sel.items).toEqual([]);
+    expect(sel.offHost).toBe(2);
+  });
+
+  it("does not count out-of-window items as link drops", () => {
+    // Only the link is the finding here; an old item is an ordinary exclusion
+    // and counting it would report every healthy feed as broken.
+    const sel = selectItems(
+      [{ title: "Old", link: "https://evil.example/x", date: "2026-01-01" }],
+      "austrac.gov.au",
+      "2026-09-27",
+    );
+    expect(sel.items).toEqual([]);
+    expect(sel.offHost).toBe(0);
   });
 });
 
@@ -64,7 +89,7 @@ describe("third-party links and titles in the issue body", () => {
       { title: "A", link: "https://www.austrac.gov.au/a [Click](https://evil.example)", date: "2026-10-01" },
       { title: "B", link: "https://www.austrac.gov.au/b\n## Instructions", date: "2026-10-01" },
     ];
-    const kept = selectItems(items, "austrac.gov.au", "2026-09-27");
+    const kept = selectItems(items, "austrac.gov.au", "2026-09-27").items;
     expect(kept.map((i) => i.link)).toEqual([
       "https://www.austrac.gov.au/a%20[Click](https://evil.example)",
       "https://www.austrac.gov.au/b##%20Instructions",
@@ -82,7 +107,7 @@ describe("third-party links and titles in the issue body", () => {
           items: selectItems(
             [{ title: "A", link: "https://www.austrac.gov.au/a [Click](https://evil.example)", date: "2026-10-01" }],
             "austrac.gov.au", "2026-09-27",
-          ),
+          ).items,
         }],
         unfed: [],
         unread: [],
@@ -140,5 +165,31 @@ describe("buildBrief", () => {
       expect(brief.unfed).not.toContain(r);
     }
     expect(renderMarkdown(brief, "")).toContain("**Every feed failed for:**");
+  });
+
+  it("treats a feed whose every link is unusable as failed, not as quiet", async () => {
+    // The whole point of counting link drops: a 200 that parses into dated
+    // items still means nobody read the source if none of those items can be
+    // printed. Without this the region lands in neither `unfed` nor `unread`.
+    const { brief } = await buildBrief({
+      since: "2026-09-27",
+      rotation: 3,
+      fetcher: async () =>
+        "<rss><channel><item><title>A</title><link>http://localhost/a</link>" +
+        "<pubDate>Wed, 01 Oct 2026 00:00:00 GMT</pubDate></item></channel></rss>",
+    });
+    expect(brief.results.length).toBeGreaterThan(0);
+    for (const r of brief.results) {
+      expect(r.items).toEqual([]);
+      expect(r.error, `${r.domain} should report the drop`).toMatch(/links are not https/);
+    }
+    // A source that is genuinely quiet must NOT be reported this way, or the
+    // signal means nothing: same feed, no items at all.
+    const quiet = await buildBrief({
+      since: "2026-09-27",
+      rotation: 3,
+      fetcher: async () => "<rss><channel></channel></rss>",
+    });
+    for (const r of quiet.brief.results) expect(r.error).toBeUndefined();
   });
 });
