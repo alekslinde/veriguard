@@ -48,9 +48,11 @@ on:
       - "eval/**"
       - "scripts/eval-metamorphic.ts"
   schedule:
-    # Mondays 21:00 UTC ≈ 07:00 Tuesday Australia/Sydney — an hour before the
-    # promotion-freshness check, so the week's maintenance flags land together.
-    - cron: "0 21 * * 1"
+    # Mondays 21:15 UTC ≈ 07:15 Tuesday Australia/Sydney — after the
+    # threat-intel source check and before promotion freshness, so the week's
+    # maintenance flags land together. A quarter-hour offset rather than the
+    # shared 21:00 these three used to hold; see source-check.yml for why.
+    - cron: "15 21 * * 1"
   workflow_dispatch:
     inputs:
       seed:

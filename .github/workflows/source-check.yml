@@ -33,6 +33,13 @@ on:
   schedule:
     # Mondays 21:00 UTC ≈ 07:00 Tuesday Australia/Sydney. An hour after the
     # Dependabot digest, so the week's flagged items land together.
+    #
+    # First of the four checks in this hour, each a quarter-hour apart: this,
+    # metamorphic at :15, the scam-calendar check at :30, deploy-drift at :45.
+    # Three of them used to share 21:00 exactly: scheduled runs queue on shared
+    # infrastructure and are delayed under load, so three firing at once was the
+    # one arrangement likely to make them late — and each comment claimed an
+    # ordering the crons did not actually keep.
     - cron: "0 21 * * 1"
   pull_request:
     paths:

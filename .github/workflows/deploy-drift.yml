@@ -17,13 +17,20 @@ name: Deploy drift
 
 on:
   schedule:
-    # Mondays 21:00 UTC ≈ 07:00 Tuesday Australia/Sydney, an hour ahead of the
-    # radar/calendar freshness check, so the week's maintenance flags arrive
-    # together rather than trickling in.
-    - cron: "0 21 * * 1"
+    # Mondays 21:45 UTC ≈ 07:45 Tuesday Australia/Sydney, a quarter-hour ahead
+    # of the radar/calendar freshness check, so the week's maintenance flags
+    # arrive together rather than trickling in. Last of the four checks in this
+    # hour, each a quarter-hour apart; see source-check.yml for why.
+    - cron: "45 21 * * 1"
   push:
     # Right after a promotion lands, so the issue closes immediately rather
     # than staying open until the next Monday.
+    #
+    # This trigger only became live when releases moved to `npm run release`.
+    # A push made with a workflow's own GITHUB_TOKEN starts no further
+    # workflows, so while CI fast-forwarded `production` this never fired and
+    # the issue stayed open until the Monday cron. The release command pushes
+    # from a maintainer's machine under their own credential, which does.
     branches: [production]
   workflow_dispatch:
 
