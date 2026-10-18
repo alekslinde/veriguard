@@ -13,7 +13,7 @@
   ],
   "license": "Apache-2.0",
   "author": "Aleks Linde",
-  "homepage": "https://veriguard.app/packages",
+  "homepage": "https://veriguard.app/packages#mcp",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/alekslinde/veriguard.git",

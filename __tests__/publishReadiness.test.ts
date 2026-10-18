@@ -30,6 +30,18 @@ const PACKAGES = [
   { name: "@veriguard/mcp", manifest: MCP, workflow: "publish-mcp.yml" },
 ];
 
+/**
+ * Where each package's npm page sends a reader. Both are documented on one
+ * site page, so the fragment is what distinguishes them — a bare
+ * /packages link lands MCP readers on the library's install instructions.
+ * Asserted per package rather than as a shared prefix, since the failure
+ * worth catching is the two manifests pointing at the same section.
+ */
+const HOMEPAGE: Record<string, string> = {
+  "@veriguard/detect": "https://veriguard.app/packages#library",
+  "@veriguard/mcp": "https://veriguard.app/packages#mcp",
+};
+
 describe("the support claim matches what CI tests", () => {
   /** The Node versions the packages job actually runs. */
   const matrix = (() => {
@@ -151,16 +163,26 @@ describe("the manifests carry what a registry page needs", () => {
     expect(manifest.publishConfig?.access).toBe("public");
   });
 
-  it.each(PACKAGES)("$name links back to its source", ({ manifest }) => {
+  it.each(PACKAGES)("$name links back to its source", ({ name, manifest }) => {
     // Provenance requires `repository`; the rest is what makes the npm page
     // useful. `directory` has to track the package's real location — it was
     // packages/engine until the package was renamed.
     expect(manifest.repository?.url).toBeTruthy();
-    // npm shows `homepage` as the package's docs link; both packages are
-    // documented on the site's /packages page.
-    expect(manifest.homepage).toBe("https://veriguard.app/packages");
+    // npm shows `homepage` as the package's docs link. Both packages are
+    // documented on the site's /packages page, so each one's link carries the
+    // fragment for its own section; AnchorHeading renders those ids.
+    expect(manifest.homepage).toBe(HOMEPAGE[name]);
     expect(manifest.bugs).toBeTruthy();
     expect(manifest.license).toBe("Apache-2.0");
+
+    // The fragment has to name a heading that exists. A renamed AnchorHeading
+    // id leaves the npm page linking to the top of /packages instead — the
+    // link still resolves, so nothing else would notice.
+    const anchor = HOMEPAGE[name].split("#")[1];
+    expect(
+      read("components/PackagesDocs.tsx"),
+      `no AnchorHeading with id="${anchor}" — the npm homepage fragment points nowhere`,
+    ).toContain(`id="${anchor}"`);
 
     const dir = manifest.repository.directory;
     expect(dir, "repository.directory is missing").toBeTruthy();
