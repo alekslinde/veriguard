@@ -233,6 +233,11 @@ const AUTHORITY_MENTIONS = [
   // Law enforcement and the fraud-reporting bodies — the reporting authority is
   // itself used as a lure ("we're investigating fraud on your account").
   "fbi", "dea", "us marshals", "police", "sheriff",
+  // FBI warning (Aug 2026): scammers pose as the Internet Crime Complaint
+  // Center to re-victimise people who already reported fraud, claiming funds
+  // were "recovered" and demanding a release fee. "ic3" contains a digit, so
+  // it has no dictionary collision and needs no case gate.
+  "ic3", "internet crime complaint center",
   "ftc", "federal trade commission",
   // Financial regulators and the deposit insurer. The SEC and FDIC never
   // cold-call consumers, and "FDIC insured" is a common false-legitimacy claim.
@@ -309,6 +314,12 @@ const REWARD_WORDS = [
   "sec approved", "sec-approved", "sec registered", "verified by sec",
   "finra approved", "fdic guaranteed", "fdic insured returns",
   "government backed investment",
+  // IC3 re-victimisation wording: the base list carries "recover your stolen
+  // funds" but not these past-tense forms, which is how the lure is phrased
+  // ("recovered", "located"). Probed 2026-10-27: both IC3 phrasings scored
+  // safe 0 with the agency named, since authority alone earns no credit.
+  "recovered your stolen funds", "lost funds have been located",
+  "funds are ready for release",
   // Same PSA: "campaign investment pool" pitches promising returns once a
   // candidate wins. No legitimate fundraising ask implies investment returns.
   "campaign investment pool",

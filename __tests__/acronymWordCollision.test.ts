@@ -350,11 +350,17 @@ const KNOWN_COLLISIONS = new Set<string>([
   // lower-case form is the word. caseSensitiveAuthorities carries them, and the
   // "matched only in caps" regression tests below are the cover.
   //
-  // FR "ants", ZA "sars" and NL "duo" are resolved the same way but do not
-  // appear here: the guard reads authorityMentions, and a collision only needs
-  // reviewing while the bare form is still matched case-insensitively.
+  // FR "ants" and ZA "sars" are resolved the same way but do not appear here:
+  // the guard reads authorityMentions, and a collision only needs reviewing
+  // while the bare form is still matched case-insensitively. MX "sat"/"ine",
+  // NL "duo" and KE "sha" are listed in authorityMentions (a
+  // caseSensitiveAuthorities entry is unreachable otherwise) and so appear.
   "US ice (ice, en)",
   "US sec (sec, en)",
+  "MX sat (sat, es)",
+  "MX ine (ine, es)",
+  "NL duo (duo, nl)",
+  "KE sha (sha, en)",
   "NG firs (fir, en)",
   "JP yubin (yubin, ja)",
 
@@ -578,5 +584,28 @@ describe("innocent messages containing agency-acronym words", () => {
     const result = checkSms(text, undefined, region);
     expect(result.verdict).not.toBe("suspicious");
     expect(result.verdict).not.toBe("likely_scam");
+  });
+});
+
+describe("caseSensitiveAuthorities", () => {
+  it("is a subset of authorityMentions in every pack", () => {
+    // An entry only in caseSensitiveAuthorities is unreachable: authorityIn()
+    // routes listed entries through the acronym matcher, so it must be listed.
+    const dead: string[] = [];
+    for (const region of supportedRegions()) {
+      const pack = resolveRegionPack(region);
+      for (const e of pack.caseSensitiveAuthorities ?? []) {
+        if (!pack.authorityMentions.includes(e)) dead.push(`${region} ${e}`);
+      }
+    }
+    expect(dead).toEqual([]);
+  });
+
+  it("MX: SAT/INE in caps read as the agency, the lower-case words do not", () => {
+    const agency = (t: string) =>
+      checkSms(t, undefined, "MX").flags.filter((f) => /government agency/i.test(f));
+    expect(agency("SAT: tienes un adeudo fiscal pendiente, regulariza hoy.")).not.toEqual([]);
+    expect(agency("INE: tu credencial para votar ha sido suspendida.")).not.toEqual([]);
+    expect(agency("I sat on the porch all afternoon drinking fine wine.")).toEqual([]);
   });
 });
