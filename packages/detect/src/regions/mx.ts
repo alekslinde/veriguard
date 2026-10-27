@@ -15,13 +15,12 @@ import type { RegionDefinition } from "./types";
 
 const AUTHORITY_MENTIONS = [
   // "sat" (the tax authority's own acronym) and "ine" (the electoral
-  // institute's) are NOT listed bare: both are ordinary English/Spanish words
-  // ("I sat down", "fine wine") and, like ZA's "saps"/"hawks", the matcher's
-  // word-boundary protection cannot help — these match as whole words because
-  // that is what they are. Found by adversarial probe (checkSms("I sat on the
-  // porch...", "MX") flagged "Names a government agency" on completely
-  // ordinary text). The expanded names below carry the same coverage without
-  // the collision.
+  // institute's) are ordinary English/Spanish words ("I sat down", "fine
+  // wine"), so a case-insensitive entry would flag ordinary text (found by
+  // adversarial probe). They are listed here but matched CASE-SENSITIVELY via
+  // caseSensitiveAuthorities, the same pattern as US "ice"/"sec" and ZA "sars":
+  // only the literal caps "SAT:" / "INE:" read as the agency.
+  "sat", "ine",
   "servicio de administración tributaria",
   "imss",
   "instituto mexicano del seguro social",
