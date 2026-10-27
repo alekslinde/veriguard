@@ -104,9 +104,12 @@ describe("engine on long, unbroken input", () => {
   // genuinely linear in the input — about 0.6s at 100,000 digits on a laptop and
   // right at a second on a loaded CI runner, so no fixed bound both fits under
   // the runner and stays below a regression. What separates the two is shape:
-  // doubling the input doubles linear work and quadruples quadratic work. Best
-  // of five runs per size keeps one slow sample from deciding the ratio: a
-  // loaded CI runner measured 3.12 against the bound of 3 with two runs.
+  // quadrupling the input quadruples linear work and multiplies quadratic work
+  // by sixteen, so the bound sits between them at eight. Doubling was tried
+  // first (bound 3, against 2 for linear and 4 for quadratic) and failed on CI
+  // at 3.1 and 3.3 even taking the best of five runs: that runner's linear
+  // ratio sits above the ideal, and a bound of 3 left it no room. Best of five
+  // runs per size still keeps one slow sample from deciding the ratio.
   it("stays linear on a long digit run through the email path", () => {
     const best = (text: string) =>
       Math.min(
@@ -116,8 +119,8 @@ describe("engine on long, unbroken input", () => {
           return performance.now() - started;
         }),
       );
-    const half = best(fill("0").slice(0, ROUTE_MAX / 2));
+    const quarter = best(fill("0").slice(0, ROUTE_MAX / 4));
     const full = best(fill("0"));
-    expect(full / half).toBeLessThan(3);
+    expect(full / quarter).toBeLessThan(8);
   });
 });
