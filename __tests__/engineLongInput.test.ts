@@ -105,11 +105,12 @@ describe("engine on long, unbroken input", () => {
   // right at a second on a loaded CI runner, so no fixed bound both fits under
   // the runner and stays below a regression. What separates the two is shape:
   // doubling the input doubles linear work and quadruples quadratic work. Best
-  // of two runs per size keeps one slow sample from deciding the ratio.
+  // of five runs per size keeps one slow sample from deciding the ratio: a
+  // loaded CI runner measured 3.12 against the bound of 3 with two runs.
   it("stays linear on a long digit run through the email path", () => {
     const best = (text: string) =>
       Math.min(
-        ...[0, 1].map(() => {
+        ...[0, 1, 2, 3, 4].map(() => {
           const started = performance.now();
           checkEmail(text);
           return performance.now() - started;
