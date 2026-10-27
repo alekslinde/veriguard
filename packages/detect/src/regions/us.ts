@@ -142,6 +142,12 @@ const URGENCY_TAX_THREAT = [
   "your ssn has been suspended", "ssn suspended", "ssn compromised",
   "legal action will be taken", "warrant issued",
   "federal charges", "your assets will be frozen",
+  // FBI IC3 PSA I-101526-3-PSA (15 Oct 2026): fake voter-registration alerts
+  // ahead of the midterm. Probed 2026-10-26: "Your voter registration has been
+  // flagged. Confirm at <link>" scored safe 15 (link only). Election offices
+  // do not send unsolicited texts framed this way.
+  "not registered to vote", "voter registration has been flagged",
+  "voter registration is inactive",
 ];
 
 // Foreign / federal-authority impersonation. The US pattern is dominated by
@@ -314,6 +320,9 @@ const REWARD_WORDS = [
   // safe 0 with the agency named, since authority alone earns no credit.
   "recovered your stolen funds", "lost funds have been located",
   "funds are ready for release",
+  // Same PSA: "campaign investment pool" pitches promising returns once a
+  // candidate wins. No legitimate fundraising ask implies investment returns.
+  "campaign investment pool",
 ];
 
 // Federal and agency domains. These are exact-or-subdomain matched by checkUrl,
