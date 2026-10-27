@@ -3,6 +3,38 @@
 *Sweep period: since the 2026-10-18 roadmap. Issues opened: #494, #495, #496
 — see §Issues opened.*
 
+## Status — as at 2026-10-27
+
+All three proposals have shipped. The research and rationale are kept as
+written on 2026-10-25; this block is the only part updated after the fact.
+
+| Proposal | Issue | Shipped in | Status |
+|---|---|---|---|
+| US-D1 — Midterm election fraud lures | #494 | #499 | ✅ Shipped |
+| US-D2 — IC3 self-impersonation | #495 | #500 | ✅ Shipped (with deviation) |
+| MX-D1 — Dead `caseSensitiveAuthorities` entries | #496 | #500 | ✅ Shipped (widened) |
+
+**Two implementations deviated from the proposal as written:**
+
+- **US-D2** — listing `"ic3"` and `"internet crime complaint center"` as
+  authorities was not enough. Authority credit alone scores nothing (a bare
+  agency mention is "ordinary for mail from that agency"), and the base
+  recovery-fraud list matches "recover your stolen funds" but not the
+  past-tense forms the lure uses. Both measured examples still scored safe 0
+  after the authority entries. Shipped with three further reward phrases:
+  `"recovered your stolen funds"`, `"lost funds have been located"` and
+  `"funds are ready for release"`. The issue's premise that existing
+  signals would compound was wrong.
+- **MX-D1** — the new subset invariant (`caseSensitiveAuthorities` ⊆
+  `authorityMentions`, every pack) found the same dead entries in two more
+  packs: NL `duo` and KE `sha`. Both were fixed the same way as `sat`/`ine`,
+  and all four are recorded in `KNOWN_COLLISIONS` as case-gated.
+
+**Not done:** step 5 of the Workflow (promotion to `/radar` and `/calendar`)
+has not been done for this cycle.
+
+---
+
 ## Step 1 — live orientation (verify-before-propose)
 
 `ls packages/detect/src/regions/*.ts | grep -Ev '/(base|rest-of-world|types|index|languageCoverage)\.ts$' | wc -l`
