@@ -347,7 +347,7 @@ const AU_THREATS: ThreatEntry[] = [
     // composite (transaction claim + disown clause + dialable number + no
     // URL) that fires independently of brand or authority wording.
     channel: "mixed",
-    status: "active",
+    status: "watchlist",
     coverage: "covered",
     firstSeen: "2026-07-26",
     lastSeen: "2026-10-16",
@@ -528,10 +528,10 @@ const AU_THREATS: ThreatEntry[] = [
     id: "toll-road-smishing",
     title: "Toll road texts (Linkt, E-Toll)",
     channel: "sms",
-    status: "watchlist",
+    status: "active",
     coverage: "covered",
     firstSeen: "2026-06-21",
-    lastSeen: "2026-08-02",
+    lastSeen: "2026-10-25",
     summary:
       "Linkt and E-Toll impersonation over a small unpaid toll. Amounts stay under about $10 deliberately — small enough that paying is less effort than checking, which is what makes the campaign profitable at volume.",
     lures: [
@@ -717,7 +717,7 @@ const AU_THREATS: ThreatEntry[] = [
     status: "active",
     coverage: "n/a",
     firstSeen: "2026-06-21",
-    lastSeen: "2026-07-01",
+    lastSeen: "2026-10-25",
     summary:
       "A call in a familiar voice — a child, a grandchild — in trouble and needing money now. A few seconds of audio from social media is enough to clone a voice convincingly.",
     lures: [
@@ -810,7 +810,7 @@ const AU_THREATS: ThreatEntry[] = [
     id: "netbank-lookalike-logon",
     title: "Fake NetBank sign-in pages",
     channel: "mixed",
-    status: "active",
+    status: "watchlist",
     coverage: "covered",
     firstSeen: "2026-10-06",
     lastSeen: "2026-10-16",
