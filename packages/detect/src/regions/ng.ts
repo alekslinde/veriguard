@@ -91,7 +91,9 @@ export const NG: RegionDefinition = {
   legitDomainDetails: "",
 
   reportingBody: "the EFCC or the Nigeria Police Force",
-  reportingUrl: "https://efccnigeria.org/efcc/report-a-crime",
+  // Updated 2026-11-01: efccnigeria.org is gone. The rebuilt efcc.gov.ng site
+  // takes petitions at /Petition; the old /efcc/report-a-crime path 404s.
+  reportingUrl: "https://efcc.gov.ng/Petition",
 
   phonePlan: {
     // No consumer premium-rate range appeared in libphonenumber's Nigerian
