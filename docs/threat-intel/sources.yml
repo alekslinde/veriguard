@@ -84,7 +84,7 @@
 # 09-09 header.
 
 version: 1
-updated: 2026-10-18
+updated: 2026-11-01
 
 tiers:
   1:
@@ -741,13 +741,28 @@ tiers:
 
     # ── TH ──────────────────────────────────────────────────────────────────
     - domain: tcsd.in.th
-      name: Technology Crime Suppression Division (Thailand)
+      name: Technology Crime Suppression Division (Thailand) (RETIRED)
       url: https://www.tcsd.in.th/
       region: TH
       check: manual
+      retired: true
       note: >-
-        National technology-crime police unit; publishes advisories and is the
-        reporting destination named in the TH pack.
+        ⚠️  Domain no longer belongs to the cited publisher — it now 301s to
+        48.in.th ("Market 48"), an unrelated Thai marketplace. Classic
+        expired-domain takeover, and exactly the pattern this project flags
+        elsewhere. Retired 2026-11-01, kept as a record: any roadmap claim
+        citing it has lost its evidence. Do not cite.
+    - domain: thaipoliceonline.go.th
+      name: Royal Thai Police — online crime reporting (ศปอส.ตร.)
+      url: https://www.thaipoliceonline.go.th/
+      region: TH
+      check: manual
+      note: >-
+        Royal Thai Police portal for reporting technology crime online, run by
+        the Technology Crime Suppression Centre (ศปอส.ตร.) under the Cyber
+        Crime Investigation Bureau. Registered 2026-11-01 as the live
+        successor to the retired tcsd.in.th; confirmed reachable and serving
+        the online-reporting form the same day.
     - domain: sec.or.th
       name: SEC Thailand — investor alerts
       url: https://market.sec.or.th/public/idisc/en/InvestorAlert

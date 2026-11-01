@@ -83,7 +83,11 @@ export const TH: RegionDefinition = {
   legitDomainDetails: "",
 
   reportingBody: "the Royal Thai Police or the DSI",
-  reportingUrl: "https://www.tcsd.in.th/",
+  // Updated 2026-11-01: tcsd.in.th lapsed and was re-registered — it now
+  // redirects to 48.in.th, an unrelated marketplace ("Market 48"). The Royal
+  // Thai Police's online reporting portal is run by the Technology Crime
+  // Suppression Centre (ศปอส.ตร.) under the Cyber Crime Investigation Bureau.
+  reportingUrl: "https://www.thaipoliceonline.go.th/",
 
   phonePlan: {
     // NBTC premium-rate range, authored WITH a leading "0" because
