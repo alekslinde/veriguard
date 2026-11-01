@@ -9,13 +9,14 @@ name: Threat-intel roadmap review
 #
 # Fires automatically (no label, no @claude) because the roadmap is
 # generated, not authored — there's no human in the loop yet to apply a
-# label. Scope is narrowed to docs/threat-intel/** so it never runs, and
-# never spends quota, on unrelated PRs.
+# label. Scope is narrowed to the dated roadmap files themselves — not the
+# whole directory — so a sources.yml or README edit does not trigger a review
+# whose prompt is entirely about roadmaps, and does not spend quota on one.
 
 on:
   pull_request:
     paths:
-      - "docs/threat-intel/**"
+      - "docs/threat-intel/*-threat-roadmap.md"
 
 permissions:
   contents: read
