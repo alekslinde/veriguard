@@ -178,7 +178,11 @@ const AU_SEASONS: ScamSeason[] = [
     // Re-checked against the 2026-10-18 sweep: that cycle's AU section carried
     // no ATO/tax-time item (its HIGH finding was BASE-level job-interview
     // phishing). Content unchanged.
-    reviewed: "2026-10-18",
+    //
+    // Re-checked against the 2026-10-25 sweep: its AU section reconfirmed the
+    // myGov/Centrelink/Medicare cost-of-living texts as the same shape Services
+    // Australia describes, already covered by URGENCY_TAX. Content unchanged.
+    reviewed: "2026-10-25",
   },
   {
     id: "eofy-business",
@@ -275,7 +279,11 @@ const AU_SEASONS: ScamSeason[] = [
     // Re-checked 2026-09-29: citations reachable. The 2026-09-27 sweep was a
     // quiet AU cycle and recorded no new text-side signal.
     // Content unchanged.
-    reviewed: "2026-09-29",
+    //
+    // Re-checked against the 2026-10-25 sweep: the myGov/Centrelink
+    // cost-of-living texts it reconfirmed are the same "your rebate is ready"
+    // shape this season covers; no new energy-specific signal. Content unchanged.
+    reviewed: "2026-10-25",
   },
   {
     id: "back-to-school",
@@ -361,7 +369,11 @@ const AU_SEASONS: ScamSeason[] = [
     // Re-checked 2026-09-29: citations reachable. The 2026-09-27 sweep was a
     // quiet AU cycle and recorded no new text-side signal.
     // Content unchanged.
-    reviewed: "2026-09-29",
+    //
+    // Re-checked against the 2026-10-25 sweep: the Medicare cost-of-living texts
+    // it reconfirmed match this season's suspended-card/rebate lures, already
+    // covered. Content unchanged.
+    reviewed: "2026-10-25",
   },
   {
     id: "eofy-donations",
