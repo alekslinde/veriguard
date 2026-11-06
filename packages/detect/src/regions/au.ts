@@ -133,6 +133,11 @@ const URGENCY_TAX = [
   "energy rebate", "energy bill relief", "electricity rebate",
   "tax recalculation", "your tax has been recalculated", "compensation payment",
   "government rebate", "tax refund waiting", "refund is waiting",
+  // Fake Centrelink "bonus payment" lure (D2 / #510 / Services Australia
+  // advisory 29 Oct 2026). The claimed amount varies by campaign
+  // ($600/$750/$890/$950/$1,600/$1,800/$4,100), so the fixed phrase rather
+  // than any amount is what's stable across campaigns.
+  "bonus payment", "cost of living bonus",
 ];
 
 // ATO debt / audit coercion lures (D7 / #124), plus benefit-suspension threats
@@ -595,6 +600,11 @@ export const AU: RegionDefinition = {
 
   fakeInvestmentPlatformFlag: (platform: string) =>
     `Named fraudulent investment platform detected ("${platform}") — ASIC and Scamwatch have issued specific warnings that this is a scam. Do not invest.`,
+
+  // ASIC's Investor Alert List has repeatedly, by name, warned on Yepbit
+  // through Sep-Oct 2026 (#509). AU previously set no entries of its own here,
+  // inheriting only base's four generic names.
+  fakeInvestmentPlatforms: ["yepbit"],
 
   typosquatBrands: { substring: TYPOSQUAT_BRANDS, word: TYPOSQUAT_WORD_BRANDS },
   // Restricted registries only, matching every other pack.

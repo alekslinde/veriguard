@@ -442,6 +442,13 @@ export const IE: RegionDefinition = {
   // there is no label for a scammer to explain away. Asserting one would be
   // false, and the rule is skipped where the field is absent.
 
+  // Agency moves the case onto WhatsApp (#511). Gardaí have repeatedly warned
+  // that scammers set a Garda crest as a WhatsApp profile photo, pose as
+  // officers and ask a victim to continue the "case" there — modelled on the
+  // AU authorityMessagingAppFlag, which this pack lacked.
+  authorityMessagingAppFlag:
+    "Claims to be from An Garda Síochána or another Irish agency and asks you to continue on WhatsApp or Telegram — Gardaí have warned scammers set a Garda crest as a WhatsApp profile photo to run this exact script. Report it to FraudSMART.",
+
   reportingBody: "An Garda Síochána (or FraudSMART)",
   // FraudSMART is the dedicated report-a-fraud portal (BPFI, linked by the
   // Garda); the Garda's own site has no stable deep reporting URL.
