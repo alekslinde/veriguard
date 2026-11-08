@@ -126,6 +126,14 @@ const URGENCY_FOREIGN_AUTHORITY = [
   "unable to deliver your court documents", "court documents could not be delivered",
   "reschedule your court documents delivery", "missed your court date",
   "avoid missing your court date",
+  // Fake traffic-summons texts (2026-11-08 roadmap CA-D1 / #519; Saskatchewan
+  // RCMP, Jun 2026; Saskatoon Police). A fabricated case number and badge
+  // number, a prosecution threat and a payment link. Fines are paid through
+  // provincial sites, never demanded by SMS. "traffic summons" also covers the
+  // "mandatory traffic summons" form, so only the short entries are listed
+  // (#234: a longer entry containing a shorter one scores the phrase twice).
+  // Probed 2026-11-08: the representative lure scored 15, the link alone.
+  "traffic summons", "traffic citation",
 ];
 
 // Digital-identity re-registration phishing. Canada's federal analogue is the
@@ -152,6 +160,10 @@ const AUTHORITY_MENTIONS = [
   // itself used as a lure ("we're investigating fraud on your account").
   "rcmp", "royal canadian mounted police", "police",
   "canadian anti-fraud centre", "anti-fraud centre", "cafc",
+  // Courts and registries named in the fake traffic-summons texts (2026-11-08
+  // roadmap CA-D1 / #519): "Courts of Saskatchewan" in the Saskatchewan RCMP
+  // warning, "Alberta Registry Services" in the Alberta variant.
+  "provincial court", "courts of saskatchewan", "alberta registry",
   // Financial regulators and the deposit insurer. "CDIC insured" is a common
   // false-legitimacy claim, and the OSC never cold-calls consumers.
   "osc", "ontario securities commission", "iiroc", "ciro",
