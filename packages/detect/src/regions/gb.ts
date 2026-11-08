@@ -182,6 +182,11 @@ const AUTHORITY_MENTIONS = [
   // itself used as a lure ("we're investigating fraud on your account").
   "police", "metropolitan police", "national crime agency", "nca",
   "action fraud", "cifas",
+  // The NCSC, impersonated by phone to extract money or information (2026-11-08
+  // roadmap GB-D1 / #520; NCSC guidance "How to spot scammers claiming to be
+  // from the NCSC", Aug 2026). Probed 2026-11-08: an NCSC lure asking to move
+  // to WhatsApp scored safe 0. No English word starts with "ncsc".
+  "ncsc", "national cyber security centre",
   // Action Fraud's successor (see reportingBody below). Matched only in title
   // case, via caseSensitiveAuthorities: "report fraud" in lower case is how
   // every bank says "call us to report fraud", which names no agency. Probed
@@ -498,6 +503,12 @@ export const GB: RegionDefinition = {
   // Action Fraud had the same boundary — and the pack has no sub-national
   // resolution to act on it, so the copy stays with the body that covers most
   // GB users rather than asserting something wrong for Scottish ones.
+  // Agency moves the case onto WhatsApp/Telegram (2026-11-08 roadmap GB-D1 /
+  // #520). The NCSC's own guidance says "we will never contact you by text
+  // message or WhatsApp" — modelled on the AU and IE flags.
+  authorityMessagingAppFlag:
+    "Claims to be from a UK agency and asks you to continue on WhatsApp or Telegram — the NCSC says it will never contact you by text message or WhatsApp, and a message from an 'agency' asking you to continue there is the scam.",
+
   reportingBody: "Report Fraud (reportfraud.police.uk)",
   reportingUrl: "https://reportfraud.police.uk",
 
