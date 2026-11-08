@@ -514,13 +514,10 @@ before this run, none overlapping; no duplicates found):
 
 | ID | Issue | Priority |
 |---|---|---|
-| US-D1 | US: "$2,000 tariff rebate" text scam | HIGH |
-| CA-D1 | CA: fake "Provincial Court" traffic-summons SMS | HIGH |
-| GB-D1 | GB: NCSC self-impersonation | HIGH |
-| ENGINE-D1 | Property-settlement / conveyancing BEC fraud (engine-level) | HIGH |
-
-(Issue links are filled in after creation — see the PR description for the
-final numbers.)
+| US-D1 | [#518 — US: "$2,000 tariff rebate" text scam](https://github.com/alekslinde/veriguard/issues/518) | HIGH |
+| CA-D1 | [#519 — CA: fake "Provincial Court" traffic-summons SMS](https://github.com/alekslinde/veriguard/issues/519) | HIGH |
+| GB-D1 | [#520 — GB: NCSC self-impersonation](https://github.com/alekslinde/veriguard/issues/520) | HIGH |
+| ENGINE-D1 | [#521 — ENGINE: property-settlement / conveyancing BEC fraud](https://github.com/alekslinde/veriguard/issues/521) | HIGH |
 
 IE-D1 and AU-D1 are MEDIUM priority and are not filed as issues this cycle;
 their full proposed-rule text is in the table above and is ready to file
