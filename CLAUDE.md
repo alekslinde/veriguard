@@ -145,6 +145,19 @@ Use these scopes in commit messages:
 - `(i18n)` — Strings and language handling
 - `(config)` — Config and environment
 
+## Branch names
+
+A PR's branch must be named `<type>/<short-kebab-description>`, or the PR
+fails. `<type>` is one of the Conventional Commit types the PR-title check
+accepts (`feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `chore`, `ci`,
+`build`, `style`, `revert`) and should match the PR title's type:
+`fix/th-ng-reporting-urls`, `test/engine-long-input-ratio-stability`,
+`docs/calendar-promote-2026-10-25`. The one exception is sweep roadmaps, which
+use `threat-intel/YYYY-MM-DD`.
+
+Auto-generated session branches (`claude/<adjective>-<name>-<id>`) don't match.
+Push the work to a conventionally named branch before opening the PR.
+
 ---
 
 ## Off Limits
