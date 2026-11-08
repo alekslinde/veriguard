@@ -1,20 +1,22 @@
 # Threat-intelligence roadmap — 2026-11-08
 
-*Sweep period: since the 2026-10-25 roadmap (plus the unarchived 2026-11-02
+*Sweep period: since the 2026-10-25 roadmap (overlapping the 2026-11-02
 sweep — see note below).*
 
 ## Note on the gap in the archive
 
-A sweep happened between this roadmap and the 2026-10-25 one, but no
-`2026-11-02-threat-roadmap.md` was ever filed: issues #509, #510 and #511 were
-opened directly and shipped in #513 ("fix(detector): close three AU/IE
-detection gaps from the Nov 2 sweep") on 2026-11-06. Those three fixes —
+A sweep happened between this roadmap and the 2026-10-25 one. When this
+roadmap was drafted, its file was still an open draft (#512), so this sweep
+read its period from 2026-10-25; `2026-11-02-threat-roadmap.md` has since been
+merged and is the provenance for issues #509, #510 and #511, which shipped in
+#513 ("fix(detector): close three AU/IE detection gaps from the Nov 2 sweep")
+on 2026-11-06. Those three fixes —
 `"yepbit"` added to AU's `fakeInvestmentPlatforms`, `"bonus payment"` /
 `"cost of living bonus"` added to AU's `URGENCY_TAX`, and IE's
 `authorityMessagingAppFlag` for the Garda/WhatsApp-crest script — are already
 live in `au.ts` and `ie.ts` as read for this cycle, so they are **not**
-re-proposed below. Recording this here so a future reader doesn't go looking
-for a roadmap file that doesn't exist for that cycle's provenance.
+re-proposed below. Recording this here so a future reader knows why the two
+sweep periods overlap.
 
 ---
 
@@ -72,8 +74,8 @@ keyword miss.
 |---|---|---|---|---|
 | 1 | **US-D1 — "$2,000 tariff rebate" text scam** | `regions/us.ts` | `"Your $2,000 tariff rebate is ready for deposit. Confirm your details..."` → safe 15 | Live since Jan 2026, still running in Oct 2026 (IRS + multiple state AGs warning); no funded program exists (SCOTUS struck down the authority) |
 | 2 | **CA-D1 — fake "Provincial Court" traffic-summons SMS** | `regions/ca.ts` | A representative "Mandatory Traffic Summons" lure → essentially bare-link score, no composite credit | Saskatchewan RCMP (30 Jun 2026) + Saskatoon Police + CC Gazette (7 Aug 2026); foreign-country-code senders; genuine fine payment never arrives this way |
-| 3 | **GB-D1 — NCSC self-impersonation** | `regions/gb.ts` | Bare "NCSC" / "National Cyber Security Centre" → no authority credit at all | NCSC's own Aug 2026 guidance: "we will never contact you by text message or WhatsApp" — GB is the only one of AU/NZ/IE's three NCSC-equivalent packs with neither the authority mention nor the messaging-app flag |
-| 4 | **ENGINE-D1 — property-settlement / conveyancing BEC** | `scamDetector.ts` (region-agnostic) | A changed-bank-details settlement email scores only the flat `changedPaymentDetails` hit, discounted 0.7× on email — the channel this scam arrives on | Scamwatch's own case study: **$883,093.90** lost to a fake solicitor invoice during property settlement; the UK SRA issued a near-identical alert 30 Sep 2026, confirming this is not AU-specific |
+| 3 | **GB-D1 — NCSC self-impersonation** | `regions/gb.ts` | Bare "NCSC" / "National Cyber Security Centre" → no authority credit at all; an NCSC lure asking to move to WhatsApp → safe 0 | NCSC's own Aug 2026 guidance: "we will never contact you by text message or WhatsApp" — NZ already lists its NCSC as an authority, and AU and IE set the messaging-app flag for their own agencies; GB has neither |
+| 4 | **ENGINE-D1 — property-settlement / conveyancing BEC** | `scamDetector.ts` (region-agnostic) | Nothing scores the settlement context: a lure is caught only by its generic bank-detail and changed-details hits, which the email channel — where this scam arrives — discounts 0.7× (65 → 45 and 35 → 24 for two lures), and "moved banks… new BSB" wording is not recognised as a change at all (safe 10) | Scamwatch's own case study: **$883,093.90** lost to a fake solicitor invoice during property settlement; the UK SRA issued a near-identical alert 30 Sep 2026, confirming this is not AU-specific |
 | 5 | **IE-D1 — Garda / Fixed Charge Notice no-link-sender gap** | `regions/ie.ts` | A Garda-impersonating link gets authority credit but no no-link-sender flag | Garda / FraudSMART reporting consistently states all Garda correspondence, including Fixed Charge Notices, is sent by post — never by SMS — and IE's `NO_LINK_SENDERS` omits Gardaí entirely |
 | 6 | **AU-D1 — fake-news-brand deepfake investment endorsements** | `regions/au.ts` | `"As seen on 9News: [fake PM endorsement] ... guaranteed returns"` → no "as seen on" credit | ASIC (mid-Aug 2026) + Scamwatch (early Nov 2026): fake articles carrying real AU media logos and fabricated PM/celebrity endorsements — the same "as seen on `<media>`" tactic NZ already encodes |
 
@@ -163,10 +165,10 @@ single week's crop of a constantly-rotating list is not durable evidence.
 ("How to spot scammers claiming to be from the NCSC", dated August 2026)
 warning that criminals pose as NCSC officials by phone to extract money or
 information, stating explicitly: "we will never contact you by text message
-or WhatsApp." NZ's NCSC-equivalent entry was added to `nz.ts` three cycles
-ago (2026-10-06 roadmap D7/#428) with its own `authorityMessagingAppFlag`,
-and AU and IE both already have an `authorityMessagingAppFlag` for their own
-agencies. GB has **neither**: no `"ncsc"` / `"national cyber security
+or WhatsApp." NZ's NCSC was added to `nz.ts`'s `AUTHORITY_MENTIONS` three
+cycles ago (2026-10-06 roadmap D7/#428), and AU and IE (and AE) each set an
+`authorityMessagingAppFlag` for their own agencies; NZ does not set one. GB
+has **neither**: no `"ncsc"` / `"national cyber security
 centre"` in `AUTHORITY_MENTIONS`, and no `authorityMessagingAppFlag` field
 set at all (it's an existing optional field on `RegionDefinition` — GB simply
 never populated it). DVLA vehicle-tax-refund scams and Ofgem/energy-rebate
@@ -300,7 +302,7 @@ abuse-reporting source found could not be dated to this cycle's window.
 | US-D1 | "$2,000 tariff rebate" text scam | Add `"tariff rebate"`, `"tariff dividend"` to `URGENCY_TAX` | `regions/us.ts` | US | LOW | **HIGH** |
 | CA-D1 | Fake "Provincial Court" traffic-summons SMS | Add `"traffic citation"`, `"traffic summons"`, `"mandatory traffic summons"`, `"outstanding traffic citation"` to `URGENCY_TOLL`; add `"provincial court"` to `AUTHORITY_MENTIONS` | `regions/ca.ts` | CA | LOW | **HIGH** |
 | GB-D1 | NCSC self-impersonation (authority mention + WhatsApp/Telegram pivot) | Add `"ncsc"`, `"national cyber security centre"` to `AUTHORITY_MENTIONS`; set `authorityMessagingAppFlag` citing NCSC's "never by text or WhatsApp" wording | `regions/gb.ts` | GB | LOW | **HIGH** |
-| ENGINE-D1 | Property-settlement / conveyancing BEC fraud | Widen the rental-bond composite's `hasRentalContext`-style gate to also match settlement/conveyancing vocabulary (`property settlement`, `conveyanc*`, `solicitor's trust account`, `settlement funds`) alongside the existing `changedPaymentDetails` qualifier; add that flag text to `UNDISCOUNTED_COMPOSITES` so the email channel — where this script actually arrives — isn't discounted 0.7× | `scamDetector.ts` (region-agnostic) | ALL (evidence from AU + GB) | MEDIUM if ungated, LOW if gated the same way the existing bond composite is | **HIGH** |
+| ENGINE-D1 | Property-settlement / conveyancing BEC fraud | A new composite requiring settlement/conveyancing context (`property settlement`, `conveyanc*`, `solicitor's trust account`, `settlement funds`) **and** a changed-payment-details claim — not a widening of the rental-bond gate, which needs only context plus a bank-detail ask; declare its email weight through the signal registry so the 0.7× discount never applies; widen the changed-details wording to cover "moved banks" / "new BSB" | `scamDetector.ts` (region-agnostic) | ALL (evidence from AU + GB) | HIGH without the changed-details half; LOW with it | **HIGH** |
 | IE-D1 | Garda / Fixed Charge Notice no-link-sender gap | Add `"garda"`, `"gardai"`, `"an garda siochana"`, `"garda siochana"` to `NO_LINK_SENDERS`; update `noLinkSendersFlag` copy to cite postal-only FCN correspondence | `regions/ie.ts` | IE | LOW | MEDIUM |
 | AU-D1 | Fake-news-brand deepfake investment endorsements | Add `"as seen on abc news"`, `"as featured on 9news"`, `"as seen on 7news"`, `"as featured in news.com.au"`, `"as seen on sunrise"`, `"as featured on today show"` to `REWARD_WORDS` | `regions/au.ts` | AU | LOW | MEDIUM |
 
@@ -309,12 +311,15 @@ abuse-reporting source found could not be dated to this cycle's window.
 | Lure | Verdict today |
 |---|---|
 | `"Your $2,000 tariff rebate is ready for deposit. Confirm your details to receive it: https://tariff-rebate-gov.top"` | safe 15 (link only) |
-| `"Tariff rebate payment of $2,000 approved. Visit https://irs-tariffcheck.top to confirm eligibility."` | safe 15 |
+| `"Tariff rebate payment of $2,000 approved. Visit https://irs-tariffcheck.top to confirm eligibility."` | likely_scam 55 — but only because "irs" in the hostname earns the +25 authority mention and the +15 never-texts flag; the same text without the link scores safe 0 |
 | `"You qualify for the $2000 tariff dividend payment. Tap to claim: https://..."` | suspicious 27 ("claim" alone) |
 
-**Acceptance criteria:** the first two lures should reach at least
-`suspicious` from the new phrase alone, independent of the link — matching
-every other entry in `URGENCY_TAX`'s shared +10-per-hit/+35-cap group.
+**Acceptance criteria:** the first lure should reach at least `suspicious`
+(link 15 + one `URGENCY_TAX` hit 10 = 25), and the new phrase should score in
+the second lure's link-free form. One hit is +10, below the 20-point
+`suspicious` threshold, so the phrase alone cannot lift a link-free message
+to `suspicious` — that is the shared group's design (+10 per hit, +35 cap),
+not a gap in this proposal.
 
 **FP note:** no legitimate program by this name exists (confirmed by the IRS
 itself), and no government agency solicits bank or ID details by unsolicited
@@ -326,12 +331,17 @@ checked by grep).
 A representative lure (`"NOTICE: You have a Mandatory Traffic Summons.
 Case #SK-2026-04471. Failure to respond will result in prosecution. View
 details: https://courts-saskatchewan.top"`) earns no `AUTHORITY_MENTIONS`
-credit and no `URGENCY_TOLL` hit today — only the generic link signal and
-whatever urgency words happen to be present.
+credit and no `URGENCY_TOLL` hit today — only the generic link signal
+(15, reported as `unknown` because CA's coverage is `partial`).
 
-**Acceptance criteria:** the lure should earn both an authority-mention hit
-(`"provincial court"`) and a `URGENCY_TOLL` hit from the new phrases, reaching
-`suspicious` independent of the link.
+**Acceptance criteria:** the lure should earn a hit from the new summons
+phrases. Note that the representative lure never says "provincial court", so
+that entry alone would not fire on it; the court names the sources quote —
+"Courts of Saskatchewan", and "Alberta Registry Services" for the Alberta
+variant — are the stronger authority entries. On placement: `ca.ts` already
+keeps court-threat wording ("missed your court date", #369) in
+`URGENCY_FOREIGN_AUTHORITY`, which fits a prosecution threat better than the
+toll group.
 
 **FP note:** no legitimate Canadian court or police service sends
 traffic-ticket payment demands by unsolicited SMS; none of the proposed
@@ -346,8 +356,8 @@ so that rule is skipped entirely for GB, same as every pack without one).
 
 **Acceptance criteria:** an NCSC-impersonating message should earn the `+25`
 authority-mention credit; one that also asks to move to WhatsApp/Telegram
-should additionally earn the messaging-app-pivot flag, mirroring AU/IE/NZ's
-existing mechanism exactly.
+should additionally earn the messaging-app-pivot flag, mirroring the
+mechanism AU and IE already use.
 
 **FP note:** "ncsc" has no dictionary collision (not a word fragment of
 ordinary English) and needs no case-sensitivity gate. LOW risk.
@@ -355,8 +365,8 @@ ordinary English) and needs no case-sensitivity gate. LOW risk.
 ### ENGINE-D1 — derivation
 
 This is **not** a `types.ts` gap — every field the fix needs
-(`bankIdentifiers`, the existing `changedPaymentDetails` regex pattern,
-`UNDISCOUNTED_COMPOSITES`) already exists. It is a `scamDetector.ts` logic
+(`bankIdentifiers`, the existing `changedPaymentDetails` regex pattern, and
+the signal registry's per-channel weights) already exists. It is a `scamDetector.ts` logic
 change, which is why it is routed to the engine file rather than any one
 region pack, and why it is flagged here as implementation work rather than a
 one-line data edit a human can apply without judgement calls.
@@ -364,25 +374,37 @@ one-line data edit a human can apply without judgement calls.
 Today, `checkSms`'s `hasRentalContext` regex
 (`/rental bond|holding deposit|lease agreement|property manager/i`) does not
 match property-*purchase* settlement vocabulary (`settlement`, `conveyancer`,
-`solicitor's trust account`), so a settlement-fraud message earns no
-rental-bond-composite credit at all — only the flat `changedPaymentDetails`
-hit if a change-of-bank-details phrase happens to be present. Worse, that
-flat hit is **not** in `UNDISCOUNTED_COMPOSITES`, so on the email channel —
-where this BEC script actually arrives, per every source found — it is
-discounted 0.7×, the same class of defect the `UNDISCOUNTED_COMPOSITES`
-mechanism exists to catch for every other multi-condition gate.
+`solicitor's trust account`), so nothing scores the settlement context. A
+lure is caught only by its generic hits — the bank-detail ask, plus the
+`changedPaymentDetails` flag when its wording matches — and the email channel,
+where this BEC script actually arrives per every source found, discounts that
+whole sub-result 0.7×.
 
-**Acceptance criteria:** a settlement-fraud email with "updated bank details"
-language and settlement/conveyancing context should reach at least
-`suspicious` on the email channel, at the same weight as its SMS-channel
-score — not discounted.
+Measured (AU): a lure with "updated bank details", "account number" and a
+BSB scores likely_scam 65 by SMS but 45 by email; "trust account details have
+been updated… BSB" scores 35 by SMS, 24 by email; "our trust account has moved
+banks… use the new BSB" scores safe 10 by email, because the changed-details
+pattern does not recognise "new BSB" or "moved banks".
 
-**FP note:** MEDIUM if a human implements the widened context match without
-the existing qualifier discipline — "property settlement" and "deposit" are
-extremely common in legitimate conveyancing correspondence. LOW if gated
-exactly the way the existing rental-bond composite already is: context
-vocabulary alone must never score; only the context-plus-changed-bank-details
-pairing should.
+The rental-bond composite is the wrong place to widen: it fires on rental
+context plus *any* bank-detail ask, with no changed-details half. A genuine
+conveyancer's settlement email carries settlement context and a BSB and
+account number as a matter of course (one already scores suspicious 21 by
+email), so widening that gate would flag them all. Nor is
+`UNDISCOUNTED_COMPOSITES` the mechanism to extend — the engine documents it as
+being retired in favour of signals that declare their own per-channel weight
+through the registry.
+
+**Acceptance criteria:** a settlement-fraud email with changed-bank-details
+language and settlement/conveyancing context scores the same on email as on
+SMS, and "moved banks" / "new BSB" wording counts as a change; a genuine
+settlement email that gives trust-account details without claiming they
+changed scores no higher than it does today.
+
+**FP note:** HIGH if implemented as a widened rental-bond gate — "property
+settlement", "deposit", BSBs and account numbers are routine in legitimate
+conveyancing correspondence. LOW if the new composite requires the
+changed-payment-details half: context vocabulary alone must never score.
 
 ### IE-D1 — measured before/after
 
@@ -422,7 +444,7 @@ AU-D1) fits the existing `RegionDefinition` shape exactly as documented —
 `AUTHORITY_MENTIONS`/`URGENCY_TAX`/`URGENCY_TOLL`/`NO_LINK_SENDERS`/
 `REWARD_WORDS` additions, and populating the already-existing optional
 `authorityMessagingAppFlag` field for GB. ENGINE-D1 needs a `scamDetector.ts`
-logic change, not a `types.ts` change — see its derivation above for why that
+logic change (a new registry-declared composite), not a `types.ts` change — see its derivation above for why that
 distinction matters.
 
 ---
