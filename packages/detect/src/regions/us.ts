@@ -118,6 +118,11 @@ const URGENCY_TAX = [
   "medicaid renewal", "medicare card",
   "fema disaster assistance", "fema relief payment",
   "disaster assistance approved", "claim your fema benefit",
+  // "$2,000 tariff rebate" texts (2026-11-08 roadmap US-D1 / #518). Live since
+  // Jan 2026 and still warned about in Oct 2026 by the IRS and state AGs; no
+  // such programme is funded. Probed 2026-11-08: "Your $2,000 tariff rebate is
+  // ready for deposit… <link>" scored safe 15, the link alone.
+  "tariff rebate", "tariff dividend",
 ];
 
 // IRS collection / enforcement coercion. The IRS initiates contact by mail, not
