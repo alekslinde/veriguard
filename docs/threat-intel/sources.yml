@@ -706,12 +706,16 @@ tiers:
     # ── KE ──────────────────────────────────────────────────────────────────
     - domain: dci.go.ke
       name: Directorate of Criminal Investigations (Kenya)
-      url: https://www.dci.go.ke/index.php/news
+      url: https://www.dci.go.ke/
       region: KE
       check: manual
       note: >-
         National criminal-investigations directorate; publishes advisories and
-        is the reporting destination named in the KE pack.
+        is the reporting destination named in the KE pack. Cited at the
+        homepage since 2026-11-09, the URL the KE pack ships as its
+        reportingUrl: the earlier /index.php/news path failed every probe from
+        CI and has no Wayback capture to vouch for it, while the homepage was
+        archived live (HTTP 200) on 2026-10-11.
     - domain: cma.or.ke
       name: Capital Markets Authority (Kenya) — investor alerts
       url: https://www.cma.or.ke/
