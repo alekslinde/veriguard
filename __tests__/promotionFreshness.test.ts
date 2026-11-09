@@ -118,11 +118,14 @@ function newestReviewed(): string {
 
 describe("staleSeasons", () => {
   it("finds nothing when every season was reviewed today", () => {
-    // Dated from the newest reviewed date rather than the wall clock: on that
-    // day nothing can be older than the threshold, whatever the data says. The
+    // Dated from the OLDEST reviewed date rather than the wall clock: on that
+    // day no season can be older than the threshold, whatever the data says.
+    // The newest date used to stand here and held only while every season sat
+    // within the threshold of it — re-reviewing one season more than 30 days
+    // after the oldest (tax-time, 2026-11-08, against 2026-09-29) broke it. The
     // previous tests in this file broke twice by reading live freshness, so the
     // reference point is stated rather than assumed.
-    expect(staleSeasons(newestReviewed())).toEqual([]);
+    expect(staleSeasons(oldestReviewed())).toEqual([]);
   });
 
   it("flags a season once it ages past the threshold, and not before", () => {
