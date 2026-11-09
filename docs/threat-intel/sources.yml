@@ -84,7 +84,7 @@
 # 09-09 header.
 
 version: 1
-updated: 2026-11-01
+updated: 2026-11-09
 
 tiers:
   1:
@@ -581,10 +581,17 @@ tiers:
       name: OJK — Otoritas Jasa Keuangan, investor alerts
       url: https://www.ojk.go.id/id/berita-dan-kegiatan/info-terkini/
       region: ID
+      expect: geofenced
       check: manual
       note: >-
         Financial services authority; publishes public warning lists of
         unauthorised investment providers, named in the ID pack's flag copy.
+        Reported UNREACHABLE by the 2026-11-03 source check (fetch failed,
+        host still resolving), yet the same URL answered HTTP 200 from an
+        ordinary network on 2026-11-08 and 2026-11-09: the host drops the CI
+        runner's connections, not every connection, so it is live rather than
+        rotted. `expect: geofenced` keeps the checker reporting it UNVERIFIED
+        while it still resolves.
     - domain: bssn.go.id
       name: BSSN — Badan Siber dan Sandi Negara
       url: https://bssn.go.id/berita/
