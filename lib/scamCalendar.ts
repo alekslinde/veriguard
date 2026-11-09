@@ -157,8 +157,9 @@ const AU_SEASONS: ScamSeason[] = [
       "\"Your myGov account has been locked — click to unlock\"",
       "\"Your TFN has been suspended\"",
       "\"You have a new secure message in your myGov inbox\"",
+      "\"You are eligible for a new Centrelink bonus payment — confirm your myGov details\"",
     ],
-    advice: "The ATO never sends a link to log in, and never threatens arrest by SMS. Open the ATO app or type my.gov.au yourself — never follow the link in the message. Not every one of these threatens you: a bland note that a secure message is waiting is the same trick with the pressure taken out.",
+    advice: "The ATO never sends a link to log in, and never threatens arrest by SMS. Open the ATO app or type my.gov.au yourself — never follow the link in the message. Not every one of these threatens you: a bland note that a secure message is waiting is the same trick with the pressure taken out. The same goes for Centrelink: check any payment in myGov or the Express Plus Centrelink app, never through a text.",
     sources: [AU.ato, AU.scamwatch],
     // Re-checked against the 2026-09-27 sweep, which recorded a myGov "Secure
     // Message" campaign using a content-free notification hook instead of any
@@ -182,7 +183,16 @@ const AU_SEASONS: ScamSeason[] = [
     // Re-checked against the 2026-10-25 sweep: its AU section reconfirmed the
     // myGov/Centrelink/Medicare cost-of-living texts as the same shape Services
     // Australia describes, already covered by URGENCY_TAX. Content unchanged.
-    reviewed: "2026-10-25",
+    //
+    // Re-checked against the 2026-11-02 sweep: Services Australia refreshed
+    // its warning on 29 Oct 2026 about a fake Centrelink "bonus payment" lure
+    // asking for myGov details — the same cost-of-living shape, worded as a
+    // payment you are owed. Added to the lures above; it scores since #513.
+    //
+    // Re-checked against the 2026-11-08 sweep: its AU section re-checked the
+    // ATO/myGov tax-time phishing and myGov/Centrelink cost-of-living texts
+    // and found both still covered. Window and confidence unchanged.
+    reviewed: "2026-11-08",
   },
   {
     id: "eofy-business",
@@ -237,13 +247,20 @@ const AU_SEASONS: ScamSeason[] = [
       "Fake Australia Post and courier tracking pages",
       "\"Invalid postal code, update your address\"",
       "Fake charity appeals in the giving season",
+      "A Marketplace \"buyer\" who sends a courier link or QR code for you to arrange pickup and payment",
     ],
-    advice: "Australia Post never asks for a fee by SMS link. Track parcels in the official app using the tracking number you were given at purchase.",
+    advice: "Australia Post never asks for a fee by SMS link. Track parcels in the official app using the tracking number you were given at purchase. If you're selling, a buyer never needs you to open a courier link or scan a code to pay you.",
     sources: [AU.auspost, AU.scamwatch],
     // Re-checked 2026-09-29: citations reachable. The 2026-09-27 sweep was a quiet
     // AU cycle and recorded no new text-side signal — the delivery and courier
     // lures re-checked that cycle stay covered. Content unchanged.
-    reviewed: "2026-09-29",
+    //
+    // Re-checked against the 2026-11-02 sweep: Australia Post's Christmas-season
+    // warning describes fake courier pages and QR codes aimed at Facebook
+    // Marketplace sellers — the seller-side version of this season's parcel
+    // lures, already caught by the quishing rule and the parcel wording. Added
+    // to the lures and advice above; window and confidence unchanged.
+    reviewed: "2026-11-02",
   },
   {
     id: "romance",
