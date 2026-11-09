@@ -159,7 +159,7 @@ const AU_SEASONS: ScamSeason[] = [
       "\"You have a new secure message in your myGov inbox\"",
       "\"You are eligible for a new Centrelink bonus payment — confirm your myGov details\"",
     ],
-    advice: "The ATO never sends a link to log in, and never threatens arrest by SMS. Open the ATO app or type my.gov.au yourself — never follow the link in the message. Not every one of these threatens you: a bland note that a secure message is waiting is the same trick with the pressure taken out.",
+    advice: "The ATO never sends a link to log in, and never threatens arrest by SMS. Open the ATO app or type my.gov.au yourself — never follow the link in the message. Not every one of these threatens you: a bland note that a secure message is waiting is the same trick with the pressure taken out. The same goes for Centrelink: check any payment in myGov or the Express Plus Centrelink app, never through a text.",
     sources: [AU.ato, AU.scamwatch],
     // Re-checked against the 2026-09-27 sweep, which recorded a myGov "Secure
     // Message" campaign using a content-free notification hook instead of any

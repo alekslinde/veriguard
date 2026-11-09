@@ -307,14 +307,14 @@ const AU_THREATS: ThreatEntry[] = [
     firstSeen: "2026-11-02",
     lastSeen: "2026-11-02",
     summary:
-      "Texts saying you're eligible for a new Centrelink \"bonus payment\" or cost-of-living bonus — $600, $950, $1,800, the amount changes by campaign — and asking you to confirm your myGov details to receive it. There is no such payment; the link leads to a fake myGov sign-in.",
+      "Texts saying you're eligible for a new Centrelink \"bonus payment\" or cost-of-living bonus — $600, $950, $1,800, the amount changes by campaign — and asking you to confirm your myGov details to receive it. There is no such payment: Services Australia warns about this lure itself.",
     lures: [
       "\"You are eligible for a new Centrelink bonus payment — confirm your myGov details\"",
       "\"Centrelink: you qualify for a cost of living bonus. Confirm your myGov login to claim\"",
-      "A fake myGov sign-in page asking for your password and a one-time code",
+      "The amount changes by campaign: $600, $750, $950, $1,800 and more",
     ],
     advice:
-      "Services Australia doesn't text you a link to claim a payment. Check what you're entitled to in the myGov or Express Plus Centrelink app, opened yourself.",
+      "Services Australia doesn't announce payments as a \"bonus payment\" by text. Check what you're entitled to in the myGov or Express Plus Centrelink app, opened yourself.",
     detection:
       "\"Bonus payment\" and \"cost of living bonus\" wording turns a mention of Centrelink into a flag.",
     roadmap: "2026-11-02",
@@ -583,15 +583,16 @@ const AU_THREATS: ThreatEntry[] = [
     // Prime Minister and celebrity endorsements. Yepbit added from the
     // 2026-11-02 sweep, after repeated ASIC warnings (scored since #513).
     //
-    // `partial`, down from `covered`: that sweep measured the "As seen on
-    // 9News" claim scoring nothing (safe 12, from "guaranteed returns" alone).
+    // `partial`, down from `covered`: that sweep found the "As seen on 9News"
+    // claim earning nothing, with credit only from "guaranteed returns"
+    // (probed 2026-11-09: safe 12).
     // The named platforms still score highly; the fake-masthead half does not.
     status: "active",
     coverage: "partial",
     firstSeen: "2026-07-01",
     lastSeen: "2026-11-08",
     summary:
-      "Ads and fake news articles using AI-generated video of Australian public figures — the Prime Minister most of all — endorsing trading platforms, dressed in the logos of real outlets like ABC News, 9News and 7News. ASIC has warned about several platforms by name, including Quantum AI, Immediate Edge and Yepbit.",
+      "Ads and fake news articles using AI-generated video of Australian public figures — reportedly the Prime Minister most of all — endorsing trading platforms, dressed in the logos of real outlets like ABC News, 9News and 7News. ASIC has warned about several platforms by name, including Quantum AI, Immediate Edge and Yepbit.",
     lures: [
       "\"[Celebrity] reveals the platform banks don't want you to know about\"",
       "A fake news article under an \"As seen on 9News\" banner, with the outlet's real logo",
@@ -666,9 +667,9 @@ const AU_THREATS: ThreatEntry[] = [
     firstSeen: "2026-11-08",
     lastSeen: "2026-11-08",
     summary:
-      "Just before settlement on a home purchase, an email that looks like it's from your conveyancer or solicitor says their trust account has changed and gives new bank details for the balance. The mailbox may genuinely be theirs, taken over by a scammer, and the money is usually gone within hours.",
+      "Just before settlement on a home purchase, an email that looks like it's from your conveyancer or solicitor says their trust account has changed and gives new bank details for the balance. The mailbox may genuinely be theirs, taken over by a scammer.",
     lures: [
-      "\"Ahead of Friday's settlement, please note our trust account has changed\"",
+      "\"Ahead of Friday's settlement, our trust account has changed — please use the new BSB and account number below\"",
       "\"Our trust account has moved banks — please use the new BSB below\"",
       "\"Updated bank details for your settlement funds\"",
       "A reply inside your real conveyancing thread, days before settlement",
@@ -676,7 +677,7 @@ const AU_THREATS: ThreatEntry[] = [
     advice:
       "Before you move settlement money, phone your conveyancer on a number you got at the start — never one from the email — and confirm the account details out loud. A real firm's details don't change days before settlement.",
     detection:
-      "Settlement wording plus a claim that the account has changed is flagged at full weight on email. A taken-over real mailbox has no spoofing to catch, so the phone call is still the check that works.",
+      "Settlement wording, a claim that the account has changed and the new bank details, together, are flagged at full weight on email. A taken-over real mailbox has no spoofing to catch, so the phone call is still the check that works.",
     roadmap: "2026-11-08",
   },
   {

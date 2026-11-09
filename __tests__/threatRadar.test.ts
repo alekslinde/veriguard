@@ -505,8 +505,8 @@ describe("coverage claims match the shipped detector", () => {
     expect(flags.some((f) => /foreign police or government authority/i.test(f))).toBe(true);
 
     // Deepfake investment: the fake "as seen on <AU outlet>" claim scores
-    // nothing (2026-11-08 sweep, AU-D1 — measured safe 12, all of it from
-    // "guaranteed returns"). When an "as seen on" rule ships this fails, and
+    // nothing (2026-11-08 sweep, AU-D1: credit only from "guaranteed
+    // returns"; probed 2026-11-09: safe 12). When an "as seen on" rule ships this fails, and
     // the entry's badge should go back to `covered`.
     const deepfake = checkSms(
       "BREAKING: As seen on 9News — Jane Smith reveals the AI trading platform making Aussies rich. Guaranteed returns, limited spots.",
