@@ -471,6 +471,8 @@ describe("coverage claims match the shipped detector", () => {
     // that makes this entry `partial`. Sampling the opener here would assert a
     // signal we don't have; sampling the escalation asserts the half we do.
     { id: "hi-mum", text: "Hi Mum, I've been in an accident and need bail money urgently", flag: /urgency/i },
+    { id: "property-settlement-redirect", text: "Ahead of Friday's property settlement please note our trust account has moved banks. Please use the new BSB 062-000, account 12345678.", flag: /Property settlement funds redirected/i },
+    { id: "centrelink-bonus-payment", text: "You are eligible for a new Centrelink bonus payment. Confirm your myGov details to receive your bonus payment now.", flag: /bonus payment/i },
   ];
 
   it("covers every sampled entry with a live signal", async () => {
@@ -501,6 +503,18 @@ describe("coverage claims match the shipped detector", () => {
     // pinning a gap is for. Kept as a regression guard on the fix instead.
     const flags = checkSms("This is the Chinese Embassy. Pay a bond to clear your name.").flags;
     expect(flags.some((f) => /foreign police or government authority/i.test(f))).toBe(true);
+
+    // Deepfake investment: the fake "as seen on <AU outlet>" claim scores
+    // nothing (2026-11-08 sweep, AU-D1 — measured safe 12, all of it from
+    // "guaranteed returns"). When an "as seen on" rule ships this fails, and
+    // the entry's badge should go back to `covered`.
+    const deepfake = checkSms(
+      "BREAKING: As seen on 9News — Jane Smith reveals the AI trading platform making Aussies rich. Guaranteed returns, limited spots.",
+      undefined,
+      "AU",
+    );
+    expect(deepfake.flags.some((f) => /as seen on/i.test(f))).toBe(false);
+    expect(deepfake.verdict).toBe("safe");
   });
 
   it("keeps n/a entries genuinely undetectable in text", async () => {

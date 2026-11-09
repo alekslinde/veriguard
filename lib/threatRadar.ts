@@ -169,7 +169,7 @@ export function roadmapUrl(entry: ThreatEntry): string {
 
 // ── Australia ───────────────────────────────────────────────────────────────
 //
-// Promoted from docs/threat-intel/2026-06-21 through 2026-10-16. Ordered
+// Promoted from docs/threat-intel/2026-06-21 through 2026-11-08. Ordered
 // roughly by how likely someone is to meet it, not by sweep date — the reader
 // wants "what should I know", not our publication history.
 
@@ -293,6 +293,31 @@ const AU_THREATS: ThreatEntry[] = [
       "The ATO never sends a link to log in and never threatens arrest or payment suspension by SMS. Open the ATO or Centrelink app, or type my.gov.au yourself. A message that only says something is waiting for you is still worth opening the app to check rather than tapping.",
     detection: "ATO and myGov impersonation combined with payment, login or payment-suspension pressure scores highly.",
     roadmap: "2026-09-27",
+  },
+  {
+    id: "centrelink-bonus-payment",
+    title: "Centrelink \"bonus payment\" texts",
+    channel: "sms",
+    // 2026-11-02 sweep (AU-D2): Services Australia refreshed its warning on
+    // 29 Oct 2026 about a recurring fake "bonus payment" lure, the amount
+    // varying by campaign. It scored safe 0 until "bonus payment" and "cost of
+    // living bonus" shipped in #513.
+    status: "active",
+    coverage: "covered",
+    firstSeen: "2026-11-02",
+    lastSeen: "2026-11-02",
+    summary:
+      "Texts saying you're eligible for a new Centrelink \"bonus payment\" or cost-of-living bonus — $600, $950, $1,800, the amount changes by campaign — and asking you to confirm your myGov details to receive it. There is no such payment; the link leads to a fake myGov sign-in.",
+    lures: [
+      "\"You are eligible for a new Centrelink bonus payment — confirm your myGov details\"",
+      "\"Centrelink: you qualify for a cost of living bonus. Confirm your myGov login to claim\"",
+      "A fake myGov sign-in page asking for your password and a one-time code",
+    ],
+    advice:
+      "Services Australia doesn't text you a link to claim a payment. Check what you're entitled to in the myGov or Express Plus Centrelink app, opened yourself.",
+    detection:
+      "\"Bonus payment\" and \"cost of living bonus\" wording turns a mention of Centrelink into a flag.",
+    roadmap: "2026-11-02",
   },
   {
     id: "super-rule-change",
@@ -528,7 +553,10 @@ const AU_THREATS: ThreatEntry[] = [
     id: "toll-road-smishing",
     title: "Toll road texts (Linkt, E-Toll)",
     channel: "sms",
-    status: "active",
+    // Demoted 2026-11-08: last re-confirmed with fresh reporting by the
+    // 2026-10-25 sweep. The 2026-11-08 sweep re-checked coverage only, which
+    // is not a sighting.
+    status: "watchlist",
     coverage: "covered",
     firstSeen: "2026-06-21",
     lastSeen: "2026-10-25",
@@ -549,21 +577,31 @@ const AU_THREATS: ThreatEntry[] = [
     id: "deepfake-investment",
     title: "Deepfake celebrity investment platforms",
     channel: "web",
-    status: "watchlist",
-    coverage: "covered",
+    // Re-confirmed by the 2026-11-08 sweep: ASIC (mid-Aug 2026) and Scamwatch
+    // (early Nov 2026) describe fake articles carrying real AU media logos —
+    // ABC News, 9News, 7News, news.com.au, Sunrise, Today — with fabricated
+    // Prime Minister and celebrity endorsements. Yepbit added from the
+    // 2026-11-02 sweep, after repeated ASIC warnings (scored since #513).
+    //
+    // `partial`, down from `covered`: that sweep measured the "As seen on
+    // 9News" claim scoring nothing (safe 12, from "guaranteed returns" alone).
+    // The named platforms still score highly; the fake-masthead half does not.
+    status: "active",
+    coverage: "partial",
     firstSeen: "2026-07-01",
-    lastSeen: "2026-07-26",
+    lastSeen: "2026-11-08",
     summary:
-      "Ads and articles using AI-generated video of Australian public figures endorsing trading platforms. ASIC has named several by name — Quantum AI and Immediate Edge among them.",
+      "Ads and fake news articles using AI-generated video of Australian public figures — the Prime Minister most of all — endorsing trading platforms, dressed in the logos of real outlets like ABC News, 9News and 7News. ASIC has warned about several platforms by name, including Quantum AI, Immediate Edge and Yepbit.",
     lures: [
       "\"[Celebrity] reveals the platform banks don't want you to know about\"",
-      "Named platforms: Quantum AI, Immediate Edge, Bitcoin Revolution",
-      "A fake news article carrying a familiar masthead's styling",
+      "A fake news article under an \"As seen on 9News\" banner, with the outlet's real logo",
+      "Named platforms: Quantum AI, Immediate Edge, Bitcoin Revolution, Yepbit",
       "\"Start with $250 and earn daily returns\"",
     ],
     advice:
-      "No public figure endorses a trading platform in a video ad. Check ASIC's investor alert list before any investment, and treat guaranteed daily returns as proof of fraud.",
-    detection: "ASIC-named platform names score highly on their own.",
+      "No public figure endorses a trading platform in a video ad, and no news outlet runs an article selling one. Check ASIC's investor alert list before any investment, and treat guaranteed daily returns as proof of fraud.",
+    detection:
+      "ASIC-named platform names, Yepbit included, score highly on their own, and guaranteed-returns wording is flagged. The fake \"as seen on\" news-outlet claim itself isn't matched yet.",
     roadmap: "2026-07-26",
   },
   {
@@ -615,6 +653,31 @@ const AU_THREATS: ThreatEntry[] = [
     detection:
       "Rental wording plus a bank-detail change scores highly, and \"our details have changed\" is flagged on its own. But a compromised real mailbox has no spoofing for us to catch, so the phone call is still the check that works.",
     roadmap: "2026-07-26",
+  },
+  {
+    id: "property-settlement-redirect",
+    title: "Property settlement \"our trust account has changed\"",
+    channel: "email",
+    // 2026-11-08 sweep (ENGINE-D1): Scamwatch's published case study records
+    // an AU couple losing $883,093.90 this way; the UK SRA issued a matching
+    // alert on 30 Sep 2026. Scored since #527.
+    status: "active",
+    coverage: "covered",
+    firstSeen: "2026-11-08",
+    lastSeen: "2026-11-08",
+    summary:
+      "Just before settlement on a home purchase, an email that looks like it's from your conveyancer or solicitor says their trust account has changed and gives new bank details for the balance. The mailbox may genuinely be theirs, taken over by a scammer, and the money is usually gone within hours.",
+    lures: [
+      "\"Ahead of Friday's settlement, please note our trust account has changed\"",
+      "\"Our trust account has moved banks — please use the new BSB below\"",
+      "\"Updated bank details for your settlement funds\"",
+      "A reply inside your real conveyancing thread, days before settlement",
+    ],
+    advice:
+      "Before you move settlement money, phone your conveyancer on a number you got at the start — never one from the email — and confirm the account details out loud. A real firm's details don't change days before settlement.",
+    detection:
+      "Settlement wording plus a claim that the account has changed is flagged at full weight on email. A taken-over real mailbox has no spoofing to catch, so the phone call is still the check that works.",
+    roadmap: "2026-11-08",
   },
   {
     id: "foreign-authority-diaspora",
@@ -786,13 +849,13 @@ const AU_THREATS: ThreatEntry[] = [
     id: "loyalty-points",
     title: "Loyalty points expiry phishing",
     channel: "mixed",
-    // Demoted 2026-09-27: neither the 09-25 nor the 09-27 sweep re-confirms
-    // this campaign, so `active` would fail the recency ratchet
-    // (threatRadar.test.ts).
-    status: "watchlist",
+    // Re-confirmed by the 2026-11-02 sweep: CommBank's October 2026
+    // advisories describe the rewards-points-expiry lure again, and the
+    // shipped signals still catch it.
+    status: "active",
     coverage: "covered",
     firstSeen: "2026-06-21",
-    lastSeen: "2026-09-06",
+    lastSeen: "2026-11-02",
     summary:
       "Flybuys, Everyday Rewards and Qantas Frequent Flyer impersonation saying points expire imminently. Back through August and September in a bank-branded form — CommBank Awards points \"about to expire\", leading to a fake NetBank sign-in.",
     lures: [
@@ -891,7 +954,9 @@ const AU_THREATS: ThreatEntry[] = [
     id: "job-interview-credential-phish",
     title: "Fake job-interview booking pages",
     channel: "web",
-    status: "active",
+    // Demoted 2026-11-08: neither the 2026-11-02 nor the 2026-11-08 sweep
+    // re-confirms it.
+    status: "watchlist",
     coverage: "partial",
     firstSeen: "2026-10-18",
     lastSeen: "2026-10-18",
