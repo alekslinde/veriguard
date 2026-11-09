@@ -17,6 +17,7 @@ import { registryScore, type Channel } from "./signalRegistry";
 import { CLICKFIX_SIGNALS } from "./signals/clickfix";
 import { FAMILY_IMPERSONATION_SIGNALS } from "./signals/familyImpersonation";
 import { PHONE_SIGNALS, SPOOFING_POINTS, NOTHING_FOUND_POINTS } from "./signals/phone";
+import { SETTLEMENT_REDIRECT_SIGNALS } from "./signals/settlementRedirect";
 import { SPLICED_WORDING_SIGNALS } from "./signals/splicedWording";
 import { TASK_PAYMENT_SIGNALS } from "./signals/taskPayment";
 // Re-exported rather than moved out of reach: each was already reachable
@@ -201,8 +202,8 @@ class Signals {
    * Lift one already-merged row back to its full pre-discount weight.
    *
    * Exists for signals that a channel-wide multiplier should not apply to —
-   * `UNDISCOUNTED_COMPOSITES` and its one remaining entry, the messaging-hijack
-   * gate. Deliberately narrow: it raises a single row it can identify by its
+   * `UNDISCOUNTED_COMPOSITES` and its two remaining entries, the messaging-hijack
+   * gate and the callback-SMS composite. Deliberately narrow: it raises a single row it can identify by its
    * opening text, never the total, so the evidence list still sums to the score
    * the reader is shown.
    *
@@ -1460,6 +1461,31 @@ function addTaskPaymentSignals(
 }
 
 /**
+ * Score the property-settlement redirect composite from the registry, on
+ * whichever channel is asking (2026-11-08 roadmap ENGINE-D1 / #521).
+ *
+ * Born in the registry rather than converted into it: it declares its own
+ * weight, so the email pass scores it outside `merge` and the 0.7 never
+ * touches it — the defect the issue was filed about. `matches` is supplied
+ * because the rule reads the pack's bank identifiers.
+ */
+function addSettlementRedirectSignals(
+  sig: Signals,
+  text: string,
+  pack: RegionPack,
+  channel: Channel,
+): void {
+  // No `words`: this signal reads `original` and `body` with its own regexes
+  // and the matcher, so the field is left absent. See `Context.words`.
+  for (const row of registryScore(
+    { channel, pack, original: text, body: text.toLowerCase(), matches: mentions },
+    SETTLEMENT_REDIRECT_SIGNALS,
+  )) {
+    sig.add(row.source, row.text, row.points);
+  }
+}
+
+/**
  * Score homoglyph splicing in a message body from the registry, on whichever
  * channel is asking.
  *
@@ -1784,6 +1810,16 @@ export function checkSms(
     /\b(bank|payment|account)\s+details\s+have\s+(been\s+)?(updated|changed|amended)/i.test(text);
   if (changedPaymentDetails && hasBankAsk) {
     sig.add("message", "Payment details presented as recently changed — this is the signature of redirect fraud, where a scammer intercepts a real invoice or tenancy thread and substitutes their own account. Confirm any change by phoning the organisation on a number you already had, never one from the message.", 20);
+  }
+
+  // Property-settlement redirection (#521) — settlement context, a changed
+  // account, and somewhere to pay. Scored from the registry; see
+  // `signals/settlementRedirect` for why it is a new composite rather than a
+  // wider rental-bond gate. Skipped on the email channel and scored by
+  // `checkEmail` instead, for the reason the task-payment gate is: the merge
+  // would discount a weight the signal declared.
+  if (channel !== "email") {
+    addSettlementRedirectSignals(sig, text, PACK, channel);
   }
 
   // Contains a URL.
@@ -2673,8 +2709,9 @@ export function checkEmail(text: string, blocklist?: HostLookup, region?: Region
   // Placed immediately after the merge so the evidence keeps the order a reader
   // saw before the conversion: body rows, then the sender and link analysis.
   //
-  // Ordered as `checkSms` scores them — splice, family, ClickFix, task payment —
-  // so the evidence list reads the same whichever channel the text arrived on.
+  // Ordered as `checkSms` scores them — splice, family, settlement, ClickFix,
+  // task payment — so the evidence list reads the same whichever channel the
+  // text arrived on.
   // The splice rule first is the load-bearing part: it is the row that explains
   // why the keyword rows found nothing.
   //
@@ -2691,6 +2728,7 @@ export function checkEmail(text: string, blocklist?: HostLookup, region?: Region
   // rather than assumed from this list's history.
   addSplicedWordingSignals(sig, text, PACK, "email");
   addFamilyImpersonationSignals(sig, text, PACK, "email");
+  addSettlementRedirectSignals(sig, text, PACK, "email");
   addClickFixSignals(sig, text, PACK, "email");
   addTaskPaymentSignals(sig, text, PACK, "email");
 

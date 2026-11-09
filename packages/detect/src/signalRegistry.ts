@@ -141,6 +141,7 @@ import type { RegionPack } from "./regions";
 import { CLICKFIX_SIGNALS } from "./signals/clickfix";
 import { FAMILY_IMPERSONATION_SIGNALS } from "./signals/familyImpersonation";
 import { PHONE_SIGNALS } from "./signals/phone";
+import { SETTLEMENT_REDIRECT_SIGNALS } from "./signals/settlementRedirect";
 import { SPLICED_WORDING_SIGNALS } from "./signals/splicedWording";
 import { TASK_PAYMENT_SIGNALS } from "./signals/taskPayment";
 
@@ -574,7 +575,9 @@ export function unsatisfiableReads(
  *
  * Converted so far: the phone channel; the ClickFix pair and the spliced-wording
  * rule on the sms, email and custom channels; and the family-impersonation and
- * task-payment gates on sms and email. `scamDetector.ts` still owns the rest.
+ * task-payment gates on sms and email. The settlement-redirect composite (#521)
+ * was written here from the start rather than converted. `scamDetector.ts`
+ * still owns the rest.
  */
 export const SIGNALS: readonly SignalDef[] = [
   ...PHONE_SIGNALS,
@@ -582,6 +585,7 @@ export const SIGNALS: readonly SignalDef[] = [
   ...SPLICED_WORDING_SIGNALS,
   ...FAMILY_IMPERSONATION_SIGNALS,
   ...TASK_PAYMENT_SIGNALS,
+  ...SETTLEMENT_REDIRECT_SIGNALS,
 ];
 
 /**

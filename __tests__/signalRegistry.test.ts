@@ -825,6 +825,11 @@ describe("a declared channel is a channel some entry point actually scores", () 
       viaVariable: ["sms", "email"],
     },
     { idPrefix: "task.", helper: "addTaskPaymentSignals", viaVariable: ["sms", "email"] },
+    {
+      idPrefix: "settlement.",
+      helper: "addSettlementRedirectSignals",
+      viaVariable: ["sms", "email"],
+    },
   ];
 
   // A row per converted signal, or the check does not run on it.
