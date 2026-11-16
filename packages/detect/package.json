@@ -65,7 +65,7 @@
     "postpack": "node scripts/restore-publish.mjs"
   },
   "dependencies": {
-    "libphonenumber-js": "^1.13.15"
+    "libphonenumber-js": "^1.13.16"
   },
   "devDependencies": {
     "tsup": "^9.0.0",
