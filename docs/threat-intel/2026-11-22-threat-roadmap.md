@@ -62,13 +62,18 @@ finally closed.
 | Rank | Proposal | Target | Measured today | Why |
 |---|---|---|---|---|
 | 1 | **BASE-D2 — `.garden` TLD** | `regions/base.ts` | `.garden` is absent from `SUSPICIOUS_TLDS` | Interisle *Phishing Landscape 2026* ranks it 4th by abuse score, directly behind `.xin`, `.win` and `.icu` — all three already listed on the same methodology; benefits every region at once, one-line change |
-| 2 | **IE-D1 — Fixed Charge Notice smishing** | `regions/ie.ts` | A Garda-impersonating "unpaid Fixed Charge Notice" link scores `safe 0` | Closes the long-outstanding **IE D8** watchlist item (unfiled since at least 2026-11-08): multiple 2026 Garda/local-news sources confirm the live script and that genuine FCN correspondence is post-only, never SMS |
+| 2 | **IE-D1 — Fixed Charge Notice smishing** | `regions/ie.ts` | A Garda-impersonating "unpaid Fixed Charge Notice" link scores `safe 0` | Closes the long-outstanding **IE D8** watchlist item (first raised 2026-10-06, unfiled every cycle since): multiple 2026 Garda/local-news sources confirm the live script and that genuine FCN correspondence is post-only, never SMS |
 | 3 | **AU-D1 / AU-D2 — QUFC Exchange & Loxaris** | `regions/au.ts` | Both platform names score `safe` today (8–10) | Two named fraudulent trading platforms added to ASIC's own alert pages in November 2026 — QUFC Exchange impersonates Macquarie Group with AI-generated video; Loxaris is on ASIC's Investor Alert List and IOSCO's I-SCAN network |
 | 4 | **US-D1 — fake traffic-citation/hearing smishing** | `regions/us.ts` | A representative lure scores `safe 0` | FTC consumer alert (Apr 2026) describes a spike in texts impersonating state courts over fake unpaid tickets; corroborated by NHTSA and three state DMVs |
 | 5 | **BASE-D1 — crypto-wallet "mandatory update" phishing** | `scamDetector.ts` (composite) + `regions/base.ts` | No existing `REQUEST_WORDS` entry matches "update your wallet" phrasing | Four independent 2026 campaigns (MetaMask, Trust Wallet, Ledger, Trezor) share one script — deadline, threatened permanent loss of access, "Update Now" link/QR — confirmed by the vendors' own "we never send mandatory update emails" statements |
 
 **Region demand:** not measurable this cycle — see *Region demand signal*,
 below. Same as every prior cycle.
+
+Ranked here are the top 5 of 10 total proposals, by impact × ease. GB-D1,
+GB-D2, FR-D1 and BASE-D3 are real findings too (see the full table under
+*Proposed detection improvements*) but rated lower priority this cycle — not
+omitted by mistake.
 
 ---
 
@@ -214,7 +219,8 @@ genuine FCN correspondence is sent by post only. `ie.ts`'s `AUTHORITY_MENTIONS`
 has `"garda"`/`"gardai"` but no FCN-specific phrase, and `URGENCY_TOLL` has
 only the generic "penalty notice issued." Measured: a plain-text variant
 scores `safe 0` via `checkSms(..., "IE")`. This closes **IE D8**, outstanding
-and unfiled since at least the 2026-11-08 roadmap.
+and unfiled every cycle since it was first raised in the 2026-10-06
+roadmap.
 
 ### Canada (`partial`) — quiet, no new finding
 
@@ -308,14 +314,14 @@ signals already in `base.ts`/`scamDetector.ts` rather than exposing a gap.
 |---|---|---|---|---|---|---|
 | **AU-D1** | QUFC Exchange — Macquarie-impersonation AI-deepfake trading platform (ASIC, Nov 2026) | Add `"qufc exchange"` to `fakeInvestmentPlatforms` | `regions/au.ts` | AU | Near-zero — invented brand, multi-word phrase avoids collision | HIGH |
 | **AU-D2** | Loxaris — unlicensed platform on ASIC's Investor Alert List / IOSCO I-SCAN (18–19 Nov 2026) | Add `"loxaris"` to `fakeInvestmentPlatforms` | `regions/au.ts` | AU | Low — distinctive invented name, no dictionary collision | HIGH |
-| **IE-D1** | Fake "unpaid Fixed Charge Notice" smishing impersonating An Garda Síochána | Add `"fixed charge notice"`, `"fcn"`, `"unpaid fixed charge notice"` to `URGENCY_TOLL`; consider pairing with Garda's `noLinkSenders` entry | `regions/ie.ts` | IE | Low — distinctive Irish legal term, no ordinary-English collision | HIGH |
+| **IE-D1** | Fake "unpaid Fixed Charge Notice" smishing impersonating An Garda Síochána | Add `"fixed charge notice"`, `"fcn"`, `"unpaid fixed charge notice"` to `URGENCY_TOLL`; consider pairing with Garda's `noLinkSenders` entry | `regions/ie.ts` | IE | Low — distinctive Irish legal term; `"fcn"` is matched through `mentions()`, which already applies `\bfcn\b` word-boundary matching to short single-token entries, so it will not fire inside a longer word | HIGH |
 | **US-D1** | Fake traffic-hearing/citation text impersonating state courts, threatening licence suspension | Add qualified phrases `"traffic hearing"`, `"traffic citation"`, `"unpaid traffic ticket"`, `"pay your traffic fine"` to `URGENCY_TOLL` | `regions/us.ts` | US | Medium — bare "traffic violation" is common in legitimate correspondence; qualify on the hearing/citation+payment framing | HIGH |
 | **GB-D1** | "New device registered" / "new payee added… to cancel" account-takeover smishing (NatWest/Halifax/Lloyds impersonation) | Add phrases (`"a new device has been registered"`, `"if this was not done by you"`, `"a new payee has been added"`) | `regions/gb.ts`, pending an interface decision (see *Pack-interface notes*) | GB (single-region evidence this cycle; language itself names no GB-specific term) | Low — "has been registered"/"NOT done by you" phrasing is scam-specific; legitimate bank/Apple/Google notices use "if this was you" | MEDIUM — see note |
 | **GB-D2** | Bare "parking fine" text wave | Add `"parking fine"`, `"outstanding parking fine"` to `URGENCY_TOLL` | `regions/gb.ts` | GB | Medium — qualify with "outstanding"/"pay your" to avoid flagging ordinary council correspondence | MEDIUM |
 | **FR-D1** | ANTAI (traffic-fine agency) impersonation phishing, named in live examples (12 Nov 2026) | Add `"antai"` to `AUTHORITY_MENTIONS` | `regions/fr.ts` | FR | Low — not an ordinary French word/fragment | MEDIUM |
 | **BASE-D1** | Crypto-wallet "mandatory update or lose access" phishing (MetaMask/Trust Wallet/Ledger/Trezor, 2026) | New composite in `scamDetector.ts` (sibling to the crypto-exchange TOAD composite): require a wallet/crypto term **and** an update-urgency phrase (`"mandatory update"`, `"wallet needs an update"`, `"lose access to your wallet"`) **and** a link/QR | `scamDetector.ts` + `regions/base.ts` (new gated phrase list) | All | Low once gated — **high if shipped as a flat word-list entry instead of a composite**, since bare "update your wallet" collides with Apple/Google Pay update prompts | HIGH |
 | **BASE-D2** | `.garden` — 4th-highest abuse score in Interisle *Phishing Landscape 2026*, directly behind three already-listed TLDs | Add `.garden` to `SUSPICIOUS_TLDS` | `regions/base.ts` | All | Very low — same evidentiary bar as `.xin`/`.bond`, no legitimate scam-adjacent consumer use | HIGH |
-| **BASE-D3** | QuickBooks/Intuit subscription-invoice callback scam (Bitdefender $95K loss, Mar 2026; ongoing through Nov 2026) | Add `"quickbooks"` to `CALLBACK_BRANDS` | `regions/base.ts` | All | Low — matches existing norton/mcafee/docusign pattern | MEDIUM |
+| **BASE-D3** | QuickBooks/Intuit subscription-invoice callback scam (Bitdefender $95K loss, Mar 2026; ongoing through Nov 2026) | Add `"quickbooks"` and `"intuit"` to `CALLBACK_BRANDS` — both, since the same script is reported under either brand name | `regions/base.ts` | All | Low — matches existing norton/mcafee/docusign pattern | MEDIUM |
 
 **Note on GB-D1's priority:** the underlying evidence (NatWest's own fraud
 guide, Which?'s reporting) is strong and the measured-before state is a clean
@@ -340,9 +346,12 @@ finding.
   route the phrases through a gated composite the way `familyImpersonation`
   and `settlementRedirect` already work. This file does not resolve which —
   that is an implementation-time design call.
-- **BASE-D1** needs no interface change: it reads the existing
-  `cryptoExchanges` list and plain-text matching, the same shape as the
-  crypto-exchange TOAD composite it sits beside.
+- **BASE-D1** needs no `types.ts` interface change: its "new gated phrase
+  list" is plain `string[]` data in `base.ts` (the same shape as
+  `KEYS_BY_POST_PHRASES` or `SCAM_COACHING_PHRASES`, not a new field on
+  `BaseSignals`/`RegionPack`), and it reads the existing `cryptoExchanges`
+  list for its other half — the same shape as the crypto-exchange TOAD
+  composite it sits beside.
 - No other proposal this cycle needs anything `types.ts` cannot already
   express — AU-D1/AU-D2/BASE-D3 are plain `string[]` additions,
   IE-D1/US-D1/GB-D2/FR-D1 are plain list additions to existing fields
